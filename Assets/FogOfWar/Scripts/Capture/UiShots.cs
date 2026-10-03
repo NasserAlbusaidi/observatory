@@ -95,6 +95,13 @@ namespace FogOfWar
                 yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
                 os?.ShowCodex(0);
                 os?.ShowConsoleTab(0);
+                if (os != null)
+                    foreach (var k in new[] { OpenWorld.JobKind.Intercept, OpenWorld.JobKind.Rescue })
+                    {
+                        bool ok = os.TestTargetJob(k);
+                        log.WriteLine($"    target a {k} job: {(ok ? "yes" : "none posted")}");
+                        if (ok) yield return Shot(app, shell, camRT, uiRT, tag, "06d-target-" + k.ToString().ToLowerInvariant());
+                    }
                 Controls.Tap(Controls.Action.Help);
                 yield return Wait(0.3f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "07-help");
