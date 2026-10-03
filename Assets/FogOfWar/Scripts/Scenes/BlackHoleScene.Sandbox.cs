@@ -524,98 +524,110 @@ namespace FogOfWar
 
         // ------------------------------------------------------------------------------------------ readouts and controls
 
+        // The sandbox readouts keep a fixed set of rows with short values, so the controls below them never move while
+        // the numbers change (QA-040). "—" fills a row that has nothing to show yet.
         void SandboxReadouts(List<Readout> list)
         {
             var s = Specs[throwKind];
             TidalScales(s, out double rt, out double Rm);
             double rh = Kerr.Horizon(A), rmb = Kerr.MarginallyBound(A);
+            const string none = "—";
             if (!s.cloud)
             {
-                string fate = rt < rh ? "swallowed whole" : rt < rmb ? "torn up as it plunges" : rt > periRs * 2 ? "shredded" : "flies past (stretched)";
-                list.Add(new Readout("Tidal radius: " + s.name.ToLowerInvariant(), (rt / 2 < 1e4 ? (rt / 2).ToString("0.00") : Fmt.Num(rt / 2, 3)) + " rs → " + fate,
+                string fate = rt < rh ? "swallowed" : rt < rmb ? "torn, plunges" : rt > periRs * 2 ? "shredded" : "flies past";
+                list.Add(new Readout("Tidal radius: " + s.name.ToLowerInvariant(), (rt / 2 < 1e4 ? (rt / 2).ToString("0.00") : Fmt.Num(rt / 2, 3)) + " rs",
                     rt < rh ? Tone.Cold : rt > periRs * 2 ? Tone.Bad : Tone.Normal));
-                // Hills mass: the heaviest hole that can still shred it outside the marginally bound orbit
+                list.Add(new Readout("Its fate at this pass", fate, rt < rh ? Tone.Cold : rt > periRs * 2 ? Tone.Bad : Tone.Normal));
+                // Hills masses: above the first all the debris is swallowed (r_t < r_mb), above the second the star itself
                 double hills = Math.Pow(s.radius * Phys.c * Phys.c / (rmb * Phys.G), 1.5) / Math.Sqrt(s.mass) / Phys.Msun;
-                list.Add(new Readout("No flare above", Fmt.Num(hills, 3) + " suns (all debris swallowed)"));
                 double intact = Math.Pow(s.radius * Phys.c * Phys.c / (rh * Phys.G), 1.5) / Math.Sqrt(s.mass) / Phys.Msun;
+                list.Add(new Readout("No flare above", Fmt.Num(hills, 3) + " suns"));
                 list.Add(new Readout("Swallowed intact above", Fmt.Num(intact, 3) + " suns"));
                 list.Add(new Readout("Its size", Rm / 2 < 0.01 ? Fmt.Num(Rm / 2 * Lunit * 2 / 1000, 3) + " km" : (Rm / 2).ToString("0.000") + " rs"));
             }
-            if (nParts > 0 || lightCurve.Count > 0)
+            else
             {
-                list.Add(new Readout("Debris coming back", Fmt.Num(fallbackRate / Tunit * Phys.yr / Phys.Msun, 3) + " suns/yr"));
-                list.Add(new Readout("Flare luminosity", Fmt.Num(lum, 3) + " × Eddington", lum > 1 ? Tone.Hot : Tone.Normal));
-                if (lastDE > 0)
-                {
-                    double tmin = 2 * Math.PI * Math.Pow(1 / (2 * lastDE), 1.5);   // return time of the most bound debris
-                    list.Add(new Readout("First debris returns after", Fmt.Duration(tmin * Tunit)));
-                }
-                list.Add(new Readout("Swallowed so far", Fmt.Num(accreted / Phys.Msun, 3) + " suns"));
+                list.Add(new Readout("Tidal radius: gas cloud", "none (no self-gravity)"));
+                list.Add(new Readout("Its fate at this pass", "stretched"));
+                list.Add(new Readout("No flare above", none));
+                list.Add(new Readout("Swallowed intact above", none));
+                list.Add(new Readout("Its size", "3 rs (model)"));
             }
-            if (diskAutoOff && !disk) list.Add(new Readout("Accretion disk", "switched off for the throw (a quiet hole)"));
-            if (!disk && FlareDisk(out float fo, out _, out _)) list.Add(new Readout("Flare disk", "forming out to 2 r_p = " + fo.ToString("0.0") + " rs (model)", Tone.Hot));
-            if (autoWarpFrom >= 0) list.Add(new Readout("Time warp", "raised so the debris returns in ~20 s"));
-            list.Add(new Readout("Sim clock", Fmt.Duration(simT * Tunit) + " (1 s = " + Fmt.Duration(Math.Pow(10, logWarp) * Tunit) + ")"));
-            if (probes.Count > 0) ProbeSummary(list, probes[probes.Count - 1]);
+            bool debris = nParts > 0 || lightCurve.Count > 0;
+            list.Add(new Readout("Debris coming back", debris ? Fmt.Num(fallbackRate / Tunit * Phys.yr / Phys.Msun, 3) + " suns/yr" : none));
+            list.Add(new Readout("Flare luminosity", debris ? Fmt.Num(lum, 3) + " × Eddington" : none, lum > 1 ? Tone.Hot : Tone.Normal));
+            list.Add(new Readout("First debris returns after", lastDE > 0 ? Fmt.Duration(2 * Math.PI * Math.Pow(1 / (2 * lastDE), 1.5) * Tunit) : none));
+            list.Add(new Readout("Swallowed so far", debris ? Fmt.Num(accreted / Phys.Msun, 3) + " suns" : none));
+            string note = none; var tone = Tone.Normal;
+            if (!disk && FlareDisk(out float fo, out _, out _)) { note = "flare disk ≤" + fo.ToString("0") + " rs"; tone = Tone.Hot; }
+            else if (autoWarpFrom >= 0) note = "warp raised";
+            else if (diskAutoOff && !disk) note = "disk off: quiet hole";
+            list.Add(new Readout("Sandbox", note, tone));
+            list.Add(new Readout("Sim clock", Fmt.Duration(simT * Tunit)));
+            list.Add(new Readout("1 s of play is", Fmt.Duration(Math.Pow(10, logWarp) * Tunit)));
+            ProbeSummary(list, probes.Count > 0 ? probes[probes.Count - 1] : null);
         }
 
         void ProbeSummary(List<Readout> list, Probe p)
         {
-            var g = p.g;
-            list.Add(new Readout("Probe", p.name + ": " + p.status));
-            if (p.photon) { list.Add(new Readout("Light: turns so far", ((g.phi) / (2 * Math.PI)).ToString("0.0"))); return; }
-            list.Add(new Readout("Probe distance", (g.r / 2).ToString("0.00") + " rs"));
-            if (p.Shift(out double dphi))
+            const string none = "—";
+            list.Add(new Readout("Probe", p != null ? p.name : none));
+            list.Add(new Readout("Probe status", p != null ? p.status : none));
+            if (p != null && p.photon) list.Add(new Readout("Light: turns so far", (p.g.phi / (2 * Math.PI)).ToString("0.0")));
+            else list.Add(new Readout("Probe distance", p != null ? (p.g.r / 2).ToString("0.00") + " rs" : none));
+            double dphi = 0;
+            bool shift = p != null && !p.photon && p.Shift(out dphi);
+            list.Add(new Readout("Perihelion shift per orbit", shift ? (dphi * 180 / Math.PI).ToString("0.0") + "°" : none, Tone.Hot));
+            string weak = none;
+            if (p != null && p.name == ProbeNames[1])
             {
-                list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
-                if (p.name == ProbeNames[1])
-                {
-                    // weak field for the same ellipse (semi-latus rectum p = 2 rp ra / (rp + ra)): Einstein's 6πM/p, minus the
-                    // prograde Lense–Thirring term 8πa M^{3/2}/p^{3/2}
-                    double pl = 2 * 14.0 * 60 / 74, sa = A;
-                    double weak = 6 * Math.PI / pl - 8 * Math.PI * sa / Math.Pow(pl, 1.5);
-                    list.Add(new Readout(sa > 0.001 ? "Weak field (with Lense–Thirring)" : "Weak-field formula says", (weak * 180 / Math.PI).ToString("0.0") + "°"));
-                }
+                // weak field for the same ellipse (semi-latus rectum p = 2 rp ra / (rp + ra)): Einstein's 6πM/p, minus the
+                // prograde Lense–Thirring term 8πa M^{3/2}/p^{3/2}
+                double pl = 2 * 14.0 * 60 / 74;
+                weak = ((6 * Math.PI / pl - 8 * Math.PI * A / Math.Pow(pl, 1.5)) * 180 / Math.PI).ToString("0.0") + "°";
             }
+            list.Add(new Readout(A > 0.001 ? "Weak field (+ Lense–Thirring)" : "Weak-field formula", weak));
         }
 
         void ProbeReadouts(List<Readout> list)
         {
             var p = riding; var g = p.g;
             double a = A;
-            list.Add(new Readout("Camera", "rides " + p.name.ToLowerInvariant()));
+            const string none = "—";
+            list.Add(new Readout("Camera", "rides the probe"));
+            list.Add(new Readout("Probe", p.name));
             list.Add(new Readout("Probe status", p.status, g.inside ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Distance", (g.r / 2).ToString("0.000") + " rs"));
             double tau = (g.tau - p.tau0) * Tunit, t = (Math.Min(simT, g.t) - p.t0) * Tunit;
-            list.Add(new Readout("Probe's clock", Fmt.Duration(tau) + (g.inside ? " (display speed inside)" : "")));
-            list.Add(new Readout("Camera limits", "≤ 0.99 c, stops at 1.03 r₊, exposure ÷ (γ(1+v))³"));
-            list.Add(new Readout("Far-away clock", g.inside ? "∞ (never sees it cross)" : Fmt.Duration(t)));
+            list.Add(new Readout(g.inside ? "Probe's clock (display speed)" : "Probe's clock", Fmt.Duration(tau)));
+            list.Add(new Readout("Far-away clock", g.inside ? "never sees it cross" : Fmt.Duration(t)));
+            string rate = none, speed = none, beacon = none, tide = none, left = none;
+            Tone rateT = Tone.Normal, beaconT = Tone.Normal, tideT = Tone.Normal;
             if (!g.inside)
             {
                 g.FourVelocity(a, out double ut, out double ur, out double uph);
-                list.Add(new Readout("Probe clock rate", (1 / ut).ToString("0.0000") + "× far away", 1 / ut < 0.5 ? Tone.Hot : Tone.Normal));
+                rate = (1 / ut).ToString("0.0000") + "×"; if (1 / ut < 0.5) rateT = Tone.Hot;
                 g.ZamoVelocity(a, out double vr, out double vph);
-                list.Add(new Readout("Speed past local ZAMOs", Math.Sqrt(vr * vr + vph * vph).ToString("0.000") + " c"));
+                speed = Math.Sqrt(vr * vr + vph * vph).ToString("0.000") + " c";
                 // its beacon, sent straight out, as received far away (b = 0, outgoing)
                 double Pp = g.r * g.r + a * a, Dl = Geo.Delta(g.r, a);
                 double prOut = Math.Sqrt(Math.Max(Pp * Pp - Dl * a * a, 0)) / Dl;
                 double gb = 1 / (ut - prOut * ur);
-                list.Add(new Readout("Its beacon seen far away", gb > 0 ? "×" + gb.ToString("0.000") + " frequency (z = " + Fmt.Num(1 / gb - 1, 3) + ")" : "—", gb < 0.5 ? Tone.Hot : Tone.Normal));
+                if (gb > 0) { beacon = "×" + gb.ToString("0.000") + " frequency"; if (gb < 0.5) beaconT = Tone.Hot; }
                 // radial tidal stretch in the probe's own frame (Marck 1983, spin 0): (2M/r³)(1 + 3L²/2r²) across 2 m
                 double tidal = 4 / (g.r * g.r * g.r) * (1 + 1.5 * g.L * g.L / (g.r * g.r)) * Phys.c * Phys.c / (Lunit * Lunit) / Phys.g;
-                list.Add(new Readout(a > 0.001 ? "Tide across 2 m (spin-0 formula)" : "Tide across a 2 m body", Fmt.Num(tidal) + " g", tidal > 10 ? Tone.Bad : Tone.Normal));
+                tide = Fmt.Num(tidal) + " g"; if (tidal > 10) tideT = Tone.Bad;
             }
-            else if (a < 0.01)
-            {
-                double left = TauToSingularity(g.r, g.E, g.L) * Tunit;
-                list.Add(new Readout("Time left on its clock", g.alive ? Fmt.Duration(left) : "0"));
-                list.Add(new Readout("Inside, r is time", "every path leads to r = 0"));
-            }
-            else list.Add(new Readout("Inside a spinning hole", "the inner horizon is not modelled"));
-            if (p.Shift(out double dphi))
-            {
-                list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
-            }
+            else if (a < 0.01) left = g.alive ? Fmt.Duration(TauToSingularity(g.r, g.E, g.L) * Tunit) : "0 (r = 0)";
+            else left = "inner horizon not modelled";
+            list.Add(new Readout("Probe clock rate", rate, rateT));
+            list.Add(new Readout("Speed past local ZAMOs", speed));
+            list.Add(new Readout("Its beacon seen far away", beacon, beaconT));
+            list.Add(new Readout(a > 0.001 ? "Tide across 2 m (spin-0 formula)" : "Tide across a 2 m body", tide, tideT));
+            list.Add(new Readout("Time left to r = 0", left));
+            list.Add(new Readout("Perihelion shift per orbit", p.Shift(out double dphi) ? (dphi * 180 / Math.PI).ToString("0.0") + "°" : none, Tone.Hot));
+            list.Add(new Readout("Camera limits", "≤ 0.99 c, 1.03 r₊"));
+            list.Add(new Readout("Camera exposure", "÷ (γ(1+v))³"));
         }
 
         // Proper time from r to r = 0 inside a Schwarzschild hole for a geodesic with energy E and angular momentum L:

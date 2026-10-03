@@ -37,7 +37,11 @@ namespace FogOfWar
             mapPlot = new VisualElement { pickingMode = PickingMode.Ignore };
             mapPlot.style.height = 230;
             mapPlot.generateVisualContent += DrawMap;
-            map.Add(mapPlot);
+            // trails and debris beyond the plot's edge are clipped to it (QA-039)
+            var clip = new VisualElement { pickingMode = PickingMode.Ignore };
+            clip.style.overflow = Overflow.Hidden;
+            clip.Add(mapPlot);
+            map.Add(clip);
             var legend = Ui.E(map, "row");
             legend.style.flexWrap = Wrap.Wrap; legend.style.marginTop = 4;
             Key(legend, CIsco, "ISCO"); Key(legend, CPhoton, "photon orbit"); Key(legend, CTidal, "tidal radius"); Key(legend, CMb, "marginally bound");
@@ -49,7 +53,10 @@ namespace FogOfWar
             curvePlot = new VisualElement { pickingMode = PickingMode.Ignore };
             curvePlot.style.height = 92;
             curvePlot.generateVisualContent += DrawCurve;
-            curveBox.Add(curvePlot);
+            var clip2 = new VisualElement { pickingMode = PickingMode.Ignore };
+            clip2.style.overflow = Overflow.Hidden;
+            clip2.Add(curvePlot);
+            curveBox.Add(clip2);
             curveLabel = Ui.L(curveBox, "", "t-label", "f-mono");
         }
 

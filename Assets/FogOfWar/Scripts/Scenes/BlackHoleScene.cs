@@ -126,8 +126,8 @@ namespace FogOfWar
             if (riding != null) { ProbeReadouts(list); return; }
             double dil = CamLapse(r, a);
             double tidal = 2 * Phys.G * M * 2 / (rm * rm * rm) / Phys.g;
-            list.Add(new Readout("Camera", "hovers (zero angular momentum)"));
-            list.Add(new Readout("Your distance", r.ToString("0.00") + " rs = " + Fmt.Num(rm / 1000, 2) + " km"));
+            list.Add(new Readout("Camera", "hovers (ZAMO)"));
+            list.Add(new Readout("Your distance", r.ToString("0.00") + " rs"));
             list.Add(new Readout("Your clock vs far away", dil.ToString("0.0000") + "×", dil < 0.8 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("1 hour for you is", Fmt.Num(1 / System.Math.Max(dil, 1e-9), 3) + " h outside"));
             double hover = HoverAccel(2 * r, a) * Phys.c * Phys.c / Lunit / Phys.g;

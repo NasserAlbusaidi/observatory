@@ -108,6 +108,9 @@ namespace FogOfWar
                 S("bh-kerr-0.998",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "spin", 0.998f))),
                 S("bh-kerr-0.998-nodisk", new Vector3(0, 0.0f, 24f), 30, With(s => { Set(s, "spin", 0.998f); Set(s, "disk", false); })),
                 S("bh-schw-nodisk",      new Vector3(0, 0.0f, 24f), 30, With(s => Set(s, "disk", false))),
+                // QA-034 recheck: the scene's own default camera (Orbit.Set in Build), spin 0.998, clumpy gas on and off
+                S("bh-kerr-0.998-default-cam", new Vector3(0, 2.2f, -24f), 55, With(s => Set(s, "spin", 0.998f))),
+                S("bh-kerr-0.998-default-smooth", new Vector3(0, 2.2f, -24f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "clumpy", false); })),
                 S("bh-kerr-0.998-guides", new Vector3(0, 0.9f, 24f), 42, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-no-doppler",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "doppler", false))),
                 // sandbox
