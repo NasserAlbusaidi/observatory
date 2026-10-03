@@ -136,7 +136,7 @@ namespace FogOfWar
                 Career.Trip(d, career.DriveRating * Ship.G0, 1, ship.Mass + c.Load, out double t, out _, out double fuel);
                 string what = c.Kind == JobKind.Survey ? c.Title
                     : c.Kind == JobKind.Passengers ? $"{c.People} × {c.Title} → {c.To} (max 1 g)" : $"{c.Tonnes:N0} t {c.Title} → {c.To}";
-                GUILayout.Label($"{what}\n{c.Pay:N0} cr   ·   {Days(c.Days)} allowed   ·   {Km(d)}   ·   full burn at {career.DriveRating:0} g: {Dur(t)}, {fuel:N1} t", ui.note);
+                GUILayout.Label($"{what}\n{c.Pay:N0} cr   ·   {Days(c.Days)} allowed   ·   {Km(d)}   ·   full burn at {career.DriveRating:0} g: {Dur(t)} with parking, {fuel:N1} t", ui.note);
                 bool ok = career.CanAccept(c, out string why);
                 if (ui.Buttons(ok ? "Accept" : "Accept (" + why + ")") == 0 && ok) career.Accept(c, jd);
             }
@@ -150,7 +150,7 @@ namespace FogOfWar
             if (ci >= 0) cruiseIdx = ci;
             double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
             Career.Trip(d, ship.AMax, CruiseFracs[cruiseIdx], ship.Mass, out double t, out double dv, out double fuel);
-            GUILayout.Label($"At {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)}, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", fuel > ship.Fuel ? ui.label : ui.note);
+            GUILayout.Label($"At {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", fuel > ship.Fuel ? ui.label : ui.note);
             if (fuel > ship.Fuel) GUILayout.Label("Not enough reaction mass. Coast, lower the g, or refuel.", ui.label);
             foreach (var c in career.Active)
             {

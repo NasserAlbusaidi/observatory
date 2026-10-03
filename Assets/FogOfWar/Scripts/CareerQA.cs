@@ -180,6 +180,26 @@ namespace FogOfWar
             career.FromSave(JsonUtility.FromJson<CareerSave>(json), ship);
             Check(Math.Abs(career.Credits - credits) < 1e-6 && Math.Abs(ship.Fuel - fuel) < 1e-6 && career.Done == done, "save and load keep credits, reaction mass and record");
 
+            // 7. autopilot arrivals with the target behind its planet (the climb-away rule must not stop it parking)
+            career.Sandbox = true;
+            foreach (var (name, from, g) in new[] { ("Phobos", 2e6, 1.0), ("Io", 5e6, 1.0), ("Moon", 1e6, 1.0), ("Titan", 1e7, 3.0), ("Ganymede", 2e5, 1.0), ("Moon", 60000.0, 0.3) })
+            {
+                var t = sys[name];
+                var planet = t.Parent;
+                var pp = sys.Pos(planet, jd);
+                var away = (pp - sys.Pos(t, jd)).Norm; // from the moon through the planet and out the far side
+                ship.Plan = Plan.None; ship.Landed = null; ship.ThrottleCmd = 0; ship.MaxG = g;
+                ship.Pos = pp + away * from; ship.Vel = sys.Vel(planet, jd);
+                Call("SetTarget", t);
+                Put("cruiseIdx", 0);
+                Put("selectedPlan", Plan.Brachistochrone);
+                Call("TogglePlan");
+                yield return null;
+                yield return Fly(() => ship.Phase == "in orbit" || ship.Phase == "holding station" || ship.Landed != null, 5, 60);
+                Check((ship.Phase == "in orbit" || ship.Phase == "holding station") && ship.Landed == null,
+                    $"arrive at {name} from {from:N0} km behind {planet.Name} at {g} g: {ship.Phase}");
+            }
+
             State("end");
             log.WriteLine($"done: {fails} failed checks");
             log.Close();
