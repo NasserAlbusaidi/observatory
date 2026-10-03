@@ -113,6 +113,10 @@ namespace FogOfWar
                 // QA-028: the free camera must actually move the view in the open world
                 Capture.TestFly(new Vector3(0, 0.6f, -6f), 1f, 30f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "10b-photo-moved");
+                log.WriteLine("    after move: " + Capture.RigState);
+                Capture.TestApproach();
+                yield return Shot(app, shell, camRT, uiRT, tag, "10c-photo-hull");
+                log.WriteLine("    after flying at the hull: " + Capture.RigState);
                 Capture.TogglePhoto();
                 app.Activate(1);
                 yield return Wait(1.0f);

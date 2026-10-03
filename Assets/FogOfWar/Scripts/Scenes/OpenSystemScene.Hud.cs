@@ -17,6 +17,9 @@ namespace FogOfWar
 
         // ---- free camera: offsets are km from the pivot (the ship, the target or the Sun)
         public override bool RigInScene => true;
+        // km: clear of the 52 m hull around the ship, or just above the surface of the target or the Sun
+        public override float RigMinDistance => pivot == Pivot.Ship ? 0.045f
+            : pivot == Pivot.Target && ship.Target != null ? (float)(ship.Target.Radius * 1.02) : (float)(sys.Sun.Radius * 1.05);
         public override void RigBegin(CamRig rig)
         {
             rig.Offset = Frame.U(camW - PivotW());

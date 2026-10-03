@@ -67,11 +67,25 @@ namespace FogOfWar
             if (Shell != null) { Shell.HideHud = false; photoRoot?.RemoveFromHierarchy(); photoRoot = null; }
         }
 
+        // QA-032: never inside the ship or a body
+        public void TestApproach() { if (!Photo) return; rig.Offset *= 0.001f; KeepClear(); } // straight at the anchor
+        public float RigDistance => rig != null ? rig.Offset.magnitude : -1;
+        public float RollShown => rollSlider != null ? rollSlider.Value : float.NaN;
+
+        void KeepClear()
+        {
+            float min = app.Current.RigMinDistance;
+            if (min > 0 && rig.Offset.magnitude < min)
+                rig.Offset = (rig.Offset.sqrMagnitude > 1e-12f ? rig.Offset.normalized : Quaternion.Euler(rig.Pitch, rig.Yaw, 0) * Vector3.back) * min;
+        }
+
         public void TestFly(Vector3 local, float seconds, float roll)
         {
             if (!Photo) return;
             rig.Move(local, seconds);
+            KeepClear();
             rig.Roll = Mathf.Clamp(rig.Roll + roll, -90, 90); rig.ToRotation();
+            rollSlider?.SetValueWithoutNotify(rig.Roll);
         }
 
         void PhotoUpdate()
@@ -89,7 +103,7 @@ namespace FogOfWar
             if (Input.GetKey(KeyCode.R) || Input.GetKey(KeyCode.Space)) mv.y += 1;
             if (Input.GetKey(KeyCode.F) || Input.GetKey(KeyCode.C)) mv.y -= 1;
             float boost = Input.GetKey(KeyCode.LeftShift) ? 4f : Input.GetKey(KeyCode.LeftControl) ? 0.2f : 1f;
-            if (mv != Vector3.zero) rig.Move(mv * boost, dt);
+            if (mv != Vector3.zero) { rig.Move(mv * boost, dt); KeepClear(); }
             float roll = (Input.GetKey(KeyCode.Q) ? 1 : 0) - (Input.GetKey(KeyCode.E) ? 1 : 0);
             if (roll != 0) { rig.Roll = Mathf.Clamp(rig.Roll + roll * 30 * dt, -90, 90); rig.ToRotation(); rollSlider?.SetValueWithoutNotify(rig.Roll); }
         }
@@ -226,7 +240,7 @@ namespace FogOfWar
             var head = Ui.E(wrap, "row");
             Ui.L(head, label.ToUpperInvariant(), "t-label", "f-condm");
             var val = Ui.L(head, fmt(v), "t-val", "f-mono");
-            var s = new FowSlider(min, max, v, x => { val.text = fmt(x); set(x); });
+            var s = new FowSlider(min, max, v, set) { Display = x => val.text = fmt(x) };
             wrap.Add(s);
             return s;
         }

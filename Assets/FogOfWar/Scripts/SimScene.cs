@@ -73,5 +73,7 @@ namespace FogOfWar
         public virtual void RigApply(CamRig rig) => Cam.transform.SetPositionAndRotation(Orbit.target + rig.Offset, rig.Rotation);
         // world position (in the rig's units, relative to the anchor) of the thing the camera is looking at, for orbit shots
         public virtual Vector3 RigFocus => Vector3.zero;
+        // how close the free camera may come to the anchor (0: no limit)
+        public virtual float RigMinDistance => 0;
     }
 }
