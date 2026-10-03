@@ -72,6 +72,7 @@ namespace FogOfWar
             gameStarted = false;
             Tour.StartIfRequested(this);
             QA.StartIfRequested(this);
+            CareerQA.StartIfRequested(this);
         }
 
         // Switch scene (closes any menu). The open world is the game; the rest are Observatory scenes.
