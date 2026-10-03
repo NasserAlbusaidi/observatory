@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/FogOfWar/FogOfWar.unity
+    guid: 95a944ac25412a04c92c8246097f4789
   m_configObjects: {}

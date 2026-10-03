@@ -1,0 +1,9 @@
+{
+  "minKm": -8.2,
+  "maxKm": 21.2,
+  "encoding": "km = minKm + grey * (maxKm - minKm), grey 0..1, approximate",
+  "highestPixel": {
+    "latDeg": -10.26,
+    "lonDeg": -121.14
+  }
+}
