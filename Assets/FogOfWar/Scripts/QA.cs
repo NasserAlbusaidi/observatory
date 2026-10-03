@@ -79,6 +79,10 @@ namespace FogOfWar
         }
 
         static OpenWorld.D3 flipFrom;
+        static int fpsFrame; static float fpsTime;
+        static void FpsMark() { fpsFrame = Time.frameCount; fpsTime = Time.realtimeSinceStartup; }
+        static void FpsReport(string what) =>
+            Debug.LogWarning($"QA fps {what}: {(Time.frameCount - fpsFrame) / Mathf.Max(Time.realtimeSinceStartup - fpsTime, 1e-3f):F1} fps average at {Screen.width}x{Screen.height}, ended {DateTime.UtcNow:HH:mm:ss}Z");
 
         // QA-019 regression: park in a circular standoff orbit around a planet, then plan a brachistochrone to a far
         // target at maximum time compression.
@@ -198,7 +202,12 @@ namespace FogOfWar
                 ("cockpit-look-left", s => { Set(s, "lookPitch", 5f); Set(s, "lookYaw", -75f); }, 1f),
                 ("cockpit-look-back", s => { Set(s, "lookPitch", 15f); Set(s, "lookYaw", 150f); }, 1f),
                 ("cockpit-wide", s => { Set(s, "lookPitch", 0f); Set(s, "lookYaw", 0f); Camera.main.fieldOfView = 90; }, 1f),
-                ("cam-chase", s => { Camera.main.fieldOfView = 55; Controls.Tap(Controls.Action.CameraMode); }, 1.5f),
+                // frame rate, cockpit vs chase, from the same spot: frames over 8 s each
+                ("fps-cockpit", s => { Camera.main.fieldOfView = 55; FpsMark(); }, 8f),
+                ("fps-cockpit-done", s => FpsReport("cockpit"), 0.1f),
+                ("cam-chase", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
+                ("fps-chase", s => FpsMark(), 8f),
+                ("fps-chase-done", s => FpsReport("chase"), 0.1f),
                 ("match-velocity-moon", s => { View(s, "Moon", 4); Set(s, "selectedPlan", OpenWorld.Plan.MatchVelocity); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 2); Invoke(s, "SetPivot", PivotShip(s), 0.16); }, 10f),
                 ("hold-station", s => { Invoke(s, "TogglePlan"); Set(s, "selectedPlan", OpenWorld.Plan.HoldStation); Invoke(s, "TogglePlan"); }, 6f),
                 ("plot-moon-100k", s => { Invoke(s, "TogglePlan"); View(s, "Moon", 4); Set(s, "selectedPlan", OpenWorld.Plan.Brachistochrone); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 5); Invoke(s, "SetPivot", PivotShip(s), 0.16); }, 12f),
