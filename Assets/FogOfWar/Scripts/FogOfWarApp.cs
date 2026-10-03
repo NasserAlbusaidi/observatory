@@ -40,6 +40,7 @@ namespace FogOfWar
         float uiScale = 1;
         float simTime;
         Controls.Action? rebinding; int rebindSlot;
+        string rebindNote;
 
         void Awake()
         {
@@ -140,7 +141,7 @@ namespace FogOfWar
 
             if (rebinding != null && e.type == EventType.KeyDown && e.keyCode != KeyCode.None)
             {
-                if (e.keyCode != KeyCode.Escape) Controls.Set(rebinding.Value, rebindSlot, e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace ? KeyCode.None : e.keyCode);
+                if (e.keyCode != KeyCode.Escape) rebindNote = Controls.Set(rebinding.Value, rebindSlot, e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace ? KeyCode.None : e.keyCode);
                 rebinding = null; e.Use();
             }
             if (e.type == EventType.KeyDown) HandleKey(e);
@@ -195,7 +196,7 @@ namespace FogOfWar
 
         void DrawMenu(float W, float H)
         {
-            float w = Mathf.Min(560, W - 32), h = Mathf.Min(H - 64, menu == Screen.Main ? 560 : H - 64);
+            float w = Mathf.Min(560, W - 32), h = Mathf.Min(H - 64, menu == Screen.Main ? 560 : menu == Screen.Observatory ? 760 : 940);
             menuRect = new Rect((W - w) / 2, (H - h) / 2, w, h);
             GUILayout.BeginArea(menuRect, ui.panel);
             ui.AvailWidth = w - 40;
@@ -247,7 +248,8 @@ namespace FogOfWar
 
         void ControlsMenu()
         {
-            GUILayout.Label("Click a key slot, then press the new key. Esc cancels; Delete clears the slot.", ui.body);
+            GUILayout.Label("Click a key slot, then press the new key. Esc cancels; Delete clears the slot. A key already in use swaps places.", ui.body);
+            if (!string.IsNullOrEmpty(rebindNote)) GUILayout.Label(rebindNote, ui.note);
             foreach (var a in Controls.All)
             {
                 GUILayout.BeginHorizontal();

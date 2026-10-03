@@ -11,6 +11,7 @@ namespace FogOfWar
     public partial class OpenSystemScene
     {
         static readonly string[] HoldNames = { "Off", "Prograde", "Retrograde", "Normal", "Anti-normal", "Radial out", "Radial in", "Target", "Anti-target", "Flip" };
+        static readonly string[] PlanShort = { "", "Brachistochrone", "Match velocity", "Hold station" };
         static readonly string[] PlanNames = { "", "Brachistochrone (fast)", "Match velocity", "Hold station" };
 
         // ---------------------------------------------------------------- pilot input (polled every frame)
@@ -275,7 +276,8 @@ namespace FogOfWar
             if (rAu > 1.7 && rAu < 5.6 && beltView.NearestIndex >= 0)
                 list.Add(new Readout("Nearest belt rock (1 % sample)", Km(beltView.NearestKm) + ", " + Fmt.Num(belt.RadiusKm[beltView.NearestIndex] * 2, 1) + " km wide"));
             if (faintRings) list.Add(new Readout("Faint rings", "brightened ×1000 (not real)", Tone.Bad));
-            list.Add(new Readout("Nav computer", ship.PlanActive ? PlanNames[(int)ship.Plan] + ": " + ship.Phase : ship.Landed != null ? ship.Phase : "idle", ship.PlanActive ? Tone.Hot : Tone.Normal));
+            list.Add(new Readout("Nav computer", ship.PlanActive ? ship.Phase : ship.Landed != null ? ship.Phase : "idle", ship.PlanActive ? Tone.Hot : Tone.Normal));
+            if (ship.PlanActive) list.Add(new Readout("Plan", PlanShort[(int)ship.Plan]));
         }
 
         static string Km(double km) => km > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : km >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";

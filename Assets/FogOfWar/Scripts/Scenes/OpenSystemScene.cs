@@ -543,10 +543,11 @@ namespace FogOfWar
             plume.gameObject.SetActive(thr > 0.01f);
             if (thr > 0.01f)
             {
-                float L = shipLen * (0.6f + 1.4f * Mathf.Sqrt(thr * (float)ship.MaxG / 3f));
+                float L = shipLen * Mathf.Min(0.5f + 0.9f * Mathf.Sqrt(thr * (float)ship.MaxG / 3f), 1.6f);
                 plume.localScale = new Vector3(shipLen * 0.06f, shipLen * 0.06f, L);
                 plume.localPosition = new Vector3(0, 0, -shipLen * 0.5f - L * 0.9f);
-                plumeMat.SetColor("_Color", new Color(0.55f, 0.75f, 1f, 0.35f + 0.5f * thr));
+                float behind = Mathf.Clamp01(Vector3.Dot((shipT.position - Cam.transform.position).normalized, shipT.forward));
+                plumeMat.SetColor("_Color", new Color(0.55f, 0.75f, 1f, (0.2f + 0.3f * thr) * Mathf.Lerp(1f, 0.25f, behind)));
             }
 
             PlaceRings(sunW);

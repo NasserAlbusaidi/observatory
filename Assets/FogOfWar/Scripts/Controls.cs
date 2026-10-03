@@ -55,13 +55,23 @@ namespace FogOfWar
         public static IEnumerable<Action> All => (Action[])Enum.GetValues(typeof(Action));
         public static KeyCode Get(Action a, int slot) => bind[a][slot];
 
-        public static void Set(Action a, int slot, KeyCode k)
+        // Assign a key. A key drives one action only: if another action had it, that action gets this slot's old key
+        // (a swap). Returns a note for the player, or null.
+        public static string Set(Action a, int slot, KeyCode k)
         {
-            // a key drives one action only: clear it elsewhere
+            string note = null;
+            var old = bind[a][slot];
             if (k != KeyCode.None)
-                foreach (var kv in bind) for (int i = 0; i < 2; i++) if (kv.Value[i] == k) kv.Value[i] = KeyCode.None;
+                foreach (var kv in bind)
+                    for (int i = 0; i < 2; i++)
+                        if (kv.Value[i] == k && !(kv.Key == a && i == slot))
+                        {
+                            kv.Value[i] = old;
+                            note = old == KeyCode.None ? $"{k} moved from \"{Label[kv.Key]}\" (now unbound there)" : $"Swapped: \"{Label[kv.Key]}\" now uses {old}";
+                        }
             bind[a][slot] = k;
             Save();
+            return note;
         }
 
         public static void ResetDefaults() { foreach (var kv in Defaults) bind[kv.Key] = new[] { kv.Value.Item1, kv.Value.Item2 }; Save(); }

@@ -17,7 +17,7 @@ namespace FogOfWar.OpenWorld
     {
         public const double G0 = 9.80665e-3;    // km/s^2
         public const double RcsAccel = 0.1 * G0; // RCS translation, all axes
-        public const float AngAccel = 0.35f;     // rad/s^2
+        public const float AngAccel = 1.5f;      // rad/s^2 (RCS torque)
         public const float MaxRate = 0.6f;       // rad/s
 
         public D3 Pos, Vel;
@@ -174,6 +174,7 @@ namespace FogOfWar.OpenWorld
                 var fwd = Att * Vector3.forward;
                 var to = Frame.U(want.Value).normalized;
                 var axis = Vector3.Cross(fwd, to);
+                if (axis.sqrMagnitude < 1e-8f && Vector3.Dot(fwd, to) < 0) axis = Att * Vector3.up * 1e-3f;
                 float angle = Mathf.Atan2(axis.magnitude, Vector3.Dot(fwd, to));
                 // rate that stops exactly on target under constant deceleration, as body-frame angular velocity
                 var wantW = axis.sqrMagnitude > 1e-12f ? axis.normalized * Mathf.Min(MaxRate, Mathf.Sqrt(2 * AngAccel * angle) * 0.9f) : Vector3.zero;
@@ -253,7 +254,16 @@ namespace FogOfWar.OpenWorld
             if (hover) vDes = (-r).Norm * (-(dist - standoff) * 0.002);
             var err = vDes - vrel;
             var cmd = orbiting && !hover ? err / tau : err / tau - gRel; // in orbit, gravity is what keeps us there
-            if (orbiting && !hover && (err.Mag < 0.003 || (parked && err.Mag < 0.05))) { parked = true; Phase = "in orbit"; return null; }
+            if (orbiting && !hover)
+            {
+                // Parked when the orbit has the right shape: speed near circular, little radial motion, radius near the
+                // standoff. Judging by shape (with looser limits to leave) rather than by the controller error stops
+                // a ship in a fine, slightly eccentric orbit from trimming forever.
+                double vc = Math.Sqrt(T.GM / dist), vr = D3.Dot(vrel, (-r).Norm);
+                double tol = parked ? 2 : 1;
+                if (Math.Abs(vrel.Mag - vc) < 0.03 * vc * tol && Math.Abs(vr) < 0.03 * vc * tol && Math.Abs(dist - standoff) < 0.15 * standoff * tol)
+                { parked = true; Phase = "in orbit"; return null; }
+            }
             parked = false;
             Phase = hover ? "holding station" : orbiting ? "circularising" : D3.Dot(cmd, r) >= 0 ? "accelerating" : "flipped, braking";
             return cmd;
