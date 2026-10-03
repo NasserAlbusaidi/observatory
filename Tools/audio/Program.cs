@@ -27,8 +27,9 @@ static class Program
         Run(dir, "04-drive-3g", 10, ShipSynth.Machinery, (s, t) => { s.Throttle = 1; s.ThrustG = 3; });
         Run(dir, "05-rcs", 12, ShipSynth.Machinery, (s, t) =>
         {
-            s.RcsOn = (t > 1 && t < 1.4) || (t > 3 && t < 5.5) || (t > 7 && t < 7.1) || (t > 8 && t < 8.1) || (t > 9 && t < 9.15);
+            s.Rcs = ((t > 1 && t < 1.4) || (t > 3 && t < 5.5) || (t > 7 && t < 7.1) || (t > 8 && t < 8.1) || (t > 9 && t < 9.15)) ? 1 : 0;
         });
+        Run(dir, "05b-rcs-autopilot-trim", 12, ShipSynth.Machinery, (s, t) => { s.Rcs = 0.06f; });
         Run(dir, "06-wheels-slew", 16, ShipSynth.Machinery, (s, t) => { s.AngRate = t > 3 && t < 9 ? 0.6f : 0; });
         Run(dir, "07-creaks-under-g", 30, ShipSynth.Cabin, (s, t) =>
         {
@@ -50,11 +51,11 @@ static class Program
         {
             s.Interior = 0; s.CinematicOn = 1;
             float thr = t > 2 && t < 9 ? 1 : 0; s.Throttle = thr; s.ThrustG = thr * 3;
-            s.RcsOn = t > 10 && t < 11.5f;
+            s.Rcs = (t > 10 && t < 11.5f) ? 1 : 0;
         }, null, interior: false);
         Run(dir, "14-exterior-default-silent", 8, -1, (s, t) =>
         {
-            s.Interior = 0; s.CinematicOn = 0; s.Throttle = 1; s.ThrustG = 3; s.RcsOn = t > 4 && t < 5;
+            s.Interior = 0; s.CinematicOn = 0; s.Throttle = 1; s.ThrustG = 3; s.Rcs = (t > 4 && t < 5) ? 1 : 0;
         }, null, interior: false);
 
         // ---- every one-shot alone, for peak levels
@@ -65,7 +66,7 @@ static class Program
         Run(dir, "20-cockpit-flight", 60, -1, (s, t) =>
         {
             s.AngRate = t > 4 && t < 9 ? 0.5f : 0.05f;
-            s.RcsOn = (t > 4 && t < 4.6) || (t > 8.4 && t < 9) || (t > 47 && t < 48.5);
+            s.Rcs = ((t > 4 && t < 4.6) || (t > 8.4 && t < 9) || (t > 47 && t < 48.5)) ? 1 : 0;
             float thr = t < 11 ? 0 : t < 20 ? 0.333f : t < 34 ? 1f : 0;
             s.Throttle = thr; s.ThrustG = thr * 3;
             s.Thermal = t > 36 ? MathF.Exp(-(t - 36) / 10f) : 0;

@@ -47,6 +47,7 @@ namespace FogOfWar.OpenWorld
         public Body Landed;
         bool parked;
         public bool RcsActive;  // RCS fired this step (pilot or autopilot trim)
+        public float RcsLevel;  // the same, as a fraction of full RCS thrust (ship sound)
         // Bodies the ship could reach this frame (collision checks) and bodies big enough to steer around; the scene
         // refreshes both, so a step doesn't evaluate hundreds of moons.
         public readonly List<Body> Near = new List<Body>();
@@ -106,6 +107,7 @@ namespace FogOfWar.OpenWorld
 
             var rcs = RcsInput.sqrMagnitude > 0 && !Dry ? Frame.FromU(Att * Vector3.ClampMagnitude(RcsInput, 1)) * RcsAccel : autoRcs;
             RcsActive = rcs.Sqr > 0;
+            RcsLevel = (float)Math.Min(1, Math.Sqrt(rcs.Sqr) / RcsAccel);
             if (Landed != null)
             {
                 var up = (Pos - sys.Pos(Landed, jd)).Norm;

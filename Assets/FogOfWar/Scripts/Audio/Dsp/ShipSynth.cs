@@ -22,7 +22,7 @@ namespace FogOfWar.Audio
         // ---- parameters, written by the game thread (single float writes are atomic)
         public float Throttle;        // applied fraction of the drive rating, 0..1
         public float ThrustG;         // applied acceleration, g
-        public bool RcsOn;            // any RCS jet firing this frame
+        public float Rcs;             // RCS use, 0..1 of full authority (pilot translation is 1; autopilot trims are small)
         public float AngRate;         // body rotation rate, rad/s
         public float Thermal;         // 0..1 thermal stress (just crossed into or out of sunlight)
         public float PingRate;        // micrometeoroid hits per second
@@ -254,15 +254,22 @@ namespace FogOfWar.Audio
 
         void Schedule(float dt)
         {
-            // RCS: pulse-width-modulated jets, each pulse a valve opening and a thump
-            if (RcsOn)
+            // RCS: jets fire in pulses (minimum impulse bits). The pulse rate follows the thrust asked for: steady
+            // translation pulses every 50–130 ms; a small autopilot trim fires a pulse now and then.
+            bool rcsOn = Rcs > 0.01f;
+            if (rcsOn)
             {
                 if (!rcsWas) rcsTimer = 0;
                 rcsTimer -= dt;
-                if (rcsTimer <= 0) { Spawn(ShipSound.RcsPulse, rng.Range(0.75f, 1f)); rcsTimer = rng.Range(0.05f, 0.13f); }
+                if (rcsTimer <= 0)
+                {
+                    Spawn(ShipSound.RcsPulse, rng.Range(0.75f, 1f));
+                    float duty = MathF.Min(Rcs, 1f);
+                    rcsTimer = rng.Range(0.05f, 0.13f) / duty;
+                }
             }
-            else if (rcsWas) Spawn(ShipSound.RcsClose, 1);
-            rcsWas = RcsOn;
+            else if (rcsWas && rcsTimer < 0.2f) Spawn(ShipSound.RcsClose, 1);
+            rcsWas = rcsOn;
 
             // hull creaks: a slow background rate, more under g, many more just after the load changes, and ticks
             // while the hull is changing temperature

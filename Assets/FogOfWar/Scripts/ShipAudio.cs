@@ -29,13 +29,13 @@ namespace FogOfWar
             src.Play();
         }
 
-        // throttle 0..1 of the rating; g the applied acceleration; angRate the rotation rate in rad/s;
-        // thermal 0..1 hull temperature change; pingRate dust hits per second
-        public void Update(double throttle, double g, bool rcsOn, float angRate, float thermal, float pingRate)
+        // throttle 0..1 of the rating; g the applied acceleration; rcs 0..1 of full RCS thrust (translation and
+        // attitude jets); angRate the rotation rate in rad/s; thermal 0..1 hull temperature change; pingRate dust hits/s
+        public void Update(double throttle, double g, float rcs, float angRate, float thermal, float pingRate)
         {
             synth.Throttle = (float)throttle;
             synth.ThrustG = (float)g;
-            synth.RcsOn = rcsOn;
+            synth.Rcs = rcs;
             synth.AngRate = angRate;
             synth.Thermal = thermal;
             synth.PingRate = pingRate;

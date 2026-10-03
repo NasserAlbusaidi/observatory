@@ -93,7 +93,7 @@ namespace FogOfWar
             Note("RCS: forward translation, then short taps");
             Controls.Hold(Controls.Action.RcsForward, true);
             yield return new WaitForSecondsRealtime(1.5f);
-            Check(sy.RcsOn, "RCS firing reaches the synth");
+            Check(sy.Rcs > 0.9f, $"RCS firing reaches the synth ({sy.Rcs:F2})");
             Controls.Hold(Controls.Action.RcsForward, false);
             for (int i = 0; i < 3; i++)
             {
@@ -114,6 +114,13 @@ namespace FogOfWar
             Note("low reaction mass: master caution");
             ship.Fuel = s.Career.TankCapacity * 0.1;
             yield return new WaitForSecondsRealtime(3f);
+
+            Note("high warp in Earth's shadow cycle: thermal ticks stay small");
+            Put("warpIdx", 3);
+            float tMax = 0;
+            for (float tw = 0; tw < 6; tw += Time.unscaledDeltaTime) { tMax = Mathf.Max(tMax, sy.Thermal); yield return null; }
+            Put("warpIdx", 0);
+            Check(tMax <= 0.1f, $"thermal kick at 1000x warp stays at or below 0.1 ({tMax:F2})");
 
             Note("chase view with the drive lit: silent hull, then cinematic sound");
             Controls.Tap(Controls.Action.ThrottleFull);

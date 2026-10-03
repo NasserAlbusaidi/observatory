@@ -34,11 +34,12 @@ namespace FogOfWar
         ShipAudio sound;
         // the Sound switch in Settings → Audio (and the classic panel) share one saved setting
         static bool muted { get => !GameSettings.ShipSound; set => GameSettings.ShipSound = !value; }
-        float heardNote, thermal;
-        bool wasLanded, wasShadow, fuelLow, fuelDry;
+        float heardNote, thermal, lastRate;
+        bool soundStarted, wasLanded, wasShadow, fuelLow, fuelDry;
         Port wasDocked;
+        Quaternion lastAtt;
 
-        void TickSound()
+        void TickSound(double achievedDt)
         {
             if (sound == null) return;
             sound.Muted = muted || App.MenuOpen || (GameSettings.MuteInBackground && !Application.isFocused);
@@ -47,13 +48,22 @@ namespace FogOfWar
             sound.Interior = pivot == Pivot.Ship && camMode == CamMode.Cockpit && App.Rig == null;
             sound.Cinematic = GameSettings.CinematicSound;
 
-            // crossing into or out of a planet's shadow: the hull cools or warms, and its joints tick and creak
+            // crossing into or out of a planet's shadow: the hull cools or warms, and its joints tick and creak. Under
+            // time warp a low orbit flips day and night faster than the hull's temperature can follow, so the kick
+            // shrinks with warp.
             bool shadow = InShadow();
-            if (shadow != wasShadow) thermal = 1;
+            if (!soundStarted) { wasShadow = shadow; lastAtt = ship.Att; soundStarted = true; }
+            if (shadow != wasShadow) thermal = Mathf.Max(thermal, (float)Math.Min(1, 60 / Warps[warpIdx]));
             wasShadow = shadow;
             thermal *= Mathf.Exp(-Time.unscaledDeltaTime / 25f);
 
-            sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, ship.RcsActive, ship.AngVel.magnitude, thermal, DustHitRate());
+            // turning: measured from the attitude itself, because holds turn the nose without a body rate. Attitude
+            // jets fire while the turn rate changes (starting or stopping a turn).
+            float rate = achievedDt > 1e-6 ? Quaternion.Angle(lastAtt, ship.Att) * Mathf.Deg2Rad / (float)achievedDt : lastRate;
+            float attJets = achievedDt > 1e-6 ? Mathf.Clamp01(Mathf.Abs(rate - lastRate) / (float)achievedDt / Ship.AngAccel) : 0;
+            lastAtt = ship.Att; lastRate = rate;
+
+            sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, Mathf.Max(ship.RcsLevel, attJets), Mathf.Min(rate, 1f), thermal, DustHitRate());
 
             bool landed = ship.Landed != null && ship.Phase.StartsWith("landed");
             if (landed && !wasLanded) sound.Touchdown(1);
@@ -109,7 +119,7 @@ namespace FogOfWar
             planWasActive = ship.PlanActive;
             planTarget = ship.Target;
             career.Tick(sys, ship, jd, simDt);
-            TickSound();
+            TickSound(achievedDt: simDt);
             TickTutorial();
         }
 
