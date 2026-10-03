@@ -34,15 +34,76 @@ namespace FogOfWar
         ShipAudio sound;
         // the Sound switch in Settings → Audio (and the classic panel) share one saved setting
         static bool muted { get => !GameSettings.ShipSound; set => GameSettings.ShipSound = !value; }
-        float heardNote;
+        float heardNote, thermal, lastRate;
+        bool soundStarted, wasLanded, wasShadow, fuelLow, fuelDry;
+        Port wasDocked;
+        Quaternion lastAtt;
 
-        void TickSound()
+        void TickSound(double achievedDt)
         {
             if (sound == null) return;
             sound.Muted = muted || App.MenuOpen || (GameSettings.MuteInBackground && !Application.isFocused);
             sound.Hull = GameSettings.Effects; sound.Ambient = GameSettings.Music; sound.Console = GameSettings.Chimes;
-            sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, ship.RcsActive, Time.unscaledDeltaTime);
+            // the listener is inside the hull only in the cockpit view; photo mode and cinematics are outside cameras
+            sound.Interior = pivot == Pivot.Ship && camMode == CamMode.Cockpit && App.Rig == null;
+            sound.Cinematic = GameSettings.CinematicSound;
+
+            // crossing into or out of a planet's shadow: the hull cools or warms, and its joints tick and creak. Under
+            // time warp a low orbit flips day and night faster than the hull's temperature can follow, so the kick
+            // shrinks with warp.
+            bool shadow = InShadow();
+            if (!soundStarted) { wasShadow = shadow; lastAtt = ship.Att; soundStarted = true; }
+            if (shadow != wasShadow) thermal = Mathf.Max(thermal, (float)Math.Min(1, 60 / Warps[warpIdx]));
+            wasShadow = shadow;
+            thermal *= Mathf.Exp(-Time.unscaledDeltaTime / 25f);
+
+            // turning: measured from the attitude itself, because holds turn the nose without a body rate. Attitude
+            // jets fire while the turn rate changes (starting or stopping a turn).
+            float rate = achievedDt > 1e-6 ? Quaternion.Angle(lastAtt, ship.Att) * Mathf.Deg2Rad / (float)achievedDt : lastRate;
+            float attJets = achievedDt > 1e-6 ? Mathf.Clamp01(Mathf.Abs(rate - lastRate) / (float)achievedDt / Ship.AngAccel) : 0;
+            lastAtt = ship.Att; lastRate = rate;
+
+            sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, Mathf.Max(ship.RcsLevel, attJets), Mathf.Min(rate, 1f), thermal, DustHitRate());
+
+            bool landed = ship.Landed != null && ship.Phase.StartsWith("landed");
+            if (landed && !wasLanded) sound.Touchdown(1);
+            wasLanded = landed;
+            if (career.Docked != wasDocked)
+            {
+                if (career.Docked != null && wasDocked == null) sound.Dock();
+                else if (career.Docked == null && wasDocked != null) sound.Undock();
+                wasDocked = career.Docked;
+            }
+            if (!career.Sandbox)
+            {
+                bool low = ship.Fuel < career.TankCapacity * 0.15, dry = ship.Fuel < 1;
+                if (low && !fuelLow && !dry) sound.Caution();
+                if (dry && !fuelDry) sound.Warning();
+                fuelLow = low; fuelDry = dry;
+            }
             foreach (var n in career.Notes) if (n.Time > heardNote) { heardNote = n.Time; sound.Notice(n.Good); }
+        }
+
+        // in the dominant body's shadow (a cylinder; the penumbra is ignored)
+        bool InShadow()
+        {
+            if (reference == null || reference == sys.Sun || ship.Landed != null) return false;
+            var c = sys.Pos(reference, jd);
+            var u = (c - sys.Pos(sys.Sun, jd)).Norm;
+            var rel = ship.Pos - c;
+            double along = D3.Dot(rel, u);
+            return along > 0 && (rel - u * along).Mag < reference.Radius;
+        }
+
+        // Dust grains big enough to hear on the hull: rare. More in the main belt, and more the faster the ship moves
+        // through the local dust (taken as moving with the dominant body). The rate is a game choice, not a flux model.
+        float DustHitRate()
+        {
+            if (ship.Landed != null || career.Docked != null) return 0;
+            double rAu = (ship.Pos - sys.Pos(sys.Sun, jd)).Mag / Frame.AU;
+            double v = reference != null ? (ship.Vel - sys.Vel(reference, jd)).Mag : 20;
+            double belt = rAu > 2.1 && rAu < 3.3 ? 5 : 1;
+            return (float)(belt * Math.Clamp(v / 20, 0.3, 3) / 240);
         }
 
         void TickCareer(double simDt)
@@ -58,7 +119,7 @@ namespace FogOfWar
             planWasActive = ship.PlanActive;
             planTarget = ship.Target;
             career.Tick(sys, ship, jd, simDt);
-            TickSound();
+            TickSound(achievedDt: simDt);
             TickTutorial();
         }
 
@@ -77,8 +138,10 @@ namespace FogOfWar
         void CareerPanel(PanelUI ui)
         {
             ui.Section("Ship's business");
-            bool on = ui.Toggle("Sound (the drive and RCS as heard through the hull)", !muted);
+            bool on = ui.Toggle("Sound (in the cockpit view: the ship as heard through its hull)", !muted);
             if (on == muted) muted = !on;
+            bool cine = ui.Toggle("Cinematic sound in outside views (not physical)", GameSettings.CinematicSound);
+            if (cine != GameSettings.CinematicSound) GameSettings.CinematicSound = cine;
             if (career.Sandbox)
             {
                 GUILayout.Label("Sandbox: unlimited reaction mass, no contracts.", ui.label);
