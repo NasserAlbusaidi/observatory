@@ -14,6 +14,8 @@ namespace FogOfWar
         public double r, w, phi, t, tau;   // w = dr/dλ
         public double E, L;
         public bool photon, alive, inside; // inside: crossed the horizon (proper time keeps running for the probe)
+        public double periPhi;             // φ at the latest pericentre (w = 0 going up), interpolated inside the step
+        public int peris;
 
         public double Mu2 => photon ? 0 : 1;
 
@@ -45,6 +47,7 @@ namespace FogOfWar
 
         public void Step(double a, double h)
         {
+            double w0 = w, ph0 = phi;
             D(r, w, a, out double r1, out double w1, out double p1, out double t1, out double s1);
             D(r + 0.5 * h * r1, w + 0.5 * h * w1, a, out double r2, out double w2, out double p2, out double t2, out double s2);
             D(r + 0.5 * h * r2, w + 0.5 * h * w2, a, out double r3, out double w3, out double p3, out double t3, out double s3);
@@ -57,6 +60,13 @@ namespace FogOfWar
             // hold r'² = R away from turning points
             double Rn = R(r, a);
             if (Rn > 1e-6 * r * r * r * r) w = (w < 0 ? -1 : 1) * Math.Sqrt(Rn);
+            if (w0 < 0 && w >= 0)
+            {
+                // pericentre inside this step: w is close to linear in λ there, and so is φ
+                double f = -w0 / Math.Max(w - w0, 1e-300);
+                periPhi = ph0 + f * (phi - ph0);
+                peris++;
+            }
         }
 
         public double Tdot(double a)

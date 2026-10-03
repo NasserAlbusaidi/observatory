@@ -32,7 +32,7 @@ namespace FogOfWar
         };
         static readonly string[] SpecNames = Array.ConvertAll(Specs, s => s.name);
 
-        static readonly string[] ProbeNames = { "Circle at the ISCO", "Precessing orbit", "Zoom–whirl", "Drop from rest", "Fall from far away", "Light at the photon orbit" };
+        static readonly string[] ProbeNames = { "Circle at the ISCO", "Precessing orbit", "Zoom–whirl", "Drop from rest", "Fall from far away", "Light just outside the photon orbit", "Light just inside the photon orbit" };
 
         class Body
         {
@@ -48,6 +48,7 @@ namespace FogOfWar
             public readonly List<Vector2> trail = new List<Vector2>();
             public readonly List<double> periPhi = new List<double>();
             public double t0, tau0, tauHorizon = -1;
+            public int peris;
             public string status = "orbiting";
         }
 
@@ -202,8 +203,10 @@ namespace FogOfWar
                     g = new Geo { r = 70, E = 1, L = 0, alive = true }; g.w = -Math.Sqrt(Math.Max(g.R(70, a), 0)); break;
                 default:
                     {
-                        double rph = Kerr.PhotonOrbit(a) * 1.0004, D = Math.Sqrt(Geo.Delta(rph, a));
-                        g = new Geo { r = rph, w = 0, E = 1, L = (rph * rph + a * a + a * D) / (a + D), photon = true, alive = true };
+                        // the photon orbit's own b, started 1e-8 outside or inside it: the orbit is unstable by e^{2π} per
+                        // turn, so the light circles about 3 times, then escapes (outside) or falls in (inside)
+                        double rph = Kerr.PhotonOrbit(a), D = Math.Sqrt(Geo.Delta(rph, a));
+                        g = new Geo { r = rph * (kind == 5 ? 1 + 1e-8 : 1 - 1e-8), w = 0, E = 1, L = (rph * rph + a * a + a * D) / (a + D), photon = true, alive = true };
                         photon = true;
                         break;
                     }
@@ -262,7 +265,7 @@ namespace FogOfWar
             if (!g.inside)
             {
                 g.ZamoVelocity(a, out double vr, out double vph);
-                double v2 = Math.Min(vr * vr + vph * vph, 0.99);   // the camera stops just outside the horizon; cap γ at 7
+                double v2 = Math.Min(vr * vr + vph * vph, 0.98);   // camera stops at 1.03 r₊, speed capped at 0.99 c (γ ≤ 7)
                 camVel = new Vector4((float)vr, 0, (float)vph, (float)(1 / Math.Sqrt(1 - v2)));
             }
         }
@@ -351,7 +354,7 @@ namespace FogOfWar
                 if (!g.alive) p.status = "reached the singularity";
             }
             if (g.inside && p.tauHorizon < 0) { p.tauHorizon = g.tau; p.status = p.photon ? "fell in" : "crossed the horizon"; if (a >= 0.01) g.alive = false; }
-            if (w0 < 0 && g.w >= 0 && !g.inside) p.periPhi.Add(g.phi);
+            if (g.peris > p.peris && !g.inside) { p.peris = g.peris; p.periPhi.Add(g.periPhi); }
             if (g.w > 0 && g.r > 600) { p.status = "escaped"; g.alive = false; }
             var pos = new Vector2((float)(g.r * Math.Cos(g.phi)), (float)(g.r * Math.Sin(g.phi)));
             if (p.trail.Count == 0 || (p.trail[p.trail.Count - 1] - pos).sqrMagnitude > 0.0025f * Mathf.Max(1, pos.sqrMagnitude * 0.01f)) p.trail.Add(pos);
@@ -485,7 +488,9 @@ namespace FogOfWar
                     rt < rh ? Tone.Cold : rt > periRs * 2 ? Tone.Bad : Tone.Normal));
                 // Hills mass: the heaviest hole that can still shred it outside the marginally bound orbit
                 double hills = Math.Pow(s.radius * Phys.c * Phys.c / (rmb * Phys.G), 1.5) / Math.Sqrt(s.mass) / Phys.Msun;
-                list.Add(new Readout("Swallowed whole above", Fmt.Num(hills, 3) + " suns"));
+                list.Add(new Readout("No flare above", Fmt.Num(hills, 3) + " suns (all debris swallowed)"));
+                double intact = Math.Pow(s.radius * Phys.c * Phys.c / (rh * Phys.G), 1.5) / Math.Sqrt(s.mass) / Phys.Msun;
+                list.Add(new Readout("Swallowed intact above", Fmt.Num(intact, 3) + " suns"));
                 list.Add(new Readout("Its size", Rm / 2 < 0.01 ? Fmt.Num(Rm / 2 * Lunit * 2 / 1000, 3) + " km" : (Rm / 2).ToString("0.000") + " rs"));
             }
             if (nParts > 0 || lightCurve.Count > 0)
@@ -515,9 +520,11 @@ namespace FogOfWar
                 list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
                 if (p.name == ProbeNames[1])
                 {
-                    // the weak-field (Einstein 1915) value for the same ellipse: 6πM / (a(1 − e²)), a = 37, e = 23/37
-                    double weak = 6 * Math.PI / (37 * (1 - (23.0 / 37) * (23.0 / 37)));
-                    list.Add(new Readout("Weak-field formula says", (weak * 180 / Math.PI).ToString("0.0") + "°"));
+                    // weak field for the same ellipse (semi-latus rectum p = 2 rp ra / (rp + ra)): Einstein's 6πM/p, minus the
+                    // prograde Lense–Thirring term 8πa M^{3/2}/p^{3/2}
+                    double pl = 2 * 14.0 * 60 / 74, sa = A;
+                    double weak = 6 * Math.PI / pl - 8 * Math.PI * sa / Math.Pow(pl, 1.5);
+                    list.Add(new Readout(sa > 0.001 ? "Weak field (with Lense–Thirring)" : "Weak-field formula says", (weak * 180 / Math.PI).ToString("0.0") + "°"));
                 }
             }
         }
@@ -530,26 +537,27 @@ namespace FogOfWar
             list.Add(new Readout("Probe status", p.status, g.inside ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Distance", (g.r / 2).ToString("0.000") + " rs"));
             double tau = (g.tau - p.tau0) * Tunit, t = (Math.Min(simT, g.t) - p.t0) * Tunit;
-            list.Add(new Readout("Probe's clock", Fmt.Duration(tau)));
+            list.Add(new Readout("Probe's clock", Fmt.Duration(tau) + (g.inside ? " (display speed inside)" : "")));
+            list.Add(new Readout("Camera limits", "≤ 0.99 c, stops at 1.03 r₊, exposure ÷ (γ(1+v))³"));
             list.Add(new Readout("Far-away clock", g.inside ? "∞ (never sees it cross)" : Fmt.Duration(t)));
             if (!g.inside)
             {
                 g.FourVelocity(a, out double ut, out double ur, out double uph);
                 list.Add(new Readout("Probe clock rate", (1 / ut).ToString("0.0000") + "× far away", 1 / ut < 0.5 ? Tone.Hot : Tone.Normal));
                 g.ZamoVelocity(a, out double vr, out double vph);
-                list.Add(new Readout("Speed past hovering observers", Math.Sqrt(vr * vr + vph * vph).ToString("0.000") + " c"));
+                list.Add(new Readout("Speed past local ZAMOs", Math.Sqrt(vr * vr + vph * vph).ToString("0.000") + " c"));
                 // its beacon, sent straight out, as received far away (b = 0, outgoing)
                 double Pp = g.r * g.r + a * a, Dl = Geo.Delta(g.r, a);
                 double prOut = Math.Sqrt(Math.Max(Pp * Pp - Dl * a * a, 0)) / Dl;
                 double gb = 1 / (ut - prOut * ur);
                 list.Add(new Readout("Its beacon seen far away", gb > 0 ? "×" + gb.ToString("0.000") + " frequency (z = " + Fmt.Num(1 / gb - 1, 3) + ")" : "—", gb < 0.5 ? Tone.Hot : Tone.Normal));
-                double tidal = 4 / (g.r * g.r * g.r) * Phys.c * Phys.c / (Lunit * Lunit) / Phys.g;   // 2GM·(2 m)/r³ with GM = c²·Lunit
-                list.Add(new Readout("Tide across a 2 m body", Fmt.Num(tidal) + " g", tidal > 10 ? Tone.Bad : Tone.Normal));
+                // radial tidal stretch in the probe's own frame (Marck 1983, spin 0): (2M/r³)(1 + 3L²/2r²) across 2 m
+                double tidal = 4 / (g.r * g.r * g.r) * (1 + 1.5 * g.L * g.L / (g.r * g.r)) * Phys.c * Phys.c / (Lunit * Lunit) / Phys.g;
+                list.Add(new Readout(a > 0.001 ? "Tide across 2 m (spin-0 formula)" : "Tide across a 2 m body", Fmt.Num(tidal) + " g", tidal > 10 ? Tone.Bad : Tone.Normal));
             }
             else if (a < 0.01)
             {
-                // radial fall from rest at infinity: proper time left to r = 0 is (4/3) M (r/2M)^{3/2}
-                double left = 4.0 / 3 * Math.Pow(g.r / 2, 1.5) * Tunit;
+                double left = TauToSingularity(g.r, g.E, g.L) * Tunit;
                 list.Add(new Readout("Time left on its clock", g.alive ? Fmt.Duration(left) : "0"));
                 list.Add(new Readout("Inside, r is time", "every path leads to r = 0"));
             }
@@ -558,6 +566,41 @@ namespace FogOfWar
             {
                 double dphi = p.periPhi[p.periPhi.Count - 1] - p.periPhi[p.periPhi.Count - 2] - 2 * Math.PI;
                 list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
+            }
+        }
+
+        // Proper time from r to r = 0 inside a Schwarzschild hole for a geodesic with energy E and angular momentum L:
+        // τ = ∫₀^r dr′ / √(E² − (1 − 2/r′)(1 + L²/r′²)), 32-point Gauss–Legendre.
+        static double[] glx, glw;
+        static double TauToSingularity(double r, double E, double L)
+        {
+            if (glx == null) GaussLegendre(32, out glx, out glw);
+            double sum = 0;
+            for (int i = 0; i < glx.Length; i++)
+            {
+                double x = 0.5 * r * (glx[i] + 1);
+                double v = E * E - (1 - 2 / x) * (1 + L * L / (x * x));
+                if (v > 0) sum += glw[i] / Math.Sqrt(v);
+            }
+            return 0.5 * r * sum;
+        }
+
+        static void GaussLegendre(int n, out double[] x, out double[] w)
+        {
+            x = new double[n]; w = new double[n];
+            for (int i = 0; i < n; i++)
+            {
+                double z = Math.Cos(Math.PI * (i + 0.75) / (n + 0.5)), dp = 1;
+                for (int it = 0; it < 100; it++)
+                {
+                    double p0 = 1, p1 = 0;
+                    for (int j = 1; j <= n; j++) { double p2 = p1; p1 = p0; p0 = ((2 * j - 1) * z * p1 - (j - 1) * p2) / j; }
+                    dp = n * (z * p0 - p1) / (z * z - 1);
+                    double dz = p0 / dp;
+                    z -= dz;
+                    if (Math.Abs(dz) < 1e-15) break;
+                }
+                x[i] = z; w[i] = 2 / ((1 - z * z) * dp * dp);
             }
         }
 
@@ -581,6 +624,7 @@ namespace FogOfWar
             logWarp = ui.Slider("Time warp", logWarp, 0, 6, v => "1 s = " + Fmt.Duration(Math.Pow(10, v) * Tunit), 0.05f);
             guides = ui.Toggle("Guide rings (ISCO, photon orbit, tidal radius)", guides);
             showMap = ui.Toggle("Map and light curve", showMap);
+            GUILayout.Label("Model, not real: gas spreads in 12 orbits (real viscous time is far longer); debris drawn ≤ 1 M wide, energy spread uses the real star; bodies drawn at least 0.06 M, probes 0.45 M; gas cloud 3 rs wide (real G2-like clouds are thousands of rs); everything in the equatorial plane; the probe's clock inside the horizon runs at display speed.", ui.note);
         }
     }
 }
