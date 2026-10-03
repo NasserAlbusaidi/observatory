@@ -16,6 +16,7 @@ namespace FogOfWar
         int currentIndex = -1;
         public int SceneCount => scenes.Length;
         public SimScene Current => current;
+        public bool InputLocked;
         readonly PanelUI ui = new PanelUI();
         readonly List<Readout> readouts = new List<Readout>();
         float readoutTimer;
@@ -99,6 +100,8 @@ namespace FogOfWar
             GUI.matrix = Matrix4x4.Scale(new Vector3(uiScale, uiScale, 1));
             float W = Screen.width / uiScale, H = Screen.height / uiScale;
             var e = Event.current;
+            // An unattended tour must not be steered by stray clicks or keys.
+            if (InputLocked && (e.isMouse || e.isKey || e.type == EventType.ScrollWheel)) e.Use();
 
             if (e.type == EventType.KeyDown) HandleKey(e);
 

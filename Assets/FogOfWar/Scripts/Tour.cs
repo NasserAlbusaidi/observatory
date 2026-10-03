@@ -37,6 +37,7 @@ namespace FogOfWar
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "tour.txt")) { AutoFlush = true };
             var app = GetComponent<FogOfWarApp>();
+            app.InputLocked = true;
             for (int s = 0; s < app.SceneCount; s++)
             {
                 app.Activate(s);
