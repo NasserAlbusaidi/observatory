@@ -59,7 +59,7 @@ namespace FogOfWar
 
         static readonly Action<SimScene> Default = s =>
         {
-            Set(s, "massIdx", 1); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
+            Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
             Set(s, "spin", 0f); Set(s, "clumpy", true);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
@@ -118,6 +118,10 @@ namespace FogOfWar
                 S("sb-sun-sgra-disc",     new Vector3(0, 3f, 26f), 50, Tde(0, 5f, 1, 6e5, 3.7f), ui: true),
                 S("sb-sun-m87-whole",     new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 2, 0, untilR: 12), ui: true),
                 S("sb-wd-imbh",           new Vector3(0, 6f, 30f), 50, Tde(1, 6f, -1, 60, untilR: 1, logMass: 3f), ui: true),
+                // the main tour's path, and the same throw played in real time (40 s of 60 fps frames)
+                S("sb-tour-repro",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 500); }), ui: true),
+                S("sb-tour-flare",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 4.2e5); }), ui: true),
+                S("sb-play-40s",          new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); for (int i = 0; i < 40 * 60; i++) B(s).Tick(1f / 60); }), ui: true),
                 S("sb-cloud",             new Vector3(0, 7f, 32f), 50, Tde(5, 6f, 1, 260), ui: true),
                 S("sb-orbit-precess",     new Vector3(0, 30f, 12f), 55, Orbit(1, 4000), ui: true),
                 S("sb-zoom-whirl",        new Vector3(0, 30f, 12f), 55, Orbit(2, 2500), ui: true),
@@ -216,6 +220,19 @@ namespace FogOfWar
                 for (int k = 0; k < 60; k++) bs.Tick(1f / 60);
                 log.WriteLine($"sandbox tick, 4000 debris particles: {(Time.realtimeSinceStartup - c0) * 1000 / 60:0.00} ms per frame");
                 Default(app.Current);
+            }
+
+            // perihelion shift of the 14 M × 60 M probe at every time warp, 60 fps frames (exact: 60.15° at spin 0)
+            foreach (float lw in new[] { 0f, 1f, 2f, 3f, 4f, 5f, 6f })
+            {
+                Default(app.Current);
+                var bs = (BlackHoleScene)app.Current;
+                bs.DropProbe(1);
+                Set(bs, "logWarp", lw);
+                int frames = 0;
+                for (; frames < 60 * 600 && (double.IsNaN(bs.LastProbeShift()) || frames < 120); frames++) bs.Tick(1f / 60);
+                for (int k = 0; k < 120; k++) bs.Tick(1f / 60);
+                log.WriteLine($"precession at warp 10^{lw}: {bs.LastProbeShift():0.00}° per orbit after {frames + 120} frames");
             }
 
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.

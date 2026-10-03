@@ -95,6 +95,15 @@ namespace FogOfWar
             mat.SetFloat("_Outer", outer);
             mat.SetFloat("_Temp", temp);
             mat.SetInt("_Steps", App.Quality == 2 ? 1500 : 1000);
+            // a tidal disruption flare with the steady disk off: the returning debris feeds a new thin disk out to the
+            // circularisation radius 2 r_p; its accretion rate follows the flare luminosity (in Eddington units)
+            if (!disk && FlareDisk(out float fOuter, out float fTemp, out float fGain))
+            {
+                mat.SetFloat("_Disk", 1);
+                mat.SetFloat("_Outer", fOuter);
+                mat.SetFloat("_Temp", fTemp);
+                mat.SetFloat("_Gain", fGain * (float)System.Math.Pow(FluxPeak0 / FluxPeak().f, 0.6));
+            }
             UploadSandbox(mat);
         }
 
