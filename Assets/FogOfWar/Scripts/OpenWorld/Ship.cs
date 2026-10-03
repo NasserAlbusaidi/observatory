@@ -37,6 +37,7 @@ namespace FogOfWar.OpenWorld
         public string Phase = "coasting";
         public Body Landed;
         bool parked;
+        public bool RcsActive;  // RCS fired this step (pilot or autopilot trim)
         // Bodies the ship could reach this frame (collision checks) and bodies big enough to steer around; the scene
         // refreshes both, so a step doesn't evaluate hundreds of moons.
         public readonly List<Body> Near = new List<Body>();
@@ -71,10 +72,15 @@ namespace FogOfWar.OpenWorld
 
             D3? want = null;
             double throttle = ThrottleCmd;
+            D3 autoRcs = D3.Zero;
             if (PlanActive)
             {
                 var cmd = Guide(sys, jd, h, g);
-                if (cmd.HasValue) { want = cmd.Value.Norm; throttle = Math.Min(cmd.Value.Mag / AMax, 1); }
+                // Small corrections (trimming an orbit, holding station) go to the RCS, which pushes in any direction
+                // without turning the ship; only real burns swing the nose round for the main drive. Otherwise a
+                // jittery small command can keep the nose chasing it and the drive never lines up (QA-008).
+                if (cmd.HasValue && cmd.Value.Mag <= RcsAccel) { autoRcs = cmd.Value; throttle = 0; }
+                else if (cmd.HasValue) { want = cmd.Value.Norm; throttle = Math.Min(cmd.Value.Mag / AMax, 1); }
                 else throttle = 0;
             }
             else
@@ -87,7 +93,8 @@ namespace FogOfWar.OpenWorld
             if (PlanActive && want.HasValue && D3.Dot(Heading, want.Value) < Math.Cos(3 * Math.PI / 180)) { throttle = 0; Phase = "turning"; }
             Throttle = throttle;
 
-            var rcs = RcsInput.sqrMagnitude > 0 ? Frame.FromU(Att * Vector3.ClampMagnitude(RcsInput, 1)) * RcsAccel : D3.Zero;
+            var rcs = RcsInput.sqrMagnitude > 0 ? Frame.FromU(Att * Vector3.ClampMagnitude(RcsInput, 1)) * RcsAccel : autoRcs;
+            RcsActive = rcs.Sqr > 0;
             if (Landed != null)
             {
                 var up = (Pos - sys.Pos(Landed, jd)).Norm;

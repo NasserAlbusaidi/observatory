@@ -20,6 +20,7 @@ namespace FogOfWar
         public SimScene Current => current;
         public bool InputLocked;
         public float UiScale => uiScale;
+        public float PanelWidth { get; private set; }
         public bool UnderPanel(Vector2 guiPoint) => panelRect.Contains(guiPoint) || railRect.Contains(guiPoint) || menuRect.Contains(guiPoint);
 
         enum Screen { None, Main, Observatory, Controls }
@@ -67,6 +68,7 @@ namespace FogOfWar
             // the open world runs behind the main menu
             Activate(GameIndex);
             menu = Screen.Main;
+            gameStarted = false;
             Tour.StartIfRequested(this);
             QA.StartIfRequested(this);
         }
@@ -129,7 +131,7 @@ namespace FogOfWar
         {
             ui.Build();
             // scale to whichever of width or height is tighter, so portrait and ultrawide screens both fit
-            uiScale = Mathf.Clamp(Mathf.Min(UnityEngine.Screen.height / 1000f, UnityEngine.Screen.width / 1500f), 0.7f, 2.2f);
+            uiScale = Mathf.Clamp(Mathf.Min(UnityEngine.Screen.height / 1000f, UnityEngine.Screen.width / 1100f), 0.7f, 2.2f);
             GUI.matrix = Matrix4x4.Scale(new Vector3(uiScale, uiScale, 1));
             float W = UnityEngine.Screen.width / uiScale, H = UnityEngine.Screen.height / uiScale;
             var e = Event.current;
@@ -219,14 +221,11 @@ namespace FogOfWar
             GUILayout.Space(8);
             if (gameStarted && InGame && GUILayout.Button("Resume", ui.choice)) menu = Screen.None;
             if (GUILayout.Button("New game", ui.choice)) { Restart(GameIndex); }
-            bool hasSave = OpenSystemScene.HasSave;
-            GUI.enabled = hasSave;
-            if (GUILayout.Button(hasSave ? "Continue (" + OpenSystemScene.SaveSummary + ")" : "Continue (no save yet)", ui.choice))
+            if (OpenSystemScene.HasSave && GUILayout.Button("Continue (" + OpenSystemScene.SaveSummary + ")", ui.choice))
             {
                 Activate(GameIndex);
                 (current as OpenSystemScene)?.LoadGame();
             }
-            GUI.enabled = true;
             if (gameStarted && InGame && GUILayout.Button("Save game", ui.choice)) (current as OpenSystemScene)?.SaveGame();
             GUILayout.Space(6);
             if (GUILayout.Button("Observatory scenes", ui.choice)) menu = Screen.Observatory;
@@ -300,12 +299,20 @@ namespace FogOfWar
         void DrawRail(float W, float H)
         {
             float w = Mathf.Min(290, W * 0.3f);
-            GUILayout.BeginArea(new Rect(16, 16, w, H - 32));
+            // QA-005: measure the list so the box ends with its last entry instead of stretching to the screen bottom
+            float inner = w - ui.panel.padding.horizontal;
+            float listH = 0;
+            for (int i = 0; i < GameIndex; i++)
+                listH += ui.sceneBtn.CalcHeight(new GUIContent(scenes[i].Title.ToUpperInvariant()), inner) + ui.sceneSub.CalcHeight(new GUIContent(scenes[i].Short), inner) + 2;
+            listH += 6 + ui.sceneBtn.CalcHeight(new GUIContent("◀ MAIN MENU"), inner);
+            float head = ui.brand.CalcHeight(new GUIContent("FOG OF WAR"), w) + ui.brandAccent.CalcHeight(new GUIContent("OBSERVATORY"), w) + 10;
+            float boxH = Mathf.Min(listH + ui.panel.padding.vertical + 4, H - 32 - head);
+            GUILayout.BeginArea(new Rect(16, 16, w, head + boxH));
             GUILayout.Label("FOG OF WAR", ui.brand);
             GUILayout.Label("OBSERVATORY", ui.brandAccent);
             GUILayout.Space(10);
-            GUILayout.BeginVertical(ui.panel, GUILayout.ExpandHeight(false));
-            railScroll = GUILayout.BeginScrollView(railScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(false), GUILayout.MaxHeight(H - 180));
+            GUILayout.BeginVertical(ui.panel, GUILayout.Height(boxH));
+            railScroll = GUILayout.BeginScrollView(railScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
             for (int i = 0; i < GameIndex; i++)
             {
                 bool on = i == currentIndex;
@@ -322,9 +329,8 @@ namespace FogOfWar
             if (GUILayout.Button("◀ MAIN MENU", ui.sceneBtn)) menu = Screen.Main;
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
-            var box = GUILayoutUtility.GetLastRect();
             GUILayout.EndArea();
-            railRect = new Rect(16, 16, w, box.yMax);
+            railRect = new Rect(16, 16, w, head + boxH);
         }
 
         void DrawPanel(float W, float H)
@@ -332,7 +338,8 @@ namespace FogOfWar
             float w = Mathf.Min(InGame ? 430 : 390, W * (InGame ? 0.4f : 0.32f));
             panelRect = new Rect(W - w - 16, 16, w, H - 32);
             GUILayout.BeginArea(panelRect, ui.panel);
-            ui.AvailWidth = w - 48;
+            ui.AvailWidth = w - 62;
+            PanelWidth = w;
             panelScroll = GUILayout.BeginScrollView(panelScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
             GUILayout.BeginVertical(GUILayout.Width(ui.AvailWidth));
             GUILayout.Label(current.Eyebrow.ToUpperInvariant(), ui.eyebrow);

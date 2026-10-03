@@ -173,7 +173,8 @@ namespace FogOfWar
             }
 
             // bottom-centre flight strip
-            float w = Mathf.Min(520, W - 40), x = (W - w) / 2, y = H - 98;
+            float free = W - App.PanelWidth - 32;
+            float w = Mathf.Min(520, free - 24), x = (free - w) / 2 + 8, y = H - 98;
             GUI.color = new Color(0, 0, 0, 0.45f);
             GUI.DrawTexture(new Rect(x, y, w, 62), Texture2D.whiteTexture);
             GUI.color = Color.white;
@@ -246,7 +247,7 @@ namespace FogOfWar
             var date = Frame.UtcFromTdb(jd);
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
-            list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? " (limited by the frame budget)" : ""), limited ? Tone.Bad : Tone.Normal));
+            list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));

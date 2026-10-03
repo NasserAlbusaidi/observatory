@@ -155,6 +155,8 @@ namespace FogOfWar
                 ("cam-chase", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
                 ("match-velocity-moon", s => { View(s, "Moon", 4); Set(s, "selectedPlan", OpenWorld.Plan.MatchVelocity); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 2); Invoke(s, "SetPivot", PivotShip(s), 0.16); }, 10f),
                 ("hold-station", s => { Invoke(s, "TogglePlan"); Set(s, "selectedPlan", OpenWorld.Plan.HoldStation); Invoke(s, "TogglePlan"); }, 6f),
+                ("plot-moon-100k", s => { Invoke(s, "TogglePlan"); View(s, "Moon", 4); Set(s, "selectedPlan", OpenWorld.Plan.Brachistochrone); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 5); Invoke(s, "SetPivot", PivotShip(s), 0.16); }, 12f),
+                ("moon-parked", s => Set(s, "warpIdx", 0), 2f),
                 ("save", s => { Invoke(s, "TogglePlan"); Set(s, "warpIdx", 0); ((OpenSystemScene)s).SaveGame(); }, 1f),
                 ("load", s => { Set(s, "jd", 2451545.0); ((OpenSystemScene)s).LoadGame(); }, 1f),
                 ("map", s => Call(s, "ToggleMap"), 3),
@@ -195,6 +197,9 @@ namespace FogOfWar
 
         IEnumerator UiPass()
         {
+            // the boot menu, before any game is started (QA-011: no Resume / Save here)
+            yield return new WaitForSecondsRealtime(1.5f);
+            yield return Shot("ui-boot-menu");
             app.Activate(app.GameIndex);
             yield return new WaitForSecondsRealtime(2f);
             log.WriteLine($"screen {UnityEngine.Screen.width}x{UnityEngine.Screen.height}, ui scale {app.UiScale:F2}");

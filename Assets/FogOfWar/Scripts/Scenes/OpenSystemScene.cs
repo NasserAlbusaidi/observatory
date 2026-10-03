@@ -33,6 +33,7 @@ namespace FogOfWar
         int warpIdx;
         bool warpLimited;
         float limitedAt = -10;
+        double effectiveWarp = 1;
         Body reference;
 
         class Vis { public Body b; public Transform t; public Material[] mats; public bool model; }
@@ -380,7 +381,10 @@ namespace FogOfWar
                 jd += h / 86400;
                 simDt -= h;
             }
-            if (warpLimited) { limitedAt = Time.realtimeSinceStartup; if (warpIdx > 0) warpIdx--; }
+            // the player's warp stays selected; when the frame budget runs out, report the rate actually achieved
+            double achieved = dt * Warps[warpIdx] - Math.Max(simDt, 0);
+            effectiveWarp = effectiveWarp * 0.9 + 0.1 * (dt > 0 ? achieved / dt : 0);
+            if (warpLimited) limitedAt = Time.realtimeSinceStartup;
             reference = Ship.Dominant(sys, ship.Pos, jd);
         }
 

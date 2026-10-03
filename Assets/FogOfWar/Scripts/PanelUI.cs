@@ -113,9 +113,9 @@ namespace FogOfWar
         public float Slider(string text, float v, float min, float max, Func<float, string> fmt, float step = 0)
         {
             GUILayout.BeginHorizontal();
-            GUILayout.Label(text, label, GUILayout.Width(AvailWidth * 0.62f));
+            GUILayout.Label(text, label, GUILayout.Width(AvailWidth * 0.58f));
             GUILayout.FlexibleSpace();
-            GUILayout.Label(fmt(v), value, GUILayout.Width(AvailWidth * 0.36f));
+            GUILayout.Label(fmt(v), value, GUILayout.Width(AvailWidth * 0.38f));
             GUILayout.EndHorizontal();
             float nv = GUILayout.HorizontalSlider(v, min, max, sliderStyle, thumbStyle, GUILayout.Width(AvailWidth));
             if (step > 0) nv = Mathf.Round(nv / step) * step;
