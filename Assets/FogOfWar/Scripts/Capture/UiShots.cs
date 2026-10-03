@@ -101,6 +101,14 @@ namespace FogOfWar
                         bool ok = os.TestTargetJob(k);
                         log.WriteLine($"    target a {k} job: {(ok ? "yes" : "none posted")}");
                         if (ok) yield return Shot(app, shell, camRT, uiRT, tag, "06d-target-" + k.ToString().ToLowerInvariant());
+                        if (ok)
+                            foreach (float frac in new[] { 0.62f, 0.72f, 0.95f })
+                            {
+                                // QA-046: target near the right-hand panels
+                                os.TestAimTargetAt(frac);
+                                yield return Shot(app, shell, camRT, uiRT, tag, $"06e-{k.ToString().ToLowerInvariant()}-at-{frac * 100:0}");
+                                log.WriteLine("    " + os.TestLabelReport());
+                            }
                     }
                 Controls.Tap(Controls.Action.Help);
                 yield return Wait(0.3f);

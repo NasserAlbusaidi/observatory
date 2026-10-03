@@ -444,7 +444,7 @@ namespace FogOfWar
             foreach (var m in wreckGlow) m.SetColor("_Emission", on ? new Color(1.2f, 0.12f, 0.08f) : new Color(0.05f, 0.005f, 0.003f));
         }
 
-        const string CareerKey = "fow-career-v1";
+        static string CareerKey => SaveKey == "fow-save-v1" ? "fow-career-v1" : SaveKey + "-career"; // follows -fowsavekey
 
         void SaveCareer()
         {

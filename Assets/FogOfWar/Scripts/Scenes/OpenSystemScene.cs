@@ -113,7 +113,9 @@ namespace FogOfWar
                     foreach (var r in rs)
                     {
                         if (mapped != null) { var arr = new Material[r.sharedMaterials.Length]; for (int i = 0; i < arr.Length; i++) arr[i] = mapped; r.sharedMaterials = arr; ms.Add(mapped); continue; }
-                        foreach (var m in r.sharedMaterials) { Own(m); ms.Add(m); }
+                        // QA-045: SimpleLit's blue rim and gloss are for hulls; on bare rock the rim drew a blue shell
+                        // around the silhouette, night side included
+                        foreach (var m in r.sharedMaterials) { Own(m); m.SetColor("_Rim", Color.black); m.SetFloat("_Spec", 0); ms.Add(m); }
                     }
                     v.mats = ms.ToArray();
                 }

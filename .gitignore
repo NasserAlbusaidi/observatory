@@ -29,3 +29,4 @@ crashlytics-build.properties
 
 # fidelity pipeline
 Tools/fidelity/__pycache__/
+/QA-Build/
