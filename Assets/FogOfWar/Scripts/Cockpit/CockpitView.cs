@@ -17,7 +17,11 @@ namespace FogOfWar.Cockpit
         readonly Camera main;
         readonly Transform root, eye;
         readonly Camera cam;
-        readonly Mesh cabinMesh, screenMesh, glassMesh;
+        readonly Mesh cabinMesh, glassMesh;
+        Mesh screenMesh, bezelMesh;            // rebuilt when the window's aspect changes (QA-049)
+        MeshFilter screenFilter, bezelFilter;
+        CockpitMesh.MfdRow row;
+        float rowAspect = -1;
         readonly Material cabinMat, screenMat, glassMat;
         public readonly CockpitMfd Mfd;
         readonly Vector4[] lampPos = new Vector4[LampCount], lampCol = new Vector4[LampCount];
@@ -30,9 +34,7 @@ namespace FogOfWar.Cockpit
             new Vector3(0, 1.08f, -0.35f),                                     // 0 overhead strip (the glass reflects this one)
             new Vector3(-0.55f, -1.21f, 0.8f), new Vector3(0.55f, -1.21f, 0.8f), // 1–2 footwell
             new Vector3(0, 0.35f, 1.22f),                                      // 3 spill from the hull-camera display
-            CockpitMesh.MfdCentres[0] + new Vector3(0, 0.03f, -0.06f),         // 4–6 the MFDs
-            CockpitMesh.MfdCentres[1] + new Vector3(0, 0.03f, -0.06f),
-            CockpitMesh.MfdCentres[2] + new Vector3(0, 0.03f, -0.06f),
+            Vector3.zero, Vector3.zero, Vector3.zero,                          // 4–6 the MFDs (from the current row)
             new Vector3(-0.78f, -0.05f, 0.55f),                                // 7 side console indicators
         };
         // The overhead strip lights the cabin; the screens only tint what is right in front of them.
@@ -55,7 +57,6 @@ namespace FogOfWar.Cockpit
             root.gameObject.layer = Layer;
 
             cabinMesh = CockpitMesh.Build();
-            screenMesh = CockpitMesh.Screens();
             glassMesh = CockpitMesh.Glass();
             cabinMat = Gfx.Mat("Cockpit");
             screenMat = Gfx.Mat("CockpitScreen");
@@ -65,8 +66,10 @@ namespace FogOfWar.Cockpit
             screenMat.SetTexture("_MainTex", Mfd.Texture);
 
             Part("Cabin", cabinMesh, cabinMat);
-            Part("MFD screens", screenMesh, screenMat);
+            bezelFilter = Part("MFD bezels", null, cabinMat).GetComponent<MeshFilter>();
+            screenFilter = Part("MFD screens", null, screenMat).GetComponent<MeshFilter>();
             Part("Display glass", glassMesh, glassMat);
+            FitRow(main.aspect);
 
             eye = new GameObject("Cockpit eye").transform;
             eye.SetParent(root, false);
@@ -82,7 +85,26 @@ namespace FogOfWar.Cockpit
             root.gameObject.SetActive(false);
         }
 
-        void Part(string name, Mesh mesh, Material mat) => Gfx.Obj(name, root, mesh, mat).layer = Layer;
+        GameObject Part(string name, Mesh mesh, Material mat)
+        {
+            var go = Gfx.Obj(name, root, mesh, mat);
+            go.layer = Layer;
+            return go;
+        }
+
+        // Size the MFD row so all three screens fit across the view at this aspect.
+        void FitRow(float aspect)
+        {
+            if (Mathf.Abs(aspect - rowAspect) < 0.01f) return;
+            rowAspect = aspect;
+            row = CockpitMesh.Row(CockpitMesh.FitScale(aspect));
+            Gfx.Destroy(screenMesh); Gfx.Destroy(bezelMesh);
+            screenMesh = CockpitMesh.Screens(row);
+            bezelMesh = CockpitMesh.Bezels(row);
+            screenFilter.sharedMesh = screenMesh;
+            bezelFilter.sharedMesh = bezelMesh;
+            for (int i = 0; i < 3; i++) LampAt[4 + i] = row.Centres[i] + new Vector3(0, 0.03f, -0.06f);
+        }
 
         // Once per frame, after the world camera is placed. look: the pilot's head turn relative to the ship;
         // g: drive acceleration in g; rcs: thruster level 0–1.
@@ -102,6 +124,7 @@ namespace FogOfWar.Cockpit
             cam.allowHDR = main.allowHDR;
             cam.allowMSAA = main.allowMSAA;
             cam.targetTexture = main.targetTexture;
+            FitRow(main.aspect);
 
             // under thrust the couch takes the load: the head sinks back a few centimetres, and the drive and the
             // thrusters shake the hull. The world view is a stabilised camera feed, so only the cabin moves.
@@ -149,11 +172,11 @@ namespace FogOfWar.Cockpit
         {
             if (!on) return 0;
             float top = 0;
-            var rot = CockpitMesh.MfdRotation(Vector3.zero);
-            foreach (var m in CockpitMesh.MfdCentres)
+            var rot = CockpitMesh.MfdRotation();
+            foreach (var m in row.Centres)
                 for (int s = -1; s <= 1; s += 2)
                 {
-                    var p = m + rot * new Vector3(s * (CockpitMesh.MfdW / 2 + 0.03f), CockpitMesh.MfdH / 2 + 0.035f, 0);
+                    var p = m + rot * new Vector3(s * (row.W / 2 + 0.03f), row.H / 2 + 0.035f, 0);
                     var sp = cam.WorldToScreenPoint(root.TransformPoint(p));
                     if (sp.z > 0 && sp.x >= 0 && sp.x <= cam.pixelWidth) top = Mathf.Max(top, sp.y);
                 }
@@ -164,7 +187,7 @@ namespace FogOfWar.Cockpit
         {
             if (main != null) main.cullingMask |= 1 << Layer;
             Mfd.Dispose();
-            Gfx.Destroy(cabinMesh); Gfx.Destroy(screenMesh); Gfx.Destroy(glassMesh);
+            Gfx.Destroy(cabinMesh); Gfx.Destroy(screenMesh); Gfx.Destroy(bezelMesh); Gfx.Destroy(glassMesh);
             Gfx.Destroy(cabinMat); Gfx.Destroy(screenMat); Gfx.Destroy(glassMat);
             if (root != null) Gfx.Destroy(root.gameObject);
         }

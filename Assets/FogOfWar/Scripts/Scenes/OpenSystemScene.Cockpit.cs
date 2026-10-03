@@ -40,15 +40,19 @@ namespace FogOfWar
         {
             if (hudShell == null || pills == null) return;
             float top = inside ? cockpit.ConsoleTop() : 0;
+            float colBottom = hudShell.Portrait ? 350 : 56; // BuildHud's own value
             if (top <= 0)
             {
                 pills.style.bottom = StyleKeyword.Null;
                 if (lessonCard != null) lessonCard.style.bottom = StyleKeyword.Null;
+                if (rightCol != null) rightCol.style.bottom = colBottom;
                 return;
             }
             float b = top / hudShell.Scale + 8;
             pills.style.bottom = b;
             if (lessonCard != null) lessonCard.style.bottom = b + 44;
+            // QA-049: the target card and ship console column ends above the MFDs (its body scrolls)
+            if (rightCol != null) rightCol.style.bottom = Mathf.Max(colBottom, b);
         }
 
         // HUD world markers and labels: false for a screen point that lands on the cabin instead of the display.

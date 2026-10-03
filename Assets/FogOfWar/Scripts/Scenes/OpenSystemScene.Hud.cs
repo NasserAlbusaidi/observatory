@@ -25,6 +25,15 @@ namespace FogOfWar
             rig.Offset = Frame.U(camW - PivotW());
             rig.Rotation = Cam.transform.rotation;
             rig.Scale = (float)Math.Max(camDist, 0.05);
+            // QA-050: the cockpit eye is inside the hull, closer than the free camera may go; start from the chase pose
+            if (pivot == Pivot.Ship && camMode == CamMode.Cockpit)
+            {
+                float d = (float)Math.Max(camDist, 0.08);
+                var off = ship.Att * OffsetDir(chaseYaw, chasePitch);
+                rig.Offset = off * d;
+                rig.Rotation = Quaternion.LookRotation(-off, ship.Att * Vector3.up);
+                rig.Scale = d;
+            }
         }
 
         UiShell hudShell;

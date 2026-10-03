@@ -16,9 +16,28 @@ namespace FogOfWar.Cockpit
         // portrait (±27.5° vertical, ±16° horizontal) shows the display above and the MFD row below.
         public const float WallZ = 1.30f, HalfW = 0.95f, Bottom = -0.27f, Top = 1.02f;
 
-        // MFD row: three screens set in the console under the display, each MfdW × MfdH, centred at MfdCentres.
+        // MFD row: three screens set in the console under the display, full size MfdW × MfdH.
         public const float MfdW = 0.32f, MfdH = 0.24f;
-        public static readonly Vector3[] MfdCentres = { new Vector3(-0.37f, -0.447f, 1.138f), new Vector3(0, -0.447f, 1.138f), new Vector3(0.37f, -0.447f, 1.138f) };
+        static readonly Vector3 RowCentre = new Vector3(0, -0.447f, 1.138f);
+
+        public sealed class MfdRow { public Vector3[] Centres; public float W, H; }
+
+        // The row at scale k (1 = full size). Smaller screens sit closer together, with their top edge where the
+        // full-size row's is, so the row stays tucked under the display.
+        public static MfdRow Row(float k)
+        {
+            float w = MfdW * k, h = MfdH * k, pitch = w + 0.05f;
+            var c = RowCentre + MfdRotation() * Vector3.up * ((MfdH - h) / 2);
+            return new MfdRow { Centres = new[] { c - Vector3.right * pitch, c, c + Vector3.right * pitch }, W = w, H = h };
+        }
+
+        // QA-049: the largest row that fits across the default 55° view at this aspect (narrow portrait windows see
+        // only ±16° across), so all three MFDs are on screen.
+        public static float FitScale(float aspect)
+        {
+            float half = Mathf.Tan(27.5f * Mathf.Deg2Rad) * aspect * RowCentre.z;   // metres visible either side at the row
+            return Mathf.Clamp((half - 0.11f) / (1.5f * MfdW), 0.45f, 1f);   // 0.11: bezel, keys and a margin
+        }
         // the console face leans back toward the pilot by this much (degrees from vertical)
         public const float ConsoleTilt = 28f;
 
@@ -104,20 +123,7 @@ namespace FogOfWar.Cockpit
             var tilt = Quaternion.Euler(ConsoleTilt, 0, 0);
             var consoleCtr = new Vector3(0, -0.47f, 1.20f);
             b.Box(consoleCtr, new Vector3(0.62f, 0.20f, 0.06f), tilt, Panel);
-            // MFD bezels, each sunk around its screen (the screens themselves are a separate mesh)
-            foreach (var m in MfdCentres)
-            {
-                var rot = MfdRotation(m);
-                var back = rot * Vector3.forward * 0.012f;
-                b.Box(m + back, new Vector3(MfdW / 2 + 0.025f, MfdH / 2 + 0.03f, 0.01f), rot, Bezel, true);
-                // soft keys down both sides
-                for (int k = 0; k < 4; k++)
-                {
-                    float y = -MfdH / 2 + 0.03f + k * (MfdH - 0.06f) / 3;
-                    b.Box(m + rot * new Vector3(-MfdW / 2 - 0.013f, y, -0.006f), new Vector3(0.007f, 0.009f, 0.004f), rot, Grip);
-                    b.Box(m + rot * new Vector3(MfdW / 2 + 0.013f, y, -0.006f), new Vector3(0.007f, 0.009f, 0.004f), rot, Grip);
-                }
-            }
+            // (the MFD bezels depend on the screen's aspect: Bezels)
             // lower console, knee panel and a row of guarded switches
             b.Box(new Vector3(0, -0.86f, 1.05f), new Vector3(0.62f, 0.22f, 0.20f), HullDark);
             for (int i = 0; i < 8; i++)
@@ -199,15 +205,40 @@ namespace FogOfWar.Cockpit
         }
 
         // The MFDs lie in the console face, which leans back toward the pilot (local −Z faces the pilot).
-        public static Quaternion MfdRotation(Vector3 centre) => Quaternion.Euler(ConsoleTilt, 0, 0);
+        public static Quaternion MfdRotation() => Quaternion.Euler(ConsoleTilt, 0, 0);
+
+        // MFD bezels, each sunk around its screen, with soft keys down both sides.
+        public static Mesh Bezels(MfdRow row)
+        {
+            var b = new B();
+            var rot = MfdRotation();
+            float w = row.W, h = row.H;
+            foreach (var m in row.Centres)
+            {
+                var back = rot * Vector3.forward * 0.012f;
+                b.Box(m + back, new Vector3(w / 2 + 0.025f, h / 2 + 0.03f, 0.01f), rot, Bezel, true);
+                for (int k = 0; k < 4; k++)
+                {
+                    float y = -h / 2 + 0.03f * h / MfdH + k * (h - 0.06f * h / MfdH) / 3;
+                    b.Box(m + rot * new Vector3(-w / 2 - 0.013f, y, -0.006f), new Vector3(0.007f, 0.009f, 0.004f), rot, Grip);
+                    b.Box(m + rot * new Vector3(w / 2 + 0.013f, y, -0.006f), new Vector3(0.007f, 0.009f, 0.004f), rot, Grip);
+                }
+            }
+            var mesh = new Mesh { name = "CockpitBezels" };
+            mesh.SetVertices(b.v); mesh.SetNormals(b.n); mesh.SetColors(b.c); mesh.SetTriangles(b.t, 0);
+            mesh.RecalculateBounds();
+            return mesh;
+        }
 
         // The three screens as one mesh; uv.x picks the screen's third of the shared MFD texture.
-        public static Mesh Screens()
+        public static Mesh Screens(MfdRow row)
         {
             var v = new List<Vector3>(); var uv = new List<Vector2>(); var n = new List<Vector3>(); var t = new List<int>();
-            for (int i = 0; i < MfdCentres.Length; i++)
+            var rot = MfdRotation();
+            float MfdW = row.W, MfdH = row.H;
+            for (int i = 0; i < row.Centres.Length; i++)
             {
-                var m = MfdCentres[i]; var rot = MfdRotation(m);
+                var m = row.Centres[i];
                 int o = v.Count;
                 // the screen's front faces −Z of its rotation (toward the pilot)
                 v.Add(m + rot * new Vector3(-MfdW / 2, -MfdH / 2, 0)); v.Add(m + rot * new Vector3(MfdW / 2, -MfdH / 2, 0));
