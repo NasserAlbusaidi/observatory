@@ -23,6 +23,8 @@ namespace FogOfWar
         readonly List<Color> cols = new List<Color>();
         Transform shell;
         float scroll, t;
+        Vector3 glowScale;
+        int view;
 
         protected override void Build()
         {
@@ -51,7 +53,9 @@ namespace FogOfWar
             ship = Models.Spawn("WarpShip", Root, new Color(0.85f, 0.86f, 0.9f)).transform;
             ship.localPosition = new Vector3(0, 0.35f, 0);
             Models.AlignMarker(ship, "Nose", Vector3.right);
+            ship.localScale *= 1.5f;
             glow = Models.FindDeep(ship, "Engine") ?? ship;
+            glowScale = glow.localScale;
 
             // bubble shell: lat/long wireframe
             var shellMesh = Own(Gfx.LineMesh("Shell"));
@@ -77,9 +81,19 @@ namespace FogOfWar
             Gfx.Obj("Streaks", Root, streakMesh, streakMat);
             Gfx.Starfield(Root, 5000);
 
-            Orbit.Set(new Vector3(-9, 8, -12), Vector3.zero, 4, 40);
+            view = 0;
+            ApplyView();
+        }
+
+        void ApplyView()
+        {
+            // Close-up frames the ship from the front quarter so the model's detail reads; min distance lets you scroll in.
+            if (view == 0) Orbit.Set(new Vector3(-6.5f, 5.5f, -8.5f), Vector3.zero, 1.2f, 40);
+            else Orbit.Set(new Vector3(1.4f, 1.6f, -4.6f), new Vector3(0, 0.35f, 0), 1.2f, 40);
             Orbit.maxPitch = 85; Orbit.minPitch = 3;
         }
+
+        public void ShowCloseUp() { view = 1; ApplyView(); }
 
         static Vector3 Sph(float lat, float lon)
         {
@@ -96,7 +110,7 @@ namespace FogOfWar
             surf.SetFloat("_AmpCol", 1f / Mathf.Max(0.15f, v * sigma * 0.35f));
             shell.localScale = Vector3.one * R;
             ship.localPosition = new Vector3(0, 0.35f + Mathf.Sin(t * 1.3f) * 0.04f, 0);
-            if (glow != ship) glow.localScale = Vector3.one * (1 + Mathf.Sin(t * 9) * 0.15f);
+            if (glow != ship) glow.localScale = glowScale * (1 + Mathf.Sin(t * 9) * 0.15f);
 
             pts.Clear(); cols.Clear();
             float len = Mathf.Clamp(v * 0.8f, 0.2f, 6f);
@@ -129,6 +143,8 @@ namespace FogOfWar
             R = ui.Slider("Bubble radius", R, 1.5f, 5f, x => (x * 33).ToString("0") + " m", 0.1f);
             sigma = ui.Slider("Wall sharpness σ", sigma, 0.6f, 8f, x => x.ToString("0.0"), 0.1f);
             amp = ui.Slider("Height exaggeration", amp, 0.2f, 3f, x => x.ToString("0.0") + "×", 0.1f);
+            int nv = ui.Choice("View", view, new[] { "Whole bubble", "Close on the ship" });
+            if (nv != view) { view = nv; ApplyView(); }
         }
     }
 }

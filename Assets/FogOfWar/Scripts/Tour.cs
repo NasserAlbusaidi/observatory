@@ -45,6 +45,7 @@ namespace FogOfWar
                 yield return Shot($"scene-{s + 1}");
                 // The torch ship only shows in the 1g trip's chase view.
                 if (app.Current is JourneyScene j) { j.ShowChase(); yield return Shot($"scene-{s + 1}-chase"); }
+                if (app.Current is WarpScene w) { w.ShowCloseUp(); yield return Shot($"scene-{s + 1}-ship"); }
             }
             log.WriteLine($"done, {errors} errors");
             log.Close();
