@@ -90,11 +90,19 @@ namespace FogOfWar
             yield return new WaitForSecondsRealtime(2.5f);
             Check(sy.Throttle == 0, "throttle cut reaches the synth");
 
+            int q0 = Mark();
+            yield return new WaitForSecondsRealtime(1.5f);
+            var quiet = Level(q0, Mark());
             Note("RCS: forward translation, then short taps");
             Controls.Hold(Controls.Action.RcsForward, true);
+            yield return new WaitForSecondsRealtime(0.2f);
+            int r0 = Mark();
             yield return new WaitForSecondsRealtime(1.5f);
+            var jets = Level(r0, Mark());
             Check(sy.Rcs > 0.9f, $"RCS firing reaches the synth ({sy.Rcs:F2})");
             Controls.Hold(Controls.Action.RcsForward, false);
+            Note($"meter, cockpit: idle RMS {quiet.rms:F1} peak {quiet.peak:F1} dBFS; RCS firing RMS {jets.rms:F1} peak {jets.peak:F1} dBFS");
+            Check(jets.rms > quiet.rms + 6 && jets.peak > quiet.peak + 10, "RCS is audible: firing is clearly louder than the idle cockpit (QA-033)");
             for (int i = 0; i < 3; i++)
             {
                 yield return new WaitForSecondsRealtime(0.6f);
@@ -148,6 +156,16 @@ namespace FogOfWar
             log.WriteLine(fails == 0 ? "AUDIO QA: all checks pass" : $"AUDIO QA: {fails} checks FAIL");
             log.Close();
             Application.Quit();
+        }
+
+        int Mark() { lock (recLock) return rec.Count; }
+
+        (float rms, float peak) Level(int a, int b)
+        {
+            double sum = 0, peak = 0;
+            lock (recLock)
+                for (int i = a; i < b && i < rec.Count; i++) { double x = rec[i]; sum += x * x; peak = Math.Max(peak, Math.Abs(x)); }
+            return ((float)(10 * Math.Log10(sum / Math.Max(b - a, 1) + 1e-12)), (float)(20 * Math.Log10(peak + 1e-9)));
         }
 
         static void WriteWav(string path, float[] d, int ch, int rate)
