@@ -263,7 +263,36 @@ namespace FogOfWar
             Application.Quit();
         }
 
-        IEnumerator Start()
+        IEnumerator Start() => Guard(Run());
+
+        // Runs a coroutine tree by hand so an exception anywhere in it (nested Shot() included) ends the run: log it,
+        // write the summary and quit. Unity would otherwise drop the coroutine and leave the process running forever.
+        IEnumerator Guard(IEnumerator root)
+        {
+            var stack = new Stack<IEnumerator>();
+            stack.Push(root);
+            while (stack.Count > 0)
+            {
+                var top = stack.Peek();
+                bool more;
+                try { more = top.MoveNext(); }
+                catch (Exception e)
+                {
+                    errors++;
+                    if (log == null) { Directory.CreateDirectory(dir); log = new StreamWriter(Path.Combine(dir, "qa.txt"), true); }
+                    log.WriteLine($"QA aborted: {e}");
+                    log.WriteLine($"done: {errors} errors, {bad} bad readouts (aborted)");
+                    log.Close(); log = null;
+                    Application.Quit();
+                    yield break;
+                }
+                if (!more) { stack.Pop(); continue; }
+                if (top.Current is IEnumerator inner) stack.Push(inner);
+                else yield return top.Current;
+            }
+        }
+
+        IEnumerator Run()
         {
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowui") >= 0)
             {
@@ -319,6 +348,39 @@ namespace FogOfWar
             }
             yield return Resources.UnloadUnusedAssets();
             log.WriteLine($"    managed heap {mem0 / 1048576} MB -> {GC.GetTotalMemory(true) / 1048576} MB");
+
+            // New game while a rescue is active and its wreck (with lamps) is drawn nearby: the old wreck's objects must
+            // not outlive the career (they spammed NullReferenceExceptions from LateWreck)
+            log.WriteLine("new game during a rescue");
+            int errBefore = errors;
+            app.Restart(app.GameIndex);
+            yield return new WaitForSecondsRealtime(1.5f);
+            // under -fowqa the career starts in sandbox mode, which never docks; Career.Rescue() posts from the port the
+            // ship is docked at, so switch sandbox off and let the first ticks dock it
+            if ((app.Current as OpenSystemScene)?.Career is OpenWorld.Career cr) cr.Sandbox = false;
+            for (int k = 0; k < 50 && (app.Current as OpenSystemScene)?.Career?.Docked == null; k++) yield return new WaitForSecondsRealtime(0.1f);
+            if (app.Current is OpenSystemScene os && os.Career?.Docked != null)
+            {
+                const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
+                var sys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", F).GetValue(os);
+                double jd = (double)typeof(OpenSystemScene).GetField("jd", F).GetValue(os);
+                var job = os.Career.Board.Find(c => c.Kind == OpenWorld.JobKind.Rescue) ?? os.Career.Rescue(new System.Random(7), sys, jd);
+                os.Career.Accept(job, jd);
+                var wreck = sys[job.To];
+                if (wreck != null)
+                {
+                    var ship = (OpenWorld.Ship)Ship(os);
+                    ship.Plan = OpenWorld.Plan.None; ship.Landed = null; ship.ThrottleCmd = 0;
+                    ship.Pos = sys.Pos(wreck, jd) + new OpenWorld.D3(2, 0, 0); ship.Vel = sys.Vel(wreck, jd); // undocks itself
+                }
+                yield return new WaitForSecondsRealtime(2f);
+                yield return Shot("9-rescue-wreck");
+                app.NewGame();
+                yield return new WaitForSecondsRealtime(3f);
+                yield return Shot("9-newgame-after-rescue");
+                log.WriteLine($"    rescue {job.To}, wreck {(wreck != null ? "found" : "MISSING")}, errors during new game: {errors - errBefore}");
+            }
+            else { errors++; log.WriteLine($"    new career is not docked ({app.Current?.Title}), so no rescue can be posted"); }
 
             log.WriteLine("window sizes");
             foreach (var (w, h) in new[] { (1280, 720), (1024, 768), (2560, 1440) })
