@@ -300,7 +300,7 @@ namespace FogOfWar
         void ControlsMenu()
         {
             GUILayout.Label("Click a key slot, then press the new key. Esc cancels; Delete clears the slot. A key already in use swaps places.", ui.body);
-            if (!string.IsNullOrEmpty(rebindNote)) GUILayout.Label(rebindNote, ui.note);
+            GUILayout.Label(string.IsNullOrEmpty(rebindNote) ? " " : rebindNote, ui.note);
             foreach (var a in Controls.All)
             {
                 GUILayout.BeginHorizontal();

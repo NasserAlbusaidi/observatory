@@ -33,6 +33,7 @@ namespace FogOfWar
         int warpIdx;
         bool warpLimited;
         float limitedAt = -10;
+        int lastWarpIdx = -1;
         double effectiveWarp = 1;
         Body reference;
 
@@ -386,6 +387,8 @@ namespace FogOfWar
             double achieved = dt * Warps[warpIdx] - Math.Max(simDt, 0);
             effectiveWarp = effectiveWarp * 0.9 + 0.1 * (dt > 0 ? achieved / dt : 0);
             if (warpLimited) limitedAt = Time.realtimeSinceStartup;
+            // QA-022: a new warp choice starts fresh, so a stale "limited" note never outlives the setting it was about
+            if (warpIdx != lastWarpIdx) { lastWarpIdx = warpIdx; limitedAt = -10; effectiveWarp = Warps[warpIdx]; }
             reference = Ship.Dominant(sys, ship.Pos, jd);
             TickCareer(achieved);
         }
