@@ -16,6 +16,7 @@ namespace FogOfWar
 
         public GUIStyle panel, brand, brandAccent, eyebrow, title, body, section, label, value, button, sceneBtn, sceneBtnOn, sceneSub, sceneSubOn, toggle, hint, note, choice, choiceOn;
         public GUIStyle sliderStyle, thumbStyle;
+        Texture2D checkOff, checkOn;
         bool built;
 
         static Texture2D Tex(Color c)
@@ -72,7 +73,10 @@ namespace FogOfWar
             sceneBtnOn = new GUIStyle(sceneBtn) { normal = { background = Tex(new Color(1, 0.71f, 0.28f, 0.12f)), textColor = Accent }, hover = { background = Tex(new Color(1, 0.71f, 0.28f, 0.16f)), textColor = Accent } };
             sceneSub = new GUIStyle { font = font, fontSize = 12, normal = { textColor = InkDim }, padding = new RectOffset(10, 10, 0, 7), wordWrap = true };
             sceneSubOn = new GUIStyle(sceneSub);
-            toggle = new GUIStyle(GUI.skin.toggle) { fontSize = 13, normal = { textColor = Ink }, onNormal = { textColor = Ink }, hover = { textColor = Accent }, onHover = { textColor = Accent } };
+            // The built-in skin's toggle draws "on" and "off" the same at runtime, so the check box is drawn by Toggle().
+            toggle = new GUIStyle { font = font, fontSize = 13, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(24, 0, 3, 3), normal = { textColor = Ink }, hover = { textColor = Accent } };
+            checkOff = Box(new Color(1, 1, 1, 0.06f), new Color(0.63f, 0.69f, 0.9f, 0.45f));
+            checkOn = Box(Accent, Accent);
             hint = new GUIStyle { font = font, fontSize = 12, normal = { textColor = InkDim }, alignment = TextAnchor.MiddleCenter };
             note = new GUIStyle(body) { fontSize = 13, normal = { textColor = InkDim }, padding = new RectOffset(10, 0, 0, 0), margin = new RectOffset(0, 0, 10, 0) };
             choice = new GUIStyle(button) { alignment = TextAnchor.MiddleLeft, margin = new RectOffset(0, 0, 0, 4), stretchWidth = true };
@@ -121,9 +125,12 @@ namespace FogOfWar
 
         public bool Toggle(string text, bool v)
         {
-            bool nv = GUILayout.Toggle(v, " " + text, toggle);
+            var content = new GUIContent(text);
+            var r = GUILayoutUtility.GetRect(content, toggle);
+            if (GUI.Button(r, content, toggle)) v = !v;
+            GUI.DrawTexture(new Rect(r.x + 2, r.y + (r.height - 14) / 2, 14, 14), v ? checkOn : checkOff);
             GUILayout.Space(4);
-            return nv;
+            return v;
         }
 
         public int Choice(string text, int idx, string[] options)

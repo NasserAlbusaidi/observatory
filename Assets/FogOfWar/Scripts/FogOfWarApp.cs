@@ -14,6 +14,8 @@ namespace FogOfWar
         SimScene[] scenes;
         SimScene current;
         int currentIndex = -1;
+        public int SceneCount => scenes.Length;
+        public string SceneTitle => current?.Title;
         readonly PanelUI ui = new PanelUI();
         readonly List<Readout> readouts = new List<Readout>();
         float readoutTimer;
@@ -38,7 +40,7 @@ namespace FogOfWar
             Cam.nearClipPlane = 0.05f;
             Cam.farClipPlane = 6000f;
             // Leftover lights from a default scene don't affect our shaders, but switch them off to avoid confusion.
-            foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) l.enabled = false;
+            foreach (var l in FindObjectsByType<Light>()) l.enabled = false;
             Orbit = new OrbitCamera(Cam);
             Art.BindSky();
 
@@ -49,6 +51,7 @@ namespace FogOfWar
             };
             Quality = PlayerPrefs.GetInt("fow-quality", 1);
             Activate(Mathf.Clamp(PlayerPrefs.GetInt("fow-scene", 0), 0, scenes.Length - 1));
+            Tour.StartIfRequested(this);
         }
 
         public void Activate(int i)
@@ -134,7 +137,7 @@ namespace FogOfWar
 
         void DrawRail(float W, float H)
         {
-            float w = 250;
+            float w = 290;
             GUILayout.BeginArea(new Rect(16, 16, w, H - 32));
             GUILayout.Label("FOG OF WAR", ui.brand);
             GUILayout.Label("OBSERVATORY", ui.brandAccent);

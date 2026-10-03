@@ -60,7 +60,7 @@ namespace FogOfWar.EditorTools
             if (report.summary.result == BuildResult.Succeeded)
             {
                 Debug.Log($"Fog of War: built {opts.locationPathName} ({report.summary.totalSize / (1024 * 1024)} MB)");
-                EditorUtility.RevealInFinder(opts.locationPathName);
+                if (!Application.isBatchMode) EditorUtility.RevealInFinder(opts.locationPathName);
             }
             else Debug.LogError("Fog of War: build failed, see the Console for the first error.");
         }

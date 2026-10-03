@@ -101,7 +101,8 @@ namespace FogOfWar
         {
             var m = Mat("Unlit");
             m.SetColor("_Color", c);
-            m.SetFloat("_SrcBlend", additive ? (float)UnityEngine.Rendering.BlendMode.One : (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            // Additive still weights by alpha: callers use alpha as intensity (halos, fading trails, thin atmospheres).
+            m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
             m.SetFloat("_DstBlend", additive ? (float)UnityEngine.Rendering.BlendMode.One : (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
             m.SetFloat("_ZWrite", zwrite ? 1 : 0);
             return m;
