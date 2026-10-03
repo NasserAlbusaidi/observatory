@@ -57,7 +57,7 @@ Shader "FogOfWar/Mars"
                     float3 rock = _HasTex > 0.5 ? texToDisplay(tex2DSphere(_MarsTex, i.op).rgb) * 1.1
                                                 : lerp(float3(0.42, 0.18, 0.08), float3(0.78, 0.45, 0.25), smoothstep(-4.0, 10.0, i.h));
                     float p = _P0 * exp(-i.h / 11.1);
-                    float boil = 1.0 / (1.0 / 373.15 - 8.314 / 40660.0 * log(max(p, 1e-3) / 1013.25)) - 273.15;
+                    float boil = 1.0 / (1.0 / 373.15 - 8.314 / 43300.0 * log(max(p, 1e-3) / 1013.25)) - 273.15;
                     bool liquid = p > 6.117 && T > 0.0 && T < boil && i.h < _Sea;
                     bool ice = T <= 0.0 && i.h < _Sea + 2.0 && _Tau > 0.3;
                     if (liquid) rock = lerp(float3(0.05, 0.2, 0.4), float3(0.1, 0.35, 0.5), smoothstep(_Sea - 6.0, _Sea, i.h));

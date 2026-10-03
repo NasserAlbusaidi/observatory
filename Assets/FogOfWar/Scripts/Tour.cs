@@ -50,8 +50,8 @@ namespace FogOfWar
                 if (app.Current is BlackHoleScene bh)
                 {
                     bh.SetSpin(0.998f); yield return Shot($"scene-{s + 1}-kerr"); bh.SetSpin(0);
-                    // sandbox: a Sun-like star on the default orbit, run until it breaks up, then let the debris spread
-                    bh.Throw(0); bh.AdvanceUntilBody(0, 500);
+                    // sandbox: a Sun-like star on the default orbit, run until it breaks up, then on to the flare peak
+                    bh.Throw(0); bh.AdvanceUntilBody(0, 4.2e5);
                     log.WriteLine($"  sandbox: {bh.DebugSummary()}");
                     yield return Shot($"scene-{s + 1}-sandbox");
                 }

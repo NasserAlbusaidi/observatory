@@ -25,8 +25,8 @@ namespace FogOfWar
         double LatDT => 70 / (1 + 0.75 * tau);
         double LapseEff => lapse * 0.75 * tau / (1 + 0.75 * tau);
         static double Pressure(double p0, double hKm) => p0 * System.Math.Exp(-hKm / ScaleH);
-        // boiling point (°C) at p mbar: 1/T = 1/373.15 − (R/L) ln(p/1013.25), L = 40.66 kJ/mol
-        static double Boil(double p) => 1 / (1 / 373.15 - 8.314 / 40660 * System.Math.Log(p / 1013.25)) - 273.15;
+        // boiling point (°C) at p mbar: 1/T = 1/373.15 − (R/L) ln(p/1013.25), L = 43.3 kJ/mol, fitted to the triple point and 100 °C at 1 atm
+        static double Boil(double p) => 1 / (1 / 373.15 - 8.314 / 43300 * System.Math.Log(p / 1013.25)) - 273.15;
         int mode;
         double Tk = 210, years;
         Mesh mesh; Vector3[] baseV, verts; float[] H;
