@@ -234,7 +234,8 @@ namespace FogOfWar.OpenWorld
             double dist = r.Mag;
             var vrel = Vel - tv;
             double aMax = AMax, tau = Math.Max(20, 4 * h);
-            var gRel = gShip - sys.Gravity(tp, jd, T);
+            // a target under thrust accelerates by its drive, not by gravity
+            var gRel = gShip - (T.PathAccel != null ? T.PathAccel(jd) : sys.Gravity(tp, jd, T));
 
             if (Plan == Plan.MatchVelocity)
             {

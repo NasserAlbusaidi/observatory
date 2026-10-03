@@ -11,7 +11,7 @@ namespace FogOfWar.OpenWorld
         public double FuelPrice; // cr per tonne
     }
 
-    public enum JobKind { Cargo, Passengers, Survey, Rescue }
+    public enum JobKind { Cargo, Passengers, Survey, Rescue, Intercept }
 
     [Serializable]
     public class Contract
@@ -30,8 +30,11 @@ namespace FogOfWar.OpenWorld
         // rescue: the derelict's two-body orbit about Parent (Body element conventions, deg and km, at Epoch)
         public string Parent;
         public double A, E, I, Node, Peri, L, DL, Epoch;
+        // intercept: the other ship's run from port RunFrom (leaving at T0) to port RunTo (arriving at T1)
+        public string RunFrom, RunTo;
+        public double T0, T1;
 
-        public double Load => Kind == JobKind.Cargo ? Tonnes : Kind == JobKind.Passengers ? People * Career.PassengerTonnes : 0;
+        public double Load => Kind == JobKind.Cargo || Kind == JobKind.Intercept ? Tonnes : Kind == JobKind.Passengers ? People * Career.PassengerTonnes : 0;
     }
 
     [Serializable]
@@ -101,7 +104,7 @@ namespace FogOfWar.OpenWorld
 
         // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
         // player action. Docked/Undocked/TankDry carry the port name or an empty string.
-        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone }
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone }
         public event Action<Happening, string> OnEvent;
 
         void Say(Happening what, string text, bool good = true)
@@ -146,6 +149,7 @@ namespace FogOfWar.OpenWorld
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
             Scan(sys, ship, jd, simDt);
             Rescues(sys, ship, jd, simDt);
+            Intercepts(sys, ship, jd, simDt);
             Expire(jd);
             foreach (var t in Codex.CheckFeats(this, ship)) Say(Happening.Achievement, "Achievement: " + t);
         }
@@ -158,11 +162,11 @@ namespace FogOfWar.OpenWorld
         {
             foreach (var b in sys.Bodies)
             {
-                if (b.Parent == null || IsDerelict(b) || Codex.Visited.Contains(b.Name)) continue;
+                if (b.Parent == null || IsCraft(b) || Codex.Visited.Contains(b.Name)) continue;
                 if ((ship.Pos - sys.Pos(b, jd)).Mag < Codex.VisitRange(b)) { Codex.Visited.Add(b.Name); Say(Happening.Visited, "Codex: " + b.Name + " visited"); }
             }
             var t = ship.Target;
-            if (t == null || t.Parent == null || IsDerelict(t) || Codex.Scanned.Contains(t.Name)) { Codex.ScanTarget = null; return; }
+            if (t == null || t.Parent == null || IsCraft(t) || Codex.Scanned.Contains(t.Name)) { Codex.ScanTarget = null; return; }
             if (Codex.ScanTarget != t.Name) { Codex.ScanTarget = t.Name; Codex.ScanProgress = 0; }
             if (ship.Throttle > 0 || (ship.Pos - sys.Pos(t, jd)).Mag > Codex.ScanRange(t)) return;
             Codex.ScanProgress += simDt;
@@ -220,7 +224,7 @@ namespace FogOfWar.OpenWorld
             Credits += pay; Earned += pay; Done++;
             Active.Remove(c);
             RemoveDerelict(c);
-            Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid, $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
+            Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid, $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
         }
 
         public static double ScanRange(Body b) => Math.Max(Ship.Standoff(b) * 2, b.Radius + 1000);
@@ -297,11 +301,12 @@ namespace FogOfWar.OpenWorld
             for (int i = 0; i < others.Length; i++) { w[i] = 1 / Math.Pow((sys.Pos(sys[others[i].Body], jd) - sys.Pos(here, jd)).Mag, 0.75); wsum += w[i]; }
             Port Pick() { double x = rng.NextDouble() * wsum; for (int i = 0; i < others.Length; i++) if ((x -= w[i]) <= 0) return others[i]; return others[others.Length - 1]; }
 
-            for (int k = 0; k < 7; k++)
+            for (int k = 0; k < 8; k++)
             {
                 var c = k < 3 ? Haul(rng, Pick(), JobKind.Cargo, sys, jd)
                       : k < 5 ? Haul(rng, Pick(), JobKind.Passengers, sys, jd)
                       : k == 6 ? (rng.NextDouble() < 0.6 ? Rescue(rng, sys, jd) : null)
+                      : k == 7 ? (rng.NextDouble() < 0.6 ? Intercept(rng, sys, jd) : null)
                       : Survey(rng, sys, jd);
                 if (c == null) continue;
                 c.Key = $"{Docked.Name}/{day}/{k}";

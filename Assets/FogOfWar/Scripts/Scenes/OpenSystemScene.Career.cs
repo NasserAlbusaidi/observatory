@@ -196,10 +196,10 @@ namespace FogOfWar
         void CodexPanel(PanelUI ui)
         {
             var cx = career.Codex;
-            int bodies = sys.Bodies.FindAll(x => x.Parent != null && !Career.IsDerelict(x)).Count;
+            int bodies = sys.Bodies.FindAll(x => x.Parent != null && !Career.IsCraft(x)).Count;
             ui.Section($"Codex: {cx.Visited.Count} visited, {cx.Scanned.Count} scanned of {bodies}");
             var b = ship.Target;
-            if (b != null && b.Parent != null && !Career.IsDerelict(b))
+            if (b != null && b.Parent != null && !Career.IsCraft(b))
             {
                 bool seen = cx.Visited.Contains(b.Name), scanned = cx.Scanned.Contains(b.Name);
                 GUILayout.Label(b.Name + (scanned ? " (scanned)" : seen ? " (visited)" : " (not visited)"), ui.label);
@@ -228,7 +228,9 @@ namespace FogOfWar
             {
                 double left = c.DeadlineJd - jd;
                 string due = left >= 0 ? "due in " + Days(left) : "LATE by " + Days(-left);
-                string what = c.Kind == JobKind.Rescue
+                string what = c.Kind == JobKind.Intercept
+                    ? $"{c.Title}: " + (c.Dwell > 0 ? $"cargo crossing, {Fmt.Num(100 * c.Dwell / Career.CrossSeconds, 0)} %" : $"match it within {Career.InterceptKm:N0} km and {Career.InterceptKms * 1000:N0} m/s while it burns")
+                    : c.Kind == JobKind.Rescue
                     ? $"{c.Title}: " + (c.Dwell > 0 ? $"crew crossing over, {Fmt.Num(100 * c.Dwell / Career.TransferSeconds, 0)} %" : $"match velocity within {Career.RescueKm:N0} km and {Career.RescueKms * 1000:N0} m/s, then hold")
                     : c.Kind == JobKind.Survey
                     ? $"{c.Title}: {Fmt.Num(100 * c.Dwell / c.DwellNeeded, 0)} % scanned (stay within {Km(career.Codex.ScanRange(sys[c.To]))}, drive off)"
@@ -251,7 +253,8 @@ namespace FogOfWar
                 var dest = career.TargetOf(c);
                 double d = Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0);
                 Career.Trip(d, career.DriveRating * Ship.G0, 1, ship.Mass + c.Load, out double t, out _, out double fuel);
-                string what = c.Kind == JobKind.Survey || c.Kind == JobKind.Rescue ? c.Title
+                string what = c.Kind == JobKind.Intercept ? $"{c.Title}. Its drive peaks at {Fmt.Num(Career.RunnerPeakG(dest, c), 2)} g; its course leaves out the Sun's pull (≈ 0.0006 g at 1 AU)"
+                    : c.Kind == JobKind.Survey || c.Kind == JobKind.Rescue ? c.Title
                     : c.Kind == JobKind.Passengers ? $"{c.People} × {c.Title} → {c.To} (max 1 g)" : $"{c.Tonnes:N0} t {c.Title} → {c.To}";
                 GUILayout.Label($"{what}\n{c.Pay:N0} cr   ·   {Days(c.Days)} allowed   ·   {Km(d)}   ·   full burn at {career.DriveRating:0} g: {Dur(t)} with parking, {fuel:N1} t", ui.note);
                 bool ok = career.CanAccept(c, out string why);
@@ -332,7 +335,47 @@ namespace FogOfWar
         const float WreckKm = 0.038f;                                        // 38 m container hauler
         static readonly Vector3 WreckTumble = new Vector3(1.1f, 0.4f, 2.3f); // deg/s, from the art's Derelict.json
 
-        void LateCareer()
+        void LateCareer() { LateWreck(); LateRunner(); }
+
+        // ---------------------------------------------------------------- the ship under thrust on an intercept job
+
+        Transform runnerT, runnerPlume;
+        float runnerLen = 1;
+        const float RunnerKm = 0.06f; // a 60 m torch ship
+
+        void LateRunner()
+        {
+            var job = career?.Active.Find(x => x.Kind == JobKind.Intercept);
+            var b = job != null ? sys[job.To] : null;
+            if (b == null) { if (runnerT != null) runnerT.gameObject.SetActive(false); return; }
+            if (runnerT == null)
+            {
+                runnerT = new GameObject("Runner").transform;
+                runnerT.SetParent(Root, false);
+                var model = Models.Spawn("TorchShip", runnerT, new Color(0.7f, 0.68f, 0.62f)).transform;
+                Models.AlignMarker(model, "Nose", Vector3.forward);
+                var rends = model.GetComponentsInChildren<Renderer>();
+                var bounds = rends[0].bounds;
+                foreach (var r in rends) { bounds.Encapsulate(r.bounds); foreach (var m in r.sharedMaterials) Own(m); }
+                runnerLen = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+                model.localPosition -= bounds.center - runnerT.position;
+                var pm = OwnMat(Gfx.Unlit(new Color(0.55f, 0.75f, 1f, 0.5f), true));
+                runnerPlume = Gfx.Obj("Runner plume", runnerT, Own(Gfx.UVSphere(24, 12)), pm).transform;
+            }
+            runnerT.gameObject.SetActive(true);
+            runnerT.localPosition = Map(sys.Pos(b, jd), out double k);
+            runnerT.localScale = Vector3.one * (float)(RunnerKm * k / runnerLen);
+            // nose along its thrust: it flies forward, then turns its drive against its motion to brake
+            var acc = b.PathAccel(jd);
+            if (acc.Sqr > 1e-18) runnerT.localRotation = Quaternion.LookRotation(Frame.U(acc.Norm));
+            float g = (float)(acc.Mag / Ship.G0);
+            runnerPlume.gameObject.SetActive(g > 0.005f);
+            float L = runnerLen * Mathf.Clamp(0.4f + 2f * g, 0.4f, 1.2f);
+            runnerPlume.localScale = new Vector3(runnerLen * 0.06f, runnerLen * 0.06f, L);
+            runnerPlume.localPosition = new Vector3(0, 0, -runnerLen * 0.5f - L * 0.9f);
+        }
+
+        void LateWreck()
         {
             var job = career?.Active.Find(x => x.Kind == JobKind.Rescue);
             var b = job != null ? sys[job.To] : null;

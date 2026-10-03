@@ -13,10 +13,20 @@ namespace FogOfWar.OpenWorld
         const string DerelictPrefix = "Derelict ";
 
         public static bool IsDerelict(Body b) => b != null && b.Name.StartsWith(DerelictPrefix);
+        // a ship rather than a natural body: a derelict or a ship flying its own course
+        public static bool IsCraft(Body b) => IsDerelict(b) || b?.Path != null;
 
         // The body a job sends you to: the survey target, the derelict (made up for a job still on the board), or the port.
         public Body TargetOf(Contract c) =>
-            c.Kind == JobKind.Survey ? Sys[c.To] : c.Kind == JobKind.Rescue ? Sys[c.To] ?? MakeBody(c, Sys) : Sys[PortAt(c.To)?.Body ?? ""];
+            c.Kind == JobKind.Survey ? Sys[c.To] : c.Kind == JobKind.Rescue || c.Kind == JobKind.Intercept ? Sys[c.To] ?? Preview(c) : Sys[PortAt(c.To)?.Body ?? ""];
+
+        // a job still on the board has no body in the system yet: build one once for the panel to measure
+        readonly System.Collections.Generic.Dictionary<int, Body> previews = new System.Collections.Generic.Dictionary<int, Body>();
+        Body Preview(Contract c)
+        {
+            if (!previews.TryGetValue(c.Id, out var b)) previews[c.Id] = b = c.Kind == JobKind.Rescue ? MakeBody(c, Sys) : MakeRunner(c, Sys);
+            return b;
+        }
 
         static readonly string[] Hulls =
         {
@@ -74,13 +84,14 @@ namespace FogOfWar.OpenWorld
 
         void SpawnDerelict(Contract c)
         {
-            if (c.Kind != JobKind.Rescue || Sys == null || Sys[c.To] != null || Sys[c.Parent] == null) return;
-            Sys.Bodies.Add(MakeBody(c, Sys));
+            if (Sys == null || Sys[c.To] != null) return;
+            if (c.Kind == JobKind.Rescue && Sys[c.Parent] != null) Sys.Bodies.Add(MakeBody(c, Sys));
+            if (c.Kind == JobKind.Intercept) Sys.Bodies.Add(MakeRunner(c, Sys));
         }
 
         void RemoveDerelict(Contract c)
         {
-            if (c.Kind != JobKind.Rescue || Sys == null) return;
+            if ((c.Kind != JobKind.Rescue && c.Kind != JobKind.Intercept) || Sys == null) return;
             Sys.Bodies.RemoveAll(b => b.Name == c.To);
         }
 

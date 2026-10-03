@@ -71,6 +71,8 @@ namespace FogOfWar.OpenWorld
         public bool Synchronous;            // spins once per orbit, prime meridian facing the parent
         public bool SizeEstimated;          // no measured radius; shown at a nominal size (labelled)
         public bool Barycentric;
+        // A ship flying its own course: heliocentric position and the thrust it is under, by Julian date (null for natural bodies).
+        public Func<double, D3> Path, PathAccel;
         public bool Asteroid;               // a named small body orbiting the Sun            // ephemeris gives the system barycentre; subtract the big moons' pull
         public List<Body> MassiveMoons = new List<Body>();
 
@@ -213,6 +215,7 @@ namespace FogOfWar.OpenWorld
         D3 PosNoCache(Body b, double jd)
         {
             if (b.Parent == null) return D3.Zero;
+            if (b.Path != null) return b.Path(jd);
             var parent = b.Parent == Sun ? D3.Zero : jd == cacheJd ? Pos(b.Parent, jd) : PosNoCache(b.Parent, jd);
             var p = parent + (b.Cheb != null && b.Cheb.Eval(jd, out var local) ? local : b.Kepler(jd));
             if (b.Barycentric && b.MassiveMoons.Count > 0)
