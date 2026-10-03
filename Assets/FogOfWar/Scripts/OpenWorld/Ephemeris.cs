@@ -68,6 +68,14 @@ namespace FogOfWar.OpenWorld
         public double A, E, I, Node, Peri, L, dA, dE, dI, dNode, dPeri, dL;
         public double EpochJd = 2451545.0;
         public double LaplaceRa = double.NaN, LaplaceDec;
+        public bool Synchronous;            // spins once per orbit, prime meridian facing the parent
+        public bool SizeEstimated;          // no measured radius; shown at a nominal size (labelled)
+        public bool Barycentric;            // ephemeris gives the system barycentre; subtract the big moons' pull
+        public List<Body> MassiveMoons = new List<Body>();
+
+        // Pole of the reference plane the elements are measured in (Laplace or spin pole; mean orbit pole otherwise).
+        public D3 OrbitPole => !double.IsNaN(LaplaceRa) ? Frame.RaDec(LaplaceRa, LaplaceDec)
+            : new D3(Math.Sin(Deg(I)) * Math.Sin(Deg(Node)), -Math.Sin(Deg(I)) * Math.Cos(Deg(Node)), Math.Cos(Deg(I)));
 
         public D3 Pole => Frame.RaDec(PoleRa, PoleDec);
 
@@ -128,6 +136,14 @@ namespace FogOfWar.OpenWorld
         // Body-fixed axes in the ecliptic frame: X prime meridian, Z north pole.
         public void Axes(double jd, out D3 prime, out D3 east, out D3 pole)
         {
+            if (Synchronous && Parent != null)
+            {
+                pole = OrbitPole;
+                var toParent = -Kepler(jd).Norm;
+                prime = (toParent - pole * D3.Dot(toParent, pole)).Norm;
+                east = D3.Cross(pole, prime);
+                return;
+            }
             double d = jd - 2451545.0;
             double ra = PoleRa, dec = PoleDec, W = W0 + Wd * d;
             if (Name == "Moon")
@@ -154,6 +170,17 @@ namespace FogOfWar.OpenWorld
             east = D3.Cross(pole, prime);
         }
     }
+
+    [Serializable] class SatMoon
+    {
+        public string name, parent, code, frame;
+        public double epochJd, a, e, i, node, peri, L, n, dNode, dPeri, laplaceRa, laplaceDec, gm, radiusKm;
+        public bool calibrated;
+    }
+    [Serializable] class SatFile { public SatMoon[] moons; }
+    [Serializable] class ArtBody { public string name; public float meanRadiusKm; }
+    [Serializable] class ArtBodies { public ArtBody[] items; }
+    [Serializable] class PlanetJson { public float meanRadiusKm; }
 
     public class SolarSystem
     {
@@ -184,9 +211,16 @@ namespace FogOfWar.OpenWorld
         D3 PosNoCache(Body b, double jd)
         {
             if (b.Parent == null) return D3.Zero;
-            var parent = b.Parent == Sun ? D3.Zero : PosNoCache(b.Parent, jd);
-            if (b.Cheb != null && b.Cheb.Eval(jd, out var local)) return parent + local;
-            return parent + b.Kepler(jd);
+            var parent = b.Parent == Sun ? D3.Zero : jd == cacheJd ? Pos(b.Parent, jd) : PosNoCache(b.Parent, jd);
+            var p = parent + (b.Cheb != null && b.Cheb.Eval(jd, out var local) ? local : b.Kepler(jd));
+            if (b.Barycentric && b.MassiveMoons.Count > 0)
+            {
+                // planet centre = barycentre − Σ GMᵢ rᵢ / (GM + Σ GMᵢ), rᵢ = moon relative to the planet
+                var s = D3.Zero; double m = b.GM;
+                foreach (var moon in b.MassiveMoons) { s += moon.Kepler(jd) * moon.GM; m += moon.GM; }
+                p -= s / m;
+            }
+            return p;
         }
 
         public D3 Vel(Body b, double jd)
@@ -204,8 +238,11 @@ namespace FogOfWar.OpenWorld
             foreach (var b in Bodies)
             {
                 if (b.GM < 1) continue;
+                bool moon = b.Parent != null && b.Parent != Sun;
+                // a moon matters only near its planet (its pull on the Sun is already in the planet system's ephemeris)
+                if (moon && b != exclude && (p - Pos(b.Parent, jd)).Sqr > (b.A * 50) * (b.A * 50)) continue;
                 var bp = Pos(b, jd);
-                if (b != Sun) g -= bp * (b.GM / Math.Pow(bp.Sqr, 1.5)); // indirect
+                if (b != Sun && !moon) g -= bp * (b.GM / Math.Pow(bp.Sqr, 1.5)); // indirect
                 if (b == exclude) continue;
                 var rel = p - bp;
                 double r2 = rel.Sqr;
@@ -219,6 +256,44 @@ namespace FogOfWar.OpenWorld
                 }
             }
             return g;
+        }
+
+        // Every known moon of Mars and the giants: JPL SSD mean elements referred to their Laplace planes, with short-period
+        // moons recalibrated to Horizons (Tools/satellites/build.mjs). Radii: JPL physical table, then the art pack's
+        // shape models and maps; otherwise unknown and shown at 2 km.
+        static void LoadSatellites(SolarSystem s)
+        {
+            var ta = Resources.Load<TextAsset>("Ephem/Satellites");
+            if (ta == null) { Debug.LogError("Fog of War: Ephem/Satellites.json missing"); return; }
+            var art = new Dictionary<string, float>();
+            var ab = Resources.Load<TextAsset>("Models/Bodies/Bodies");
+            if (ab != null) foreach (var x in JsonUtility.FromJson<ArtBodies>("{\"items\":" + ab.text + "}").items) art[x.name] = x.meanRadiusKm;
+            foreach (var m in JsonUtility.FromJson<SatFile>(ta.text).moons)
+            {
+                var parent = s[m.parent];
+                if (parent == null) continue;
+                double r = m.radiusKm;
+                if (r <= 0 && art.TryGetValue(m.name, out var ar)) r = ar;
+                if (r <= 0)
+                {
+                    var pj = Resources.Load<TextAsset>("Planets/" + m.name + "/Body");
+                    if (pj != null) r = JsonUtility.FromJson<PlanetJson>(pj.text).meanRadiusKm;
+                }
+                bool icy = m.parent != "Mars" && m.parent != "Jupiter";
+                var b = new Body
+                {
+                    Name = m.name.Replace('_', ' '), Parent = parent, GM = m.gm, Radius = r > 0 ? r : 2, SizeEstimated = r <= 0,
+                    Look = Look.Rocky, Texture = "Planets/" + m.name + "/Color", Synchronous = true,
+                    ColA = icy ? new Color(0.62f, 0.62f, 0.64f) : new Color(0.42f, 0.39f, 0.36f),
+                    ColB = icy ? new Color(0.86f, 0.86f, 0.88f) : new Color(0.62f, 0.58f, 0.53f),
+                    A = m.a, E = m.e, I = m.i, Node = m.node, Peri = m.peri, L = m.L, dL = m.n, dNode = m.dNode, dPeri = m.dPeri,
+                    EpochJd = m.epochJd, LaplaceRa = m.frame == "ecliptic" ? double.NaN : m.laplaceRa, LaplaceDec = m.laplaceDec,
+                };
+                if (b.Name == "Phobos") { b.Synchronous = false; b.PoleRa = 317.68; b.PoleDec = 52.90; b.W0 = 35.06; b.Wd = 1128.8445850; }
+                if (b.Name == "Deimos") { b.Synchronous = false; b.PoleRa = 316.65; b.PoleDec = 53.52; b.W0 = 79.41; b.Wd = 285.1618970; }
+                s.Bodies.Add(b);
+                if (parent.Barycentric && b.GM > 1) parent.MassiveMoons.Add(b);
+            }
         }
 
         // Fallback elements: JPL "Keplerian Elements for Approximate Positions of the Major Planets", table 1
@@ -264,7 +339,7 @@ namespace FogOfWar.OpenWorld
                 PoleRa = 269.9949, PoleDec = 66.5392, W0 = 38.3213, Wd = 13.17635815,
             };
             s.Bodies.Add(s.Moon);
-            var mars = P(Planet("Mars", 1.52371034, 0.00001847, 0.09339410, 0.00007882, 1.84969142, -0.00813131, -4.55343205, 19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343),
+            P(Planet("Mars", 1.52371034, 0.00001847, 0.09339410, 0.00007882, 1.84969142, -0.00813131, -4.55343205, 19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343),
                 42828.37, 3396.2, 0.00589, 1.956e-3, Look.Rocky, new Color(0.6f, 0.3f, 0.16f), new Color(0.82f, 0.55f, 0.36f), 317.681, 52.887, 176.630, 350.89198226, "Textures/Mars_Color", new Color(0.9f, 0.6f, 0.45f, 0.25f));
             // Giants: positions are system barycentres. Saturn rotation is the IAU System III (radio) period.
             P(Planet("Jupiter", 5.20288700, -0.00011607, 0.04838624, -0.00013253, 1.30439695, -0.00183714, 34.39644051, 3034.74612775, 14.72847983, 0.21252668, 100.47390909, 0.20469106),
@@ -277,20 +352,12 @@ namespace FogOfWar.OpenWorld
             P(Planet("Neptune", 30.06992276, 0.00026291, 0.00859048, 0.00005105, 1.77004347, 0.00035372, -55.12002969, 218.45945325, 44.96476227, -0.32241464, 131.78422574, -0.00508664),
                 6836529, 24764, 0.01708, 3.408e-3, Look.Ice, new Color(0.58f, 0.77f, 0.89f), new Color(0.64f, 0.81f, 0.91f), 299.36, 43.46, 249.978, 541.1397757, "Planets/Neptune/Color");
 
-            // Martian moons: JPL SSD mean elements (epoch 2000-01-01.5 TDB), Laplace-plane referred, with precession.
-            s.Bodies.Add(new Body
-            {
-                Name = "Phobos", Parent = mars, GM = 7.087e-4, Radius = 11.08, Look = Look.Rocky, ColA = new Color(0.28f, 0.25f, 0.23f), ColB = new Color(0.4f, 0.36f, 0.32f),
-                PoleRa = 317.68, PoleDec = 52.90, W0 = 35.06, Wd = 1128.8445850,
-            }.JplMoon(9375, 0.015, 216.3, 189.7, 1.1, 169.2, 1128.8444155, 1.1, 2.3, 317.7, 52.9));
-            s.Bodies.Add(new Body
-            {
-                Name = "Deimos", Parent = mars, GM = 9.6e-5, Radius = 6.2, Look = Look.Rocky, ColA = new Color(0.33f, 0.3f, 0.27f), ColB = new Color(0.46f, 0.42f, 0.37f),
-                PoleRa = 316.65, PoleDec = 53.52, W0 = 79.41, Wd = 285.1618970,
-            }.JplMoon(23457, 0.0002, 0.0, 205.0, 1.8, 54.3, 285.1618875, 0, 56.2, 316.6, 53.5));
+            foreach (var g in new[] { "Jupiter", "Saturn", "Uranus", "Neptune" }) s[g].Barycentric = true;
+            LoadSatellites(s);
 
             foreach (var b in s.Bodies)
             {
+                if (b.Parent != null && b.Parent != sun && b != s.Moon) continue; // moons use mean elements
                 b.Cheb = Cheb.Load(b.Name);
                 if (b.Cheb != null) { s.EphemStart = Math.Max(s.EphemStart, b.Cheb.JdStart); s.EphemEnd = Math.Min(s.EphemEnd, b.Cheb.JdEnd); }
             }

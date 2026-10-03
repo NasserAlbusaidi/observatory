@@ -19,7 +19,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Every planet and moon is where it really is today, on its real orbit. Your ship has a fusion drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b>, and it flies a brachistochrone, burning toward the target, flipping at the midpoint and braking the rest of the way, then parks in orbit.\n\n" +
             "Crank time compression to cross the system. At 1 g, Mars is a few days away; Neptune is a few weeks.";
-        public override string Note => "Positions: JPL Horizons fits, 2000–2100 (TDB). Drive efficiency and high-g endurance are fictional; trajectories and Δv are real. Keys: Space drive on/off · F flip · P plot & burn · T next target · [ ] time compression · M system map. Drag to orbit the camera, scroll to zoom from 20 m to the whole system.";
+        public override string Note => "Positions: JPL Horizons fits, 2000–2100 (TDB). Drive efficiency and high-g endurance are fictional; trajectories and Δv are real. Coasting follows two-body conics around the dominant body (patched conics). Keys: Space drive on/off · F flip · P plot & burn · T next target · [ ] time compression · M system map. Drag to orbit the camera, scroll to zoom from 20 m to the whole system.";
 
         const double LinearLimit = 1e5;     // km rendered 1:1 around the camera
         static readonly double[] Warps = { 1, 10, 100, 1e3, 1e4, 1e5, 1e6 };
@@ -57,7 +57,7 @@ namespace FogOfWar
         protected override void Build()
         {
             sys = SolarSystem.Build();
-            targets = sys.Bodies.FindAll(b => b != sys.Sun);
+            targets = sys.Bodies.FindAll(b => b != sys.Sun && (b.Parent == sys.Sun || b.Radius >= 100 || b == sys.Moon)); // T cycles these
             jd = Frame.JulianDateTdb(DateTime.UtcNow);
             warpIdx = 0;
 
@@ -67,6 +67,8 @@ namespace FogOfWar
             Cam.fieldOfView = 55;
 
             LoadArtBodies();
+            BuildShip();
+            PlaceShipNearEarth();
             var sphere = Own(Gfx.UVSphere(128, 64));
             foreach (var b in sys.Bodies)
             {
@@ -88,13 +90,14 @@ namespace FogOfWar
                     v.t = Gfx.Obj(b.Name, Root, sphere, m).transform;
                     v.mats = new[] { m };
                 }
-                else if (Resources.Load<GameObject>("Models/Bodies/" + b.Name) != null)
+                else if (ModelFor(b) is string modelPath)
                 {
                     // irregular body from the art pack: mean radius 1 (volume-equivalent), body frame given by its
                     // Prime / North markers (the FBX axis conversion can't be trusted). Scaled by meanRadiusKm.
+                    // Small moons with no shape model borrow one of the instancing rocks.
                     var holder = new GameObject(b.Name).transform;
                     holder.SetParent(Root, false);
-                    var go = Models.Spawn("Bodies/" + b.Name, holder, b.ColA);
+                    var go = Models.Spawn(modelPath, holder, b.ColA);
                     AlignToMarkers(go.transform);
                     if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0) b.Radius = info.meanRadiusKm;
                     v.t = holder; v.model = true;
@@ -109,6 +112,13 @@ namespace FogOfWar
                     m.SetColor("_ColA", b.ColA); m.SetColor("_ColB", b.ColB); m.SetColor("_Atmo", b.Atmo);
                     m.SetFloat("_Kind", b.Look == Look.Rocky ? 0 : b.Look == Look.Cloudy ? 1 : b.Look == Look.Gas ? 2 : 3);
                     m.SetFloat("_Seed", b.Name.GetHashCode() % 97);
+                    if (b.Name == "Titan")
+                    {
+                        // the art map is the 938 nm surface; in visible light Titan is an orange haze ball
+                        m.SetColor("_Atmo", new Color(0.9f, 0.62f, 0.3f, 0.9f));
+                        m.SetColor("_HazeCol", new Color(0.78f, 0.55f, 0.28f));
+                        m.SetFloat("_Haze", 0.85f);
+                    }
                     if (b.Texture != null && Art.Bind(m, ("_MainTex", b.Texture)))
                     {
                         // Planets/<Body> maps are contrast-stretched per body; geometric albedo sets the absolute
@@ -122,6 +132,10 @@ namespace FogOfWar
                 }
                 vis.Add(v);
             }
+            BuildRings();
+            // biggest first, so labels of large bodies win overlaps
+            vis.Sort((x, y) => y.b.Radius.CompareTo(x.b.Radius));
+            foreach (var b in sys.Bodies) if (b.Parent != null && b.Radius >= 100) ship.Obstacles.Add(b);
 
             orbitMesh = Own(Gfx.LineMesh("Orbits"));
             orbitMat = OwnMat(Gfx.Unlit(Color.white, true));
@@ -130,8 +144,73 @@ namespace FogOfWar
             stars = Gfx.Starfield(Root, 6000).transform;
             stars.localRotation = Frame.StarsToRender;
 
-            BuildShip();
-            PlaceShipNearEarth();
+        }
+
+        class RingVis { public Vis planet; public Transform t; public Material m; public double outerKm; }
+        [Serializable] class RingJson { public float innerKm, outerKm; }
+        readonly List<RingVis> rings = new List<RingVis>();
+        bool faintRings;
+
+        void BuildRings()
+        {
+            rings.Clear();
+            foreach (var name in new[] { "Jupiter", "Saturn", "Uranus", "Neptune" })
+            {
+                var tex = Resources.Load<Texture2D>("Rings/" + name + "_Rings");
+                var json = Resources.Load<TextAsset>("Rings/" + name + "_Rings");
+                if (tex == null || json == null) continue;
+                var rj = JsonUtility.FromJson<RingJson>(json.text);
+                var m = OwnMat(Gfx.Mat("Ring"));
+                m.SetTexture("_MainTex", tex);
+                m.SetFloat("_Inner", rj.innerKm / rj.outerKm);
+                var planet = vis.Find(v => v.b.Name == name);
+                var t = Gfx.Obj(name + " rings", Root, Own(Annulus(rj.innerKm / rj.outerKm, 720)), m).transform;
+                rings.Add(new RingVis { planet = planet, t = t, m = m, outerKm = rj.outerKm });
+            }
+        }
+
+        static Mesh Annulus(float inner, int seg)
+        {
+            var v = new Vector3[seg * 2]; var tri = new int[seg * 6];
+            for (int i = 0; i < seg; i++)
+            {
+                float a = i * Mathf.PI * 2 / seg, c = Mathf.Cos(a), s = Mathf.Sin(a);
+                // the outer edge sits on the polygon's corners, so push it out to cover the true circle
+                float outer = 1f / Mathf.Cos(Mathf.PI / seg);
+                v[i * 2] = new Vector3(c * inner, 0, s * inner); v[i * 2 + 1] = new Vector3(c * outer, 0, s * outer);
+                int j = (i + 1) % seg;
+                tri[i * 6] = i * 2; tri[i * 6 + 1] = j * 2; tri[i * 6 + 2] = i * 2 + 1;
+                tri[i * 6 + 3] = i * 2 + 1; tri[i * 6 + 4] = j * 2; tri[i * 6 + 5] = j * 2 + 1;
+            }
+            var m = new Mesh { name = "Annulus", vertices = v, triangles = tri };
+            m.RecalculateBounds();
+            return m;
+        }
+
+        void PlaceRings(D3 sunW)
+        {
+            foreach (var r in rings)
+            {
+                var pv = r.planet;
+                float k = pv.t.localScale.x / (float)pv.b.Radius; // render units per km at the planet
+                r.t.localPosition = pv.t.localPosition;
+                r.t.localRotation = pv.t.localRotation;
+                r.t.localScale = Vector3.one * (float)(r.outerKm * k);
+                r.m.SetVector("_PlanetPos", pv.t.localPosition);
+                r.m.SetFloat("_PlanetR", pv.t.localScale.x);
+                r.m.SetVector("_SunDir", Frame.U((sunW - sys.Pos(pv.b, jd)).Norm));
+                // Saturn's rings are bright for real; the others are τ ≈ 10⁻⁶–10⁻¹ and nearly invisible unless boosted
+                r.m.SetFloat("_TauGain", faintRings && pv.b.Name != "Saturn" ? 1000f : 1f);
+            }
+        }
+
+        string ModelFor(Body b)
+        {
+            if (Resources.Load<GameObject>("Models/Bodies/" + b.Name) != null) return "Bodies/" + b.Name;
+            bool moon = b.Parent != null && b.Parent != sys.Sun;
+            if (moon && b.Radius < 150 && (b.Texture == null || Resources.Load<Texture2D>(b.Texture) == null))
+                return $"Asteroids/Asteroid{(b.Name.GetHashCode() & 0x7fffffff) % 32:00}";
+            return null;
         }
 
         [Serializable] class BodyJson { public float geometricAlbedo; }
@@ -227,21 +306,81 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- simulation
 
+        // -fowprof: log where frame time goes, every 2 s
+        static readonly bool Prof = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowprof") >= 0;
+        readonly System.Diagnostics.Stopwatch swTick = new System.Diagnostics.Stopwatch(), swLate = new System.Diagnostics.Stopwatch(), swGui = new System.Diagnostics.Stopwatch();
+        int profFrames, profSteps; float profT;
+
         public override void Tick(float dt)
+        {
+            if (Prof) swTick.Start();
+            try { TickInner(dt); } finally { if (Prof) swTick.Stop(); }
+            if (Prof && (profT += Time.unscaledDeltaTime) > 2f)
+            {
+                Debug.Log($"PROF frames {profFrames} tick {swTick.Elapsed.TotalMilliseconds / profFrames:F2} ms late {swLate.Elapsed.TotalMilliseconds / profFrames:F2} ms gui {swGui.Elapsed.TotalMilliseconds / profFrames:F2} ms substeps/frame {profSteps / (float)profFrames:F0} warp {WarpNames[warpIdx]}");
+                swTick.Reset(); swLate.Reset(); swGui.Reset(); profFrames = profSteps = 0; profT = 0;
+            }
+            profFrames++;
+        }
+
+        void TickInner(float dt)
         {
             double simDt = dt * Warps[warpIdx];
             warpLimited = false;
+            // only bodies the ship could reach this frame get per-substep collision checks
+            ship.Near.Clear();
+            double reach0 = simDt * (ship.Vel.Mag + 60) + 100;
+            foreach (var b in sys.Bodies)
+                if (b.Parent != null && (sys.Pos(b, jd) - ship.Pos).Mag < reach0 + b.Radius * 2) ship.Near.Add(b);
             int steps = 0;
             while (simDt > 1e-9)
             {
-                double h = SubstepSize(simDt);
                 if (++steps > MaxSubsteps) { warpLimited = true; break; }
+                if (ship.Landed != null && !ship.DriveLit && !ship.Autopilot)
+                {
+                    ship.Step(sys, jd, simDt, reference); // riding the surface: no dynamics to resolve
+                    jd += simDt / 86400; simDt = 0;
+                    break;
+                }
+                if (Coasting())
+                {
+                    double used = Coast(simDt);
+                    jd += used / 86400; simDt -= used;
+                    profSteps++;
+                    continue;
+                }
+                double h = SubstepSize(simDt);
                 ship.Step(sys, jd, h, reference);
+                profSteps++;
                 jd += h / 86400;
                 simDt -= h;
             }
             if (warpLimited && warpIdx > 0) warpIdx--;
             reference = Ship.Dominant(sys, ship.Pos, jd);
+        }
+
+        // Drive off (or the autopilot parked in orbit): ride a two-body conic around the dominant body. Exact at any
+        // warp; other bodies' pulls are ignored until the next burn (patched conics).
+        bool Coasting() => ship.Landed == null && (ship.Autopilot ? ship.Phase == "in orbit" && ship.Throttle == 0 : !ship.DriveLit);
+
+        double Coast(double maxDt)
+        {
+            var dom = Ship.Dominant(sys, ship.Pos, jd);
+            var dp = sys.Pos(dom, jd);
+            var r0 = ship.Pos - dp; var v0 = ship.Vel - sys.Vel(dom, jd);
+            double T = Rails.Period(r0, v0, dom.GM);
+            // chunks short enough to notice a sphere-of-influence change or a surface in the way
+            double chunk = Math.Min(maxDt, double.IsInfinity(T) ? Math.Max(60, 0.25 * r0.Mag / Math.Max(v0.Mag, 1e-6)) : T / 16);
+            chunk = Math.Max(chunk, Math.Min(maxDt, 1));
+            Rails.Propagate(r0, v0, dom.GM, chunk, out var r1, out var v1);
+            double jd1 = jd + chunk / 86400;
+            ship.Pos = sys.Pos(dom, jd1) + r1;
+            ship.Vel = sys.Vel(dom, jd1) + v1;
+            ship.Phase = ship.Autopilot ? "in orbit" : "coasting";
+            ship.CheckTouchdown(sys, jd1);
+            // the autopilot re-checks its orbit after each arc and burns again if it has drifted
+            if (ship.Autopilot) ship.Step(sys, jd1, 0.001, dom);
+            return chunk;
         }
 
         double SubstepSize(double remaining)
@@ -295,6 +434,12 @@ namespace FogOfWar
         }
 
         public override void LateTick(float dt)
+        {
+            if (Prof) swLate.Start();
+            try { LateInner(dt); } finally { if (Prof) swLate.Stop(); }
+        }
+
+        void LateInner(float dt)
         {
             camDist = Math.Max(camDist, MinCamDist()); // targets change size under a fixed camera distance
             var off = OffsetDir();
@@ -355,6 +500,7 @@ namespace FogOfWar
                 plumeMat.SetColor("_Color", new Color(0.55f, 0.75f, 1f, 0.35f + 0.5f * thr));
             }
 
+            PlaceRings(sunW);
             DrawOrbits();
         }
 
@@ -368,8 +514,9 @@ namespace FogOfWar
                 bool isMoon = b.Parent != sys.Sun;
                 // moons' orbits only when the camera is near enough to see them as more than a dot
                 var parentW = isMoon ? sys.Pos(b.Parent, jd) : D3.Zero;
-                if (isMoon && (parentW - camW).Mag > b.A * 400) continue;
                 bool tgt = ship.Target == b;
+                if (isMoon && (parentW - camW).Mag > b.A * 400) continue;
+                if (isMoon && !tgt && b.Radius < 50) continue; // hundreds of small moons: their orbits would be a hairball
                 var c = tgt ? new Color(1f, 0.71f, 0.28f, 0.75f) : isMoon ? new Color(0.5f, 0.6f, 0.85f, 0.35f) : new Color(0.45f, 0.55f, 0.85f, 0.4f);
                 // planet orbits fade out when the camera is in close: from a ship they'd be streaks across the screen
                 if (!isMoon) c.a *= Mathf.Lerp(tgt ? 0.3f : 0f, 1f, Mathf.Clamp01((float)(Math.Log10(Math.Max(camDist, 1)) - 3) / 4f));
@@ -380,7 +527,7 @@ namespace FogOfWar
                 {
                     double t = jd + period * i / N;
                     // the real (perturbed) path relative to the parent, drawn around where the parent is now
-                    var p = parentW + sys.PosAt(b, t) - (isMoon ? sys.PosAt(b.Parent, t) : D3.Zero);
+                    var p = parentW + (b.Cheb == null && isMoon ? b.Kepler(t) : sys.PosAt(b, t) - (isMoon ? sys.PosAt(b.Parent, t) : D3.Zero));
                     var q = Map(p, out _);
                     if (i > 0) { pts.Add(prev); pts.Add(q); cols.Add(c); cols.Add(c); }
                     prev = q;
@@ -419,6 +566,12 @@ namespace FogOfWar
         }
 
         public override void OnGUIOverlay()
+        {
+            if (Prof) swGui.Start();
+            try { OverlayInner(); } finally { if (Prof) swGui.Stop(); }
+        }
+
+        void OverlayInner()
         {
             var e = Event.current;
             if (e.type == EventType.KeyDown && !App.InputLocked)
@@ -500,6 +653,8 @@ namespace FogOfWar
             float rpx = (float)renderRadius / dist * pxPerRad;
             bool tgt = b != null && b == ship.Target;
             if (rpx > 40 && !tgt) return; // big enough to recognise
+            // hundreds of small moons: name them only when the camera is close to them
+            if (b != null && !tgt && b.Parent != null && b.Parent != sys.Sun && b.Radius < 100 && dist > 2e4 * renderRadius) return;
             var g = new Vector2(sp.x / ui, (Screen.height - sp.y) / ui);
             foreach (var (c, cr, cd) in occluders)
                 if (cd < dist * 0.999f && (c - g).magnitude < cr) return;
@@ -536,11 +691,13 @@ namespace FogOfWar
                 var r = tp - ship.Pos;
                 var vr = ship.Vel - sys.Vel(ship.Target, jd);
                 double closing = D3.Dot(vr, r.Norm);
-                list.Add(new Readout("Target", ship.Target.Name, Tone.Hot));
+                list.Add(new Readout("Target", ship.Target.Name + (ship.Target.SizeEstimated ? " (size unknown, shown 2 km)" : ""), Tone.Hot));
+                if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
                 list.Add(new Readout("Closing speed", Fmt.Num(closing, 3) + " km/s", closing > 0 ? Tone.Cold : Tone.Normal));
                 list.Add(new Readout("Flip-and-burn at " + Fmt.Num(ship.MaxG, 2) + " g", Dur(ship.EtaSeconds(sys, jd))));
             }
+            if (faintRings) list.Add(new Readout("Faint rings", "brightened ×1000 (not real)", Tone.Bad));
             list.Add(new Readout("Autopilot", ship.Autopilot ? ship.Phase : ship.Landed != null ? ship.Phase : "off", ship.Autopilot ? Tone.Hot : Tone.Normal));
         }
 
@@ -577,16 +734,31 @@ namespace FogOfWar
             int wi = ui.Buttons(wl);
             if (wi >= 0) warpIdx = wi;
 
+            faintRings = ui.Toggle("Brighten faint rings ×1000 (Jupiter, Uranus, Neptune)", faintRings);
             GUILayout.Label("Camera", ui.label);
             int ci = ui.Buttons("Ship", "Target", "System map");
             if (ci == 0) SetPivot(Pivot.Ship, 0.16);
             if (ci == 1 && ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4);
             if (ci == 2) { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
 
-            var names = new string[targets.Count];
-            for (int i = 0; i < targets.Count; i++) names[i] = (targets[i].Parent != sys.Sun ? "   " : "") + targets[i].Name;
-            int ti = ui.Choice("Target", targetIdx, names);
-            if (ti != targetIdx) SetTarget(targets[ti]);
+            // target picker: choose a planet, then its moons (largest first; tiny ones are clickable by label)
+            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun);
+            var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
+            int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
+            if (si >= 0) SetTarget(planets[si]);
+            if (sel != null)
+            {
+                var moons = sys.Bodies.FindAll(x => x.Parent == sel && x.Radius >= 10);
+                moons.Sort((x, y) => y.Radius.CompareTo(x.Radius));
+                int small = sys.Bodies.FindAll(x => x.Parent == sel).Count - moons.Count;
+                if (moons.Count > 0)
+                {
+                    var mnames = moons.ConvertAll(m => (m == ship.Target ? "● " : "") + m.Name).ToArray();
+                    int mi = ui.Buttons(mnames);
+                    if (mi >= 0) SetTarget(moons[mi]);
+                }
+                if (small > 0) GUILayout.Label(small + " smaller moons: click their labels in view", ui.label);
+            }
         }
     }
 }

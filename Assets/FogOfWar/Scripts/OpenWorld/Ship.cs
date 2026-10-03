@@ -18,6 +18,10 @@ namespace FogOfWar.OpenWorld
         public double DvUsed;
         public string Phase = "coasting";
         public Body Landed;
+        // Bodies the ship could reach this frame (collision checks) and bodies big enough to steer around; the scene
+        // refreshes both, so a step doesn't evaluate hundreds of moons.
+        public readonly System.Collections.Generic.List<Body> Near = new System.Collections.Generic.List<Body>();
+        public readonly System.Collections.Generic.List<Body> Obstacles = new System.Collections.Generic.List<Body>();
 
         public double AMax => MaxG * G0;
 
@@ -78,11 +82,17 @@ namespace FogOfWar.OpenWorld
             Pos += Vel * h;
             DvUsed += Throttle * AMax * h;
 
-            // Touchdown: anything that hits a surface stops on it (no crash model yet).
-            foreach (var b in sys.Bodies)
+            CheckTouchdown(sys, jd);
+        }
+
+        // Anything that hits a surface stops on it (no crash model yet). Bodies come from the scene's Near list, at
+        // the given date; using the step's start date keeps the ephemeris cache warm.
+        public void CheckTouchdown(SolarSystem sys, double jd)
+        {
+            foreach (var b in Near)
             {
                 if (b == sys.Sun) continue;
-                var bp = sys.Pos(b, jd + h / 86400);
+                var bp = sys.Pos(b, jd);
                 var r = Pos - bp;
                 double R = b.Radius * Math.Max(b.Shape.x, Math.Max(b.Shape.y, b.Shape.z)) * (1 - b.Flattening) * 0.98;
                 if (r.Mag < R)
@@ -148,7 +158,7 @@ namespace FogOfWar.OpenWorld
         // Bend the straight-line course around any body (other than the target) it would pass through.
         D3 Avoid(SolarSystem sys, double jd, D3 dir, double dist)
         {
-            foreach (var b in sys.Bodies)
+            foreach (var b in Obstacles)
             {
                 if (b == Target || b.Parent == null) continue;
                 var c = sys.Pos(b, jd);

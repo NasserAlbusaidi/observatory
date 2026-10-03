@@ -12,6 +12,8 @@ Shader "FogOfWar/Planet"
         _Seed ("Seed", Float) = 0
         _HasTex ("Has texture", Float) = 0
         _Gain ("Map gain", Float) = 1
+        _Haze ("Haze cover", Float) = 0
+        _HazeCol ("Haze colour", Color) = (0.8,0.6,0.3,1)
         _MainTex ("Colour map", 2D) = "white" {}
     }
     SubShader
@@ -26,7 +28,8 @@ Shader "FogOfWar/Planet"
             #include "UnityCG.cginc"
             #include "FOWCommon.cginc"
             float4 _ColA, _ColB, _Atmo;
-            float _Kind, _Seed, _HasTex, _Gain;
+            float _Kind, _Seed, _HasTex, _Gain, _Haze;
+            float4 _HazeCol;
             float3 _SunDir;
             sampler2D _MainTex;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
@@ -81,6 +84,7 @@ Shader "FogOfWar/Planet"
                     // a cloud deck map (Venus) is single-channel opacity: tint it between the two deck colours
                     albedo = (_Kind > 0.5 && _Kind < 1.5) ? lerp(_ColA.rgb, _ColB.rgb, t.r) : texToDisplay(t.rgb) * _Gain;
                 }
+                albedo = lerp(albedo, _HazeCol.rgb, _Haze);
                 float ndl = dot(n, l);
                 float diff = max(ndl, 0.0);
                 // gas and cloud decks scatter light past the terminator
