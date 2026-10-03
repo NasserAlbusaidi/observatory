@@ -66,11 +66,16 @@ namespace FogOfWar
         {
             QualitySettings.vSyncCount = VSync ? 1 : 0;
             Application.targetFrameRate = FrameCap > 0 ? FrameCap : -1;
-            QualitySettings.globalTextureMipmapLimit = TextureDetail;
-            QualitySettings.streamingMipmapsActive = true;
-            QualitySettings.streamingMipmapsMemoryBudget = StreamBudgetMb[TextureDetail];
+            ApplyTextureDetail(TextureDetail);
             AudioListener.volume = SilentOutput ? 0 : 1; // Master is applied in the ship synth, so the audio check can meter it
             AudioListener.pause = false;
+        }
+
+        public static void ApplyTextureDetail(int level)
+        {
+            QualitySettings.globalTextureMipmapLimit = level;
+            QualitySettings.streamingMipmapsActive = true;
+            QualitySettings.streamingMipmapsMemoryBudget = StreamBudgetMb[level];
         }
 
         public static void SetDisplayMode(int mode)

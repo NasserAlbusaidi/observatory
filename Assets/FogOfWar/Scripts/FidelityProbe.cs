@@ -12,6 +12,7 @@ namespace FogOfWar
     // Unattended fidelity check: `FogOfWar.exe -fowfidelity <dir>` frames the mapped bodies of the open world from
     // close range (sunlit and near the terminator), screenshots each, logs frame rate per view and every Texture2D in
     // memory with its size and format. Writes fidelity.txt and quits. Used to compare texture work against a baseline.
+    // -fowtexdetail N runs it at texture detail N (0 full, 1 half, 2 quarter) without touching the saved setting.
     public class FidelityProbe : MonoBehaviour
     {
         const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -44,6 +45,14 @@ namespace FogOfWar
             app.InputLocked = true;
             Controls.Locked = true;
             yield return new WaitForSecondsRealtime(2f);
+            // after the shell has applied the saved settings, so this one wins
+            var args = Environment.GetCommandLineArgs();
+            int ti = Array.IndexOf(args, "-fowtexdetail");
+            if (ti >= 0 && ti + 1 < args.Length && int.TryParse(args[ti + 1], out int detail))
+            {
+                GameSettings.ApplyTextureDetail(Mathf.Clamp(detail, 0, 2));
+                yield return new WaitForSecondsRealtime(1f);
+            }
             log.WriteLine($"{SystemInfo.graphicsDeviceName}, {Screen.width}x{Screen.height}, mipmap limit {QualitySettings.globalTextureMipmapLimit}, streaming {QualitySettings.streamingMipmapsActive} budget {QualitySettings.streamingMipmapsMemoryBudget} MB");
 
             var fps = new List<float>();
