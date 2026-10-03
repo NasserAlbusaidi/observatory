@@ -30,6 +30,7 @@ namespace FogOfWar
         UiShell hudShell;
         VisualElement markers, mkPro, mkRetro, mkHead, mkTgt, mkEdge, mapHead, rightCol, consoleBody, tcBody;
         Label stDate, stWarp, stNear, stSun, stLimited;
+        VisualElement tcIcon, mkIcon;
         Label tcName, tcSub, tcDist, tcRel, tcClose, tcBrach, tcNav, tcEngage, tcNoTarget;
         Label spdVal, spdRef, drvVal, drvSub, dvVal, rotVal, mkTgtName, mkTgtDist, mkEdgeName, consoleToggle;
         VisualElement thrFill, thrCmd, pills;
@@ -192,7 +193,9 @@ namespace FogOfWar
             lab.name = "label";
             lab.pickingMode = PickingMode.Ignore;
             lab.style.position = Position.Absolute;
-            mkTgtName = Ui.L(lab, "", "t-h3", "f-cond", "accent", "glow");
+            var nameRow = Ui.E(lab, "row");
+            mkIcon = KindIcon(nameRow);
+            mkTgtName = Ui.L(nameRow, "", "t-h3", "f-cond", "accent", "glow");
             mkTgtDist = Ui.L(lab, "", "t-label", "f-mono");
             mkTgtName.style.whiteSpace = WhiteSpace.NoWrap; mkTgtDist.style.whiteSpace = WhiteSpace.NoWrap;
 
@@ -292,6 +295,7 @@ namespace FogOfWar
             tcNoTarget = Ui.L(p, "No target. Press " + UiShell.Keys(A.NextTarget) + " or click a label.", "t-note");
             tcBody = Ui.E(p, "col");
             var head = Ui.E(tcBody, "row");
+            tcIcon = KindIcon(head);
             tcName = Ui.L(head, "", "tc-name", "f-cond");
             tcName.style.flexGrow = 1;
             Ui.B(head, "◀", () => SetTarget(targets[(targetIdx - 1 + targets.Count) % targets.Count]), "small");
@@ -313,6 +317,8 @@ namespace FogOfWar
 
         string Kind(Body b)
         {
+            var craft = CraftKind(b);
+            if (craft != null) return craft;
             if (b.Asteroid) return "Asteroid";
             if (b.Parent == sys.Sun) return "Planet";
             return b.Parent != null ? "Moon of " + b.Parent.Name : "Star";
@@ -541,7 +547,10 @@ namespace FogOfWar
                 var vr = ship.Vel - sys.Vel(t, jd);
                 double closing = D3.Dot(vr, r.Norm);
                 Ui.Text(tcName, t.Name.ToUpperInvariant());
-                Ui.Text(tcSub, Kind(t).ToUpperInvariant() + (t.SizeEstimated ? "  ·  SIZE UNKNOWN" : "  ·  R " + Km(t.Radius)));
+                var kind = KindOf(t);
+                SetKindIcon(tcIcon, kind);
+                SetKindIcon(mkIcon, kind);
+                Ui.Text(tcSub, Kind(t).ToUpperInvariant() + (kind != TargetKind.Body ? "" : t.SizeEstimated ? "  ·  SIZE UNKNOWN" : "  ·  R " + Km(t.Radius)));
                 Ui.Text(tcDist, Km(r.Mag - t.Radius));
                 Ui.Text(tcRel, Fmt.Num(vr.Mag, 3) + " km/s");
                 Ui.Text(tcClose, (closing >= 0 ? "+" : "") + Fmt.Num(closing, 3) + " km/s");

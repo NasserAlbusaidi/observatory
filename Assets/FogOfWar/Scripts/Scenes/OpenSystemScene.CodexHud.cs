@@ -50,7 +50,7 @@ namespace FogOfWar
             Stat(stats, cx.Scanned.Count, "scanned");
             Stat(stats, sys.Bodies.Count - 1, "bodies");
             var b = ship.Target;
-            if (b == null || b.Parent == null || Career.IsDerelict(b))
+            if (b == null || b.Parent == null || Career.IsCraft(b))
             {
                 Ui.L(c, "Target a planet, moon or asteroid to read its entry.", "t-note").style.marginTop = 8;
                 return;
