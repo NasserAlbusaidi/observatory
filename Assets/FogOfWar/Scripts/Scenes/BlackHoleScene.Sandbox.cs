@@ -63,10 +63,11 @@ namespace FogOfWar
             public double t0, tau0, tauHorizon = -1;
             public int peris;
             public string status = "orbiting";
+            public double turnsEnd = -1;   // light: turns made when it escaped or fell in (frozen there)
         }
 
-        const int MaxParts = 6000, NR = 384, NP = 512;
-        const double TexRMax = 400;
+        const int MaxParts = 12000, NR = 448, NP = 512;
+        const double TexRMax = 8000;   // M: the outgoing stream stays drawn to its apocentre
         Geo[] parts;
         float[] pTemp, pHeat, pBase;
         byte[] pPhase;
@@ -81,8 +82,12 @@ namespace FogOfWar
 
         int throwKind;
         float periRs = 5f, logWarp = 1.5f;
-        bool guides = true, ride, diskAutoOff;
+        bool guides = true, ride, diskAutoOff, follow = true, followOn;
         double autoWarpFrom = -1;
+        // after a break-up the warp is held for a few seconds so the stream can be seen stretching, then ramped up to
+        // warpTarget (audit #46)
+        float warpTarget = -1, warpHold;
+        readonly System.Random simRng = new System.Random(7);
         double simT, accreted, heatScale = 1e-9;
         // light curve: (sim time in M, luminosity / Eddington) and the fallback rate in kg per M of time
         readonly List<Vector2> lightCurve = new List<Vector2>();
@@ -112,7 +117,8 @@ namespace FogOfWar
         {
             bodies.Clear(); probes.Clear(); nParts = 0; riding = null; ride = false;
             if (diskAutoOff) disk = true;
-            diskAutoOff = false; autoWarpFrom = -1;
+            diskAutoOff = false; autoWarpFrom = -1; warpTarget = -1; debrisMedR = -1;
+            if (followOn) { Orbit.target = Vector3.zero; Orbit.distance = 24; followOn = false; }
             camVel = new Vector4(0, 0, 0, 1);
             lightCurve.Clear(); lum = fallbackRate = fallbackAcc = accreted = 0; heatScale = 1e-9; curveT = 0; lastDE = 0; simT = 0;
             Orbit.enabled = true;
@@ -152,23 +158,16 @@ namespace FogOfWar
             b.state = 1;
             b.tDisrupt = simT;
             double a = A;
-            int n = Math.Min(b.spec.cloud ? 2500 : 4000, MaxParts - nParts);
-            if (n < 100) { CompactParticles(); n = Math.Min(b.spec.cloud ? 2500 : 4000, MaxParts - nParts); }
+            int want = b.spec.cloud ? 2500 : 4000;
+            if (MaxParts - nParts < want) CompactParticles();
+            if (MaxParts - nParts < want) RetireOldest(want - (MaxParts - nParts));   // audit #45: the oldest debris makes room
+            int n = Math.Min(want, MaxParts - nParts);
             var c = b.g;
             c.FourVelocity(a, out _, out double ur, out double uph);
             // the debris starts as a disc of the body's size (capped so it stays on screen); the energy spread is the
             // real one, ΔE = R / r_dis² (M = 1), scaled onto the drawn size
-            double Rvis = Math.Min(b.Rm, 1.0);
+            double Rvis = b.spec.cloud ? b.Rm : Math.Min(b.Rm, 1.0);   // clouds at their stated size (audit #49)
             double dE = b.spec.cloud ? 0 : b.Rm / (rDis * rDis);
-            b.dE = dE; lastDE = Math.Max(lastDE, dE);
-            // The bound debris first comes back after t_min = 2π (GM/2ΔE)^{3/2}: 85 days for the Sun at Sgr A*, hours of real
-            // time at the default warp. Raise the warp so the return and the flare arrive about 20 s after the break-up.
-            if (dE > 0)
-            {
-                double tmin = 2 * Math.PI * Math.Pow(1 / (2 * dE), 1.5);
-                float want = (float)Math.Min(6, Math.Log10(tmin / 20));
-                if (want > logWarp) { autoWarpFrom = logWarp; logWarp = want; }
-            }
             var rng = new System.Random(1234 + bodies.Count);
             for (int i = 0; i < n; i++)
             {
@@ -195,6 +194,68 @@ namespace FogOfWar
                 pPhase[k] = 0;
                 pMass[k] = b.spec.mass / n;
             }
+            // a cloud's spread comes from the velocity it shares across its width: measure it
+            if (b.spec.cloud && n > 0)
+            {
+                double lo = double.MaxValue, hi = double.MinValue;
+                for (int k = nParts - n; k < nParts; k++) { lo = Math.Min(lo, parts[k].E); hi = Math.Max(hi, parts[k].E); }
+                dE = 0.5 * (hi - lo);
+            }
+            b.dE = dE; lastDE = dE;
+            // The bound debris first comes back after t_min = 2π (GM/2ΔE)^{3/2}: 85 days for the Sun at Sgr A*, hours of real
+            // time at the default warp. Raise the warp (after a short hold, see TickSandbox) so the return and the flare
+            // arrive about 25 s after the break-up. Not when the whole orbit is inside r_mb: then nothing comes back.
+            if (dE > 0 && b.rp > Kerr.MarginallyBound(A))
+            {
+                double tmin = 2 * Math.PI * Math.Pow(1 / (2 * dE), 1.5);
+                float target = (float)Math.Min(6, Math.Log10(tmin / 20));
+                if (target > logWarp) { autoWarpFrom = logWarp; warpTarget = target; warpHold = 2f; debrisOut = 1; }
+            }
+        }
+
+        // Median radius, centre (world, rs units) and the still-outgoing fraction of the bound debris that has not come
+        // back yet (phases 0 and 1); every 4th particle.
+        double debrisMedR = -1, debrisOut = 1;
+        Vector3 debrisCentre;
+        readonly List<double> trackR = new List<double>();
+        void TrackDebris()
+        {
+            trackR.Clear();
+            double sx = 0, sz = 0; int bound = 0, back = 0;
+            for (int i = 0; i < nParts; i += 4)
+            {
+                ref var p = ref parts[i];
+                if (!p.alive || p.E >= 1) continue;
+                bound++;
+                if (pPhase[i] == 2) { back++; continue; }
+                trackR.Add(p.r);
+                sx += p.r * Math.Cos(p.phi); sz += p.r * Math.Sin(p.phi);
+            }
+            if (trackR.Count == 0) { debrisMedR = -1; debrisOut = bound > 0 ? 0 : 1; return; }
+            trackR.Sort();
+            debrisMedR = trackR[trackR.Count / 2];
+            debrisOut = (double)trackR.Count / Math.Max(bound, 1);
+            debrisCentre = new Vector3((float)(sx / trackR.Count), 0, (float)(sz / trackR.Count)) * 0.5f;
+        }
+
+        // "Camera follows the debris": the orbit camera aims between the hole and the debris and backs off to keep both
+        // in view; drag still turns it (audit #46, #63).
+        void FollowCamera(float dt)
+        {
+            if (!follow || riding != null || warpTarget <= 0 || debrisMedR <= 0) { followOn = false; return; }
+            followOn = true;
+            Orbit.maxDistance = 1200;
+            float k = 1 - Mathf.Exp(-dt * 2.5f);
+            Orbit.target = Vector3.Lerp(Orbit.target, debrisCentre * 0.5f, k);
+            float want = Mathf.Clamp(debrisCentre.magnitude * 1.5f + 10, 24, 1100);
+            Orbit.distance = Mathf.Lerp(Orbit.distance, want, k);
+        }
+
+        // Kill the oldest n live particles (they were added first, and compaction keeps the order).
+        void RetireOldest(int n)
+        {
+            for (int i = 0; i < nParts && n > 0; i++) if (parts[i].alive) { parts[i].alive = false; n--; }
+            CompactParticles();
         }
 
         void CompactParticles()
@@ -299,6 +360,20 @@ namespace FogOfWar
         void TickSandbox(float dt)
         {
             double a = A;
+            // After a break-up the warp follows the bound debris (audit #46): one local orbital time r^{3/2} (at the
+            // debris's median radius) passes in about two seconds of play. The stream is watched passing pericentre,
+            // stretching on its way out, turning round and coming back; the warp tops out at warpTarget far away and
+            // drops again as the debris returns. It lets go once most of the bound debris is back.
+            if (warpTarget > 0)
+            {
+                if (warpHold > 0) warpHold -= dt;
+                if (debrisOut < 0.1) { logWarp = Mathf.Max(logWarp, 1.5f); warpTarget = -1; }
+                else if (debrisMedR > 0)
+                {
+                    float want = (float)Math.Log10(Math.Pow(Math.Max(debrisMedR, 8), 1.5) / 2);
+                    logWarp = Mathf.Clamp(want, 0.8f, warpTarget);
+                }
+            }
             double h = dt * Math.Pow(10, logWarp);
             simT += h;
             double rh = Kerr.Horizon(a);
@@ -306,7 +381,7 @@ namespace FogOfWar
             foreach (var b in bodies)
             {
                 if (b.state != 0) continue;
-                b.g.AdvanceT(a, simT - b.g.t);
+                b.g.AdvanceT(a, simT - b.g.t, 0.08, 20000, b.rt);   // stop at r_t even when a frame spans the passage (audit #44)
                 double eps = Math.Min(Math.Pow(b.rt / b.g.r, 3), 1);
                 b.stretch = 1 + 2 * eps;
                 if (b.g.r <= b.rt) Shred(b, b.rt);
@@ -314,19 +389,21 @@ namespace FogOfWar
                 else if (b.g.w > 0 && b.g.r > 150) b.state = 3;
             }
 
-            double heatMax = 0, dissipated = 0;
+            double heatMax = 0, dissipated = 0, isco = Kerr.Isco(a);
             for (int i = 0; i < nParts; i++)
             {
                 ref var p = ref parts[i];
                 if (!p.alive) continue;
-                double w0 = p.w;
-                p.AdvanceT(a, simT - p.t, 0.12, 40);   // to the shared clock, so a particle that ran out of steps catches up
+                // to the shared clock, so a particle that ran out of steps catches up; more steps near the hole (audit #51)
+                p.AdvanceT(a, simT - p.t, 0.12, p.r < 50 ? 200 : 40);
                 if (p.inside) { p.alive = false; accreted += pMass[i]; continue; }
                 if (p.E >= 1 && p.r > TexRMax * 2) { p.alive = false; continue; }
-                if (pPhase[i] == 0 && w0 > 0 && p.w <= 0 && p.E < 1) pPhase[i] = 1;               // apocentre: on its way back
-                else if (pPhase[i] == 1 && w0 < 0 && p.w >= 0) { pPhase[i] = 2; fallbackAcc += pMass[i]; }  // back at pericentre
+                // turning points are counted inside the integrator, so several per frame are not missed at high warp
+                if (pPhase[i] == 0 && p.apoR > 0 && p.E < 1) pPhase[i] = 1;                           // apocentre: on its way back
+                if (pPhase[i] == 1 && p.peris >= 2) { pPhase[i] = 2; fallbackAcc += pMass[i]; }        // back at pericentre
                 double heat = 0;
-                if (pPhase[i] == 2)
+                // inside the ISCO gas plunges in a free-fall time and radiates almost nothing: no braking there (audit #43)
+                if (pPhase[i] == 2 && p.r > isco)
                 {
                     double P = 2 * Math.PI * Math.Pow(p.r, 1.5);
                     double E0 = p.E;
@@ -341,7 +418,8 @@ namespace FogOfWar
                 if (pHeat[i] > heatMax) heatMax = pHeat[i];
             }
             heatScale = Math.Max(heatScale * Math.Exp(-h / 3000), heatMax);
-            if (nParts > 0 && (nParts > MaxParts / 2) && UnityEngine.Random.value < 0.02f) CompactParticles();
+            TrackDebris();
+            if (nParts > MaxParts / 2 && simRng.NextDouble() < 0.02) CompactParticles();
 
             foreach (var p in probes) StepProbe(p, h, dt);
             if (riding != null && (!riding.g.alive && riding.g.inside == false)) StopRide();
@@ -377,6 +455,7 @@ namespace FogOfWar
                 g.AdvanceTau(a, h * 0.25);
                 if (!g.alive) p.status = "reached the singularity";
             }
+            if (p.photon && p.turnsEnd < 0 && (g.inside || (g.w > 0 && g.r > 20))) { p.turnsEnd = g.phi / (2 * Math.PI); if (!g.inside) p.status = "escaped"; }
             if (g.inside && p.tauHorizon < 0) { p.tauHorizon = g.tau; p.status = p.photon ? "fell in" : "crossed the horizon"; if (a >= 0.01) g.alive = false; }
             if (g.peris > p.peris && !g.inside) { p.peris = g.peris; p.periPhi.Add(g.periPhi); p.periN.Add(g.peris); }
             if (g.w > 0 && g.r > 600) { p.status = "escaped"; g.alive = false; }
@@ -399,7 +478,8 @@ namespace FogOfWar
                 ref var p = ref parts[i];
                 if (!p.alive || p.r > TexRMax) continue;
                 double fh = pHeat[i] / hs;
-                float w = (float)((pBase[i] + 1.5 * fh * pBase[i] * 4) * 100 / Math.Max(p.r * p.r, 1));
+                // per unit length, not area: a stream that stretches as it climbs stays visible (display choice)
+                float w = (float)((pBase[i] + 1.5 * fh * pBase[i] * 4) * 500 / Math.Max(p.r, 1));
                 float T = pTemp[i] + 15000f * (float)Math.Pow(Math.Max(fh, 0), 0.25);
                 p.FourVelocity(a, out _, out double ur, out double uph);
                 double u = (Math.Log(p.r) - lnMin) * inv * NR - 0.5;
@@ -431,13 +511,13 @@ namespace FogOfWar
             m.SetFloat("_GuideOn", guides ? 1 : 0);
 
             int n = 0;
-            var pos = new Vector4[4]; var axis = new Vector4[4]; var col = new Vector4[4]; var vel = new Vector4[4];
+            var pos = new Vector4[4]; var axis = new Vector4[4]; var col = new Vector4[4]; var vel = new Vector4[4]; var rad = new Vector4[4];
             foreach (var b in bodies)
             {
                 if (b.state != 0 || n >= 4 || b.Rm > 40) continue;
                 var g = b.g;
                 g.FourVelocity(a, out double ut, out double ur, out double uph);
-                pos[n] = (Vector4)Kerr.FromBL(g.r, 0, g.phi, a); pos[n].w = (float)Math.Max(b.Rm, 0.06);
+                pos[n] = (Vector4)Kerr.FromBL(g.r, 0, g.phi, a); pos[n].w = (float)Math.Max(b.Rm, 0.35);
                 axis[n] = new Vector4((float)Math.Cos(g.phi), 0, (float)Math.Sin(g.phi), (float)b.stretch);
                 col[n] = new Vector4((float)b.spec.temp, b.spec.glow, b.spec.star ? 1 : 0, 0);
                 vel[n] = new Vector4((float)ut, (float)ur, (float)uph, 0);
@@ -454,7 +534,9 @@ namespace FogOfWar
                 vel[n] = new Vector4((float)ut, (float)ur, (float)uph, 0);
                 n++;
             }
+            for (int i = 0; i < n; i++) rad[i] = new Vector4(Mathf.Sqrt(Mathf.Max(((Vector3)pos[i]).sqrMagnitude - (float)(a * a), 0)), pos[i].w * Mathf.Max(axis[i].w, 1) * 1.2f + 0.05f, 0, 0);
             m.SetInt("_NB", n);
+            m.SetVectorArray("_BRad", rad);
             m.SetVectorArray("_BPos", pos); m.SetVectorArray("_BAxis", axis); m.SetVectorArray("_BCol", col); m.SetVectorArray("_BVel", vel);
         }
 
@@ -494,6 +576,31 @@ namespace FogOfWar
             if (after > 0) Advance(after);
         }
 
+        // One line on what the newest throw is doing now, in real seconds of play where that helps (audit #63).
+        string Narration(out Tone tone)
+        {
+            tone = Tone.Normal;
+            Body b = bodies.Count > 0 ? bodies[bodies.Count - 1] : null;
+            double perSec = Math.Pow(10, logWarp);
+            if (b == null) return probes.Count > 0 ? "probe on its orbit" : "throw something in";
+            if (b.state == 0) return b.g.r > b.rt * 1.5 ? "falling in" : "stretched by the tide";
+            if (b.state == 2) { tone = Tone.Cold; return "swallowed whole"; }
+            if (b.state == 3) return "flew past intact";
+            if (!disk && FlareDisk(out _, out _, out _)) { tone = Tone.Hot; return "flare: " + Fmt.Num(lum, 2) + " × Eddington"; }
+            if (b.rp <= Kerr.MarginallyBound(A)) { tone = Tone.Cold; return "all debris swallowed"; }
+            if (b.dE > 0)
+            {
+                double back = b.tDisrupt + 2 * Math.PI * Math.Pow(1 / (2 * b.dE), 1.5) - simT;
+                if (back > 0)
+                {
+                    // real seconds left, allowing for the warp ramp still to come
+                    double rate = warpTarget > 0 ? Math.Pow(10, warpTarget) : perSec;
+                    return (warpHold > 0 ? "torn apart; " : "debris out; ") + "back in ~" + Fmt.Num(Math.Max(back / rate, 1), 0) + " s";
+                }
+            }
+            return lum > 1e-3 ? "debris returning" : "debris on its way";
+        }
+
         // Perihelion shift per orbit (degrees) of the newest probe, NaN until two pericentres were seen (QA).
         public double LastProbeShift()
         {
@@ -513,7 +620,7 @@ namespace FogOfWar
                 rmin = Math.Min(rmin, parts[i].r); rmax = Math.Max(rmax, parts[i].r);
             }
             string b = bodies.Count > 0 ? $" body r={bodies[bodies.Count - 1].g.r:0.0} rt={bodies[bodies.Count - 1].rt:0.0} state={bodies[bodies.Count - 1].state}" : "";
-            return $"t={simT:0} parts {nParts} alive {alive} nan {nan} circ {ph2} r {rmin:0.0}..{rmax:0.0} heat {heatScale:0.0e0} lum {lum:0.00e0}{b}";
+            return $"cam d={Orbit.distance:0.0} tgt={Orbit.target} follow={followOn} warp={logWarp:0.00} t={simT:0} parts {nParts} alive {alive} nan {nan} circ {ph2} r {rmin:0.0}..{rmax:0.0} heat {heatScale:0.0e0} lum {lum:0.00e0}{b}";
         }
 
         // Run until the ridden probe is within r (M units).
@@ -524,98 +631,110 @@ namespace FogOfWar
 
         // ------------------------------------------------------------------------------------------ readouts and controls
 
+        // The sandbox readouts keep a fixed set of rows with short values, so the controls below them never move while
+        // the numbers change (QA-040). "—" fills a row that has nothing to show yet.
         void SandboxReadouts(List<Readout> list)
         {
             var s = Specs[throwKind];
             TidalScales(s, out double rt, out double Rm);
             double rh = Kerr.Horizon(A), rmb = Kerr.MarginallyBound(A);
+            const string none = "—";
             if (!s.cloud)
             {
-                string fate = rt < rh ? "swallowed whole" : rt < rmb ? "torn up as it plunges" : rt > periRs * 2 ? "shredded" : "flies past (stretched)";
-                list.Add(new Readout("Tidal radius: " + s.name.ToLowerInvariant(), (rt / 2 < 1e4 ? (rt / 2).ToString("0.00") : Fmt.Num(rt / 2, 3)) + " rs → " + fate,
+                // the fate depends on the closest approach too: r_p inside r_mb plunges, r_p inside r_t tears (audit #52a)
+                double rpM = periRs * 2;
+                string fate = rpM < rmb ? (rt > rpM && rt > rh ? "torn, all swallowed" : "swallowed whole")
+                            : rt > rpM ? "shredded" : "flies past intact";
+                list.Add(new Readout("Tidal radius: " + s.name.ToLowerInvariant(), (rt / 2 < 1e4 ? (rt / 2).ToString("0.00") : Fmt.Num(rt / 2, 3)) + " rs",
                     rt < rh ? Tone.Cold : rt > periRs * 2 ? Tone.Bad : Tone.Normal));
-                // Hills mass: the heaviest hole that can still shred it outside the marginally bound orbit
+                list.Add(new Readout("Its fate at this pass", fate, rt < rh ? Tone.Cold : rt > periRs * 2 ? Tone.Bad : Tone.Normal));
+                // Hills masses: above the first all the debris is swallowed (r_t < r_mb), above the second the star itself
                 double hills = Math.Pow(s.radius * Phys.c * Phys.c / (rmb * Phys.G), 1.5) / Math.Sqrt(s.mass) / Phys.Msun;
-                list.Add(new Readout("No flare above", Fmt.Num(hills, 3) + " suns (all debris swallowed)"));
                 double intact = Math.Pow(s.radius * Phys.c * Phys.c / (rh * Phys.G), 1.5) / Math.Sqrt(s.mass) / Phys.Msun;
+                list.Add(new Readout("No flare above", Fmt.Num(hills, 3) + " suns"));
                 list.Add(new Readout("Swallowed intact above", Fmt.Num(intact, 3) + " suns"));
                 list.Add(new Readout("Its size", Rm / 2 < 0.01 ? Fmt.Num(Rm / 2 * Lunit * 2 / 1000, 3) + " km" : (Rm / 2).ToString("0.000") + " rs"));
             }
-            if (nParts > 0 || lightCurve.Count > 0)
+            else
             {
-                list.Add(new Readout("Debris coming back", Fmt.Num(fallbackRate / Tunit * Phys.yr / Phys.Msun, 3) + " suns/yr"));
-                list.Add(new Readout("Flare luminosity", Fmt.Num(lum, 3) + " × Eddington", lum > 1 ? Tone.Hot : Tone.Normal));
-                if (lastDE > 0)
-                {
-                    double tmin = 2 * Math.PI * Math.Pow(1 / (2 * lastDE), 1.5);   // return time of the most bound debris
-                    list.Add(new Readout("First debris returns after", Fmt.Duration(tmin * Tunit)));
-                }
-                list.Add(new Readout("Swallowed so far", Fmt.Num(accreted / Phys.Msun, 3) + " suns"));
+                list.Add(new Readout("Tidal radius: gas cloud", "none (no self-gravity)"));
+                list.Add(new Readout("Its fate at this pass", "stretched"));
+                list.Add(new Readout("No flare above", none));
+                list.Add(new Readout("Swallowed intact above", none));
+                list.Add(new Readout("Its size", "3 rs (model)"));
             }
-            if (diskAutoOff && !disk) list.Add(new Readout("Accretion disk", "switched off for the throw (a quiet hole)"));
-            if (!disk && FlareDisk(out float fo, out _, out _)) list.Add(new Readout("Flare disk", "forming out to 2 r_p = " + fo.ToString("0.0") + " rs (model)", Tone.Hot));
-            if (autoWarpFrom >= 0) list.Add(new Readout("Time warp", "raised so the debris returns in ~20 s"));
-            list.Add(new Readout("Sim clock", Fmt.Duration(simT * Tunit) + " (1 s = " + Fmt.Duration(Math.Pow(10, logWarp) * Tunit) + ")"));
-            if (probes.Count > 0) ProbeSummary(list, probes[probes.Count - 1]);
+            bool debris = nParts > 0 || lightCurve.Count > 0;
+            list.Add(new Readout("Debris coming back", debris ? Fmt.Num(fallbackRate / Tunit * Phys.yr / Phys.Msun, 3) + " suns/yr" : none));
+            list.Add(new Readout("Flare luminosity", debris ? Fmt.Num(lum, 3) + " × Eddington" : none, lum > 1 ? Tone.Hot : Tone.Normal));
+            list.Add(new Readout("First debris returns after", lastDE > 0 ? Fmt.Duration(2 * Math.PI * Math.Pow(1 / (2 * lastDE), 1.5) * Tunit) : none));
+            list.Add(new Readout("Swallowed so far", debris ? Fmt.Num(accreted / Phys.Msun, 3) + " suns" : none));
+            list.Add(new Readout("What is happening", Narration(out var tone), tone));
+            list.Add(new Readout("Sim clock", Fmt.Duration(simT * Tunit)));
+            list.Add(new Readout("1 s of play is", Fmt.Duration(Math.Pow(10, logWarp) * Tunit)));
+            ProbeSummary(list, probes.Count > 0 ? probes[probes.Count - 1] : null);
         }
 
         void ProbeSummary(List<Readout> list, Probe p)
         {
-            var g = p.g;
-            list.Add(new Readout("Probe", p.name + ": " + p.status));
-            if (p.photon) { list.Add(new Readout("Light: turns so far", ((g.phi) / (2 * Math.PI)).ToString("0.0"))); return; }
-            list.Add(new Readout("Probe distance", (g.r / 2).ToString("0.00") + " rs"));
-            if (p.Shift(out double dphi))
+            const string none = "—";
+            list.Add(new Readout("Probe", p != null ? p.name : none));
+            string status = p == null ? none : p.photon && p.g.alive && !p.g.inside ? "circling" : p.status;
+            list.Add(new Readout("Probe status", status));
+            if (p != null && p.photon) list.Add(new Readout("Light: turns", (p.turnsEnd >= 0 ? p.turnsEnd : p.g.phi / (2 * Math.PI)).ToString("0.0")));
+            else list.Add(new Readout("Probe distance", p != null ? (p.g.r / 2).ToString("0.00") + " rs" : none));
+            double dphi = 0;
+            bool shift = p != null && !p.photon && p.Shift(out dphi);
+            list.Add(new Readout("Perihelion shift per orbit", shift ? (dphi * 180 / Math.PI).ToString("0.0") + "°" : none, Tone.Hot));
+            string weak = none;
+            if (p != null && p.name == ProbeNames[1])
             {
-                list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
-                if (p.name == ProbeNames[1])
-                {
-                    // weak field for the same ellipse (semi-latus rectum p = 2 rp ra / (rp + ra)): Einstein's 6πM/p, minus the
-                    // prograde Lense–Thirring term 8πa M^{3/2}/p^{3/2}
-                    double pl = 2 * 14.0 * 60 / 74, sa = A;
-                    double weak = 6 * Math.PI / pl - 8 * Math.PI * sa / Math.Pow(pl, 1.5);
-                    list.Add(new Readout(sa > 0.001 ? "Weak field (with Lense–Thirring)" : "Weak-field formula says", (weak * 180 / Math.PI).ToString("0.0") + "°"));
-                }
+                // weak field for the same ellipse (semi-latus rectum p = 2 rp ra / (rp + ra)): Einstein's 6πM/p, minus the
+                // prograde Lense–Thirring term 8πa M^{3/2}/p^{3/2}
+                double pl = 2 * 14.0 * 60 / 74;
+                weak = ((6 * Math.PI / pl - 8 * Math.PI * A / Math.Pow(pl, 1.5)) * 180 / Math.PI).ToString("0.0") + "°";
             }
+            list.Add(new Readout(A > 0.001 ? "Weak field (+ Lense–Thirring)" : "Weak-field formula", weak));
         }
 
         void ProbeReadouts(List<Readout> list)
         {
             var p = riding; var g = p.g;
             double a = A;
-            list.Add(new Readout("Camera", "rides " + p.name.ToLowerInvariant()));
+            const string none = "—";
+            list.Add(new Readout("Camera", "rides the probe"));
+            list.Add(new Readout("Probe", p.name));
             list.Add(new Readout("Probe status", p.status, g.inside ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Distance", (g.r / 2).ToString("0.000") + " rs"));
             double tau = (g.tau - p.tau0) * Tunit, t = (Math.Min(simT, g.t) - p.t0) * Tunit;
-            list.Add(new Readout("Probe's clock", Fmt.Duration(tau) + (g.inside ? " (display speed inside)" : "")));
-            list.Add(new Readout("Camera limits", "≤ 0.99 c, stops at 1.03 r₊, exposure ÷ (γ(1+v))³"));
-            list.Add(new Readout("Far-away clock", g.inside ? "∞ (never sees it cross)" : Fmt.Duration(t)));
+            list.Add(new Readout(g.inside ? "Probe's clock (display speed)" : "Probe's clock", Fmt.Duration(tau)));
+            list.Add(new Readout("Far-away clock", g.inside ? "never sees it cross" : Fmt.Duration(t)));
+            string rate = none, speed = none, beacon = none, tide = none, left = none;
+            Tone rateT = Tone.Normal, beaconT = Tone.Normal, tideT = Tone.Normal;
             if (!g.inside)
             {
                 g.FourVelocity(a, out double ut, out double ur, out double uph);
-                list.Add(new Readout("Probe clock rate", (1 / ut).ToString("0.0000") + "× far away", 1 / ut < 0.5 ? Tone.Hot : Tone.Normal));
+                rate = (1 / ut).ToString("0.0000") + "×"; if (1 / ut < 0.5) rateT = Tone.Hot;
                 g.ZamoVelocity(a, out double vr, out double vph);
-                list.Add(new Readout("Speed past local ZAMOs", Math.Sqrt(vr * vr + vph * vph).ToString("0.000") + " c"));
+                speed = Math.Sqrt(vr * vr + vph * vph).ToString("0.000") + " c";
                 // its beacon, sent straight out, as received far away (b = 0, outgoing)
                 double Pp = g.r * g.r + a * a, Dl = Geo.Delta(g.r, a);
                 double prOut = Math.Sqrt(Math.Max(Pp * Pp - Dl * a * a, 0)) / Dl;
                 double gb = 1 / (ut - prOut * ur);
-                list.Add(new Readout("Its beacon seen far away", gb > 0 ? "×" + gb.ToString("0.000") + " frequency (z = " + Fmt.Num(1 / gb - 1, 3) + ")" : "—", gb < 0.5 ? Tone.Hot : Tone.Normal));
+                if (gb > 0) { beacon = "×" + gb.ToString("0.000") + " frequency"; if (gb < 0.5) beaconT = Tone.Hot; }
                 // radial tidal stretch in the probe's own frame (Marck 1983, spin 0): (2M/r³)(1 + 3L²/2r²) across 2 m
                 double tidal = 4 / (g.r * g.r * g.r) * (1 + 1.5 * g.L * g.L / (g.r * g.r)) * Phys.c * Phys.c / (Lunit * Lunit) / Phys.g;
-                list.Add(new Readout(a > 0.001 ? "Tide across 2 m (spin-0 formula)" : "Tide across a 2 m body", Fmt.Num(tidal) + " g", tidal > 10 ? Tone.Bad : Tone.Normal));
+                tide = Fmt.Num(tidal) + " g"; if (tidal > 10) tideT = Tone.Bad;
             }
-            else if (a < 0.01)
-            {
-                double left = TauToSingularity(g.r, g.E, g.L) * Tunit;
-                list.Add(new Readout("Time left on its clock", g.alive ? Fmt.Duration(left) : "0"));
-                list.Add(new Readout("Inside, r is time", "every path leads to r = 0"));
-            }
-            else list.Add(new Readout("Inside a spinning hole", "the inner horizon is not modelled"));
-            if (p.Shift(out double dphi))
-            {
-                list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
-            }
+            else if (a < 0.01) left = g.alive ? Fmt.Duration(TauToSingularity(g.r, g.E, g.L) * Tunit) : "0 (r = 0)";
+            else left = "inner horizon not modelled";
+            list.Add(new Readout("Probe clock rate", rate, rateT));
+            list.Add(new Readout("Speed past local ZAMOs", speed));
+            list.Add(new Readout("Its beacon seen far away", beacon, beaconT));
+            list.Add(new Readout(a > 0.001 ? "Tide across 2 m (spin-0 formula)" : "Tide across a 2 m body", tide, tideT));
+            list.Add(new Readout("Time left to r = 0", left));
+            list.Add(new Readout("Perihelion shift per orbit", p.Shift(out double dphi) ? (dphi * 180 / Math.PI).ToString("0.0") + "°" : none, Tone.Hot));
+            list.Add(new Readout("Camera limits", "≤ 0.99 c, 1.03 r₊"));
+            list.Add(new Readout("Camera exposure", "÷ (γ(1+v))³"));
         }
 
         // Proper time from r to r = 0 inside a Schwarzschild hole for a geodesic with energy E and angular momentum L:
@@ -662,6 +781,7 @@ namespace FogOfWar
             ui.Section("Sandbox: probes and light");
             int k = ui.Buttons(ProbeNames);
             if (k >= 0) DropProbe(k);
+            follow = ui.Toggle("Camera follows the debris", follow);
             bool r = ui.Toggle("Ride along with the probe", ride);
             if (r != ride)
             {

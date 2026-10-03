@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
         };
@@ -108,6 +108,15 @@ namespace FogOfWar
                 S("bh-kerr-0.998",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "spin", 0.998f))),
                 S("bh-kerr-0.998-nodisk", new Vector3(0, 0.0f, 24f), 30, With(s => { Set(s, "spin", 0.998f); Set(s, "disk", false); })),
                 S("bh-schw-nodisk",      new Vector3(0, 0.0f, 24f), 30, With(s => Set(s, "disk", false))),
+                // QA-034 round 7: zoomed in from the default side, guides on, as in QA-Shots\r7\play\11-zoom.png
+                S("bh-kerr-0.998-default-zoom14", new Vector3(0, 1.3f, -14f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                S("bh-kerr-0.998-default-zoom10", new Vector3(0, 0.9f, -10f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                S("bh-kerr-0.998-default-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                S("dbg-fate-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 1f); })),
+                S("dbg-hit-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 2f); })),
+                // QA-034 recheck: the scene's own default camera (Orbit.Set in Build), spin 0.998, clumpy gas on and off
+                S("bh-kerr-0.998-default-cam", new Vector3(0, 2.2f, -24f), 55, With(s => Set(s, "spin", 0.998f))),
+                S("bh-kerr-0.998-default-smooth", new Vector3(0, 2.2f, -24f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "clumpy", false); })),
                 S("bh-kerr-0.998-guides", new Vector3(0, 0.9f, 24f), 42, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-no-doppler",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "doppler", false))),
                 // sandbox
@@ -119,9 +128,14 @@ namespace FogOfWar
                 S("sb-sun-m87-whole",     new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 2, 0, untilR: 12), ui: true),
                 S("sb-wd-imbh",           new Vector3(0, 6f, 30f), 50, Tde(1, 6f, -1, 60, untilR: 1, logMass: 3f), ui: true),
                 // the main tour's path, and the same throw played in real time (40 s of 60 fps frames)
-                S("sb-tour-repro",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 500); }), ui: true),
-                S("sb-tour-flare",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 4.2e5); }), ui: true),
-                S("sb-play-40s",          new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); for (int i = 0; i < 40 * 60; i++) B(s).Tick(1f / 60); }), ui: true),
+                S("sb-tour-repro",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 500); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-follow-8s",         Vector3.zero, 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 480; i++) B(s).Tick(1f / 60); }), ui: true, free: true),
+                S("sb-follow-16s",        Vector3.zero, 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 960; i++) B(s).Tick(1f / 60); }), ui: true, free: true),
+                S("sb-follow-30s",        Vector3.zero, 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 1800; i++) B(s).Tick(1f / 60); }), ui: true, free: true),
+                S("sb-stream-3s",         new Vector3(0, 12f, 30f), 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 180; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-stream-6s",         new Vector3(0, 12f, 30f), 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 360; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-tour-flare",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 4.2e5); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-play-40s",          new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); for (int i = 0; i < 40 * 60; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
                 S("sb-cloud",             new Vector3(0, 7f, 32f), 50, Tde(5, 6f, 1, 260), ui: true),
                 S("sb-orbit-precess",     new Vector3(0, 30f, 12f), 55, Orbit(1, 4000), ui: true),
                 S("sb-zoom-whirl",        new Vector3(0, 30f, 12f), 55, Orbit(2, 2500), ui: true),
@@ -152,6 +166,7 @@ namespace FogOfWar
             Controls.Locked = true;
             app.InputLocked = true;
             app.Quality = 2;   // in memory only
+            { int qa = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowbhquality"); if (qa >= 0) app.Quality = int.Parse(Environment.GetCommandLineArgs()[qa + 1]); }
             yield return null;
             app.Activate(1);
             var shell = UiShell.Instance;
@@ -171,7 +186,8 @@ namespace FogOfWar
                 Time.timeScale = 1;
                 try { s.setup?.Invoke(app.Current); }
                 catch (Exception e) { log.WriteLine($"{s.name}: setup threw {e.InnerException?.Message ?? e.Message}"); errors++; }
-                app.Orbit.enabled = false;
+                if (!s.free) app.Orbit.enabled = false;
+                else if (app.Orbit.enabled) app.Orbit.Snap();   // follow-camera shots: jump to where the camera is heading
                 cam.fieldOfView = s.fov;
                 var baseRot = s.free ? Quaternion.identity : Quaternion.LookRotation(s.look - s.pos, Vector3.up) * Quaternion.Euler(0, 0, s.roll);
                 if (!s.free) cam.transform.SetPositionAndRotation(s.pos, baseRot);
@@ -235,12 +251,56 @@ namespace FogOfWar
                 log.WriteLine($"precession at warp 10^{lw}: {bs.LastProbeShift():0.00}° per orbit after {frames + 120} frames");
             }
 
+            // sandbox play-through at 60 fps, as a player would: three Suns at Sgr A* thrown one after another, each after
+            // the previous flare (so later throws start at the raised warp), then a circular probe and photon launches
+            {
+                Default(app.Current);
+                var bs = (BlackHoleScene)app.Current;
+                Set(bs, "periRs", 5f);
+                var lumF = typeof(BlackHoleScene).GetField("lum", F);
+                for (int throwN = 1; throwN <= 3; throwN++)
+                {
+                    bs.Throw(0);
+                    double peak = 0; int f = 0;
+                    for (; f < 60 * 60; f++) { bs.Tick(1f / 60); peak = Math.Max(peak, (double)lumF.GetValue(bs)); }
+                    log.WriteLine($"throw {throwN}: after {f / 60} s  peak {peak:0.0} L_Edd  {bs.DebugSummary()}");
+                }
+                Default(app.Current);
+                bs.DropProbe(0); for (int k = 0; k < 60 * 30; k++) bs.Tick(1f / 60);
+                log.WriteLine($"circle at the ISCO: shift {bs.LastProbeShift()} (NaN = no false pericentres)");
+                foreach (float sp in new[] { 0f, 0.9f, 0.998f })
+                    foreach (int kind in new[] { 5, 6 })
+                    {
+                        Default(app.Current); Set(bs, "spin", sp); Set(bs, "logWarp", 1f);
+                        bs.DropProbe(kind); for (int k = 0; k < 60 * 30; k++) bs.Tick(1f / 60);
+                        var probes = (System.Collections.IList)typeof(BlackHoleScene).GetField("probes", F).GetValue(bs);
+                        var pr = probes[probes.Count - 1];
+                        var st = pr.GetType().GetField("status").GetValue(pr); var te = pr.GetType().GetField("turnsEnd").GetValue(pr);
+                        log.WriteLine($"light spin {sp} kind {kind}: {st}, turns {te}");
+                    }
+            }
+
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.
+            // One throw-away render per configuration first, so the first row does not carry the warm-up (audit #56).
+            cam.targetTexture = rt; cam.Render();
             Time.timeScale = 1;
+            // second pass (audit #62): a busy sandbox: one shredded star's debris, two intact white dwarfs and a probe
+            // (three bodies tested on every ray step), from the same camera
+            foreach (bool busy in new[] { false, true })
+            {
             Default(app.Current);
+            if (busy)
+            {
+                var bs = (BlackHoleScene)app.Current;
+                Set(bs, "periRs", 5f); bs.Throw(0); bs.AdvanceUntilBody(1, 40);
+                Set(bs, "warpTarget", -1f); Set(bs, "logWarp", 0f);
+                bs.Throw(1); bs.Throw(1); bs.DropProbe(1);
+            }
+            app.Orbit.enabled = false;
             foreach (var res in new[] { new Vector2Int(1920, 1080), new Vector2Int(2560, 1440), new Vector2Int(3840, 2160) })
                 foreach (int q in new[] { 0, 1, 2 })
                 {
+                    if (busy && !((res.x == 1920 && q == 1) || (res.x == 3840 && q == 2))) continue;
                     app.Quality = q;
                     var trt = new RenderTexture(res.x, res.y, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                     trt.Create();
@@ -255,10 +315,11 @@ namespace FogOfWar
                     for (int k = 0; k < N; k++) cam.Render();
                     ReadOne(trt, small);
                     float ms = (Time.realtimeSinceStartup - t0) * 1000 / N;
-                    log.WriteLine($"timing {res.x}x{res.y} quality {q}: {ms:0.0} ms per frame");
+                    log.WriteLine($"timing{(busy ? " (busy sandbox)" : "")} {res.x}x{res.y} quality {q}: {ms:0.0} ms per frame");
                     cam.targetTexture = null;
                     trt.Release(); Destroy(trt); Destroy(small);
                 }
+            }
 
             cam.targetTexture = null;
             if (shell != null) shell.Surface = null;

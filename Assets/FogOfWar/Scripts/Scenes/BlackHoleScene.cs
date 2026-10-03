@@ -29,6 +29,7 @@ namespace FogOfWar
         static readonly double FluxPeak0 = Kerr.FluxPeak(0).f;
         (double r, double f) FluxPeak() { if (peakSpin != spin) { peakSpin = spin; peak = Kerr.FluxPeak(spin); } return peak; }
         Material mat;
+        float debugFate;   // review harness only: 1 ray fates, 2 first disc hit
 
         // mass of the hole in kg, and the time and length units GM/c³ (s) and GM/c² (m)
         double MassKg => System.Math.Pow(10, logMass) * Phys.Msun;
@@ -54,6 +55,7 @@ namespace FogOfWar
         {
             SyncMass();
             TickSandbox(dt);
+            FollowCamera(dt);
         }
 
         void SyncMass()
@@ -88,13 +90,13 @@ namespace FogOfWar
             // brighter, which would clip to white; part of that is taken out so the structure stays visible
             mat.SetFloat("_Gain", (float)System.Math.Pow(FluxPeak0 / FluxPeak().f, 0.6));
             mat.SetFloat("_SwirlRate", 15);   // disc pattern speed, sped up: ISCO period ≈ 6 s instead of 92 GM/c³
-            mat.SetFloat("_StepK", App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.12f);
+            mat.SetFloat("_StepK", App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.15f);   // Sharp 0.12 cost 4K over 16 ms (audit #61)
             mat.SetFloat("_Disk", disk ? 1 : 0);
             mat.SetFloat("_Doppler", doppler ? 1 : 0);
             mat.SetFloat("_Lens", lens ? 1 : 0);
             mat.SetFloat("_Outer", outer);
             mat.SetFloat("_Temp", temp);
-            mat.SetInt("_Steps", App.Quality == 2 ? 1500 : 1000);
+            mat.SetInt("_Steps", App.Quality == 2 ? 1200 : 1000);   // 1500 put 4K Sharp over 16 ms (audit #61)
             // a tidal disruption flare with the steady disk off: the returning debris feeds a new thin disk out to the
             // circularisation radius 2 r_p; its accretion rate follows the flare luminosity (in Eddington units)
             if (!disk && FlareDisk(out float fOuter, out float fTemp, out float fGain))
@@ -105,6 +107,7 @@ namespace FogOfWar
                 mat.SetFloat("_Gain", fGain * (float)System.Math.Pow(FluxPeak0 / FluxPeak().f, 0.6));
             }
             UploadSandbox(mat);
+            mat.SetFloat("_DebugFate", debugFate);
         }
 
         public override void Readouts(List<Readout> list)
@@ -127,8 +130,8 @@ namespace FogOfWar
             if (riding != null) { ProbeReadouts(list); return; }
             double dil = CamLapse(r, a);
             double tidal = 2 * Phys.G * M * 2 / (rm * rm * rm) / Phys.g;
-            list.Add(new Readout("Camera", "hovers (zero angular momentum)"));
-            list.Add(new Readout("Your distance", r.ToString("0.00") + " rs = " + Fmt.Num(rm / 1000, 2) + " km"));
+            list.Add(new Readout("Camera", "hovers (ZAMO)"));
+            list.Add(new Readout("Your distance", r.ToString("0.00") + " rs"));
             list.Add(new Readout("Your clock vs far away", dil.ToString("0.0000") + "×", dil < 0.8 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("1 hour for you is", Fmt.Num(1 / System.Math.Max(dil, 1e-9), 3) + " h outside"));
             double hover = HoverAccel(2 * r, a) * Phys.c * Phys.c / Lunit / Phys.g;
@@ -162,15 +165,18 @@ namespace FogOfWar
         {
             int mi = ui.Choice("Black hole", massIdx, MassNames);
             if (mi != massIdx) { massIdx = mi; SyncMass(); }
-            float lm = ui.Slider("Mass (any)", logMass, 0.5f, 10.9f, v => Fmt.Num(System.Math.Pow(10, v), 2) + " suns", 0.01f);
-            if (Mathf.Abs(lm - logMass) > 1e-4f) { logMass = lm; massIdx = shownMassIdx = -1; }
+            // the slider rounds to its 0.01 step every frame; compare with the rounded value so a preset's exact mass is
+            // only replaced when the player actually moves the slider (audit #54)
+            float shown = Mathf.Round(logMass / 0.01f) * 0.01f;
+            float lm = ui.Slider("Mass (any)", shown, 0.5f, 10.9f, v => Fmt.Num(System.Math.Pow(10, v), 2) + " suns", 0.01f);
+            if (Mathf.Abs(lm - shown) > 1e-4f) { logMass = lm; massIdx = shownMassIdx = -1; }
             spin = ui.Slider("Spin (a/M)", spin, 0, 0.998f, v => v.ToString("0.000"), 0.001f);
             disk = ui.Toggle("Accretion disk", disk);
             doppler = ui.Toggle("Doppler beaming + redshift", doppler);
             lens = ui.Toggle("Gravitational lensing", lens);
             clumpy = ui.Toggle("Clumpy gas texture", clumpy);
             outer = ui.Slider("Disk outer radius", outer, 6, 20, v => v.ToString("0.0") + " rs", 0.5f);
-            temp = ui.Slider(spin > 0.001f ? "Disk temperature (peak at spin 0)" : "Peak disk temperature", temp, 2500, 20000, v => Fmt.Num(v, 0) + " K", 100);
+            temp = ui.Slider(spin > 0.001f ? "Accretion rate (as spin-0 peak temp.)" : "Peak disk temperature", temp, 2500, 20000, v => Fmt.Num(v, 0) + " K", 100);
             SandboxControls(ui);
         }
     }
