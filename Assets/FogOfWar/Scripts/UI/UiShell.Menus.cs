@@ -119,6 +119,8 @@ namespace FogOfWar.UI
 
         // ------------------------------------------------------------------------------------------ settings
 
+        public void OpenSettings(int tab) { settingsTab = tab; builtMenu = -1; app.ShowMenu(MenuSettings); } // review shots
+
         void BuildSettings(VisualElement host)
         {
             var card = Ui.Panel(host, null, null, true, "menu-card");
@@ -294,10 +296,17 @@ namespace FogOfWar.UI
 
         void AudioTab(VisualElement c)
         {
-            Ui.L(c, "The game has no sound yet. These levels are saved and will apply when it does.", "t-note");
-            SliderRow(c, "Master", 0, 1, GameSettings.Master, v => Mathf.RoundToInt(v * 100) + " %", v => GameSettings.Master = v);
-            SliderRow(c, "Music", 0, 1, GameSettings.Music, v => Mathf.RoundToInt(v * 100) + " %", v => GameSettings.Music = v);
-            SliderRow(c, "Effects", 0, 1, GameSettings.Effects, v => Mathf.RoundToInt(v * 100) + " %", v => GameSettings.Effects = v);
+            Ui.L(c, "Space carries no sound. What you hear is the ship through its hull: the drive, the thrusters, a low hum and the console.", "t-note");
+            Ui.FormRow(c, "Ship sound", out var ctl);
+            ctl.Add(new Switch(GameSettings.ShipSound, v => GameSettings.ShipSound = v));
+            string Pct(float v) => Mathf.RoundToInt(v * 100) + " %";
+            SliderRow(c, "Master volume", 0, 1, GameSettings.Master, Pct, v => GameSettings.Master = v);
+            SliderRow(c, "Drive and thrusters", 0, 1, GameSettings.Effects, Pct, v => GameSettings.Effects = v);
+            SliderRow(c, "Hull ambience", 0, 1, GameSettings.Music, Pct, v => GameSettings.Music = v);
+            SliderRow(c, "Console chimes", 0, 1, GameSettings.Chimes, Pct, v => GameSettings.Chimes = v);
+            Ui.FormRow(c, "Mute when the game is in the background", out ctl);
+            ctl.Add(new Switch(GameSettings.MuteInBackground, v => GameSettings.MuteInBackground = v));
+            Ui.L(c, "The ship is silent while a menu is open. There is no music yet.", "t-note").style.marginTop = 10;
         }
 
         // ------------------------------------------------------------------------------------------ chrome

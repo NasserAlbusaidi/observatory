@@ -29,10 +29,13 @@ namespace FogOfWar
         public static bool VSync { get => I("vsync", 1) == 1; set => SetI("vsync", value ? 1 : 0); }
         public static int FrameCap { get => I("fpscap", 120); set => SetI("fpscap", value); } // 0 = unlimited
 
-        // audio (placeholders until the game has sound)
+        // audio: Master drives AudioListener.volume; the rest scale the ship's sound groups (ShipAudio)
         public static float Master { get => F("vol-master", 0.8f); set => SetF("vol-master", Mathf.Clamp01(value)); }
-        public static float Music { get => F("vol-music", 0.6f); set => SetF("vol-music", Mathf.Clamp01(value)); }
-        public static float Effects { get => F("vol-fx", 0.8f); set => SetF("vol-fx", Mathf.Clamp01(value)); }
+        public static bool ShipSound { get => I("ship-sound", 1) == 1; set => SetI("ship-sound", value ? 1 : 0); }
+        public static float Effects { get => F("vol-fx", 0.8f); set => SetF("vol-fx", Mathf.Clamp01(value)); }      // drive and RCS
+        public static float Music { get => F("vol-music", 0.6f); set => SetF("vol-music", Mathf.Clamp01(value)); }   // ambient hull hum
+        public static float Chimes { get => F("vol-chimes", 0.8f); set => SetF("vol-chimes", Mathf.Clamp01(value)); } // console notices
+        public static bool MuteInBackground { get => I("mute-bg", 1) == 1; set => SetI("mute-bg", value ? 1 : 0); }
 
         // capture
         public static int ShotScale { get => I("shot-scale", 1); set => SetI("shot-scale", Mathf.Clamp(value, 1, 4)); } // 1, 2 or 4
@@ -58,6 +61,7 @@ namespace FogOfWar
             QualitySettings.vSyncCount = VSync ? 1 : 0;
             Application.targetFrameRate = FrameCap > 0 ? FrameCap : -1;
             AudioListener.volume = Master;
+            AudioListener.pause = false;
         }
 
         public static void SetDisplayMode(int mode)

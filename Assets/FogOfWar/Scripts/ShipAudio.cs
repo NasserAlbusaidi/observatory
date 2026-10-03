@@ -12,6 +12,7 @@ namespace FogOfWar
         readonly AudioSource drive, rcs, ambient, ui;
         readonly AudioClip good, bad;
         public bool Muted;
+        public float Hull = 1, Ambient = 1, Console = 1; // group levels from Settings → Audio
 
         public ShipAudio(Transform parent, Func<UnityEngine.Object, UnityEngine.Object> own)
         {
@@ -37,13 +38,13 @@ namespace FogOfWar
         {
             float m = Muted ? 0 : 1;
             float target = throttle > 0 ? (float)(0.25 + 0.35 * Math.Min(1, Math.Sqrt(g / 3))) : 0;
-            drive.volume = Mathf.MoveTowards(drive.volume, target * m, dt * 1.5f);
+            drive.volume = Mathf.MoveTowards(drive.volume, target * m * Hull, dt * 1.5f);
             drive.pitch = 0.75f + 0.35f * Mathf.Clamp01((float)g / 3);
-            rcs.volume = Mathf.MoveTowards(rcs.volume, (rcsOn ? 0.22f : 0) * m, dt * 8f);
-            ambient.volume = Mathf.MoveTowards(ambient.volume, 0.12f * m, dt * 0.3f);
+            rcs.volume = Mathf.MoveTowards(rcs.volume, (rcsOn ? 0.22f : 0) * m * Hull, dt * 8f);
+            ambient.volume = Mathf.MoveTowards(ambient.volume, 0.12f * m * Ambient, dt * 0.3f);
         }
 
-        public void Notice(bool goodNews) { if (!Muted) ui.PlayOneShot(goodNews ? good : bad, 0.35f); }
+        public void Notice(bool goodNews) { if (!Muted && Console > 0) ui.PlayOneShot(goodNews ? good : bad, 0.35f * Console); }
 
         // ------------------------------------------------------------ synthesis
 

@@ -69,8 +69,10 @@ namespace FogOfWar
                 // fresh boot: main menu over the paused game
                 app.Restart(app.GameIndex); app.ShowMenu(UiShell.MenuMain); SetStarted(app, false);
                 yield return Shot(app, shell, camRT, uiRT, tag, "01-main-menu");
-                app.ShowMenu(UiShell.MenuSettings);
+                shell.OpenSettings(0);
                 yield return Shot(app, shell, camRT, uiRT, tag, "02-settings");
+                shell.OpenSettings(4);
+                yield return Shot(app, shell, camRT, uiRT, tag, "02b-audio");
                 app.ShowMenu(UiShell.MenuControls);
                 yield return Shot(app, shell, camRT, uiRT, tag, "03-controls");
                 app.ShowMenu(UiShell.MenuObservatory);
