@@ -45,7 +45,6 @@ namespace FogOfWar
         void Check(bool ok, string what) { if (!ok) fails++; log.WriteLine((ok ? "  PASS " : "  FAIL ") + what); }
         void Note(string what) => log.WriteLine($"[{Time.realtimeSinceStartup:F1}s] {what}");
 
-        void Update() => AudioListener.volume = 0; // record, but play nothing out loud
 
         IEnumerator Start()
         {
@@ -53,7 +52,10 @@ namespace FogOfWar
             log = new StreamWriter(Path.Combine(dir, "audioqa.txt")) { AutoFlush = true };
             app = GetComponent<FogOfWarApp>();
             app.InputLocked = true; Controls.Locked = true;
+            GameSettings.SilentOutput = true; AudioListener.volume = 0; // record, but play nothing out loud
             bool cine = GameSettings.CinematicSound, on = GameSettings.ShipSound, bg = GameSettings.MuteInBackground;
+            float vMaster = GameSettings.Master, vFx = GameSettings.Effects, vAmb = GameSettings.Music, vCh = GameSettings.Chimes;
+            GameSettings.Master = 0.8f; GameSettings.Effects = 0.8f; GameSettings.Music = 0.6f; GameSettings.Chimes = 0.8f;
             GameSettings.ShipSound = true; GameSettings.MuteInBackground = false; GameSettings.CinematicSound = false;
             ShipSynthFilter.Tap = (d, ch) => { lock (recLock) { recChannels = ch; rec.AddRange(d); } };
             Note($"output {AudioSettings.outputSampleRate} Hz, {AudioSettings.driverCapabilities}, batchmode {Application.isBatchMode}");
@@ -119,6 +121,8 @@ namespace FogOfWar
             Check(sy.AngRate > 0.05f, $"turn rate reaches the synth ({sy.AngRate:F2} rad/s)");
             yield return new WaitForSecondsRealtime(3f);
 
+            yield return Sliders();
+
             Note("low reaction mass: master caution");
             ship.Fuel = s.Career.TankCapacity * 0.1;
             yield return new WaitForSecondsRealtime(3f);
@@ -145,6 +149,7 @@ namespace FogOfWar
 
             ShipSynthFilter.Tap = null;
             GameSettings.CinematicSound = cine; GameSettings.ShipSound = on; GameSettings.MuteInBackground = bg;
+            GameSettings.Master = vMaster; GameSettings.Effects = vFx; GameSettings.Music = vAmb; GameSettings.Chimes = vCh;
             float[] data;
             int ch;
             lock (recLock) { data = rec.ToArray(); ch = recChannels; }
@@ -159,6 +164,75 @@ namespace FogOfWar
         }
 
         int Mark() { lock (recLock) return rec.Count; }
+
+        IEnumerator Meter(float seconds, Action<(float rms, float peak)> got)
+        {
+            yield return new WaitForSecondsRealtime(0.4f); // bus levels glide for about 150 ms
+            int a = Mark();
+            yield return new WaitForSecondsRealtime(seconds);
+            got(Level(a, Mark()));
+        }
+
+        // Each Settings → Audio slider changes what plays (QA round 6), in the cockpit and with the menu open.
+        IEnumerator Sliders()
+        {
+            (float rms, float peak) on = default, off = default;
+            Note("sliders: drive at full burn in the cockpit");
+            Put("camMode", 2);
+            Controls.Tap(Controls.Action.ThrottleFull);
+            yield return new WaitForSecondsRealtime(1.5f);
+            yield return Meter(1f, l => on = l);
+            GameSettings.Effects = 0;
+            yield return Meter(1f, l => off = l);
+            GameSettings.Effects = 0.8f;
+            Note($"meter: drive {on.rms:F1} dBFS RMS; Drive and thrusters at 0 % {off.rms:F1}");
+            Check(off.rms < on.rms - 15, "Drive, thrusters and machinery slider at 0 % silences the drive");
+            GameSettings.Master = 0;
+            yield return Meter(1f, l => off = l);
+            GameSettings.Master = 0.8f;
+            Note($"meter: Master at 0 % {off.rms:F1} dBFS RMS");
+            Check(off.rms < -70, "Master slider at 0 % silences everything");
+            GameSettings.Master = 0.4f;
+            yield return Meter(1f, l => off = l);
+            GameSettings.Master = 0.8f;
+            Note($"meter: Master at 40 % {off.rms:F1} dBFS RMS");
+            Check(Mathf.Abs(off.rms - (on.rms - 6.02f)) < 2, "Master slider at half level lowers the mix by about 6 dB");
+
+            Controls.Tap(Controls.Action.ThrottleCut);
+            yield return new WaitForSecondsRealtime(3f);
+            yield return Meter(1.5f, l => on = l);
+            GameSettings.Music = 0;
+            yield return Meter(1.5f, l => off = l);
+            GameSettings.Music = 0.6f;
+            Note($"meter: idle cockpit {on.rms:F1} dBFS RMS; Life support and hull at 0 % {off.rms:F1}");
+            Check(off.rms < on.rms - 6, "Life support and hull slider at 0 % removes the cabin bed");
+
+            var snd = (ShipAudio)Get(s, "sound");
+            int c0 = Mark(); snd.Notice(true);
+            yield return new WaitForSecondsRealtime(0.4f);
+            on = Level(c0, Mark());
+            GameSettings.Chimes = 0;
+            yield return new WaitForSecondsRealtime(0.5f);
+            c0 = Mark(); snd.Notice(true);
+            yield return new WaitForSecondsRealtime(0.4f);
+            off = Level(c0, Mark());
+            GameSettings.Chimes = 0.8f;
+            Note($"meter: chime peak {on.peak:F1} dBFS; Console and alarms at 0 % {off.peak:F1}");
+            Check(off.peak < on.peak - 10, "Console and alarms slider at 0 % silences the chime");
+
+            Note("sliders: Settings menu open (game paused)");
+            app.ShowMenu(4);
+            yield return new WaitForSecondsRealtime(3f); // past the preview from the last slider change
+            yield return Meter(1f, l => off = l);
+            GameSettings.Music = 0.9f;
+            yield return Meter(1.2f, l => on = l);
+            Note($"meter: menu open {off.rms:F1} dBFS RMS; after moving Life support {on.rms:F1}");
+            Check(off.rms < -70, "the ship is silent under the menu");
+            Check(on.rms > off.rms + 30, "moving a slider in the menu plays a preview at the new level");
+            GameSettings.Music = 0.6f;
+            app.ShowMenu(0);
+            yield return new WaitForSecondsRealtime(3f);
+        }
 
         (float rms, float peak) Level(int a, int b)
         {
