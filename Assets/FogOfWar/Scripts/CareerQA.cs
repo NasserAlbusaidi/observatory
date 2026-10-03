@@ -198,6 +198,42 @@ namespace FogOfWar
                 yield return Fly(() => ship.Phase == "in orbit" || ship.Phase == "holding station" || ship.Landed != null, 5, 60);
                 Check((ship.Phase == "in orbit" || ship.Phase == "holding station") && ship.Landed == null,
                     $"arrive at {name} from {from:N0} km behind {planet.Name} at {g} g: {ship.Phase}");
+                yield return Fly(() => career.Codex.Scanned.Contains(name), 4, 15); // park long enough to scan it
+            }
+
+            // 8. discovery: parking at a target scans it; the codex survives a save
+            var cx = career.Codex;
+            Check(Codex.Facts("Titan").Length > 0 && Codex.Facts("Phobos").Length > 0, "codex facts load");
+            Check(cx.Visited.Contains("Jupiter") && cx.Visited.Contains("Saturn") && cx.Visited.Contains("Moon"), $"bodies passed close are logged ({cx.Visited.Count} visited)");
+            Check(cx.Scanned.Contains("Phobos") && cx.Scanned.Contains("Titan"), $"parked targets were scanned ({string.Join(", ", cx.Scanned)})");
+            int nv = cx.Visited.Count, ns = cx.Scanned.Count, na = cx.Achieved.Count;
+            var cj = JsonUtility.ToJson(career.ToSave(ship));
+            cx.Visited.Clear(); cx.Scanned.Clear(); cx.Achieved.Clear();
+            career.FromSave(JsonUtility.FromJson<CareerSave>(cj), ship);
+            Check(cx.Visited.Count == nv && cx.Scanned.Count == ns && cx.Achieved.Count == na, "codex and achievements survive a save");
+            career.Sandbox = false;
+            Put("cruiseIdx", 0);
+            Call("SetTarget", sys["Titan"]);
+            Put("warpIdx", 0);
+            yield return new WaitForSecondsRealtime(1f);
+            yield return Shot("c07-codex-titan");
+            Check(cx.Has("first_job") && cx.Has("jovian") && cx.Has("coast"), $"achievements (career only): {string.Join(", ", cx.Achieved)}");
+
+            // 9. a rescue: fly to a drifting ship on its own orbit, match it, hold while the crew crosses
+            State("before rescue");
+            Check(career.Docked?.Name == "Luna", "docked at Luna again");
+            if (career.Docked != null)
+            {
+                career.BuyFuel(ship, 1000);
+                var res = career.Board.Find(c => c.Kind == JobKind.Rescue) ?? career.Rescue(new System.Random(7), sys, jd);
+                career.Accept(res, jd);
+                var wreck = sys[res.To];
+                Check(wreck != null && Career.IsDerelict(wreck), $"derelict is in the system: {res.To} around {res.Parent}");
+                double c3 = career.Credits;
+                yield return Trip(wreck, 0, "rescue " + res.To, () => !career.Active.Contains(res), 4, 120);
+                State("after rescue");
+                Check(!career.Active.Contains(res) && career.Credits > c3 && sys[res.To] == null, $"crew rescued and paid ({career.Credits - c3:N0} cr), wreck removed");
+                yield return Shot("c08-rescue");
             }
 
             State("end");
