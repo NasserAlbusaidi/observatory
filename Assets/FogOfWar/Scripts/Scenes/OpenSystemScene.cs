@@ -73,6 +73,7 @@ namespace FogOfWar
 
             LoadArtBodies();
             BuildShip();
+            BuildCockpit();
             PlaceShipNearEarth();
             var sphere = Own(Gfx.UVSphere(128, 64));
             foreach (var b in sys.Bodies)
@@ -330,6 +331,7 @@ namespace FogOfWar
         {
             if (Cam != null) Cam.nearClipPlane = 0.05f; // on quit the camera may already be gone
             Orbit.enabled = true;
+            DisposeCockpit(); // gives the camera back its full culling mask
             vis.Clear();
         }
 
@@ -524,6 +526,7 @@ namespace FogOfWar
                 Cam.transform.rotation = Quaternion.LookRotation(-off, Vector3.up);
             }
             shipModel.gameObject.SetActive(mode != CamMode.Cockpit);
+            LateCockpit(mode == CamMode.Cockpit);
 
             var sunW = sys.Pos(sys.Sun, jd);
             foreach (var v in vis)

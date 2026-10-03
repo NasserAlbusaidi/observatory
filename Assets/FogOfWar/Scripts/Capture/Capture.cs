@@ -156,6 +156,13 @@ namespace FogOfWar
                 rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = scale == 1 ? 8 : 4 };
                 cam.targetTexture = rt;
                 cam.Render();
+                // overlay cameras drawn on top of the main one (the open world's cockpit interior)
+                foreach (var oc in Camera.allCameras)
+                {
+                    if (oc == cam || oc.depth <= cam.depth || oc.clearFlags != CameraClearFlags.Depth) continue;
+                    var ot = oc.targetTexture;
+                    oc.targetTexture = rt; oc.Render(); oc.targetTexture = ot;
+                }
                 var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
                 var act = RenderTexture.active;
                 RenderTexture.active = rt;
