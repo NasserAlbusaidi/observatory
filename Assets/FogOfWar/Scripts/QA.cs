@@ -79,6 +79,44 @@ namespace FogOfWar
         }
 
         static OpenWorld.D3 flipFrom;
+
+        // QA-019 regression: park in a circular standoff orbit around a planet, then plan a brachistochrone to a far
+        // target at maximum time compression.
+        static void Depart(SimScene s, string from, string to)
+        {
+            const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
+            var t = s.GetType();
+            var sys = (OpenWorld.SolarSystem)t.GetField("sys", F).GetValue(s);
+            var ship = (OpenWorld.Ship)Ship(s);
+            double jd = (double)t.GetField("jd", F).GetValue(s);
+            var p = sys[from];
+            double r = OpenWorld.Ship.Standoff(p);
+            var pp = sys.Pos(p, jd); var pv = sys.Vel(p, jd);
+            var radial = OpenWorld.D3.Cross(p.Pole, new OpenWorld.D3(1, 0, 0)).Norm;
+            var tangent = OpenWorld.D3.Cross(p.Pole, radial).Norm;
+            ship.Plan = OpenWorld.Plan.None; ship.Landed = null; ship.ThrottleCmd = 0; ship.Hold = OpenWorld.Hold.Off;
+            ship.Pos = pp + radial * r; ship.Vel = pv + tangent * Math.Sqrt(p.GM / r);
+            View(s, to, 4);
+            Invoke(s, "SetPivot", PivotShip(s), 0.16);
+            Set(s, "selectedPlan", OpenWorld.Plan.Brachistochrone);
+            Invoke(s, "TogglePlan");
+            Set(s, "warpIdx", 6);
+            departFrom = p;
+        }
+
+        static OpenWorld.Body departFrom;
+
+        static void DepartCheck(SimScene s)
+        {
+            const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
+            var sys = (OpenWorld.SolarSystem)s.GetType().GetField("sys", F).GetValue(s);
+            double jd = (double)s.GetType().GetField("jd", F).GetValue(s);
+            var ship = (OpenWorld.Ship)Ship(s);
+            double alt = (ship.Pos - sys.Pos(departFrom, jd)).Mag - departFrom.Radius;
+            string msg = $"QA depart {departFrom.Name}: {ship.Phase}, {alt:F0} km from its centre minus radius, plan {ship.Plan}";
+            if (ship.Landed != null || alt < 0) Debug.LogError(msg); else Debug.LogWarning(msg);
+            Set(s, "warpIdx", 0);
+        }
         static object Ship(SimScene s) => s.GetType().GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
         static object PivotShip(SimScene s) => Enum.ToObject(s.GetType().GetNestedType("Pivot", BindingFlags.NonPublic), 0);
         static void Invoke(object o, string method, params object[] args)
@@ -187,6 +225,14 @@ namespace FogOfWar
                 ("view-vesta", s => View(s, "Vesta", 3), 2),
                 ("plot-ceres-1M", s => { View(s, "Ceres", 4); Call(s, "TogglePlot"); Set(s, "warpIdx", 6); }, 12),
                 ("belt-rock", s => { Call(s, "TogglePlot"); Set(s, "warpIdx", 0); BeltRock(s, 1234); }, 2),
+                ("depart-jupiter", s => Depart(s, "Jupiter", "Ceres"), 4),
+                ("depart-jupiter-check", s => DepartCheck(s), 0.5f),
+                ("depart-saturn", s => Depart(s, "Saturn", "Ceres"), 4),
+                ("depart-saturn-check", s => DepartCheck(s), 0.5f),
+                ("depart-uranus", s => Depart(s, "Uranus", "Mars"), 4),
+                ("depart-uranus-check", s => DepartCheck(s), 0.5f),
+                ("depart-neptune", s => Depart(s, "Neptune", "Mars"), 4),
+                ("depart-neptune-check", s => DepartCheck(s), 0.5f),
                 ("plot-titan-1M", s => { View(s, "Titan", 6); Call(s, "TogglePlot"); Set(s, "warpIdx", 6); }, 15),
             },
             [typeof(MeteorScene)] = new (string, Action<SimScene>, float)[]

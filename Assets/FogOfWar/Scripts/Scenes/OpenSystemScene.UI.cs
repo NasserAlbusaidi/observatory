@@ -280,7 +280,11 @@ namespace FogOfWar
             if (ship.PlanActive) list.Add(new Readout("Plan", PlanShort[(int)ship.Plan]));
         }
 
-        static string Km(double km) => km > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : km >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
+        static string Km(double km)
+        {
+            double a = Math.Abs(km);
+            return a > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : a >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
+        }
 
         static string Dur(double s)
         {

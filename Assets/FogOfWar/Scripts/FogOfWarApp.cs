@@ -182,7 +182,7 @@ namespace FogOfWar
             if (e.keyCode == KeyCode.Escape)
             {
                 if (HelpOpen) HelpOpen = false;
-                else if (menu == Screen.Controls || menu == Screen.Observatory) menu = Screen.Main;
+                else if (menu == Screen.Controls || menu == Screen.Observatory) { menu = Screen.Main; rebindNote = null; }
                 else if (MenuOpen) { if (gameStarted && InGame) menu = Screen.None; }
                 else menu = Screen.Main;
                 e.Use();
@@ -266,8 +266,8 @@ namespace FogOfWar
             GUILayout.Label("Fixed keys: 1–9 attitude holds in flight (off, prograde, retrograde, normal, anti-normal, radial out, radial in, target, anti-target) · Esc menu · F2 hide panels · F11 fullscreen.", ui.note);
             GUILayout.Space(6);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Reset to defaults", ui.button)) Controls.ResetDefaults();
-            if (GUILayout.Button("Back", ui.button)) { rebinding = null; menu = Screen.Main; }
+            if (GUILayout.Button("Reset to defaults", ui.button)) { Controls.ResetDefaults(); rebindNote = null; }
+            if (GUILayout.Button("Back", ui.button)) { rebinding = null; rebindNote = null; menu = Screen.Main; }
             GUILayout.EndHorizontal();
         }
 

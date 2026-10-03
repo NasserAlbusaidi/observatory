@@ -288,7 +288,7 @@ namespace FogOfWar
             engine = Models.FindDeep(shipModel, "Engine");
             if (engine != null) engineScale = engine.localScale;
 
-            plumeMat = OwnMat(Gfx.Unlit(new Color(0.55f, 0.75f, 1f, 0.8f), true));
+            plumeMat = OwnMat(Gfx.Mat("Plume"));
             plume = Gfx.Obj("Plume", shipT, Own(Gfx.UVSphere(24, 12)), plumeMat).transform;
         }
 
@@ -429,6 +429,13 @@ namespace FogOfWar
             if (ship.ThrottleCmd > 0 || ship.PlanActive || ship.RcsInput.sqrMagnitude > 0) h = Math.Min(h, 30);
             // rotating under pilot control at low warp: small steps so the rigid-body dynamics stay smooth
             if (ship.RotInput.sqrMagnitude > 0 || ship.AngVel.sqrMagnitude > 0) h = Math.Min(h, 0.05);
+            foreach (var b in ship.Near)
+            {
+                if (b == sys.Sun) continue;
+                var rel = ship.Pos - sys.Pos(b, jd);
+                double alt = rel.Mag - b.Radius, closing = -D3.Dot(ship.Vel - sys.Vel(b, jd), rel.Norm);
+                if (closing > 0) h = Math.Min(h, Math.Max(0.2 * alt / closing, 0.05));
+            }
             if (ship.PlanActive)
             {
                 double d = (sys.Pos(ship.Target, jd) - ship.Pos).Mag;
@@ -547,7 +554,7 @@ namespace FogOfWar
                 plume.localScale = new Vector3(shipLen * 0.06f, shipLen * 0.06f, L);
                 plume.localPosition = new Vector3(0, 0, -shipLen * 0.5f - L * 0.9f);
                 float behind = Mathf.Clamp01(Vector3.Dot((shipT.position - Cam.transform.position).normalized, shipT.forward));
-                plumeMat.SetColor("_Color", new Color(0.55f, 0.75f, 1f, (0.2f + 0.3f * thr) * Mathf.Lerp(1f, 0.25f, behind)));
+                plumeMat.SetFloat("_Intensity", (0.5f + 0.9f * thr) * Mathf.Lerp(1f, 0.3f, behind));
             }
 
             PlaceRings(sunW);
