@@ -120,7 +120,7 @@ namespace FogOfWar
             // 1. the first job, full burn to the Moon
             double c0 = career.Credits;
             log.WriteLine($"  Moon vs Earth seen from the ship: {Vector3.Angle(Frame.U(sys.Pos(sys.Moon, jd) - ship.Pos), Frame.U(sys.Pos(sys.Earth, jd) - ship.Pos)):F0} deg");
-            yield return Trip(sys.Moon, 0, "Earth → Moon full burn", () => career.Docked?.Name == "Luna", moonWarp, 60);
+            yield return Trip(sys.Moon, 0, "Earth → Moon full burn", () => career.Docked?.Name == "Luna" && ship.Phase == "in orbit", moonWarp, 60);
             State("at Luna");
             Check(career.Docked?.Name == "Luna", "docked at Luna after the autopilot parks");
             Check(career.Credits - c0 >= 3000, $"first job paid ({career.Credits - c0:N0} cr)");
