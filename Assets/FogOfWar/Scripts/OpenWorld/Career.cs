@@ -99,7 +99,16 @@ namespace FogOfWar.OpenWorld
 
         public static Port PortAt(string name) => Array.Find(Ports, p => p.Name == name);
 
-        void Say(string text, bool good = true) => Notes.Add(new Note { Text = text, Good = good, Time = UnityEngine.Time.realtimeSinceStartup });
+        // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
+        // player action. Docked/Undocked/TankDry carry the port name or an empty string.
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone }
+        public event Action<Happening, string> OnEvent;
+
+        void Say(Happening what, string text, bool good = true)
+        {
+            Notes.Add(new Note { Text = text, Good = good, Time = UnityEngine.Time.realtimeSinceStartup });
+            OnEvent?.Invoke(what, text);
+        }
 
         // A fresh career: docked at Earth with one easy first job to the Moon.
         public void StartNew(double jd)
@@ -128,15 +137,21 @@ namespace FogOfWar.OpenWorld
             Notes.RemoveAll(n => UnityEngine.Time.realtimeSinceStartup - n.Time > 8);
             Discover(sys, ship, jd, simDt);
             if (Sandbox) { Docked = null; return; }
-            Docked = FindDock(sys, ship, jd);
+            var was = Docked;
+            Docked = FindDock(sys, ship, jd, was);
+            if (Docked != was) OnEvent?.Invoke(Docked != null ? Happening.Docked : Happening.Undocked, (Docked ?? was).Name);
+            bool dry = ship.Fuel <= 0;
+            if (dry && !wasDry) OnEvent?.Invoke(Happening.TankDry, "");
+            wasDry = dry;
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
             Scan(sys, ship, jd, simDt);
             Rescues(sys, ship, jd, simDt);
             Expire(jd);
-            foreach (var t in Codex.CheckFeats(this, ship)) Say("Achievement: " + t);
+            foreach (var t in Codex.CheckFeats(this, ship)) Say(Happening.Achievement, "Achievement: " + t);
         }
 
         public readonly Codex Codex = new Codex();
+        bool wasDry;
 
         // Visits to every body passed close; a scan of the current target with the drive off. A first scan sells its data.
         void Discover(SolarSystem sys, Ship ship, double jd, double simDt)
@@ -144,7 +159,7 @@ namespace FogOfWar.OpenWorld
             foreach (var b in sys.Bodies)
             {
                 if (b.Parent == null || IsDerelict(b) || Codex.Visited.Contains(b.Name)) continue;
-                if ((ship.Pos - sys.Pos(b, jd)).Mag < Codex.VisitRange(b)) { Codex.Visited.Add(b.Name); Say("Codex: " + b.Name + " visited"); }
+                if ((ship.Pos - sys.Pos(b, jd)).Mag < Codex.VisitRange(b)) { Codex.Visited.Add(b.Name); Say(Happening.Visited, "Codex: " + b.Name + " visited"); }
             }
             var t = ship.Target;
             if (t == null || t.Parent == null || IsDerelict(t) || Codex.Scanned.Contains(t.Name)) { Codex.ScanTarget = null; return; }
@@ -153,31 +168,32 @@ namespace FogOfWar.OpenWorld
             Codex.ScanProgress += simDt;
             if (Codex.ScanProgress < Codex.ScanSeconds) return;
             Codex.Scanned.Add(t.Name); Codex.Visited.Add(t.Name);
-            if (Sandbox) { Say("Codex: " + t.Name + " scanned"); return; }
+            if (Sandbox) { Say(Happening.Scanned, "Codex: " + t.Name + " scanned"); return; }
             double v = Codex.DataValue(sys, t, jd);
             Credits += v; Earned += v;
-            Say($"Codex: {t.Name} scanned. First data sold: +{v:N0} cr");
+            Say(Happening.Scanned, $"Codex: {t.Name} scanned. First data sold: +{v:N0} cr");
         }
 
         public bool BuySensors()
         {
             if (Docked == null || Codex.SensorLevel > 0 || Credits < Codex.SensorCost) return false;
             Credits -= Codex.SensorCost; Codex.SensorLevel = 1;
-            Say("Sensors upgraded: scan range ×2, scan time halved");
+            Say(Happening.Upgrade, "Sensors upgraded: scan range ×2, scan time halved");
             return true;
         }
 
         // Docked: in a bound orbit close to the port body with the drive off (or sitting on its surface).
         public static double DockRange(Body b) => Ship.Standoff(b) * 2;
 
-        Port FindDock(SolarSystem sys, Ship ship, double jd)
+        // Once docked, trim burns while the autopilot circularises don't undock you; leaving range or orbit does.
+        Port FindDock(SolarSystem sys, Ship ship, double jd, Port was)
         {
-            if (ship.Throttle > 0) return null;
             foreach (var p in Ports)
             {
                 var b = sys[p.Body];
                 if (b == null) continue;
                 if (ship.Landed == b) return p;
+                if (ship.Throttle > 0 && p != was) continue;
                 var r = ship.Pos - sys.Pos(b, jd);
                 double d = r.Mag;
                 if (d > DockRange(b)) continue;
@@ -204,7 +220,7 @@ namespace FogOfWar.OpenWorld
             Credits += pay; Earned += pay; Done++;
             Active.Remove(c);
             RemoveDerelict(c);
-            Say($"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
+            Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid, $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
         }
 
         public static double ScanRange(Body b) => Math.Max(Ship.Standoff(b) * 2, b.Radius + 1000);
@@ -233,7 +249,7 @@ namespace FogOfWar.OpenWorld
                 if (jd - c.IssuedJd <= 2 * (c.DeadlineJd - c.IssuedJd)) continue;
                 Active.RemoveAt(i); Failed++;
                 RemoveDerelict(c);
-                Say("Contract failed, far past its deadline: " + c.Title, false);
+                Say(Happening.JobFailed, "Contract failed, far past its deadline: " + c.Title, false);
             }
         }
 
@@ -256,7 +272,7 @@ namespace FogOfWar.OpenWorld
             c.IssuedJd = jd; c.DeadlineJd = jd + c.Days;
             Active.Add(c);
             SpawnDerelict(c);
-            Say("Accepted: " + c.Title);
+            Say(Happening.JobAccepted, "Accepted: " + c.Title);
         }
 
         public void Abandon(Contract c)
@@ -264,7 +280,7 @@ namespace FogOfWar.OpenWorld
             if (!Active.Remove(c)) return;
             RemoveDerelict(c);
             Failed++;
-            Say("Abandoned: " + c.Title, false);
+            Say(Happening.JobFailed, "Abandoned: " + c.Title, false);
         }
 
         void RefreshBoard(SolarSystem sys, Ship ship, double jd)
@@ -373,7 +389,7 @@ namespace FogOfWar.OpenWorld
             if (tonnes <= 0.01) return;
             ship.Fuel += tonnes;
             Credits -= tonnes * Docked.FuelPrice;
-            Say($"Bought {tonnes:N1} t of reaction mass: −{tonnes * Docked.FuelPrice:N0} cr");
+            Say(Happening.FuelBought, $"Bought {tonnes:N1} t of reaction mass: −{tonnes * Docked.FuelPrice:N0} cr");
         }
 
         // Adrift with a dry tank: a tender brings reaction mass. Debt is allowed.
@@ -381,14 +397,14 @@ namespace FogOfWar.OpenWorld
         {
             ship.Fuel = Math.Min(TankCapacity, ship.Fuel + EmergencyTonnes);
             Credits -= EmergencyCost;
-            Say($"Emergency tender: +{EmergencyTonnes:N0} t of reaction mass, −{EmergencyCost:N0} cr", false);
+            Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of reaction mass, −{EmergencyCost:N0} cr", false);
         }
 
         public bool BuyDrive()
         {
             if (Docked == null || DriveLevel >= DriveG.Length - 1 || Credits < DriveCost[DriveLevel + 1]) return false;
             Credits -= DriveCost[++DriveLevel];
-            Say($"Drive upgraded: rated {DriveRating:0} g");
+            Say(Happening.Upgrade, $"Drive upgraded: rated {DriveRating:0} g");
             return true;
         }
 
@@ -396,7 +412,7 @@ namespace FogOfWar.OpenWorld
         {
             if (Docked == null || TankLevel >= MaxTankLevel || Credits < TankCost) return false;
             Credits -= TankCost; TankLevel++;
-            Say($"Tank enlarged to {TankCapacity:N0} t");
+            Say(Happening.Upgrade, $"Tank enlarged to {TankCapacity:N0} t");
             return true;
         }
 
