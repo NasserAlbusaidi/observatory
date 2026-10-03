@@ -484,6 +484,7 @@ namespace FogOfWar
 
         public override void LateTick(float dt)
         {
+            MixSound();
             if (Prof) swLate.Start();
             try { LateInner(dt); } finally { if (Prof) swLate.Stop(); }
         }

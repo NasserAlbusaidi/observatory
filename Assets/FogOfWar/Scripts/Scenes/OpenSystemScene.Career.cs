@@ -39,14 +39,42 @@ namespace FogOfWar
         Port wasDocked;
         Quaternion lastAtt;
 
+        readonly float[] lastMix = new float[4];
+        bool mixSeen;
+        float previewUntil, nextPreview;
+
+        // Settings → Audio, the view and mute. Runs every frame from LateTick, including while the game is paused
+        // under a menu: the menu mutes the ship, except for a short preview after an audio slider moves.
+        void MixSound()
+        {
+            if (sound == null) return;
+            float m = GameSettings.Master, fx = GameSettings.Effects, amb = GameSettings.Music, ch = GameSettings.Chimes;
+            float now = Time.unscaledTime;
+            if (mixSeen)
+            {
+                int bus = fx != lastMix[1] ? Audio.ShipSynth.Machinery : amb != lastMix[2] ? Audio.ShipSynth.Cabin
+                        : ch != lastMix[3] ? Audio.ShipSynth.Console : m != lastMix[0] ? -1 : -2;
+                if (bus > -2)
+                {
+                    previewUntil = now + 2.5f;
+                    if (now > nextPreview) { sound.Preview(bus); nextPreview = now + 0.6f; }
+                }
+            }
+            mixSeen = true;
+            lastMix[0] = m; lastMix[1] = fx; lastMix[2] = amb; lastMix[3] = ch;
+            bool preview = now < previewUntil;
+            sound.Volume = m; sound.Hull = fx; sound.Ambient = amb; sound.Console = ch;
+            sound.Muted = muted || (App.MenuOpen && !preview) || (GameSettings.MuteInBackground && !Application.isFocused);
+            // the listener is inside the hull only in the cockpit view; photo mode and cinematics are outside cameras.
+            // A preview always plays as heard from the cockpit.
+            sound.Interior = preview || (pivot == Pivot.Ship && camMode == CamMode.Cockpit && App.Rig == null);
+            sound.Cinematic = GameSettings.CinematicSound;
+            sound.ApplyMix();
+        }
+
         void TickSound(double achievedDt)
         {
             if (sound == null) return;
-            sound.Muted = muted || App.MenuOpen || (GameSettings.MuteInBackground && !Application.isFocused);
-            sound.Hull = GameSettings.Effects; sound.Ambient = GameSettings.Music; sound.Console = GameSettings.Chimes;
-            // the listener is inside the hull only in the cockpit view; photo mode and cinematics are outside cameras
-            sound.Interior = pivot == Pivot.Ship && camMode == CamMode.Cockpit && App.Rig == null;
-            sound.Cinematic = GameSettings.CinematicSound;
 
             // crossing into or out of a planet's shadow: the hull cools or warms, and its joints tick and creak. Under
             // time warp a low orbit flips day and night faster than the hull's temperature can follow, so the kick

@@ -14,6 +14,7 @@ namespace FogOfWar
         static void SetI(string k, int v) { PlayerPrefs.SetInt("fow-set-" + k, v); PlayerPrefs.Save(); Changed?.Invoke(); }
 
         public static event Action Changed;
+        public static bool SilentOutput; // the audio check records the synth with the speakers off
 
         // interface
         public static float UiScale { get => F("ui-scale", 1f); set => SetF("ui-scale", Mathf.Clamp(value, 0.7f, 1.6f)); }
@@ -29,7 +30,7 @@ namespace FogOfWar
         public static bool VSync { get => I("vsync", 1) == 1; set => SetI("vsync", value ? 1 : 0); }
         public static int FrameCap { get => I("fpscap", 120); set => SetI("fpscap", value); } // 0 = unlimited
 
-        // audio: Master drives AudioListener.volume; the rest scale the ship's sound groups (ShipAudio)
+        // audio: levels for the ship's sound (ShipAudio applies them every frame, menus included)
         public static float Master { get => F("vol-master", 0.8f); set => SetF("vol-master", Mathf.Clamp01(value)); }
         public static bool ShipSound { get => I("ship-sound", 1) == 1; set => SetI("ship-sound", value ? 1 : 0); }
         public static float Effects { get => F("vol-fx", 0.8f); set => SetF("vol-fx", Mathf.Clamp01(value)); }      // drive, thrusters, machinery
@@ -62,7 +63,7 @@ namespace FogOfWar
         {
             QualitySettings.vSyncCount = VSync ? 1 : 0;
             Application.targetFrameRate = FrameCap > 0 ? FrameCap : -1;
-            AudioListener.volume = Master;
+            AudioListener.volume = SilentOutput ? 0 : 1; // Master is applied in the ship synth, so the audio check can meter it
             AudioListener.pause = false;
         }
 

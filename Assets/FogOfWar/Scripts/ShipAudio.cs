@@ -12,7 +12,7 @@ namespace FogOfWar
     {
         readonly ShipSynth synth;
         public bool Muted;
-        public float Hull = 1, Ambient = 1, Console = 1; // group levels from Settings → Audio
+        public float Volume = 1, Hull = 1, Ambient = 1, Console = 1; // master and group levels from Settings → Audio
         public bool Interior = true, Cinematic;
 
         public ShipAudio(Transform parent, Func<UnityEngine.Object, UnityEngine.Object> own)
@@ -39,13 +39,36 @@ namespace FogOfWar
             synth.AngRate = angRate;
             synth.Thermal = thermal;
             synth.PingRate = pingRate;
+            ApplyMix();
+        }
+
+        // view, mute and levels; also called while the game is paused under a menu
+        public void ApplyMix()
+        {
             synth.Interior = Interior ? 1 : 0;
             synth.CinematicOn = Cinematic ? 1 : 0;
-            synth.Master = Muted ? 0 : 1;
+            synth.Master = Muted ? 0 : Volume;
             synth.BusLevel[ShipSynth.Machinery] = Hull;
             synth.BusLevel[ShipSynth.Cinematic] = Hull;
             synth.BusLevel[ShipSynth.Cabin] = Ambient;
             synth.BusLevel[ShipSynth.Console] = Console;
+        }
+
+        // a sample of one group, so a slider moved in the menu can be heard (bus −1: everything)
+        public void Preview(int bus)
+        {
+            switch (bus)
+            {
+                case ShipSynth.Machinery:
+                    synth.Play(ShipSound.RcsPulse); synth.Play(ShipSound.RcsPulse, 1, 0.12f); synth.Play(ShipSound.DriveLight, 1, 0.3f);
+                    break;
+                case ShipSynth.Cabin:
+                    synth.Play(ShipSound.ScrubberValve); synth.Play(ShipSound.Creak, 1, 0.4f);
+                    break;
+                default:
+                    synth.Play(ShipSound.ChimeGood);
+                    break;
+            }
         }
 
         public void Notice(bool goodNews) => synth.Play(goodNews ? ShipSound.ChimeGood : ShipSound.ChimeBad);
