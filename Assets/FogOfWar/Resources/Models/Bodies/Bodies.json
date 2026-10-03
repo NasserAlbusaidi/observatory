@@ -1,0 +1,767 @@
+[
+ {
+  "name": "Phobos",
+  "parent": "Mars",
+  "triaxialKm": [
+   26.8,
+   22.4,
+   18.4
+  ],
+  "meanRadiusKm": 11.135,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Deimos",
+  "parent": "Mars",
+  "triaxialKm": [
+   15.0,
+   12.2,
+   10.4
+  ],
+  "meanRadiusKm": 6.196,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Metis",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   60,
+   40,
+   34
+  ],
+  "meanRadiusKm": 21.687,
+  "class": "red",
+  "colour": [
+   0.32,
+   0.18,
+   0.12
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Adrastea",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   20,
+   16,
+   14
+  ],
+  "meanRadiusKm": 8.243,
+  "class": "red",
+  "colour": [
+   0.32,
+   0.18,
+   0.12
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Amalthea",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   250,
+   146,
+   128
+  ],
+  "meanRadiusKm": 83.587,
+  "class": "red",
+  "colour": [
+   0.32,
+   0.18,
+   0.12
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Thebe",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   116,
+   98,
+   84
+  ],
+  "meanRadiusKm": 49.237,
+  "class": "red",
+  "colour": [
+   0.32,
+   0.18,
+   0.12
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Himalia",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   150,
+   150,
+   120
+  ],
+  "meanRadiusKm": 69.624,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Elara",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   80,
+   76,
+   72
+  ],
+  "meanRadiusKm": 37.965,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Pasiphae",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   60,
+   58,
+   56
+  ],
+  "meanRadiusKm": 28.989,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Carme",
+  "parent": "Jupiter",
+  "triaxialKm": [
+   46,
+   46,
+   44
+  ],
+  "meanRadiusKm": 22.662,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Pan",
+  "parent": "Saturn",
+  "triaxialKm": [
+   34,
+   31,
+   21
+  ],
+  "meanRadiusKm": 14.039,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Daphnis",
+  "parent": "Saturn",
+  "triaxialKm": [
+   9,
+   8,
+   6
+  ],
+  "meanRadiusKm": 3.78,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Atlas",
+  "parent": "Saturn",
+  "triaxialKm": [
+   41,
+   35,
+   19
+  ],
+  "meanRadiusKm": 15.049,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Prometheus",
+  "parent": "Saturn",
+  "triaxialKm": [
+   136,
+   79,
+   59
+  ],
+  "meanRadiusKm": 42.951,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Pandora",
+  "parent": "Saturn",
+  "triaxialKm": [
+   104,
+   81,
+   64
+  ],
+  "meanRadiusKm": 40.695,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Epimetheus",
+  "parent": "Saturn",
+  "triaxialKm": [
+   130,
+   114,
+   106
+  ],
+  "meanRadiusKm": 58.124,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Janus",
+  "parent": "Saturn",
+  "triaxialKm": [
+   203,
+   185,
+   153
+  ],
+  "meanRadiusKm": 89.555,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Telesto",
+  "parent": "Saturn",
+  "triaxialKm": [
+   33,
+   24,
+   20
+  ],
+  "meanRadiusKm": 12.557,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Calypso",
+  "parent": "Saturn",
+  "triaxialKm": [
+   30,
+   23,
+   14
+  ],
+  "meanRadiusKm": 10.649,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Helene",
+  "parent": "Saturn",
+  "triaxialKm": [
+   45,
+   39,
+   27
+  ],
+  "meanRadiusKm": 18.093,
+  "class": "ice",
+  "colour": [
+   0.8,
+   0.8,
+   0.82
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Hyperion",
+  "parent": "Saturn",
+  "triaxialKm": [
+   360,
+   266,
+   205
+  ],
+  "meanRadiusKm": 134.881,
+  "class": "hyperion",
+  "colour": [
+   0.55,
+   0.5,
+   0.44
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Phoebe",
+  "parent": "Saturn",
+  "triaxialKm": [
+   219,
+   217,
+   204
+  ],
+  "meanRadiusKm": 106.614,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Puck",
+  "parent": "Uranus",
+  "triaxialKm": [
+   162,
+   162,
+   162
+  ],
+  "meanRadiusKm": 81.0,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Portia",
+  "parent": "Uranus",
+  "triaxialKm": [
+   156,
+   126,
+   126
+  ],
+  "meanRadiusKm": 67.649,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Sycorax",
+  "parent": "Uranus",
+  "triaxialKm": [
+   157,
+   157,
+   157
+  ],
+  "meanRadiusKm": 78.5,
+  "class": "red",
+  "colour": [
+   0.32,
+   0.18,
+   0.12
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Caliban",
+  "parent": "Uranus",
+  "triaxialKm": [
+   72,
+   72,
+   72
+  ],
+  "meanRadiusKm": 36.0,
+  "class": "red",
+  "colour": [
+   0.32,
+   0.18,
+   0.12
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Naiad",
+  "parent": "Neptune",
+  "triaxialKm": [
+   96,
+   60,
+   52
+  ],
+  "meanRadiusKm": 33.454,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Thalassa",
+  "parent": "Neptune",
+  "triaxialKm": [
+   108,
+   100,
+   52
+  ],
+  "meanRadiusKm": 41.252,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Despina",
+  "parent": "Neptune",
+  "triaxialKm": [
+   180,
+   148,
+   128
+  ],
+  "meanRadiusKm": 75.258,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Galatea",
+  "parent": "Neptune",
+  "triaxialKm": [
+   204,
+   184,
+   144
+  ],
+  "meanRadiusKm": 87.749,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Larissa",
+  "parent": "Neptune",
+  "triaxialKm": [
+   216,
+   204,
+   168
+  ],
+  "meanRadiusKm": 97.447,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Proteus",
+  "parent": "Neptune",
+  "triaxialKm": [
+   436,
+   416,
+   402
+  ],
+  "meanRadiusKm": 208.884,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Nereid",
+  "parent": "Neptune",
+  "triaxialKm": [
+   357,
+   357,
+   357
+  ],
+  "meanRadiusKm": 178.5,
+  "class": "grey",
+  "colour": [
+   0.25,
+   0.25,
+   0.26
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Halimede",
+  "parent": "Neptune",
+  "triaxialKm": [
+   62,
+   62,
+   62
+  ],
+  "meanRadiusKm": 31.0,
+  "class": "grey",
+  "colour": [
+   0.25,
+   0.25,
+   0.26
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Eros",
+  "parent": "Sun",
+  "triaxialKm": [
+   34.4,
+   11.2,
+   11.2
+  ],
+  "meanRadiusKm": 8.14,
+  "class": "S",
+  "colour": [
+   0.3,
+   0.26,
+   0.22
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Vesta",
+  "parent": "Sun",
+  "triaxialKm": [
+   572.6,
+   557.2,
+   446.4
+  ],
+  "meanRadiusKm": 261.115,
+  "class": "V",
+  "colour": [
+   0.4,
+   0.37,
+   0.34
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Pallas",
+  "parent": "Sun",
+  "triaxialKm": [
+   568,
+   532,
+   448
+  ],
+  "meanRadiusKm": 256.734,
+  "class": "B",
+  "colour": [
+   0.09,
+   0.09,
+   0.1
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Hygiea",
+  "parent": "Sun",
+  "triaxialKm": [
+   450,
+   430,
+   424
+  ],
+  "meanRadiusKm": 217.263,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Psyche",
+  "parent": "Sun",
+  "triaxialKm": [
+   278,
+   238,
+   171
+  ],
+  "meanRadiusKm": 112.247,
+  "class": "M",
+  "colour": [
+   0.36,
+   0.36,
+   0.37
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Ida",
+  "parent": "Sun",
+  "triaxialKm": [
+   59.8,
+   25.4,
+   18.6
+  ],
+  "meanRadiusKm": 15.228,
+  "class": "S",
+  "colour": [
+   0.3,
+   0.26,
+   0.22
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Gaspra",
+  "parent": "Sun",
+  "triaxialKm": [
+   18.2,
+   10.5,
+   8.9
+  ],
+  "meanRadiusKm": 5.968,
+  "class": "S",
+  "colour": [
+   0.3,
+   0.26,
+   0.22
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Mathilde",
+  "parent": "Sun",
+  "triaxialKm": [
+   66,
+   48,
+   44
+  ],
+  "meanRadiusKm": 25.925,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Itokawa",
+  "parent": "Sun",
+  "triaxialKm": [
+   0.535,
+   0.294,
+   0.209
+  ],
+  "meanRadiusKm": 0.16,
+  "class": "S",
+  "colour": [
+   0.3,
+   0.26,
+   0.22
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Bennu",
+  "parent": "Sun",
+  "triaxialKm": [
+   0.565,
+   0.535,
+   0.508
+  ],
+  "meanRadiusKm": 0.268,
+  "class": "B",
+  "colour": [
+   0.09,
+   0.09,
+   0.1
+  ],
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Ryugu",
+  "parent": "Sun",
+  "triaxialKm": [
+   1.04,
+   1.04,
+   0.88
+  ],
+  "meanRadiusKm": 0.492,
+  "class": "C",
+  "colour": [
+   0.075,
+   0.072,
+   0.07
+  ],
+  "source": "procedural (seeded by name)"
+ }
+]

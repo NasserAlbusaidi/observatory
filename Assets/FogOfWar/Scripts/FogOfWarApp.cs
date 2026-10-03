@@ -48,7 +48,7 @@ namespace FogOfWar
             scenes = new SimScene[]
             {
                 new WormholeScene(), new BlackHoleScene(), new WarpScene(), new JourneyScene(),
-                new NegativeMassScene(), new TidesScene(), new MarsScene(), new MeteorScene(),
+                new NegativeMassScene(), new TidesScene(), new MarsScene(), new MeteorScene(), new OpenSystemScene(),
             };
             Quality = PlayerPrefs.GetInt("fow-quality", 1);
             Activate(Mathf.Clamp(PlayerPrefs.GetInt("fow-scene", 0), 0, scenes.Length - 1));
@@ -110,7 +110,7 @@ namespace FogOfWar
             {
                 DrawRail(W, H);
                 DrawPanel(W, H);
-                GUI.Label(new Rect(W / 2 - 300, H - 30, 600, 20), "drag to orbit · scroll to zoom · 1–8 switch scene · H hide panels · F11 fullscreen · Esc quit", ui.hint);
+                GUI.Label(new Rect(W / 2 - 300, H - 30, 600, 20), "drag to orbit · scroll to zoom · 1–9 switch scene · H hide panels · F11 fullscreen · Esc quit", ui.hint);
             }
             else { railRect = panelRect = Rect.zero; }
 
@@ -125,9 +125,9 @@ namespace FogOfWar
                 case EventType.MouseUp:
                     dragging = false; break;
                 case EventType.MouseDrag when dragging:
-                    Orbit.Drag(e.delta, dragButton != 0); e.Use(); break;
+                    if (current == null || !current.HandleDrag(e.delta, dragButton)) Orbit.Drag(e.delta, dragButton != 0); e.Use(); break;
                 case EventType.ScrollWheel when !overUI:
-                    Orbit.Zoom(e.delta.y); e.Use(); break;
+                    if (current == null || !current.HandleZoom(e.delta.y)) Orbit.Zoom(e.delta.y); e.Use(); break;
             }
         }
 
@@ -136,7 +136,7 @@ namespace FogOfWar
             if (e.keyCode == KeyCode.H) { showUI = !showUI; e.Use(); }
             else if (e.keyCode == KeyCode.F11) { Screen.fullScreen = !Screen.fullScreen; e.Use(); }
             else if (e.keyCode == KeyCode.Escape) { Application.Quit(); e.Use(); }
-            else if (e.keyCode >= KeyCode.Alpha1 && e.keyCode <= KeyCode.Alpha8) { Activate(e.keyCode - KeyCode.Alpha1); e.Use(); }
+            else if (e.keyCode >= KeyCode.Alpha1 && e.keyCode <= KeyCode.Alpha9 && e.keyCode - KeyCode.Alpha1 < scenes.Length) { Activate(e.keyCode - KeyCode.Alpha1); e.Use(); }
         }
 
         void DrawRail(float W, float H)

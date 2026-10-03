@@ -51,6 +51,9 @@ namespace FogOfWar
         public abstract void Readouts(List<Readout> list);
         public abstract void Controls(PanelUI ui);
         public virtual void OnGUIOverlay() { }
+        // Return true to take mouse drag / wheel input instead of the shared orbit camera.
+        public virtual bool HandleDrag(Vector2 delta, int button) => false;
+        public virtual bool HandleZoom(float wheel) => false;
         protected virtual void Teardown() { }
     }
 }

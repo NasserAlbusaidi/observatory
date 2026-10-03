@@ -13,7 +13,7 @@ namespace FogOfWar
     public class QA : MonoBehaviour
     {
         string dir;
-        int errors, bad;
+        int errors, bad, only = -1;
         StreamWriter log;
         FogOfWarApp app;
 
@@ -22,7 +22,11 @@ namespace FogOfWar
             var args = Environment.GetCommandLineArgs();
             int i = Array.IndexOf(args, "-fowqa");
             if (i < 0 || i + 1 >= args.Length) return;
-            app.gameObject.AddComponent<QA>().dir = args[i + 1];
+            var qa = app.gameObject.AddComponent<QA>();
+            qa.dir = args[i + 1];
+            // -fowqascene N limits the per-scene steps to scene N (1-based)
+            int j = Array.IndexOf(args, "-fowqascene");
+            if (j >= 0 && j + 1 < args.Length && int.TryParse(args[j + 1], out int only)) qa.only = only - 1;
         }
 
         void OnEnable() => Application.logMessageReceived += OnLog;
@@ -98,6 +102,16 @@ namespace FogOfWar
                 ("relief-max", s => Set(s, "relief", 20f), 2),
                 ("flat-icy", s => { Set(s, "relief", 0f); Set(s, "tau", 0f); Set(s, "albedo", 0.6f); Set(s, "lapse", 0f); }, 6),
             },
+            [typeof(OpenSystemScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("map", s => Call(s, "ToggleMap"), 3),
+                ("ship", s => Call(s, "ToggleMap"), 2),
+                ("plot-mars-100k", s => { Call(s, "TogglePlot"); Set(s, "warpIdx", 5); }, 5),
+                ("mars-arrival", s => { }, 15),
+                ("mars-target-cam", s => { Set(s, "warpIdx", 0); s.GetType().GetMethod("SetPivot", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(s, new object[] { Enum.ToObject(s.GetType().GetNestedType("Pivot", BindingFlags.NonPublic), 1), 15000.0 }); }, 3),
+                ("phobos-hold", s => { Call(s, "TogglePlot"); Set(s, "targetIdx", 8); Call(s, "NextTarget"); Call(s, "TogglePlot"); Set(s, "warpIdx", 3); }, 12),
+                ("jupiter-1M", s => { Call(s, "TogglePlot"); Set(s, "targetIdx", 4); Call(s, "NextTarget"); Call(s, "TogglePlot"); Set(s, "warpIdx", 6); }, 12),
+            },
             [typeof(MeteorScene)] = new (string, Action<SimScene>, float)[]
             {
                 ("storm-600x", s => { Set(s, "shower", 3); Set(s, "timeWarp", 600f); }, 8),
@@ -116,6 +130,7 @@ namespace FogOfWar
 
             for (int i = 0; i < app.SceneCount; i++)
             {
+                if (only >= 0 && i != only) continue;
                 app.Activate(i);
                 var scene = app.Current;
                 log.WriteLine($"scene {i + 1}: {scene.Title}");
@@ -174,6 +189,7 @@ namespace FogOfWar
             foreach (var r in list)
                 if (r.value.Contains("NaN") || r.value.Contains("Infinity") || r.value.Contains("∞")) flagged.Add($"{r.label}={r.value}");
             bad += flagged.Count;
+            if (app.Current is OpenSystemScene) foreach (var r in list) log.WriteLine($"      {r.label}: {r.value}");
             log.WriteLine($"  {name}: {1f / Time.smoothDeltaTime:F0} fps{(flagged.Count > 0 ? "  BAD: " + string.Join(", ", flagged) : "")}");
         }
     }

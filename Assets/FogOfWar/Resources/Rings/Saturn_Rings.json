@@ -1,0 +1,189 @@
+{
+ "innerKm": 66900,
+ "outerKm": 141000,
+ "encoding": "rows 0-1 lit rgb, rows 2-3 unlit rgb, alpha = 1 - exp(-tau) normal to the ring plane",
+ "colour": "sRGB-ish display values",
+ "features": [
+  {
+   "name": "D",
+   "innerKm": 66900,
+   "outerKm": 74510,
+   "tau": 0.002
+  },
+  {
+   "name": "C",
+   "innerKm": 74658,
+   "outerKm": 92000,
+   "tau": 0.1
+  },
+  {
+   "name": "C plateau 1",
+   "centreKm": 84870,
+   "widthKm": 240,
+   "tau": 0.4,
+   "kind": "ringlet"
+  },
+  {
+   "name": "C plateau 2",
+   "centreKm": 85800,
+   "widthKm": 240,
+   "tau": 0.4,
+   "kind": "ringlet"
+  },
+  {
+   "name": "C plateau 3",
+   "centreKm": 86710,
+   "widthKm": 240,
+   "tau": 0.4,
+   "kind": "ringlet"
+  },
+  {
+   "name": "C plateau 4",
+   "centreKm": 88840,
+   "widthKm": 240,
+   "tau": 0.4,
+   "kind": "ringlet"
+  },
+  {
+   "name": "C plateau 5",
+   "centreKm": 89310,
+   "widthKm": 240,
+   "tau": 0.4,
+   "kind": "ringlet"
+  },
+  {
+   "name": "C plateau 6",
+   "centreKm": 90060,
+   "widthKm": 240,
+   "tau": 0.4,
+   "kind": "ringlet"
+  },
+  {
+   "name": "C plateau 7",
+   "centreKm": 90520,
+   "widthKm": 240,
+   "tau": 0.4,
+   "kind": "ringlet"
+  },
+  {
+   "name": "Colombo Gap",
+   "centreKm": 77870,
+   "widthKm": 150,
+   "kind": "gap"
+  },
+  {
+   "name": "Titan Ringlet",
+   "centreKm": 77870,
+   "widthKm": 25,
+   "tau": 0.6,
+   "kind": "ringlet"
+  },
+  {
+   "name": "Maxwell Gap",
+   "centreKm": 87510,
+   "widthKm": 270,
+   "kind": "gap"
+  },
+  {
+   "name": "Maxwell Ringlet",
+   "centreKm": 87510,
+   "widthKm": 64,
+   "tau": 1.0,
+   "kind": "ringlet"
+  },
+  {
+   "name": "B inner (B1)",
+   "innerKm": 92000,
+   "outerKm": 99000,
+   "tau": 1.2
+  },
+  {
+   "name": "B core (B2-B3)",
+   "innerKm": 99000,
+   "outerKm": 110000,
+   "tau": 3.5
+  },
+  {
+   "name": "B outer (B4)",
+   "innerKm": 110000,
+   "outerKm": 117580,
+   "tau": 2.2
+  },
+  {
+   "name": "Cassini Division",
+   "innerKm": 117580,
+   "outerKm": 122170,
+   "tau": 0.12
+  },
+  {
+   "name": "Huygens Gap",
+   "centreKm": 117680,
+   "widthKm": 285,
+   "kind": "gap"
+  },
+  {
+   "name": "Huygens Ringlet",
+   "centreKm": 117825,
+   "widthKm": 17,
+   "tau": 1.0,
+   "kind": "ringlet"
+  },
+  {
+   "name": "Laplace Gap",
+   "centreKm": 119967,
+   "widthKm": 238,
+   "kind": "gap"
+  },
+  {
+   "name": "A inner",
+   "innerKm": 122170,
+   "outerKm": 133400,
+   "tau": 0.75
+  },
+  {
+   "name": "A outer",
+   "innerKm": 133700,
+   "outerKm": 136775,
+   "tau": 0.6
+  },
+  {
+   "name": "Encke Gap",
+   "centreKm": 133589,
+   "widthKm": 325,
+   "kind": "gap"
+  },
+  {
+   "name": "Encke ringlet",
+   "centreKm": 133589,
+   "widthKm": 10,
+   "tau": 0.1,
+   "kind": "ringlet"
+  },
+  {
+   "name": "Keeler Gap",
+   "centreKm": 136505,
+   "widthKm": 42,
+   "kind": "gap"
+  },
+  {
+   "name": "F",
+   "centreKm": 140180,
+   "widthKm": 50,
+   "tau": 0.5,
+   "kind": "ringlet"
+  }
+ ],
+ "source": "radii and tau: Cassini/Voyager ring literature, rounded; fine structure modelled",
+ "beyond": {
+  "G": [
+   166000,
+   175000,
+   1e-06
+  ],
+  "E": [
+   180000,
+   480000,
+   1e-05
+  ]
+ }
+}
