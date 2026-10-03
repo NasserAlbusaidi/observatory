@@ -67,6 +67,13 @@ namespace FogOfWar
             if (Shell != null) { Shell.HideHud = false; photoRoot?.RemoveFromHierarchy(); photoRoot = null; }
         }
 
+        public void TestFly(Vector3 local, float seconds, float roll)
+        {
+            if (!Photo) return;
+            rig.Move(local, seconds);
+            rig.Roll = Mathf.Clamp(rig.Roll + roll, -90, 90); rig.ToRotation();
+        }
+
         void PhotoUpdate()
         {
             if (Controls.Locked) return;

@@ -28,6 +28,10 @@ namespace FogOfWar
         public static bool Recording => runner != null && runner.Recorder.Active;
         public static float RecordElapsed => runner != null ? runner.Recorder.Elapsed : 0;
         public static bool HandleEscape() => runner != null && runner.HandleEscape();
+        public static void KeyEvent(KeyCode k) => runner?.KeyEvent(k);
+        public static void KeyUp(KeyCode k) => runner?.KeyUp(k);
+        // tests: fly the photo camera as WASD/QE would
+        public static void TestFly(Vector3 local, float seconds, float roll) => runner?.TestFly(local, seconds, roll);
 
         public static void OpenFolder()
         {
@@ -75,10 +79,14 @@ namespace FogOfWar
         void Update()
         {
             while (mainThread.TryDequeue(out var a)) a();
-            bool keys = app.Rebinding == null;
-            if (keys && Controls.Pressed(A.Screenshot)) Shoot();
-            if (keys && Controls.Pressed(A.PhotoMode)) TogglePhoto();
-            if (keys && Controls.Pressed(A.RecordClip)) ToggleRecord();
+            // read every frame (Pressed clears virtual taps); act only when keys aren't held back by a rebind
+            bool shot = Controls.Pressed(A.Screenshot), photo = Controls.Pressed(A.PhotoMode), rec = Controls.Pressed(A.RecordClip);
+            if (!app.KeysQuiet)
+            {
+                if (shot) Fire(A.Screenshot);
+                if (photo) Fire(A.PhotoMode);
+                if (rec) Fire(A.RecordClip);
+            }
             if (Photo) PhotoUpdate();
         }
 
@@ -87,6 +95,28 @@ namespace FogOfWar
             if (Photo) { CineLateUpdate(); app.Cam.fieldOfView = rig.Fov; LatePanel(); }
             if (Fx.enabled) { Fx.FocusScale = rig != null ? rig.Scale : 1; Fx.RenderDepth(); }
             Recorder.LateUpdate();
+        }
+
+        // one trigger per press, whether it arrives through Input polling or an IMGUI key event
+        readonly System.Collections.Generic.Dictionary<A, int> firedAt = new System.Collections.Generic.Dictionary<A, int>();
+
+        void Fire(A a)
+        {
+            if (firedAt.TryGetValue(a, out int f) && Time.frameCount - f < 6) return;
+            firedAt[a] = Time.frameCount;
+            if (a == A.Screenshot) Shoot();
+            else if (a == A.PhotoMode) TogglePhoto();
+            else if (a == A.RecordClip) ToggleRecord();
+        }
+
+        readonly System.Collections.Generic.HashSet<KeyCode> down = new System.Collections.Generic.HashSet<KeyCode>();
+        public void KeyUp(KeyCode k) => down.Remove(k);
+
+        public void KeyEvent(KeyCode k)
+        {
+            if (Controls.Locked || !down.Add(k)) return; // held keys auto-repeat KeyDown events
+            foreach (var a in new[] { A.Screenshot, A.PhotoMode, A.RecordClip })
+                if (Controls.Get(a, 0) == k || Controls.Get(a, 1) == k) Fire(a);
         }
 
         public bool HandleEscape()

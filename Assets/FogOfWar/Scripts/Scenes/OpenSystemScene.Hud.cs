@@ -15,6 +15,15 @@ namespace FogOfWar
     {
         public override bool HasHud => !GameSettings.ClassicPanel;
 
+        // ---- free camera: offsets are km from the pivot (the ship, the target or the Sun)
+        public override bool RigInScene => true;
+        public override void RigBegin(CamRig rig)
+        {
+            rig.Offset = Frame.U(camW - PivotW());
+            rig.Rotation = Cam.transform.rotation;
+            rig.Scale = (float)Math.Max(camDist, 0.05);
+        }
+
         UiShell hudShell;
         VisualElement markers, mkPro, mkRetro, mkHead, mkTgt, mkEdge, mapHead, rightCol, consoleBody, tcBody;
         Label stDate, stWarp, stNear, stSun, stLimited;

@@ -110,6 +110,9 @@ namespace FogOfWar
                 Capture.TogglePhoto();
                 yield return Wait(0.5f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "10-photo-mode");
+                // QA-028: the free camera must actually move the view in the open world
+                Capture.TestFly(new Vector3(0, 0.6f, -6f), 1f, 30f);
+                yield return Shot(app, shell, camRT, uiRT, tag, "10b-photo-moved");
                 Capture.TogglePhoto();
                 app.Activate(1);
                 yield return Wait(1.0f);

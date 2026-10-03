@@ -48,6 +48,9 @@ namespace FogOfWar
         public string RebindNote => rebindNote;
         public void BeginRebind(Controls.Action a, int slot) { rebinding = a; rebindSlot = slot; rebindNote = null; }
         public void CancelRebind() => rebinding = null;
+        // actions stay quiet for a few frames after a rebind, so the key just bound doesn't also fire
+        public bool KeysQuiet => rebinding != null || Time.frameCount - rebindEndedFrame < 4;
+        int rebindEndedFrame = -100;
         public void NewGame() => Restart(GameIndex);
         public void ContinueGame() { Activate(GameIndex); (current as OpenSystemScene)?.LoadGame(); }
         public void SaveGame() => (current as OpenSystemScene)?.SaveGame();
@@ -136,7 +139,7 @@ namespace FogOfWar
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             simTime += dt;
             Shader.SetGlobalFloat("_SimTime", simTime);
-            if (Controls.Pressed(Controls.Action.Help) && rebinding == null) HelpOpen = !HelpOpen;
+            if (Controls.Pressed(Controls.Action.Help) && !KeysQuiet) HelpOpen = !HelpOpen;
             // the game pauses under its menu; Observatory scenes keep animating behind theirs
             if (!(MenuOpen && InGame)) current?.Tick(dt);
         }
@@ -172,8 +175,11 @@ namespace FogOfWar
             if (rebinding != null && e.type == EventType.KeyDown && e.keyCode != KeyCode.None)
             {
                 if (e.keyCode != KeyCode.Escape) rebindNote = Controls.Set(rebinding.Value, rebindSlot, e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace ? KeyCode.None : e.keyCode);
-                rebinding = null; e.Use();
+                rebinding = null; rebindEndedFrame = Time.frameCount; e.Use();
             }
+            // QA-030: catch capture keys from the event stream too, so very short taps aren't missed
+            if (e.type == EventType.KeyDown && e.keyCode != KeyCode.None && !KeysQuiet) Capture.KeyEvent(e.keyCode);
+            if (e.type == EventType.KeyUp) Capture.KeyUp(e.keyCode);
             if (e.type == EventType.KeyDown) HandleKey(e);
 
             menuRect = Rect.zero;

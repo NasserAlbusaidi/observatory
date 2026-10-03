@@ -493,7 +493,14 @@ namespace FogOfWar
             camDist = Math.Max(camDist, MinCamDist()); // targets change size under a fixed camera distance
             var mode = pivot == Pivot.Ship ? camMode : CamMode.Orbit;
             Cam.transform.position = Vector3.zero;
-            if (mode == CamMode.Chase)
+            if (App.Rig != null)
+            {
+                // photo mode / cinematics: a free camera at an offset (km) from the pivot
+                camW = PivotW() + Frame.FromU(App.Rig.Offset);
+                Cam.transform.rotation = App.Rig.Rotation;
+                mode = CamMode.Orbit; // keep the ship model visible
+            }
+            else if (mode == CamMode.Chase)
             {
                 // behind and above the ship, turning with it
                 var off = ship.Att * OffsetDir(chaseYaw, chasePitch);
