@@ -296,17 +296,19 @@ namespace FogOfWar.UI
 
         void AudioTab(VisualElement c)
         {
-            Ui.L(c, "Space carries no sound. What you hear is the ship through its hull: the drive, the thrusters, a low hum and the console.", "t-note");
+            Ui.L(c, "Space carries no sound. In the cockpit view you hear what reaches you through the hull and the cabin air: the drive, the thrusters, the machinery, life support and the console. Outside views are silent apart from the console.", "t-note");
             Ui.FormRow(c, "Ship sound", out var ctl);
             ctl.Add(new Switch(GameSettings.ShipSound, v => GameSettings.ShipSound = v));
             string Pct(float v) => Mathf.RoundToInt(v * 100) + " %";
             SliderRow(c, "Master volume", 0, 1, GameSettings.Master, Pct, v => GameSettings.Master = v);
-            SliderRow(c, "Drive and thrusters", 0, 1, GameSettings.Effects, Pct, v => GameSettings.Effects = v);
-            SliderRow(c, "Hull ambience", 0, 1, GameSettings.Music, Pct, v => GameSettings.Music = v);
-            SliderRow(c, "Console chimes", 0, 1, GameSettings.Chimes, Pct, v => GameSettings.Chimes = v);
+            SliderRow(c, "Drive, thrusters and machinery", 0, 1, GameSettings.Effects, Pct, v => GameSettings.Effects = v);
+            SliderRow(c, "Life support and hull", 0, 1, GameSettings.Music, Pct, v => GameSettings.Music = v);
+            SliderRow(c, "Console and alarms", 0, 1, GameSettings.Chimes, Pct, v => GameSettings.Chimes = v);
+            Ui.FormRow(c, "Cinematic sound in outside views (not physical)", out ctl);
+            ctl.Add(new Switch(GameSettings.CinematicSound, v => GameSettings.CinematicSound = v));
             Ui.FormRow(c, "Mute when the game is in the background", out ctl);
             ctl.Add(new Switch(GameSettings.MuteInBackground, v => GameSettings.MuteInBackground = v));
-            Ui.L(c, "The ship is silent while a menu is open. There is no music yet.", "t-note").style.marginTop = 10;
+            Ui.L(c, "Cinematic sound adds the film version outside the ship: a roaring drive and hissing thrusters. Real vacuum carries none of it. The ship is silent while a menu is open. There is no music.", "t-note").style.marginTop = 10;
         }
 
         // ------------------------------------------------------------------------------------------ chrome
