@@ -11,8 +11,8 @@ namespace FogOfWar
         public static readonly Color Accent = new Color32(0xFF, 0xB5, 0x47, 0xFF);   // accretion-disk amber
         public static readonly Color Accent2 = new Color32(0x69, 0xD2, 0xFF, 0xFF);  // negative-energy cyan
         public static readonly Color Warn = new Color32(0xFF, 0x6B, 0x5E, 0xFF);
-        static readonly Color PanelBg = new Color(0.04f, 0.047f, 0.086f, 0.86f);
-        static readonly Color Line = new Color(0.63f, 0.69f, 0.9f, 0.16f);
+        static readonly Color PanelBg = new Color(0.031f, 0.043f, 0.078f, 0.78f);
+        static readonly Color Line = new Color(0.59f, 0.69f, 1f, 0.14f);
 
         public GUIStyle panel, brand, brandAccent, eyebrow, title, body, section, label, value, button, sceneBtn, sceneBtnOn, sceneSub, sceneSubOn, toggle, hint, note, choice, choiceOn;
         public GUIStyle sliderStyle, thumbStyle;
@@ -47,16 +47,26 @@ namespace FogOfWar
         {
             if (built) return;
             built = true;
-            var font = GUI.skin.font;
+            // same fonts and palette as the UI Toolkit shell (Resources/UI), so both layers read as one UI
+            var font = Resources.Load<Font>("UI/Fonts/Barlow-Medium") ?? GUI.skin.font;
+            var cond = Resources.Load<Font>("UI/Fonts/BarlowCondensed-SemiBold") ?? font;
+            var condM = Resources.Load<Font>("UI/Fonts/BarlowCondensed-Medium") ?? font;
+            var mono = Resources.Load<Font>("UI/Fonts/JetBrainsMono-Medium") ?? font;
+            var vs = GUI.skin.verticalScrollbar;
+            vs.normal.background = Tex(new Color(1, 1, 1, 0.04f)); vs.fixedWidth = 6; vs.border = new RectOffset(0, 0, 0, 0); vs.margin = new RectOffset(4, 0, 0, 0);
+            var th = GUI.skin.verticalScrollbarThumb;
+            th.normal.background = Tex(new Color(0.59f, 0.69f, 1f, 0.35f)); th.hover.background = Tex(new Color(1f, 0.71f, 0.28f, 0.7f)); th.active.background = th.hover.background;
+            th.fixedWidth = 6; th.border = new RectOffset(0, 0, 0, 0);
+            GUI.skin.verticalScrollbarUpButton.fixedHeight = 0; GUI.skin.verticalScrollbarDownButton.fixedHeight = 0;
             panel = new GUIStyle { normal = { background = Box(PanelBg, Line) }, border = new RectOffset(4, 4, 4, 4), padding = new RectOffset(16, 16, 14, 14) };
-            brand = new GUIStyle { font = font, fontSize = 30, fontStyle = FontStyle.Bold, normal = { textColor = Ink }, wordWrap = true };
+            brand = new GUIStyle { font = cond, fontSize = 30, normal = { textColor = Ink }, wordWrap = true };
             brandAccent = new GUIStyle(brand) { normal = { textColor = Accent } };
-            eyebrow = new GUIStyle { font = font, fontSize = 11, normal = { textColor = InkDim }, margin = new RectOffset(0, 0, 0, 2) };
-            title = new GUIStyle { font = font, fontSize = 26, fontStyle = FontStyle.Bold, normal = { textColor = Ink }, wordWrap = true, margin = new RectOffset(0, 0, 0, 8) };
+            eyebrow = new GUIStyle { font = condM, fontSize = 12, normal = { textColor = InkDim }, margin = new RectOffset(0, 0, 0, 2) };
+            title = new GUIStyle { font = cond, fontSize = 28, normal = { textColor = Ink }, wordWrap = true, margin = new RectOffset(0, 0, 0, 8) };
             body = new GUIStyle { font = font, fontSize = 14, normal = { textColor = new Color(0.77f, 0.79f, 0.87f) }, wordWrap = true, richText = true, margin = new RectOffset(0, 0, 0, 8) };
-            section = new GUIStyle { font = font, fontSize = 11, fontStyle = FontStyle.Bold, normal = { textColor = InkDim }, margin = new RectOffset(0, 0, 10, 4) };
+            section = new GUIStyle { font = condM, fontSize = 12, normal = { textColor = InkDim }, margin = new RectOffset(0, 0, 10, 4) };
             label = new GUIStyle { font = font, fontSize = 13, normal = { textColor = InkDim }, wordWrap = true };
-            value = new GUIStyle { font = font, fontSize = 13, normal = { textColor = Ink }, alignment = TextAnchor.UpperRight, wordWrap = true };
+            value = new GUIStyle { font = mono, fontSize = 13, normal = { textColor = Ink }, alignment = TextAnchor.UpperRight, wordWrap = true };
             button = new GUIStyle
             {
                 font = font, fontSize = 13, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(10, 10, 6, 6), margin = new RectOffset(0, 6, 0, 6),
@@ -67,7 +77,7 @@ namespace FogOfWar
             };
             sceneBtn = new GUIStyle
             {
-                font = font, fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft, padding = new RectOffset(10, 10, 7, 0),
+                font = cond, fontSize = 17, alignment = TextAnchor.UpperLeft, padding = new RectOffset(10, 10, 7, 0),
                 normal = { textColor = Ink }, hover = { background = Tex(new Color(1, 1, 1, 0.05f)), textColor = Ink }, margin = new RectOffset(0, 0, 0, 0),
             };
             sceneBtnOn = new GUIStyle(sceneBtn) { normal = { background = Tex(new Color(1, 0.71f, 0.28f, 0.12f)), textColor = Accent }, hover = { background = Tex(new Color(1, 0.71f, 0.28f, 0.16f)), textColor = Accent } };

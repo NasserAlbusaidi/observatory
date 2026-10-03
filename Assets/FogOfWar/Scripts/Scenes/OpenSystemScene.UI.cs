@@ -18,7 +18,7 @@ namespace FogOfWar
 
         void ReadInput(float dt)
         {
-            bool live = !App.MenuOpen && !App.HelpOpen;
+            bool live = !App.MenuOpen && !App.HelpOpen && App.Rig == null; // photo mode flies its own camera
             ship.RotInput = live ? new Vector3(Ctl.Axis(A.PitchUp, A.PitchDown), Ctl.Axis(A.YawLeft, A.YawRight), Ctl.Axis(A.RollRight, A.RollLeft)) : Vector3.zero;
             ship.RcsInput = live ? new Vector3(Ctl.Axis(A.RcsLeft, A.RcsRight), Ctl.Axis(A.RcsDown, A.RcsUp), Ctl.Axis(A.RcsBack, A.RcsForward)) : Vector3.zero;
             if (!live) return;
@@ -122,7 +122,7 @@ namespace FogOfWar
         public override void OnGUIOverlay()
         {
             if (Prof) swGui.Start();
-            try { DrawLabels(); DrawHud(); DrawCareerNotes(); } finally { if (Prof) swGui.Stop(); }
+            try { if (GameSettings.ShowLabels) DrawLabels(); if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
         }
 
         GUIStyle labelStyle, labelOn, hudStyle, hudBig;
@@ -131,7 +131,7 @@ namespace FogOfWar
         void Styles()
         {
             if (labelStyle != null) return;
-            labelStyle = new GUIStyle { fontSize = 12, normal = { textColor = new Color(0.75f, 0.8f, 0.95f, 0.85f) } };
+            labelStyle = new GUIStyle { font = Resources.Load<Font>("UI/Fonts/Barlow-Medium"), fontSize = 13, normal = { textColor = new Color(0.75f, 0.8f, 0.95f, 0.85f) } };
             labelOn = new GUIStyle(labelStyle) { fontStyle = FontStyle.Bold, normal = { textColor = PanelUI.Accent } };
             hudStyle = new GUIStyle { fontSize = 13, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.85f, 0.9f, 1f, 0.95f) } };
             hudBig = new GUIStyle(hudStyle) { fontSize = 18, fontStyle = FontStyle.Bold };

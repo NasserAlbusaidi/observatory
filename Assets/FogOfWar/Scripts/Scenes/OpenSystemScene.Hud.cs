@@ -1,0 +1,600 @@
+using System;
+using System.Collections.Generic;
+using FogOfWar.OpenWorld;
+using FogOfWar.UI;
+using UnityEngine;
+using UnityEngine.UIElements;
+using A = FogOfWar.Controls.Action;
+
+namespace FogOfWar
+{
+    // Open System flight HUD for the UI Toolkit shell: status (top left), target card and ship console (right),
+    // flight cluster and status pills (bottom), and flight markers drawn over the view (prograde, retrograde,
+    // heading, target brackets with an edge arrow when the target is off screen). Labels stay in IMGUI (DrawLabels).
+    public partial class OpenSystemScene
+    {
+        public override bool HasHud => !GameSettings.ClassicPanel;
+
+        UiShell hudShell;
+        VisualElement markers, mkPro, mkRetro, mkHead, mkTgt, mkEdge, mapHead, rightCol, consoleBody, tcBody;
+        Label stDate, stWarp, stNear, stSun, stLimited;
+        Label tcName, tcSub, tcDist, tcRel, tcClose, tcBrach, tcNav, tcEngage, tcNoTarget;
+        Label spdVal, spdRef, drvVal, drvSub, dvVal, rotVal, mkTgtName, mkTgtDist, mkEdgeName, consoleToggle;
+        VisualElement thrFill, thrCmd, pills;
+        Label pAssist, pHold, pNav, pCam, pLimited, pEphem, pJet, pLanded;
+        FowSlider thrSlider;
+        Segmented segG, segPlan, segWarp, segCam, segWarpTop;
+        Switch swAssist, swBelt, swHist, swRings;
+        readonly List<Label> holdBtns = new List<Label>();
+        Label planEngage, navTarget, navEst, navHohmann, navPhase;
+        VisualElement moonsBox, histBox, dataBox;
+        Body moonsFor;
+        bool consoleOpen = true;
+        float dataT;
+        readonly List<Readout> hudReadouts = new List<Readout>();
+        bool hudTargetsDirty = true;
+
+        public override void BuildHud(UiShell shell, VisualElement layer)
+        {
+            hudShell = shell;
+            holdBtns.Clear();
+            markers = Ui.E(layer, "layer"); markers.pickingMode = PickingMode.Ignore;
+            BuildMarkers();
+
+            // ---- status, top left
+            var st = Ui.E(layer, "status-box");
+            stDate = Ui.L(st, "", "t-h3", "f-mono", "glow-ink");
+            var wr = Ui.E(st, "row");
+            wr.style.marginTop = 4;
+            Ui.L(wr, "TIME", "t-micro", "f-condm").style.marginRight = 8;
+            segWarpTop = new Segmented(WarpNames, warpIdx, i => warpIdx = i);
+            segWarpTop.style.marginBottom = 0;
+            foreach (var c in segWarpTop.Children()) { c.AddToClassList("small"); c.style.paddingLeft = 6; c.style.paddingRight = 6; }
+            wr.Add(segWarpTop);
+            stLimited = Ui.L(st, "", "t-note", "warn");
+            stNear = Ui.L(st, "", "t-body", "f-semi");
+            stNear.style.marginTop = 6;
+            stSun = Ui.L(st, "", "t-label", "f-mono");
+            var stStatus = st;
+
+            // ---- right column: target card + console
+            rightCol = Ui.E(layer, "col");
+            rightCol.style.position = Position.Absolute;
+            rightCol.style.top = 18; rightCol.style.right = 20; rightCol.style.width = 380;
+            rightCol.style.bottom = shell.Portrait ? 190 : 56;
+            BuildTargetCard(rightCol);
+            BuildConsole(rightCol);
+
+            // ---- flight cluster, bottom centre
+            var fl = Ui.E(layer, "flight");
+            var sp = Ui.E(fl, "gauge", "speed");
+            Ui.L(sp, "VELOCITY", "t-micro", "f-condm");
+            spdVal = Ui.L(sp, "", "t-big", "f-mono", "glow-ink");
+            spdRef = Ui.L(sp, "", "t-label", "f-condm");
+            var dr = Ui.E(fl, "gauge", "drive");
+            var drHead = Ui.E(dr, "row");
+            Ui.L(drHead, "DRIVE", "t-micro", "f-condm").style.flexGrow = 1;
+            drvVal = Ui.L(drHead, "", "t-h3", "f-mono");
+            var thr = Ui.E(dr, "thr");
+            for (int i = 1; i < 4; i++) { var t = Ui.E(thr, "tick"); t.style.left = Length.Percent(25 * i); }
+            thrFill = Ui.E(thr, "fill");
+            thrCmd = Ui.E(thr, "cmd");
+            drvSub = Ui.L(dr, "", "t-label", "f-condm");
+            BuildCareerStrip(dr, stStatus);
+            var rg = Ui.E(fl, "gauge", "right-g");
+            Ui.L(rg, "Δv SPENT", "t-micro", "f-condm");
+            dvVal = Ui.L(rg, "", "t-big", "f-mono");
+            rotVal = Ui.L(rg, "", "t-label", "f-mono");
+
+            pills = Ui.E(layer, "pills");
+            pills.pickingMode = PickingMode.Ignore;
+            pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV"); pCam = Pill("CAM");
+            pLanded = Pill("LANDED"); pLimited = Pill("WARP LIMITED"); pEphem = Pill("EPHEMERIS"); pJet = Pill("JET POWER");
+
+            // ---- system map header
+            mapHead = Ui.E(layer, "col");
+            mapHead.style.position = Position.Absolute; mapHead.style.top = 18; mapHead.style.left = Length.Percent(50);
+            mapHead.style.width = 640; mapHead.style.marginLeft = -320; mapHead.style.alignItems = Align.Center;
+            Ui.L(mapHead, "SYSTEM MAP", "t-h2", "f-cond", "glow");
+            Ui.L(mapHead, "Distances beyond 100,000 km are drawn on a log scale. Click a label to target it.", "t-note").style.unityTextAlign = TextAnchor.MiddleCenter;
+            var mrow = Ui.E(mapHead, "row");
+            mrow.style.marginTop = 6;
+            Ui.B(mrow, "Back to ship  " + UiShell.Keys(A.Map), ToggleMap, "small");
+            Ui.B(mrow, "Frame target", () => { if (ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4); }, "small");
+            hudTargetsDirty = true;
+        }
+
+        Label Pill(string text)
+        {
+            var l = Ui.L(pills, text, "chip", "f-condm");
+            return l;
+        }
+
+        void SetPill(Label p, string text, string tone)
+        {
+            Ui.Show(p, text != null);
+            if (text == null) return;
+            Ui.Text(p, text);
+            Ui.SetClass(p, "hot", tone == "hot"); Ui.SetClass(p, "cold", tone == "cold");
+            Ui.SetClass(p, "bad", tone == "bad"); Ui.SetClass(p, "ok", tone == "ok");
+        }
+
+        // ------------------------------------------------------------------------------------------ markers
+
+        VisualElement Ring(VisualElement parent, float size, Color c, float width = 2)
+        {
+            var r = Ui.E(parent);
+            r.pickingMode = PickingMode.Ignore;
+            r.style.position = Position.Absolute;
+            r.style.width = size; r.style.height = size; r.style.left = -size / 2; r.style.top = -size / 2;
+            r.style.borderTopLeftRadius = r.style.borderTopRightRadius = r.style.borderBottomLeftRadius = r.style.borderBottomRightRadius = size / 2;
+            r.style.borderTopWidth = r.style.borderBottomWidth = r.style.borderLeftWidth = r.style.borderRightWidth = width;
+            r.style.borderTopColor = r.style.borderBottomColor = r.style.borderLeftColor = r.style.borderRightColor = c;
+            return r;
+        }
+
+        VisualElement Bar(VisualElement parent, float x, float y, float w, float h, Color c, float rot = 0)
+        {
+            var b = Ui.E(parent);
+            b.pickingMode = PickingMode.Ignore;
+            b.style.position = Position.Absolute;
+            b.style.left = x - w / 2; b.style.top = y - h / 2; b.style.width = w; b.style.height = h;
+            b.style.backgroundColor = c;
+            if (rot != 0) b.style.rotate = new Rotate(rot);
+            return b;
+        }
+
+        VisualElement Mk()
+        {
+            var m = Ui.E(markers, "mk");
+            m.pickingMode = PickingMode.Ignore;
+            return m;
+        }
+
+        void BuildMarkers()
+        {
+            var green = new Color(0.55f, 1f, 0.62f, 0.95f);
+            var red = new Color(1f, 0.55f, 0.48f, 0.95f);
+            var white = new Color(0.92f, 0.95f, 1f, 0.95f);
+            var amber = new Color(1f, 0.71f, 0.28f, 1f);
+
+            mkPro = Mk();
+            Ring(mkPro, 24, green);
+            Bar(mkPro, 0, -17, 2, 9, green); Bar(mkPro, -17, 0, 9, 2, green); Bar(mkPro, 17, 0, 9, 2, green);
+            Bar(mkPro, 0, 0, 4, 4, green);
+            mkRetro = Mk();
+            Ring(mkRetro, 24, red);
+            Bar(mkRetro, 0, 0, 22, 2, red, 45); Bar(mkRetro, 0, 0, 22, 2, red, -45);
+            Bar(mkRetro, 0, 17, 2, 9, red); Bar(mkRetro, -17, 0, 9, 2, red); Bar(mkRetro, 17, 0, 9, 2, red);
+            // ship's nose: a broken horizon line
+            mkHead = Mk();
+            Bar(mkHead, -15, 0, 14, 2, white); Bar(mkHead, 15, 0, 14, 2, white); Bar(mkHead, -8, 4, 2, 9, white); Bar(mkHead, 8, 4, 2, 9, white);
+            Bar(mkHead, 0, 0, 3, 3, white);
+
+            mkTgt = Mk();
+            foreach (var c in new[] { "tl", "tr", "bl", "br2" }) { var b = Ui.E(mkTgt, "br", c); b.pickingMode = PickingMode.Ignore; b.name = c; }
+            var lab = Ui.E(mkTgt, "col");
+            lab.name = "label";
+            lab.pickingMode = PickingMode.Ignore;
+            lab.style.position = Position.Absolute;
+            mkTgtName = Ui.L(lab, "", "t-h3", "f-cond", "accent", "glow");
+            mkTgtDist = Ui.L(lab, "", "t-label", "f-mono");
+            mkTgtName.style.whiteSpace = WhiteSpace.NoWrap; mkTgtDist.style.whiteSpace = WhiteSpace.NoWrap;
+
+            mkEdge = Mk();
+            var chev = Ui.E(mkEdge);
+            chev.name = "chev";
+            chev.pickingMode = PickingMode.Ignore;
+            chev.style.position = Position.Absolute;
+            chev.style.width = 16; chev.style.height = 16; chev.style.left = -8; chev.style.top = -8;
+            chev.style.borderTopWidth = 3; chev.style.borderRightWidth = 3;
+            chev.style.borderTopColor = amber; chev.style.borderRightColor = amber;
+            mkEdgeName = Ui.L(mkEdge, "", "t-label", "f-condm", "accent");
+            mkEdgeName.style.position = Position.Absolute;
+            mkEdgeName.style.whiteSpace = WhiteSpace.NoWrap;
+        }
+
+        // place a marker at a render-space direction; false if it's behind the camera or off screen
+        bool PlaceDir(VisualElement m, Vector3 dirRender, out Vector2 at)
+        {
+            var sp = Cam.WorldToScreenPoint(dirRender.normalized * 10f);
+            at = hudShell.ScreenToHud(sp);
+            bool on = sp.z > 0 && sp.x >= 0 && sp.y >= 0 && sp.x <= Cam.pixelWidth && sp.y <= Cam.pixelHeight;
+            Ui.Show(m, on);
+            if (on) m.style.translate = new Translate(at.x, at.y);
+            return on;
+        }
+
+        void UpdateMarkers()
+        {
+            bool flying = pivot == Pivot.Ship;
+            var v = ship.Vel - sys.Vel(reference, jd);
+            bool moving = v.Sqr > 1e-10;
+            if (flying && moving) { PlaceDir(mkPro, Frame.U(v), out _); PlaceDir(mkRetro, Frame.U(-v), out _); }
+            else { Ui.Show(mkPro, false); Ui.Show(mkRetro, false); }
+            if (flying && camMode != CamMode.Cockpit) PlaceDir(mkHead, Frame.U(ship.Heading), out _);
+            else if (flying) PlaceDir(mkHead, Frame.U(ship.Heading), out _);
+            else Ui.Show(mkHead, false);
+
+            if (ship.Target == null) { Ui.Show(mkTgt, false); Ui.Show(mkEdge, false); return; }
+            var tw = sys.Pos(ship.Target, jd);
+            var rel = tw - camW;
+            var dir = Frame.U(rel);
+            var sp = Cam.WorldToScreenPoint(dir.normalized * 10f);
+            bool inView = sp.z > 0 && sp.x >= 0 && sp.y >= 0 && sp.x <= Cam.pixelWidth && sp.y <= Cam.pixelHeight;
+            string dist = Km((tw - ship.Pos).Mag - ship.Target.Radius);
+            if (inView)
+            {
+                Ui.Show(mkTgt, true); Ui.Show(mkEdge, false);
+                var at = hudShell.ScreenToHud(sp);
+                mkTgt.style.translate = new Translate(at.x, at.y);
+                // bracket the body's disc, never smaller than a fixed box
+                float pxPerRad = Cam.pixelHeight / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
+                float ang = (float)Math.Atan2(ship.Target.Radius, Math.Max(rel.Mag, 1e-9));
+                float r = Mathf.Clamp(ang * pxPerRad / hudShell.Scale + 6, 16, hudShell.H * 0.45f);
+                SetBracket("tl", -r, -r); SetBracket("tr", r - 12, -r); SetBracket("bl", -r, r - 12); SetBracket("br2", r - 12, r - 12);
+                var lab = mkTgt.Q("label");
+                lab.style.left = r + 8; lab.style.top = -r;
+                Ui.Text(mkTgtName, ship.Target.Name.ToUpperInvariant());
+                Ui.Text(mkTgtDist, dist);
+            }
+            else
+            {
+                Ui.Show(mkTgt, false); Ui.Show(mkEdge, true);
+                // direction on screen from the centre; flipped if the target is behind
+                var c = new Vector2(Cam.pixelWidth / 2f, Cam.pixelHeight / 2f);
+                var d = new Vector2(sp.x, sp.y) - c;
+                if (sp.z < 0) d = -d;
+                if (d.sqrMagnitude < 1e-6f) d = Vector2.down;
+                d.Normalize();
+                float hw = hudShell.HudWidth / 2 - 60, hh = hudShell.H / 2 - 90;
+                float k = Mathf.Min(hw / Mathf.Max(Mathf.Abs(d.x), 1e-4f), hh / Mathf.Max(Mathf.Abs(d.y), 1e-4f));
+                var at = new Vector2(hudShell.HudWidth / 2 + d.x * k, hudShell.H / 2 - d.y * k);
+                mkEdge.style.translate = new Translate(at.x, at.y);
+                float deg = Mathf.Atan2(-d.y, d.x) * Mathf.Rad2Deg; // screen y grows downward
+                mkEdge.Q("chev").style.rotate = new Rotate(deg + 45);
+                Ui.Text(mkEdgeName, ship.Target.Name.ToUpperInvariant() + "  " + dist);
+                mkEdgeName.style.left = d.x > 0.3f ? -150 : 14;
+                mkEdgeName.style.top = d.y < -0.3f ? -30 : 12;
+                mkEdgeName.style.width = 136;
+                mkEdgeName.style.unityTextAlign = d.x > 0.3f ? TextAnchor.UpperRight : TextAnchor.UpperLeft;
+            }
+        }
+
+        void SetBracket(string n, float x, float y)
+        {
+            var b = mkTgt.Q(n);
+            b.style.left = x; b.style.top = y;
+        }
+
+        // ------------------------------------------------------------------------------------------ target card
+
+        void BuildTargetCard(VisualElement parent)
+        {
+            var p = Ui.Panel(parent, null, "Target", true);
+            p.style.flexShrink = 0;
+            p.style.marginBottom = 10;
+            tcNoTarget = Ui.L(p, "No target. Press " + UiShell.Keys(A.NextTarget) + " or click a label.", "t-note");
+            tcBody = Ui.E(p, "col");
+            var head = Ui.E(tcBody, "row");
+            tcName = Ui.L(head, "", "tc-name", "f-cond");
+            tcName.style.flexGrow = 1;
+            Ui.B(head, "◀", () => SetTarget(targets[(targetIdx - 1 + targets.Count) % targets.Count]), "small");
+            Ui.B(head, "▶", NextTarget, "small");
+            tcSub = Ui.L(tcBody, "", "t-label", "f-condm");
+            tcSub.style.marginBottom = 6;
+            tcDist = Ui.KV(tcBody, "Distance").value;
+            tcRel = Ui.KV(tcBody, "Relative speed").value;
+            tcClose = Ui.KV(tcBody, "Closing").value;
+            Ui.E(tcBody, "rule");
+            tcBrach = Ui.L(tcBody, "", "t-note", "f-mono");
+            var nrow = Ui.E(tcBody, "row");
+            nrow.style.marginTop = 6;
+            tcNav = Ui.L(nrow, "", "t-label", "f-condm");
+            tcNav.style.flexGrow = 1; tcNav.style.flexShrink = 1;
+            tcEngage = Ui.B(nrow, "ENGAGE", TogglePlan, "primary", "f-cond");
+            tcEngage.style.marginRight = 0; tcEngage.style.marginBottom = 0;
+        }
+
+        string Kind(Body b)
+        {
+            if (b.Asteroid) return "Asteroid";
+            if (b.Parent == sys.Sun) return "Planet";
+            return b.Parent != null ? "Moon of " + b.Parent.Name : "Star";
+        }
+
+        // ------------------------------------------------------------------------------------------ console
+
+        void BuildConsole(VisualElement parent)
+        {
+            var p = Ui.Panel(parent, null, null, true, "console-body");
+            p.style.flexShrink = 1;
+            var head = Ui.E(p, "row");
+            Ui.L(head, "SHIP CONSOLE", "t-h3", "f-cond", "glow-ink").style.flexGrow = 1;
+            consoleToggle = Ui.B(head, "–", () => { consoleOpen = !consoleOpen; Ui.Show(consoleBody, consoleOpen); Ui.Text(consoleToggle, consoleOpen ? "–" : "+"); }, "small", "ghost");
+            consoleBody = Ui.E(p, "col");
+            consoleBody.style.flexShrink = 1;
+            var tabs = new Tabs(true);
+            tabs.style.flexShrink = 1;
+            consoleBody.Add(tabs);
+            tabs.Add("Jobs", Scroll(JobsTab));
+            tabs.Add("Flight", Scroll(FlightTab));
+            tabs.Add("Nav", Scroll(NavTab));
+            tabs.Add("Targets", Scroll(TargetsTab));
+            tabs.Add("View", Scroll(ViewTab));
+            tabs.Add("Data", Scroll(DataTab));
+            Ui.Show(consoleBody, consoleOpen); Ui.Text(consoleToggle, consoleOpen ? "–" : "+");
+        }
+
+        static VisualElement Scroll(Action<VisualElement> fill) => Ui.Scroll(fill);
+
+        Label thrLabel;
+
+        void FlightTab(VisualElement c)
+        {
+            var head = Ui.E(c, "row");
+            Ui.L(head, "THROTTLE", "t-label", "f-condm").style.flexGrow = 1;
+            thrLabel = Ui.L(head, "", "t-val", "f-mono");
+            thrSlider = new FowSlider(0, 1, (float)ship.ThrottleCmd, v => { ship.ThrottleCmd = v; if (ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "pilot override"; } });
+            c.Add(thrSlider);
+            Ui.L(c, $"{UiShell.Keys(A.ThrottleUp)} / {UiShell.Keys(A.ThrottleDown)} throttle · {UiShell.Keys(A.ThrottleFull)} full · {UiShell.Keys(A.ThrottleCut)} cut", "t-note");
+            Ui.Section(c, "Drive limit");
+            var gl = new string[Gs.Length];
+            for (int i = 0; i < Gs.Length; i++) gl[i] = Fmt.Num(Gs[i], 1) + " g" + (Gs[i] >= 10 ? "*" : "");
+            segG = new Segmented(gl, Array.FindIndex(Gs, g => Math.Abs(g - ship.MaxG) < 1e-6), i => ship.MaxG = Gs[i]);
+            c.Add(segG);
+            segGNote = Ui.L(c, "", "t-note");
+            var r = Ui.E(c, "check-row");
+            r.style.marginTop = 6;
+            swAssist = new Switch(ship.FlightAssist, v => ship.FlightAssist = v);
+            r.Add(swAssist);
+            Ui.L(r, $"Flight assist ({UiShell.Keys(A.FlightAssist)}): stop rotating when the stick is released", "t-body");
+            var row = Ui.E(c, "row", "wrap");
+            row.style.marginTop = 6;
+            Ui.B(row, "Flip  " + UiShell.Keys(A.Flip), Flip);
+            Ui.B(row, "Kill rotation", () => { ship.AngVel = Vector3.zero; ship.Hold = Hold.Off; });
+            Ui.Section(c, "Attitude hold  (keys 1–9)");
+            var grid = Ui.E(c, "row", "wrap");
+            for (int i = 0; i < 9; i++)
+            {
+                int k = i;
+                var b = Ui.B(grid, $"{i + 1}  {HoldNames[i]}", () => SetHold((Hold)k), "small");
+                b.style.width = 108;
+                b.style.justifyContent = Justify.FlexStart;
+                b.style.unityTextAlign = TextAnchor.MiddleLeft;
+                holdBtns.Add(b);
+            }
+            Ui.Section(c, "Thrusters");
+            Ui.L(c, $"RCS: {UiShell.Keys(A.RcsForward)}/{UiShell.Keys(A.RcsBack)} fore-aft, {UiShell.Keys(A.RcsLeft)}/{UiShell.Keys(A.RcsRight)} left-right, {UiShell.Keys(A.RcsUp)}/{UiShell.Keys(A.RcsDown)} up-down. Attitude: {UiShell.Keys(A.PitchDown)}{UiShell.Keys(A.PitchUp)} pitch, {UiShell.Keys(A.YawLeft)}{UiShell.Keys(A.YawRight)} yaw, {UiShell.Keys(A.RollLeft)}{UiShell.Keys(A.RollRight)} roll.", "t-note");
+        }
+
+        void NavTab(VisualElement c)
+        {
+            navTarget = Ui.L(c, "", "t-h3", "f-cond", "accent");
+            navEst = Ui.L(c, "", "t-note", "f-mono");
+            navHohmann = Ui.L(c, "", "t-note", "f-mono");
+            Ui.Section(c, "Plan");
+            var pl = new[] { Plan.Brachistochrone, Plan.MatchVelocity, Plan.HoldStation };
+            segPlan = new Segmented(new[] { "Brachistochrone", "Match velocity", "Hold station" }, Array.IndexOf(pl, selectedPlan), i => selectedPlan = pl[i]);
+            c.Add(segPlan);
+            planEngage = Ui.B(c, "ENGAGE  " + UiShell.Keys(A.Engage), TogglePlan, "primary", "f-cond");
+            planEngage.style.marginTop = 4;
+            navPhase = Ui.L(c, "", "t-label", "f-condm");
+            Ui.Section(c, "Time compression");
+            segWarp = new Segmented(WarpNames, warpIdx, i => warpIdx = i);
+            c.Add(segWarp);
+            Ui.L(c, $"{UiShell.Keys(A.WarpUp)} faster · {UiShell.Keys(A.WarpDown)} slower. Flying by hand drops to 10×.", "t-note");
+        }
+
+        void TargetsTab(VisualElement c)
+        {
+            Ui.Section(c, "Planets");
+            var row = Ui.E(c, "row", "wrap");
+            foreach (var p in sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid))
+            {
+                var b = p;
+                var l = Ui.B(row, p.Name, () => SetTarget(b), "small");
+                l.userData = b;
+            }
+            moonsBox = Ui.E(c, "col");
+            Ui.Section(c, "Asteroids");
+            var ar = Ui.E(c, "row", "wrap");
+            foreach (var a in sys.Bodies.FindAll(x => x.Asteroid))
+            {
+                var b = a;
+                var l = Ui.B(ar, a.Name, () => SetTarget(b), "small");
+                l.userData = b;
+            }
+            moonsFor = null;
+        }
+
+        void RebuildMoons()
+        {
+            var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
+            if (sel == moonsFor) return;
+            moonsFor = sel;
+            moonsBox.Clear();
+            if (sel == null || sel.Asteroid) return;
+            var moons = sys.Bodies.FindAll(x => x.Parent == sel && x.Radius >= 10);
+            moons.Sort((x, y) => y.Radius.CompareTo(x.Radius));
+            int small = sys.Bodies.FindAll(x => x.Parent == sel).Count - moons.Count;
+            if (moons.Count == 0 && small == 0) return;
+            Ui.Section(moonsBox, "Moons of " + sel.Name);
+            var row = Ui.E(moonsBox, "row", "wrap");
+            foreach (var m in moons)
+            {
+                var b = m;
+                var l = Ui.B(row, m.Name, () => SetTarget(b), "small");
+                l.userData = b;
+            }
+            if (small > 0) Ui.L(moonsBox, small + (small == 1 ? " smaller moon: click its label in view" : " smaller moons: click their labels in view"), "t-note");
+            Ui.Fontify(moonsBox);
+        }
+
+        void ViewTab(VisualElement c)
+        {
+            Ui.Section(c, "Camera  (" + UiShell.Keys(A.CameraMode) + " cycles)");
+            segCam = new Segmented(new[] { "Chase", "Orbit", "Cockpit", "Target", "Map" }, 0, SetCam, wrap: true);
+            c.Add(segCam);
+            Ui.Section(c, "Show");
+            var r = Ui.E(c, "check-row"); r.Add(new Switch(GameSettings.ShowLabels, v => GameSettings.ShowLabels = v)); Ui.L(r, "Body labels", "t-body");
+            r = Ui.E(c, "check-row"); swBelt = new Switch(beltView.Visible, v => beltView.Visible = v); r.Add(swBelt); Ui.L(r, "Asteroid belt (a 1 % sample: real rocks are about a million km apart)", "t-body");
+            r = Ui.E(c, "check-row"); swRings = new Switch(faintRings, v => faintRings = v); r.Add(swRings); Ui.L(r, "Brighten faint rings ×1000 (Jupiter, Uranus, Neptune)", "t-body");
+            r = Ui.E(c, "check-row"); swHist = new Switch(showHist, v => { showHist = v; Ui.Show(histBox, v); }); r.Add(swHist); Ui.L(r, "Belt semi-major axis histogram", "t-body");
+            histBox = Ui.E(c, "col");
+            var img = new Image { image = beltHist, scaleMode = ScaleMode.StretchToFill };
+            img.style.height = 90; img.style.marginTop = 4;
+            histBox.Add(img);
+            Ui.L(histBox, "1.6 → 5.6 AU. Kirkwood gaps (Jupiter resonances 4:1, 3:1, 5:2, 7:3, 2:1) at 2.06, 2.50, 2.82, 2.96, 3.28 AU; Hildas at 3.97 (3:2); Trojans at 5.2 (1:1). The gaps are in orbit size, so they don't show as empty rings in space.", "t-note");
+            Ui.Show(histBox, showHist);
+        }
+
+        void SetCam(int ci)
+        {
+            if (ci <= 2) { SetPivot(Pivot.Ship, 0.16); camMode = (CamMode)ci; lookYaw = lookPitch = 0; Cam.fieldOfView = 55; }
+            if (ci == 3 && ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4);
+            if (ci == 4) { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
+        }
+
+        int CamIndex() => pivot == Pivot.Target ? 3 : pivot == Pivot.Sun ? 4 : (int)camMode;
+
+        void DataTab(VisualElement c)
+        {
+            dataBox = Ui.E(c, "col");
+            Ui.L(c, Note, "t-note").style.marginTop = 10;
+            Ui.Section(c, "Game");
+            var row = Ui.E(c, "row", "wrap");
+            Ui.B(row, "Save  " + UiShell.Keys(A.QuickSave), () => { SaveGame(); hudShell.Toast("Game saved"); });
+            Ui.B(row, "Load", () => { if (HasSave) { LoadGame(); hudShell.Toast("Game loaded"); } });
+            Ui.B(row, "Main menu", App.OpenMenu);
+        }
+
+        void UpdateData()
+        {
+            hudReadouts.Clear();
+            Readouts(hudReadouts);
+            while (dataBox.childCount > hudReadouts.Count) dataBox.RemoveAt(dataBox.childCount - 1);
+            for (int i = 0; i < hudReadouts.Count; i++)
+            {
+                var r = hudReadouts[i];
+                if (i >= dataBox.childCount)
+                {
+                    var (row, _) = Ui.KV(dataBox, "");
+                    Ui.Fontify(row);
+                }
+                var rowE = dataBox[i];
+                var k = (Label)rowE[0]; var v = (Label)rowE[1];
+                Ui.Text(k, r.label.ToUpperInvariant());
+                Ui.Text(v, r.value);
+                Ui.SetClass(v, "accent", r.tone == Tone.Hot); Ui.SetClass(v, "cold", r.tone == Tone.Cold); Ui.SetClass(v, "warn", r.tone == Tone.Bad);
+                v.style.whiteSpace = WhiteSpace.Normal;
+                v.style.flexShrink = 1;
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------ per frame
+
+        public override void UpdateHud(UiShell shell)
+        {
+            if (markers == null) return;
+            hudShell = shell;
+            bool map = pivot == Pivot.Sun;
+            UpdateMarkers();
+            Ui.Show(mapHead, map);
+
+            // status
+            var date = Frame.UtcFromTdb(jd);
+            Ui.Text(stDate, date.ToString("yyyy-MM-dd  HH:mm:ss") + " UTC");
+            segWarpTop.Value = warpIdx;
+            bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
+            Ui.Text(stLimited, limited ? $"Limited by the frame budget: running at {Fmt.Num(effectiveWarp, 0)}×" : "");
+            Ui.Show(stLimited, limited);
+            var refPos = sys.Pos(reference, jd);
+            double alt = (ship.Pos - refPos).Mag - reference.Radius;
+            Ui.Text(stNear, (ship.Landed != null ? "ON " : "NEAR ") + reference.Name.ToUpperInvariant() + "  ·  " + Km(alt) + (reference == sys.Sun ? " out" : " up"));
+            Ui.Text(stSun, Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU from the Sun");
+
+            // target
+            var t = ship.Target;
+            Ui.Show(tcNoTarget, t == null); Ui.Show(tcBody, t != null);
+            if (t != null)
+            {
+                var tp = sys.Pos(t, jd);
+                var r = tp - ship.Pos;
+                var vr = ship.Vel - sys.Vel(t, jd);
+                double closing = D3.Dot(vr, r.Norm);
+                Ui.Text(tcName, t.Name.ToUpperInvariant());
+                Ui.Text(tcSub, Kind(t).ToUpperInvariant() + (t.SizeEstimated ? "  ·  SIZE UNKNOWN" : "  ·  R " + Km(t.Radius)));
+                Ui.Text(tcDist, Km(r.Mag - t.Radius));
+                Ui.Text(tcRel, Fmt.Num(vr.Mag, 3) + " km/s");
+                Ui.Text(tcClose, (closing >= 0 ? "+" : "") + Fmt.Num(closing, 3) + " km/s");
+                Ui.SetClass(tcClose, "cold", closing > 0);
+                double d = Math.Max(r.Mag - Ship.Standoff(t), 0);
+                Ui.Text(tcBrach, $"{Fmt.Num(ship.MaxG, 1)} g brachistochrone: {Dur(2 * Math.Sqrt(d / ship.AMax))}\nΔv {Fmt.Num(2 * Math.Sqrt(d * ship.AMax), 0)} km/s · peak {Fmt.Num(Math.Sqrt(d * ship.AMax), 0)} km/s");
+                Ui.Text(tcNav, ship.PlanActive ? "NAV  " + ship.Phase.ToUpperInvariant() : "NAV IDLE");
+                Ui.SetClass(tcNav, "accent", ship.PlanActive);
+                Ui.Text(tcEngage, ship.PlanActive ? "ABORT" : "ENGAGE");
+                Ui.SetClass(tcEngage, "danger", ship.PlanActive);
+            }
+
+            // flight cluster
+            var vRef = (ship.Vel - sys.Vel(reference, jd)).Mag;
+            Ui.Text(spdVal, Fmt.Num(vRef, vRef < 10 ? 3 : 1));
+            Ui.Text(spdRef, "KM/S VS " + reference.Name.ToUpperInvariant());
+            Ui.Text(drvVal, Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g");
+            Ui.SetClass(drvVal, "accent", ship.Throttle > 0);
+            Ui.SetClass(drvVal, "glow", ship.Throttle > 0);
+            thrFill.style.width = Length.Percent((float)ship.Throttle * 100);
+            thrCmd.style.left = Length.Percent((float)ship.ThrottleCmd * 100);
+            Ui.Text(drvSub, $"THROTTLE {Mathf.RoundToInt((float)ship.ThrottleCmd * 100)} %  ·  LIMIT {Fmt.Num(ship.MaxG, 1)} g");
+            Ui.Text(dvVal, Fmt.Num(ship.DvUsed, ship.DvUsed < 100 ? 2 : 0));
+            Ui.Text(rotVal, "KM/S  ·  ROT " + Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s");
+
+            // pills
+            UpdateCareerStrip();
+            SetPill(pAssist, "ASSIST " + (ship.FlightAssist ? "ON" : "OFF"), ship.FlightAssist ? "ok" : "bad");
+            SetPill(pHold, "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant(), ship.Hold != Hold.Off ? "cold" : null);
+            SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : "NAV IDLE", ship.PlanActive ? "hot" : null);
+            SetPill(pCam, "CAM " + (pivot == Pivot.Ship ? camMode.ToString() : pivot == Pivot.Sun ? "MAP" : "TARGET").ToUpperInvariant(), null);
+            SetPill(pLanded, ship.Landed != null ? "LANDED " + ship.Landed.Name.ToUpperInvariant() : null, "ok");
+            SetPill(pLimited, limited ? "WARP LIMITED " + Fmt.Num(effectiveWarp, 0) + "×" : null, "bad");
+            SetPill(pEphem, sys.Approximate(jd) ? "EPHEMERIS APPROXIMATE" : null, "bad");
+            SetPill(pJet, ship.Throttle > 0 ? "JET " + Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW (FICTIONAL)" : null, "bad");
+
+            if (!consoleOpen) return;
+            // console: reflect state changed by keys
+            if (!thrSlider.Dragging) thrSlider.SetValueWithoutNotify((float)ship.ThrottleCmd);
+            Ui.Text(thrLabel, Mathf.RoundToInt((float)ship.ThrottleCmd * 100) + " %");
+            segG.Value = Array.FindIndex(Gs, g => Math.Abs(g - ship.MaxG) < 1e-6);
+            UpdateDriveLimit();
+            UpdateJobs();
+            swAssist.Value = ship.FlightAssist;
+            for (int i = 0; i < holdBtns.Count; i++) Ui.SetClass(holdBtns[i], "on", (int)ship.Hold == i);
+            segWarp.Value = warpIdx;
+            segCam.Value = CamIndex();
+            segPlan.Value = Array.IndexOf(new[] { Plan.Brachistochrone, Plan.MatchVelocity, Plan.HoldStation }, selectedPlan);
+            swBelt.Value = beltView.Visible; swRings.Value = faintRings;
+            Ui.Text(planEngage, ship.PlanActive ? "ABORT PLAN  " + UiShell.Keys(A.Engage) : "ENGAGE  " + UiShell.Keys(A.Engage));
+            Ui.SetClass(planEngage, "danger", ship.PlanActive);
+            Ui.Text(navPhase, ship.PlanActive ? "ACTIVE: " + ship.Phase.ToUpperInvariant() : "IDLE (" + ship.Phase + ")");
+            if (t != null)
+            {
+                var tp = sys.Pos(t, jd);
+                double d = Math.Max((tp - ship.Pos).Mag - Ship.Standoff(t), 0);
+                Ui.Text(navTarget, "TARGET  " + t.Name.ToUpperInvariant());
+                Ui.Text(navEst, $"Brachistochrone at {Fmt.Num(ship.MaxG, 1)} g: {Dur(2 * Math.Sqrt(d / ship.AMax))}\nΔv ≈ {Fmt.Num(2 * Math.Sqrt(d * ship.AMax), 0)} km/s, peak {Fmt.Num(Math.Sqrt(d * ship.AMax), 0)} km/s");
+                if (t.Parent == sys.Sun)
+                {
+                    var (dv, tt) = Ship.Hohmann(ship.Pos.Mag, tp.Mag, sys.Sun.GM);
+                    Ui.Text(navHohmann, $"Economy (Hohmann, circular orbits): {Dur(tt)}, Δv ≈ {Fmt.Num(dv, 1)} km/s");
+                }
+                else Ui.Text(navHohmann, "");
+            }
+            else { Ui.Text(navTarget, "NO TARGET"); Ui.Text(navEst, "Pick one in Targets or click a label."); Ui.Text(navHohmann, ""); }
+            RebuildMoons();
+            foreach (var b in consoleBody.Query<Label>(className: "btn").ToList())
+                if (b.userData is Body body) Ui.SetClass(b, "on", body == ship.Target);
+            if ((dataT -= Time.unscaledDeltaTime) <= 0) { dataT = 0.25f; UpdateData(); }
+        }
+    }
+}
