@@ -198,6 +198,8 @@ namespace FogOfWar
             mkTgtName = Ui.L(nameRow, "", "t-h3", "f-cond", "accent", "glow");
             mkTgtDist = Ui.L(lab, "", "t-label", "f-mono");
             mkTgtName.style.whiteSpace = WhiteSpace.NoWrap; mkTgtDist.style.whiteSpace = WhiteSpace.NoWrap;
+            // QA-046: long names end in an ellipsis instead of running under the panels
+            mkTgtName.style.maxWidth = 300; mkTgtName.style.overflow = Overflow.Hidden; mkTgtName.style.textOverflow = TextOverflow.Ellipsis;
 
             mkEdge = Mk();
             var chev = Ui.E(mkEdge);
@@ -252,7 +254,7 @@ namespace FogOfWar
                 float r = Mathf.Clamp(ang * pxPerRad / hudShell.Scale + 6, 16, hudShell.H * 0.45f);
                 SetBracket("tl", -r, -r); SetBracket("tr", r - 12, -r); SetBracket("bl", -r, r - 12); SetBracket("br2", r - 12, r - 12);
                 var lab = mkTgt.Q("label");
-                lab.style.left = r + 8; lab.style.top = -r;
+                PlaceTargetLabel(lab, at, r);
                 Ui.Text(mkTgtName, ship.Target.Name.ToUpperInvariant());
                 Ui.Text(mkTgtDist, dist);
             }
@@ -277,6 +279,28 @@ namespace FogOfWar
                 mkEdgeName.style.width = 136;
                 mkEdgeName.style.unityTextAlign = d.x > 0.3f ? TextAnchor.UpperRight : TextAnchor.UpperLeft;
             }
+        }
+
+        // QA-046: the label sits right of the bracket unless that would run under the right-hand panels (or off
+        // screen); then it goes left of the bracket, and below it if neither side has room.
+        void PlaceTargetLabel(VisualElement lab, Vector2 at, float r)
+        {
+            float w = float.IsNaN(lab.resolvedStyle.width) ? 200 : lab.resolvedStyle.width;
+            float h = float.IsNaN(lab.resolvedStyle.height) ? 40 : lab.resolvedStyle.height;
+            float rightLimit = hudShell.HudWidth - 8;
+            if (rightCol != null && rightCol.resolvedStyle.display == DisplayStyle.Flex && !float.IsNaN(rightCol.layout.x))
+            {
+                var col = rightCol.layout;
+                // only where the label's rows overlap the column vertically
+                if (at.y - r < col.yMax && at.y - r + h > col.y) rightLimit = Mathf.Min(rightLimit, col.x - 8);
+            }
+            float left, top = -r;
+            if (at.x + r + 8 + w <= rightLimit) { left = r + 8; lab.style.alignItems = Align.FlexStart; }
+            else if (at.x - r - 8 - w >= 8) { left = -r - 8 - w; lab.style.alignItems = Align.FlexEnd; }
+            else { left = -w / 2; top = r + 6; lab.style.alignItems = Align.Center; }
+            // a bracket that is itself under the panels still gets its label in the open: pull it left of them
+            left = Mathf.Max(Mathf.Min(left, rightLimit - w - at.x), 8 - at.x);
+            lab.style.left = left; lab.style.top = top;
         }
 
         void SetBracket(string n, float x, float y)

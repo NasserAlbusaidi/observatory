@@ -69,6 +69,30 @@ namespace FogOfWar
             return true;
         }
 
+        // review shots: orbit camera around the ship, turned so the target sits at `frac` of the screen width
+        public void TestAimTargetAt(float frac)
+        {
+            if (ship.Target == null) return;
+            SetPivot(Pivot.Ship, 0.16);
+            camMode = CamMode.Orbit;
+            var d = Frame.U(sys.Pos(ship.Target, jd) - ship.Pos).normalized;
+            float hfov = Mathf.Atan(Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2) * Cam.aspect);
+            float ang = Mathf.Atan((frac - 0.5f) * 2 * Mathf.Tan(hfov)) * Mathf.Rad2Deg;
+            var f = Quaternion.AngleAxis(-ang, Vector3.up) * d;
+            var off = -f;
+            yaw = Mathf.Atan2(off.x, -off.z) * Mathf.Rad2Deg;
+            pitch = Mathf.Asin(Mathf.Clamp(off.y, -1, 1)) * Mathf.Rad2Deg;
+        }
+
+        // review shots: does the bracket label overlap the right-hand panels?
+        public string TestLabelReport()
+        {
+            var lab = mkTgt?.Q("label");
+            if (lab == null || mkTgt.resolvedStyle.display != DisplayStyle.Flex) return "label hidden";
+            var a = lab.worldBound; var b = rightCol.worldBound;
+            return $"label x {a.xMin:0}–{a.xMax:0}, panels from x {b.xMin:0}: {(a.Overlaps(b) ? "OVERLAP" : "clear")}";
+        }
+
         string CraftKind(Body b)
         {
             switch (KindOf(b))
