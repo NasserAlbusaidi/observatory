@@ -122,7 +122,7 @@ namespace FogOfWar
         public override void OnGUIOverlay()
         {
             if (Prof) swGui.Start();
-            try { if (GameSettings.ShowLabels) DrawLabels(); if (!HasHud || !App.ShellActive) DrawHud(); } finally { if (Prof) swGui.Stop(); }
+            try { if (GameSettings.ShowLabels) DrawLabels(); if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
         }
 
         GUIStyle labelStyle, labelOn, hudStyle, hudBig;
@@ -245,6 +245,7 @@ namespace FogOfWar
 
         public override void Readouts(List<Readout> list)
         {
+            CareerReadouts(list);
             var date = Frame.UtcFromTdb(jd);
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
@@ -280,7 +281,11 @@ namespace FogOfWar
             if (ship.PlanActive) list.Add(new Readout("Plan", PlanShort[(int)ship.Plan]));
         }
 
-        static string Km(double km) => km > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : km >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
+        static string Km(double km)
+        {
+            double a = Math.Abs(km);
+            return a > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : a >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
+        }
 
         static string Dur(double s)
         {
@@ -294,6 +299,7 @@ namespace FogOfWar
 
         public override void Controls(PanelUI ui)
         {
+            CareerPanel(ui);
             // --- ship
             GUILayout.Label("Throttle (" + Ctl.Keys(A.ThrottleUp) + " / " + Ctl.Keys(A.ThrottleDown) + ", " + Ctl.Keys(A.ThrottleFull) + " full, " + Ctl.Keys(A.ThrottleCut) + " cut)", ui.label);
             float th = GUILayout.HorizontalSlider((float)ship.ThrottleCmd, 0, 1);
@@ -406,6 +412,7 @@ namespace FogOfWar
         public void SaveGame()
         {
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(ship.ToSave(jd, warpIdx)));
+            SaveCareer();
             PlayerPrefs.Save();
             ship.Phase = "game saved";
         }
@@ -423,6 +430,7 @@ namespace FogOfWar
             reference = Ship.Dominant(sys, ship.Pos, jd);
             SetPivot(Pivot.Ship, 0.16);
             camMode = CamMode.Chase;
+            LoadCareer();
             ship.Phase = "game loaded";
         }
     }

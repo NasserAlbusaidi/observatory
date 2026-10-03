@@ -268,7 +268,7 @@ namespace FogOfWar.UI
             for (int i = 0; i < options.Length; i++)
             {
                 int k = i;
-                var b = Ui.B(this, options[i], () => { Value = k; Changed?.Invoke(k); });
+                var b = Ui.B(this, options[i], () => { if (items[k].ClassListContains("disabled")) return; Value = k; Changed?.Invoke(k); });
                 if (i == options.Length - 1) b.AddToClassList("last");
                 items.Add(b);
             }
@@ -282,6 +282,7 @@ namespace FogOfWar.UI
         }
 
         public void SetLabel(int i, string text) => Ui.Text(items[i], text);
+        public void SetEnabled(int i, bool on) => Ui.SetClass(items[i], "disabled", !on);
         public int Count => items.Count;
     }
 

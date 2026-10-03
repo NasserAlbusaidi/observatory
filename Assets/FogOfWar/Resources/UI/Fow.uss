@@ -141,7 +141,7 @@
 .fade-up { opacity: 0; translate: 0 14px; transition-property: opacity, translate; transition-duration: 0.25s; transition-timing-function: ease-out-cubic; }
 .fade-up.in { opacity: 1; translate: 0 0; }
 
-.tabs { flex-direction: row; border-bottom-width: 1px; border-color: rgba(150, 175, 255, 0.14); margin-bottom: 12px; flex-wrap: wrap; }
+.tabs { flex-shrink: 0; flex-direction: row; border-bottom-width: 1px; border-color: rgba(150, 175, 255, 0.14); margin-bottom: 12px; flex-wrap: wrap; }
 .tab { font-size: 15px; letter-spacing: 2.5px; color: rgb(141, 148, 179); padding: 8px 14px 7px 14px; border-bottom-width: 2px; border-color: rgba(0, 0, 0, 0); margin-bottom: -1px; transition-property: color, border-color; transition-duration: 0.12s; }
 .tab:hover { color: rgb(230, 233, 245); }
 .tab.on { color: rgb(255, 181, 71); border-color: rgb(255, 181, 71); text-shadow: 0 0 8px rgba(255, 181, 71, 0.4); }
@@ -239,3 +239,10 @@
 .compact .menu-side { width: 440px; padding-left: 40px; padding-top: 40px; }
 .compact .brand-a { font-size: 46px; letter-spacing: 8px; }
 .compact .menu-item { font-size: 22px; }
+
+/* toasts for things that went wrong */
+.toast.bad { border-color: rgba(255, 107, 94, 0.75); }
+.toast.bad > .dot { background-color: rgb(255, 107, 94); }
+
+.panel-head, .row { flex-shrink: 0; }
+.job-title { flex-grow: 1; flex-shrink: 1; white-space: normal; margin-right: 8px; }

@@ -34,6 +34,15 @@ namespace FogOfWar.OpenWorld
         public Body Target;
         public D3 StationOffset;
         public double DvUsed;
+        // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
+        // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
+        public const double Ve = 10000;          // km/s
+        public double DryMass = 300, Fuel = 200, Cargo;
+        public bool UnlimitedFuel = true;
+        public double Mass => DryMass + Fuel + Cargo;
+        public bool Dry => !UnlimitedFuel && Fuel <= 0;
+        public double CruiseCap;                 // km/s; a brachistochrone coasts at this speed instead (0 = none)
+        bool cruising;
         public string Phase = "coasting";
         public Body Landed;
         bool parked;
@@ -88,12 +97,13 @@ namespace FogOfWar.OpenWorld
                 want = HoldDir(sys, jd, reference);
                 Phase = ThrottleCmd > 0 ? "burning" : RcsInput.sqrMagnitude > 0 ? "RCS" : "coasting";
             }
+            if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of reaction mass"; }
             UpdateAttitude(want, h);
             // the drive fires only along the commanded line: flip first, then burn
             if (PlanActive && want.HasValue && D3.Dot(Heading, want.Value) < Math.Cos(3 * Math.PI / 180)) { throttle = 0; Phase = "turning"; }
             Throttle = throttle;
 
-            var rcs = RcsInput.sqrMagnitude > 0 ? Frame.FromU(Att * Vector3.ClampMagnitude(RcsInput, 1)) * RcsAccel : autoRcs;
+            var rcs = RcsInput.sqrMagnitude > 0 && !Dry ? Frame.FromU(Att * Vector3.ClampMagnitude(RcsInput, 1)) * RcsAccel : autoRcs;
             RcsActive = rcs.Sqr > 0;
             if (Landed != null)
             {
@@ -113,7 +123,9 @@ namespace FogOfWar.OpenWorld
             var a = g + Heading * (Throttle * AMax) + rcs;
             Vel += a * h;
             Pos += Vel * h;
-            DvUsed += (Throttle * AMax + rcs.Mag) * h;
+            double dv = (Throttle * AMax + rcs.Mag) * h;
+            DvUsed += dv;
+            if (!UnlimitedFuel) Fuel = Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
             CheckTouchdown(sys, jd);
         }
 
@@ -196,13 +208,14 @@ namespace FogOfWar.OpenWorld
                 if (b == sys.Sun) continue;
                 var bp = sys.Pos(b, jd);
                 var r = Pos - bp;
-                double R = b.Radius * Math.Max(b.Shape.x, Math.Max(b.Shape.y, b.Shape.z)) * (1 - b.Flattening) * 0.98;
+                double R = SurfaceRadius(b, r) * 0.999;
                 if (r.Mag < R)
                 {
-                    Pos = bp + r.Norm * b.Radius * 1.0001;
+                    Pos = bp + r.Norm * SurfaceRadius(b, r) * 1.0001;
                     Vel = sys.Vel(b, jd);
                     Landed = b; Plan = Plan.None; ThrottleCmd = 0; Throttle = 0; AngVel = Vector3.zero;
-                    Phase = "landed on " + b.Name;
+                    bool giant = b.Look == Look.Gas || b.Look == Look.Ice;
+                    Phase = giant ? "in " + b.Name + "'s cloud tops (no surface): climb out" : "landed on " + b.Name;
                     break;
                 }
             }
@@ -224,7 +237,7 @@ namespace FogOfWar.OpenWorld
             {
                 if (vrel.Mag < 0.0005) { Phase = "velocity matched"; return null; }
                 Phase = "matching velocity";
-                return -vrel / tau - gRel;
+                return Budget(-vrel / tau, gRel);
             }
             if (Plan == Plan.HoldStation)
             {
@@ -232,7 +245,7 @@ namespace FogOfWar.OpenWorld
                 var e = want - vrel;
                 if (e.Mag < 0.0005 && (StationOffset - (Pos - tp)).Mag < 1) { Phase = "holding station"; return -gRel; }
                 Phase = "station keeping";
-                return e / tau - gRel;
+                return Budget(e / tau, gRel);
             }
 
             // Brachistochrone: steer relative velocity onto v = sqrt(2·a·distance) toward the target, so the ship
@@ -241,7 +254,18 @@ namespace FogOfWar.OpenWorld
             D3 vDes;
             bool orbiting = dist < standoff * 1.25 && vrel.Mag < Math.Sqrt(T.GM / Math.Max(dist, 1)) * 2 + 0.5;
             if (!orbiting)
-                vDes = Avoid(sys, jd, r.Norm, dist) * Math.Sqrt(2 * aMax * 0.85 * Math.Max(dist - standoff, 0));
+            {
+                double vb = Math.Sqrt(2 * aMax * 0.85 * Math.Max(dist - standoff, 0));
+                // burn–coast–burn: hold the cruise speed on rails until the braking point
+                bool capped = CruiseCap > 0 && vb > CruiseCap;
+                vDes = Avoid(sys, jd, r.Norm, dist) * (capped ? CruiseCap : vb);
+                if (capped)
+                {
+                    cruising = (vDes - vrel).Mag < CruiseCap * (cruising ? 0.02 : 0.005);
+                    if (cruising) { Phase = "cruising"; return null; }
+                }
+                else cruising = false;
+            }
             else
             {
                 var radial = (-r).Norm;
@@ -253,7 +277,11 @@ namespace FogOfWar.OpenWorld
             bool hover = orbiting && T.GM < 1;
             if (hover) vDes = (-r).Norm * (-(dist - standoff) * 0.002);
             var err = vDes - vrel;
-            var cmd = orbiting && !hover ? err / tau : err / tau - gRel; // in orbit, gravity is what keeps us there
+            // in orbit, gravity is what keeps us there; otherwise cancel it first, then steer with what is left
+            var cmd = orbiting && !hover ? err / tau : Budget(err / tau, gRel);
+            // periapsis guard: if the coast arc around the body we're in would hit it, climb out before anything else
+            var guard = Clearance(sys, jd);
+            if (guard.HasValue && !orbiting) { Phase = "climbing clear of " + guardBody.Name; return guard; }
             if (orbiting && !hover)
             {
                 // Parked when the orbit has the right shape: speed near circular, little radial motion, radius near the
@@ -269,6 +297,48 @@ namespace FogOfWar.OpenWorld
             return cmd;
         }
 
+        // Radius of the surface (or the 1-bar cloud tops) under a direction r from the body's centre: the oblate
+        // spheroid R(φ) = Req (1 − f sin²φ), times any irregular-shape factor.
+        public static double SurfaceRadius(Body b, D3 r)
+        {
+            double s = D3.Dot(r.Norm, b.Pole);
+            return b.Radius * Math.Max(b.Shape.x, Math.Max(b.Shape.y, b.Shape.z)) * (1 - b.Flattening * s * s);
+        }
+
+        // Thrust allocation for a saturating drive: cancel the relative gravity first, then spend what is left of the
+        // drive's limit along the steering command. A plain clamp of (steer − g) scales the gravity term away when the
+        // steering demand is huge (leaving orbit for a target AUs away), and the ship falls into the planet (QA-019).
+        D3 Budget(D3 steer, D3 gRel)
+        {
+            var comp = -gRel;
+            double left = AMax - comp.Mag;
+            if (left <= 0) return comp.Norm * AMax;
+            double s = steer.Mag;
+            return s > left ? comp + steer * (left / s) : comp + steer;
+        }
+
+        Body guardBody;
+
+        // If the two-body arc around the body we're inside would come within 10 % of its surface, burn radially out and
+        // along the motion (raising periapsis) until it won't.
+        D3? Clearance(SolarSystem sys, double jd)
+        {
+            var b = Dominant(sys, Pos, jd);
+            if (b == sys.Sun || b == Target || b.GM < 1) return null;
+            var r = Pos - sys.Pos(b, jd); var v = Vel - sys.Vel(b, jd);
+            double rm = r.Mag, vr = D3.Dot(r, v) / rm;
+            if (vr >= 0 && rm > b.Radius * 1.2) return null; // climbing and clear
+            var h = D3.Cross(r, v);
+            double energy = v.Sqr / 2 - b.GM / rm;
+            double p = h.Sqr / b.GM, e = Math.Sqrt(Math.Max(0, 1 + 2 * energy * h.Sqr / (b.GM * b.GM)));
+            double rp = p / (1 + e);
+            if (rp > b.Radius * 1.1) return null;
+            guardBody = b;
+            var outward = r / rm;
+            var along = v.Sqr > 1e-12 ? (v - outward * vr).Norm : D3.Cross(b.Pole, outward).Norm;
+            return (outward + along).Norm * AMax;
+        }
+
         // Bend the straight-line course around any body (other than the target) it would pass through.
         D3 Avoid(SolarSystem sys, double jd, D3 dir, double dist)
         {
@@ -280,6 +350,14 @@ namespace FogOfWar.OpenWorld
                 double d = rel.Mag;
                 if (d > 40 * b.Radius || d > dist) continue;
                 double safe = b.Radius * 1.5 + 200;
+                // Falling toward it on a path that dips inside the safe radius, and too close to stop with the drive
+                // left over after gravity: climb first. Without this a 1 g ship that kills its orbital speed to head
+                // for a target behind the body falls in (the Moon behind Earth from a 15,000 km orbit).
+                var up = (-rel).Norm;
+                var v = Vel - sys.Vel(b, jd);
+                double vin = -D3.Dot(v, up), net = AMax - b.GM / (d * d);
+                if (vin > 0 && d - safe < vin * vin / Math.Max(net, 1e-9) + 0.3 * safe && Periapsis(-rel, v, b.GM) < safe)
+                { dir = (dir + up * 3).Norm; continue; }
                 if (d < safe) { dir = (dir + (-rel).Norm * 1.5).Norm; continue; } // too close: climb out first
                 double t = D3.Dot(rel, dir);
                 if (t <= 0) continue;
@@ -290,6 +368,14 @@ namespace FogOfWar.OpenWorld
                 dir = ((c + perp * safe) - Pos).Norm; // aim at the tangent point just outside the safe radius
             }
             return dir;
+        }
+
+        // Two-body periapsis radius of relative state (r, v) about GM; for an escape orbit, the hyperbola's.
+        static double Periapsis(D3 r, D3 v, double mu)
+        {
+            double h = D3.Cross(r, v).Mag, eps = v.Sqr / 2 - mu / r.Mag;
+            double e = Math.Sqrt(Math.Max(0, 1 + 2 * eps * h * h / (mu * mu)));
+            return h * h / mu / (1 + e);
         }
 
         // Flip-and-burn trip time to the target from rest: t = 2·sqrt(d / a).

@@ -450,10 +450,11 @@ namespace FogOfWar.UI
         VisualElement toastBox;
         readonly List<(VisualElement e, float until)> toasts = new List<(VisualElement, float)>();
 
-        public void Toast(string text, string note = null, float seconds = 3.5f)
+        public void Toast(string text, string note = null, float seconds = 3.5f, string tone = null)
         {
             if (toastBox == null) return;
             var t = Ui.E(toastBox, "toast");
+            if (tone != null) t.AddToClassList(tone);
             t.pickingMode = PickingMode.Ignore;
             Ui.E(t, "dot");
             Ui.L(t, text, "t-body", "f-semi");

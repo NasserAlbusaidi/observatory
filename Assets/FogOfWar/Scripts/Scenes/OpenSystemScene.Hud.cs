@@ -55,6 +55,7 @@ namespace FogOfWar
             stNear = Ui.L(st, "", "t-body", "f-semi");
             stNear.style.marginTop = 6;
             stSun = Ui.L(st, "", "t-label", "f-mono");
+            var stStatus = st;
 
             // ---- right column: target card + console
             rightCol = Ui.E(layer, "col");
@@ -79,6 +80,7 @@ namespace FogOfWar
             thrFill = Ui.E(thr, "fill");
             thrCmd = Ui.E(thr, "cmd");
             drvSub = Ui.L(dr, "", "t-label", "f-condm");
+            BuildCareerStrip(dr, stStatus);
             var rg = Ui.E(fl, "gauge", "right-g");
             Ui.L(rg, "Δv SPENT", "t-micro", "f-condm");
             dvVal = Ui.L(rg, "", "t-big", "f-mono");
@@ -315,6 +317,7 @@ namespace FogOfWar
             var tabs = new Tabs(true);
             tabs.style.flexShrink = 1;
             consoleBody.Add(tabs);
+            tabs.Add("Jobs", Scroll(JobsTab));
             tabs.Add("Flight", Scroll(FlightTab));
             tabs.Add("Nav", Scroll(NavTab));
             tabs.Add("Targets", Scroll(TargetsTab));
@@ -340,7 +343,7 @@ namespace FogOfWar
             for (int i = 0; i < Gs.Length; i++) gl[i] = Fmt.Num(Gs[i], 1) + " g" + (Gs[i] >= 10 ? "*" : "");
             segG = new Segmented(gl, Array.FindIndex(Gs, g => Math.Abs(g - ship.MaxG) < 1e-6), i => ship.MaxG = Gs[i]);
             c.Add(segG);
-            Ui.L(c, "* 10 g needs the juice (fictional).", "t-note");
+            segGNote = Ui.L(c, "", "t-note");
             var r = Ui.E(c, "check-row");
             r.style.marginTop = 6;
             swAssist = new Switch(ship.FlightAssist, v => ship.FlightAssist = v);
@@ -548,6 +551,7 @@ namespace FogOfWar
             Ui.Text(rotVal, "KM/S  ·  ROT " + Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s");
 
             // pills
+            UpdateCareerStrip();
             SetPill(pAssist, "ASSIST " + (ship.FlightAssist ? "ON" : "OFF"), ship.FlightAssist ? "ok" : "bad");
             SetPill(pHold, "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant(), ship.Hold != Hold.Off ? "cold" : null);
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : "NAV IDLE", ship.PlanActive ? "hot" : null);
@@ -562,6 +566,8 @@ namespace FogOfWar
             if (!thrSlider.Dragging) thrSlider.SetValueWithoutNotify((float)ship.ThrottleCmd);
             Ui.Text(thrLabel, Mathf.RoundToInt((float)ship.ThrottleCmd * 100) + " %");
             segG.Value = Array.FindIndex(Gs, g => Math.Abs(g - ship.MaxG) < 1e-6);
+            UpdateDriveLimit();
+            UpdateJobs();
             swAssist.Value = ship.FlightAssist;
             for (int i = 0; i < holdBtns.Count; i++) Ui.SetClass(holdBtns[i], "on", (int)ship.Hold == i);
             segWarp.Value = warpIdx;
