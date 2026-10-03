@@ -55,5 +55,23 @@ namespace FogOfWar
         public virtual bool HandleDrag(Vector2 delta, int button) => false;
         public virtual bool HandleZoom(float wheel) => false;
         protected virtual void Teardown() { }
+
+        // ---- UI Toolkit shell: a scene can draw its own HUD instead of the IMGUI instrument panel
+        public virtual bool HasHud => false;
+        public virtual void BuildHud(UI.UiShell shell, UnityEngine.UIElements.VisualElement layer) { }
+        public virtual void UpdateHud(UI.UiShell shell) { }
+
+        // ---- free camera (photo mode, cinematics). By default the rig sits at an offset from the orbit target.
+        // Scenes that place the camera themselves every frame apply the rig in LateTick (RigInScene).
+        public virtual bool RigInScene => false;
+        public virtual void RigBegin(CamRig rig)
+        {
+            rig.Offset = Cam.transform.position - Orbit.target;
+            rig.Rotation = Cam.transform.rotation;
+            rig.Scale = Mathf.Max(Orbit.mode == OrbitCamera.Mode.Orbit ? Orbit.distance : 2f, 0.05f);
+        }
+        public virtual void RigApply(CamRig rig) => Cam.transform.SetPositionAndRotation(Orbit.target + rig.Offset, rig.Rotation);
+        // world position (in the rig's units, relative to the anchor) of the thing the camera is looking at, for orbit shots
+        public virtual Vector3 RigFocus => Vector3.zero;
     }
 }

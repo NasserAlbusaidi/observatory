@@ -21,14 +21,36 @@ namespace FogOfWar
         public bool InputLocked;
         public float UiScale => uiScale;
         public float PanelWidth { get; private set; }
-        public bool UnderPanel(Vector2 guiPoint) => panelRect.Contains(guiPoint) || railRect.Contains(guiPoint) || menuRect.Contains(guiPoint);
+        public bool UnderPanel(Vector2 guiPoint) => panelRect.Contains(guiPoint) || railRect.Contains(guiPoint) || menuRect.Contains(guiPoint)
+            || (ShellActive && UI.UiShell.Instance.UnderGui(guiPoint, uiScale));
 
-        enum Screen { None, Main, Observatory, Controls }
+        enum Screen { None, Main, Observatory, Controls, Settings }
         Screen menu = Screen.Main;
         bool gameStarted;
         public bool MenuOpen => menu != Screen.None;
         public bool InGame => currentIndex == GameIndex;
         public bool HelpOpen;
+
+        // ---- for the UI Toolkit shell (UI/UiShell) and the capture tools (Capture/)
+        public bool ShellActive => UI.UiShell.Instance != null;
+        public int MenuIndex => (int)menu;
+        public bool GameStarted => gameStarted;
+        public int CurrentIndex => currentIndex;
+        public int SceneEpoch { get; private set; } // bumps whenever a scene is (re)built
+        public SimScene SceneAt(int i) => scenes[i];
+        public bool ShowUI { get => showUI; set => showUI = value; }
+        // hides the IMGUI layer (panels, labels, scene overlays) for screenshots and photo mode
+        public bool HideGui;
+        // free camera for photo mode and cinematics; null when the scene drives the camera
+        public CamRig Rig;
+        public Controls.Action? Rebinding => rebinding;
+        public int RebindSlot => rebindSlot;
+        public string RebindNote => rebindNote;
+        public void BeginRebind(Controls.Action a, int slot) { rebinding = a; rebindSlot = slot; rebindNote = null; }
+        public void CancelRebind() => rebinding = null;
+        public void NewGame() => Restart(GameIndex);
+        public void ContinueGame() { Activate(GameIndex); (current as OpenSystemScene)?.LoadGame(); }
+        public void SaveGame() => (current as OpenSystemScene)?.SaveGame();
 
         readonly PanelUI ui = new PanelUI();
         readonly List<Readout> readouts = new List<Readout>();
@@ -66,10 +88,15 @@ namespace FogOfWar
                 new NegativeMassScene(), new TidesScene(), new MarsScene(), new MeteorScene(), new OpenSystemScene(),
             };
             Quality = PlayerPrefs.GetInt("fow-quality", 1);
+            // clean captures from tours and QA runs, whose input is locked
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fowhidehud") >= 0) showUI = false;
             // the open world runs behind the main menu
             Activate(GameIndex);
             menu = Screen.Main;
             gameStarted = false;
+            UI.UiShell.Install(this);
+            Capture.Install(this);
+            UiShots.StartIfRequested(this);
             Tour.StartIfRequested(this);
             QA.StartIfRequested(this);
         }
@@ -86,6 +113,7 @@ namespace FogOfWar
             Cam.fieldOfView = 55;
             Cam.farClipPlane = 6000f;
             current.Enter(this);
+            SceneEpoch++;
             readoutTimer = 0;
             panelScroll = Vector2.zero;
         }
@@ -115,7 +143,8 @@ namespace FogOfWar
         void LateUpdate()
         {
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
-            Orbit.Apply(dt);
+            if (Rig == null) Orbit.Apply(dt);
+            else if (current != null && !current.RigInScene) current.RigApply(Rig);
             current?.LateTick(dt);
             readoutTimer -= Time.unscaledDeltaTime;
             if (readoutTimer <= 0 && current != null)
@@ -147,7 +176,13 @@ namespace FogOfWar
             if (e.type == EventType.KeyDown) HandleKey(e);
 
             menuRect = Rect.zero;
-            if (MenuOpen) { railRect = panelRect = Rect.zero; DrawMenu(W, H); }
+            if (ShellActive)
+            {
+                // the shell draws menus, rail, hints and help; IMGUI keeps the scene's instrument panel
+                railRect = panelRect = Rect.zero;
+                if (!MenuOpen && showUI && !HideGui && (!InGame || GameSettings.ClassicPanel)) DrawPanel(W, H);
+            }
+            else if (MenuOpen) { railRect = panelRect = Rect.zero; DrawMenu(W, H); }
             else if (showUI)
             {
                 if (!InGame) DrawRail(W, H); else railRect = Rect.zero;
@@ -158,11 +193,24 @@ namespace FogOfWar
             }
             else { railRect = panelRect = Rect.zero; }
 
-            if (!MenuOpen) current?.OnGUIOverlay();
-            if (HelpOpen) DrawHelp(W, H);
+            if (!MenuOpen && !HideGui && (showUI || !ShellActive)) current?.OnGUIOverlay(); // F2 hides labels too
+            if (HelpOpen && !ShellActive) DrawHelp(W, H);
 
             // Camera input from whatever the panels didn't consume.
-            bool overUI = railRect.Contains(e.mousePosition) || panelRect.Contains(e.mousePosition) || menuRect.Contains(e.mousePosition);
+            bool overUI = railRect.Contains(e.mousePosition) || panelRect.Contains(e.mousePosition) || menuRect.Contains(e.mousePosition)
+                || (ShellActive && (e.isMouse || e.type == EventType.ScrollWheel) && UI.UiShell.Instance.PointerOverMouse);
+            if (Rig != null)
+            {
+                // photo mode: the mouse steers the free camera
+                switch (e.type)
+                {
+                    case EventType.MouseDown when !overUI: dragging = true; dragButton = e.button; break;
+                    case EventType.MouseUp: dragging = false; break;
+                    case EventType.MouseDrag when dragging: Rig.Look(e.delta, dragButton); e.Use(); break;
+                    case EventType.ScrollWheel when !overUI: Rig.Wheel(e.delta.y); e.Use(); break;
+                }
+                return;
+            }
             switch (e.type)
             {
                 case EventType.MouseDown when !overUI:
@@ -181,13 +229,15 @@ namespace FogOfWar
             if (rebinding != null) return;
             if (e.keyCode == KeyCode.Escape)
             {
-                if (HelpOpen) HelpOpen = false;
-                else if (menu == Screen.Controls || menu == Screen.Observatory) menu = Screen.Main;
+                if (Capture.HandleEscape()) { }
+                else if (HelpOpen) HelpOpen = false;
+                else if (menu == Screen.Controls || menu == Screen.Observatory || menu == Screen.Settings) menu = Screen.Main;
                 else if (MenuOpen) { if (gameStarted && InGame) menu = Screen.None; }
                 else menu = Screen.Main;
                 e.Use();
             }
             else if (e.keyCode == KeyCode.F11) { UnityEngine.Screen.fullScreen = !UnityEngine.Screen.fullScreen; e.Use(); }
+            else if (Rig != null) { }
             else if (e.keyCode == KeyCode.F2 || (!InGame && e.keyCode == KeyCode.H)) { showUI = !showUI; e.Use(); }
             else if (!InGame && !MenuOpen && e.keyCode >= KeyCode.Alpha1 && e.keyCode <= KeyCode.Alpha8) { Activate(e.keyCode - KeyCode.Alpha1); e.Use(); }
         }
