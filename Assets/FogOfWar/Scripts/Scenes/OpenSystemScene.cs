@@ -137,6 +137,7 @@ namespace FogOfWar
 
             stars = Gfx.Starfield(Root, 6000).transform;
             stars.localRotation = Frame.StarsToRender;
+            InitCareer();
 
         }
 
@@ -386,12 +387,13 @@ namespace FogOfWar
             effectiveWarp = effectiveWarp * 0.9 + 0.1 * (dt > 0 ? achieved / dt : 0);
             if (warpLimited) limitedAt = Time.realtimeSinceStartup;
             reference = Ship.Dominant(sys, ship.Pos, jd);
+            TickCareer(achieved);
         }
 
         // Drive off (or the autopilot parked in orbit): ride a two-body conic around the dominant body. Exact at any
         // warp; other bodies' pulls are ignored until the next burn (patched conics).
         bool Coasting() => ship.Landed == null && ship.RcsInput.sqrMagnitude == 0 &&
-            (ship.PlanActive ? ship.Throttle == 0 && (ship.Phase == "in orbit" || ship.Phase == "velocity matched") : ship.ThrottleCmd == 0);
+            (ship.PlanActive ? ship.Throttle == 0 && (ship.Phase == "in orbit" || ship.Phase == "velocity matched" || ship.Phase == "cruising") : ship.ThrottleCmd == 0);
 
         double Coast(double maxDt)
         {
@@ -401,6 +403,9 @@ namespace FogOfWar
             double T = Rails.Period(r0, v0, dom.GM);
             // chunks short enough to notice a sphere-of-influence change or a surface in the way
             double chunk = Math.Min(maxDt, double.IsInfinity(T) ? Math.Max(60, 0.25 * r0.Mag / Math.Max(v0.Mag, 1e-6)) : T / 16);
+            // a cruising autopilot must wake up in time for its braking point
+            if (ship.PlanActive && ship.Phase == "cruising")
+                chunk = Math.Min(chunk, 0.01 * (sys.Pos(ship.Target, jd) - ship.Pos).Mag / Math.Max((ship.Vel - sys.Vel(ship.Target, jd)).Mag, 1e-3));
             chunk = Math.Max(chunk, Math.Min(maxDt, 1));
             Rails.Propagate(r0, v0, dom.GM, chunk, out var r1, out var v1);
             double jd1 = jd + chunk / 86400;

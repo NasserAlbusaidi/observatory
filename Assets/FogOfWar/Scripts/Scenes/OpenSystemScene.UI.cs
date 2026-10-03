@@ -122,7 +122,7 @@ namespace FogOfWar
         public override void OnGUIOverlay()
         {
             if (Prof) swGui.Start();
-            try { DrawLabels(); DrawHud(); } finally { if (Prof) swGui.Stop(); }
+            try { DrawLabels(); DrawHud(); DrawCareerNotes(); } finally { if (Prof) swGui.Stop(); }
         }
 
         GUIStyle labelStyle, labelOn, hudStyle, hudBig;
@@ -245,6 +245,7 @@ namespace FogOfWar
 
         public override void Readouts(List<Readout> list)
         {
+            CareerReadouts(list);
             var date = Frame.UtcFromTdb(jd);
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
@@ -294,6 +295,7 @@ namespace FogOfWar
 
         public override void Controls(PanelUI ui)
         {
+            CareerPanel(ui);
             // --- ship
             GUILayout.Label("Throttle (" + Ctl.Keys(A.ThrottleUp) + " / " + Ctl.Keys(A.ThrottleDown) + ", " + Ctl.Keys(A.ThrottleFull) + " full, " + Ctl.Keys(A.ThrottleCut) + " cut)", ui.label);
             float th = GUILayout.HorizontalSlider((float)ship.ThrottleCmd, 0, 1);
@@ -406,6 +408,7 @@ namespace FogOfWar
         public void SaveGame()
         {
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(ship.ToSave(jd, warpIdx)));
+            SaveCareer();
             PlayerPrefs.Save();
             ship.Phase = "game saved";
         }
@@ -423,6 +426,7 @@ namespace FogOfWar
             reference = Ship.Dominant(sys, ship.Pos, jd);
             SetPivot(Pivot.Ship, 0.16);
             camMode = CamMode.Chase;
+            LoadCareer();
             ship.Phase = "game loaded";
         }
     }
