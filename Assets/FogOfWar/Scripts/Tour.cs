@@ -47,7 +47,14 @@ namespace FogOfWar
                 // The torch ship only shows in the 1g trip's chase view.
                 if (app.Current is JourneyScene j) { j.ShowChase(); yield return Shot($"scene-{s + 1}-chase"); }
                 if (app.Current is WarpScene w) { w.ShowCloseUp(); yield return Shot($"scene-{s + 1}-ship"); }
-                if (app.Current is BlackHoleScene bh) { bh.SetSpin(0.998f); yield return Shot($"scene-{s + 1}-kerr"); bh.SetSpin(0); }
+                if (app.Current is BlackHoleScene bh)
+                {
+                    bh.SetSpin(0.998f); yield return Shot($"scene-{s + 1}-kerr"); bh.SetSpin(0);
+                    // sandbox: a Sun-like star on the default orbit, run until it breaks up, then let the debris spread
+                    bh.Throw(0); bh.AdvanceUntilBody(0, 500);
+                    log.WriteLine($"  sandbox: {bh.DebugSummary()}");
+                    yield return Shot($"scene-{s + 1}-sandbox");
+                }
             }
             log.WriteLine($"done, {errors} errors");
             log.Close();
