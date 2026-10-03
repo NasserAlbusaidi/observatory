@@ -88,6 +88,11 @@ namespace FogOfWar
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowuidump") >= 0) Dump(shell.HudLayer, 0);
                 if (size == sizes[0] && Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcapturetest") >= 0) yield return CaptureTest();
                 Controls.Tap(Controls.Action.ThrottleCut);
+                // cockpit view (chase → orbit → cockpit), then back to chase
+                Controls.Tap(Controls.Action.CameraMode); yield return null;
+                Controls.Tap(Controls.Action.CameraMode); yield return Wait(0.5f);
+                yield return Shot(app, shell, camRT, uiRT, tag, "06f-cockpit");
+                Controls.Tap(Controls.Action.CameraMode); yield return null;
                 var os = app.Current as OpenSystemScene;
                 os?.ShowConsoleTab(5);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
@@ -185,6 +190,9 @@ namespace FogOfWar
             yield return Wait(0.6f);
             yield return new WaitForEndOfFrame();
             app.Cam.Render(); // batch mode runs no render loop; the UI panel draws itself into its texture
+            // overlay cameras on top of the main one (the cockpit interior) render into the same target
+            foreach (var oc in Camera.allCameras)
+                if (oc != app.Cam && oc.depth > app.Cam.depth && oc.clearFlags == CameraClearFlags.Depth && oc.targetTexture == camRT) oc.Render();
             var cam = Read(camRT);
             var ui = Read(uiRT);
             var a = cam.GetPixels32(); var b = ui.GetPixels32();
