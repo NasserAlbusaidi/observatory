@@ -130,7 +130,7 @@ namespace FogOfWar
         void CodexPanel(PanelUI ui)
         {
             var cx = career.Codex;
-            int bodies = sys.Bodies.Count - 1;
+            int bodies = sys.Bodies.FindAll(x => x.Parent != null && !Career.IsDerelict(x)).Count;
             ui.Section($"Codex: {cx.Visited.Count} visited, {cx.Scanned.Count} scanned of {bodies}");
             var b = ship.Target;
             if (b != null && b.Parent != null && !Career.IsDerelict(b))
