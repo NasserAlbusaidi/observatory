@@ -109,7 +109,8 @@ namespace FogOfWar.Cockpit
             float sink = -0.012f * Mathf.Min(g, 6f);
             float amp = 0.0012f * throttle + 0.0025f * rcs;
             var shake = new Vector3(Mathf.PerlinNoise(shakeT * 23f, 0.3f) - 0.5f, Mathf.PerlinNoise(0.7f, shakeT * 19f) - 0.5f, Mathf.PerlinNoise(shakeT * 17f, 5.1f) - 0.5f) * 2f * amp;
-            eye.localPosition = new Vector3(0, 0, sink) + shake;
+            // the eye sits 5 cm low in the couch, which lifts the MFD row clear of the bottom edge on wide screens
+            eye.localPosition = new Vector3(0, -0.05f, sink) + shake;
             eye.localRotation = look;
 
             // high-g burns go to red lighting, as on a warship: it keeps night vision and marks "stay in your couch"
@@ -121,7 +122,7 @@ namespace FogOfWar.Cockpit
             }
             Shader.SetGlobalVectorArray("_CkLampPos", lampPos);
             Shader.SetGlobalVectorArray("_CkLampCol", lampCol);
-            Shader.SetGlobalVector("_CkLedCol", Color.Lerp(new Color(1.6f, 1.6f, 1.6f), new Color(1.2f, 0.5f, 0.5f), red));
+            Shader.SetGlobalVector("_CkLedCol", Color.Lerp(new Color(1.1f, 1.1f, 1.1f), new Color(0.9f, 0.4f, 0.4f), red));
             Shader.SetGlobalFloat("_CkExposure", 1f);
             Shader.SetGlobalFloat("_CkScreenGain", Mathf.Lerp(0.55f, 0.4f, red));
         }

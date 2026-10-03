@@ -161,7 +161,11 @@ namespace FogOfWar.Cockpit
                 b.Box(new Vector3(wx - s * 0.025f, 0.45f, -0.1f), new Vector3(0.02f, 0.02f, 1.30f), HullDark);
                 b.Box(new Vector3(wx - s * 0.12f, -0.15f, 0.55f), new Vector3(0.12f, 0.35f, 0.40f), Panel);             // side console
                 for (int k = 0; k < 6; k++)
-                    b.Box(new Vector3(wx - s * 0.241f, -0.05f - (k / 2) * 0.12f, 0.40f + (k % 2) * 0.22f), new Vector3(0.002f, 0.035f, 0.07f), k == 1 ? LedAmber : Bezel);
+                {
+                    var at = new Vector3(wx - s * 0.241f, -0.05f - (k / 2) * 0.12f, 0.40f + (k % 2) * 0.22f);
+                    b.Box(at, new Vector3(0.002f, 0.035f, 0.07f), Bezel);                                                   // small status panel
+                    b.Box(at + new Vector3(-s * 0.002f, 0.025f, -0.055f), new Vector3(0.001f, 0.004f, 0.004f), k == 1 ? LedRed : LedAmber); // its LED
+                }
                 b.Box(new Vector3(wx - s * 0.09f, 0.15f, -0.85f), new Vector3(0.09f, 0.55f, 0.32f), HullDark);          // locker
                 b.Box(new Vector3(wx - s * 0.181f, 0.15f, -0.85f), new Vector3(0.002f, 0.50f, 0.005f), Bezel);           // locker seam
                 // grab bar on stand-offs
