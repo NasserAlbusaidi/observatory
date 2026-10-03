@@ -75,6 +75,9 @@ namespace FogOfWar
             bodies.Add(b);
         }
 
+        // Root (and every body under it) is destroyed on Exit, but this scene object is reused on the next visit.
+        protected override void Teardown() => bodies.Clear();
+
         void Reset()
         {
             foreach (var b in bodies) Gfx.Destroy(b.t.gameObject);

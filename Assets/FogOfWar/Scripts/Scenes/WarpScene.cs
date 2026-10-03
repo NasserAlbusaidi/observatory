@@ -75,6 +75,7 @@ namespace FogOfWar
             shell = Gfx.Obj("Bubble", Root, shellMesh, OwnMat(Gfx.Unlit(Color.white, true))).transform;
 
             // near-field streaks that stream past to show motion relative to distant space
+            streakBase.Clear(); // this scene object is reused on every visit
             for (int i = 0; i < 900; i++) streakBase.Add(Random.insideUnitSphere * 60f);
             streakMesh = Own(Gfx.LineMesh("Streaks"));
             streakMat = OwnMat(Gfx.Unlit(Color.white, true));

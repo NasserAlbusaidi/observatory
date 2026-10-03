@@ -53,6 +53,7 @@ namespace FogOfWar
             Quality = PlayerPrefs.GetInt("fow-quality", 1);
             Activate(Mathf.Clamp(PlayerPrefs.GetInt("fow-scene", 0), 0, scenes.Length - 1));
             Tour.StartIfRequested(this);
+            QA.StartIfRequested(this);
         }
 
         public void Activate(int i)

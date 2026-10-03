@@ -29,6 +29,7 @@ namespace FogOfWar
         {
             Shader.SetGlobalVector("_FOWSunDir", new Vector3(1, 0.35f, 0.25f).normalized);
             mesh = Own(Gfx.IcoSphere(7));
+            samples.Clear(); // this scene object is reused on every visit
             baseV = mesh.vertices;
             verts = new Vector3[baseV.Length];
             H = new float[baseV.Length];
