@@ -1,0 +1,125 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace FogOfWar
+{
+    // Rebindable keyboard actions for the open world. Each action has a primary and a secondary key; bindings persist in
+    // PlayerPrefs. Unattended QA can hold or press actions virtually (Hold/Tap), which also works while real input is
+    // locked.
+    public static class Controls
+    {
+        public enum Action
+        {
+            PitchDown, PitchUp, YawLeft, YawRight, RollLeft, RollRight,
+            ThrottleUp, ThrottleDown, ThrottleFull, ThrottleCut,
+            RcsForward, RcsBack, RcsUp, RcsDown, RcsLeft, RcsRight,
+            FlightAssist, Flip, Engage, NextTarget, WarpUp, WarpDown, Map, CameraMode, Help, QuickSave,
+        }
+
+        public static readonly Dictionary<Action, string> Label = new Dictionary<Action, string>
+        {
+            [Action.PitchDown] = "Pitch nose down", [Action.PitchUp] = "Pitch nose up", [Action.YawLeft] = "Yaw left", [Action.YawRight] = "Yaw right",
+            [Action.RollLeft] = "Roll left", [Action.RollRight] = "Roll right",
+            [Action.ThrottleUp] = "Throttle up", [Action.ThrottleDown] = "Throttle down", [Action.ThrottleFull] = "Throttle full", [Action.ThrottleCut] = "Throttle cut",
+            [Action.RcsForward] = "RCS forward", [Action.RcsBack] = "RCS back", [Action.RcsUp] = "RCS up", [Action.RcsDown] = "RCS down",
+            [Action.RcsLeft] = "RCS left", [Action.RcsRight] = "RCS right",
+            [Action.FlightAssist] = "Flight assist on/off", [Action.Flip] = "Flip (point retrograde)", [Action.Engage] = "Engage / abort nav plan",
+            [Action.NextTarget] = "Next target", [Action.WarpUp] = "Time compression up", [Action.WarpDown] = "Time compression down",
+            [Action.Map] = "System map", [Action.CameraMode] = "Camera: chase / orbit / cockpit", [Action.Help] = "Show controls", [Action.QuickSave] = "Quick save",
+        };
+
+        static readonly Dictionary<Action, (KeyCode, KeyCode)> Defaults = new Dictionary<Action, (KeyCode, KeyCode)>
+        {
+            [Action.PitchDown] = (KeyCode.W, KeyCode.None), [Action.PitchUp] = (KeyCode.S, KeyCode.None),
+            [Action.YawLeft] = (KeyCode.A, KeyCode.None), [Action.YawRight] = (KeyCode.D, KeyCode.None),
+            [Action.RollLeft] = (KeyCode.Q, KeyCode.None), [Action.RollRight] = (KeyCode.E, KeyCode.None),
+            [Action.ThrottleUp] = (KeyCode.LeftShift, KeyCode.KeypadPlus), [Action.ThrottleDown] = (KeyCode.LeftControl, KeyCode.KeypadMinus),
+            [Action.ThrottleFull] = (KeyCode.Z, KeyCode.None), [Action.ThrottleCut] = (KeyCode.X, KeyCode.None),
+            [Action.RcsForward] = (KeyCode.H, KeyCode.None), [Action.RcsBack] = (KeyCode.N, KeyCode.None),
+            [Action.RcsUp] = (KeyCode.I, KeyCode.None), [Action.RcsDown] = (KeyCode.K, KeyCode.None),
+            [Action.RcsLeft] = (KeyCode.J, KeyCode.None), [Action.RcsRight] = (KeyCode.L, KeyCode.None),
+            [Action.FlightAssist] = (KeyCode.V, KeyCode.None), [Action.Flip] = (KeyCode.F, KeyCode.None),
+            [Action.Engage] = (KeyCode.P, KeyCode.None), [Action.NextTarget] = (KeyCode.Tab, KeyCode.None),
+            [Action.WarpUp] = (KeyCode.Period, KeyCode.RightBracket), [Action.WarpDown] = (KeyCode.Comma, KeyCode.LeftBracket),
+            [Action.Map] = (KeyCode.M, KeyCode.None), [Action.CameraMode] = (KeyCode.C, KeyCode.None),
+            [Action.Help] = (KeyCode.F1, KeyCode.None), [Action.QuickSave] = (KeyCode.F5, KeyCode.None),
+        };
+
+        static readonly Dictionary<Action, KeyCode[]> bind = new Dictionary<Action, KeyCode[]>();
+        static readonly HashSet<Action> virtualHeld = new HashSet<Action>(), virtualTap = new HashSet<Action>();
+        public static bool Locked; // real input ignored (unattended QA/tours)
+
+        static Controls() => Load();
+
+        public static IEnumerable<Action> All => (Action[])Enum.GetValues(typeof(Action));
+        public static KeyCode Get(Action a, int slot) => bind[a][slot];
+
+        public static void Set(Action a, int slot, KeyCode k)
+        {
+            // a key drives one action only: clear it elsewhere
+            if (k != KeyCode.None)
+                foreach (var kv in bind) for (int i = 0; i < 2; i++) if (kv.Value[i] == k) kv.Value[i] = KeyCode.None;
+            bind[a][slot] = k;
+            Save();
+        }
+
+        public static void ResetDefaults() { foreach (var kv in Defaults) bind[kv.Key] = new[] { kv.Value.Item1, kv.Value.Item2 }; Save(); }
+
+        static void Load()
+        {
+            foreach (var kv in Defaults)
+            {
+                var keys = new[] { kv.Value.Item1, kv.Value.Item2 };
+                for (int i = 0; i < 2; i++)
+                {
+                    string s = PlayerPrefs.GetString($"fow-key-{kv.Key}-{i}", null);
+                    if (!string.IsNullOrEmpty(s) && Enum.TryParse(s, out KeyCode k)) keys[i] = k;
+                }
+                bind[kv.Key] = keys;
+            }
+        }
+
+        static void Save()
+        {
+            foreach (var kv in bind) for (int i = 0; i < 2; i++) PlayerPrefs.SetString($"fow-key-{kv.Key}-{i}", kv.Value[i].ToString());
+            PlayerPrefs.Save();
+        }
+
+        public static bool Held(Action a)
+        {
+            if (virtualHeld.Contains(a)) return true;
+            if (Locked) return false;
+            var k = bind[a];
+            return (k[0] != KeyCode.None && Input.GetKey(k[0])) || (k[1] != KeyCode.None && Input.GetKey(k[1]));
+        }
+
+        public static bool Pressed(Action a)
+        {
+            if (virtualTap.Remove(a)) return true;
+            if (Locked) return false;
+            var k = bind[a];
+            return (k[0] != KeyCode.None && Input.GetKeyDown(k[0])) || (k[1] != KeyCode.None && Input.GetKeyDown(k[1]));
+        }
+
+        public static float Axis(Action neg, Action pos) => (Held(pos) ? 1 : 0) - (Held(neg) ? 1 : 0);
+
+        // QA: hold an action until released, or tap it once
+        public static void Hold(Action a, bool on) { if (on) virtualHeld.Add(a); else virtualHeld.Remove(a); }
+        public static void Tap(Action a) => virtualTap.Add(a);
+        public static void ReleaseAll() { virtualHeld.Clear(); virtualTap.Clear(); }
+
+        public static string Keys(Action a)
+        {
+            var k = bind[a];
+            string Name(KeyCode c) => c switch
+            {
+                KeyCode.None => "", KeyCode.LeftShift => "L-Shift", KeyCode.LeftControl => "L-Ctrl", KeyCode.Period => ".", KeyCode.Comma => ",",
+                KeyCode.LeftBracket => "[", KeyCode.RightBracket => "]", KeyCode.KeypadPlus => "Num +", KeyCode.KeypadMinus => "Num -",
+                _ => c.ToString(),
+            };
+            string a0 = Name(k[0]), a1 = Name(k[1]);
+            return a1 == "" ? a0 : a0 == "" ? a1 : a0 + " / " + a1;
+        }
+    }
+}

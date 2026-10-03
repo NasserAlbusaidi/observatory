@@ -11,7 +11,7 @@ namespace FogOfWar
     // (floating origin) and each object is placed at its offset from the camera. Past 100,000 km that offset is
     // compressed logarithmically and the object scaled by the same factor, so angular sizes stay exact and depth order
     // is kept while everything fits inside a float depth range.
-    public class OpenSystemScene : SimScene
+    public partial class OpenSystemScene : SimScene
     {
         public override string Title => "Open System";
         public override string Eyebrow => "The Expanse, true scale";
@@ -19,7 +19,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Every planet and moon is where it really is today, on its real orbit. Your ship has a fusion drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b>, and it flies a brachistochrone, burning toward the target, flipping at the midpoint and braking the rest of the way, then parks in orbit.\n\n" +
             "Crank time compression to cross the system. At 1 g, Mars is a few days away; Neptune is a few weeks.";
-        public override string Note => "Positions: JPL Horizons fits, 2000–2100 (TDB). Drive efficiency and high-g endurance are fictional; trajectories and Δv are real. Coasting follows two-body conics around the dominant body (patched conics). Keys: Space drive on/off · F flip · P plot & burn · T next target · [ ] time compression · M system map. Drag to orbit the camera, scroll to zoom from 20 m to the whole system.";
+        public override string Note => "Positions: JPL Horizons fits, 2000–2100 (TDB). Drive efficiency and high-g endurance are fictional; trajectories and Δv are real. Coasting follows two-body conics around the dominant body (patched conics). F1 lists the controls; Esc → Controls rebinds them.";
 
         const double LinearLimit = 1e5;     // km rendered 1:1 around the camera
         static readonly double[] Warps = { 1, 10, 100, 1e3, 1e4, 1e5, 1e6 };
@@ -32,6 +32,7 @@ namespace FogOfWar
         double jd;
         int warpIdx;
         bool warpLimited;
+        float limitedAt = -10;
         Body reference;
 
         class Vis { public Body b; public Transform t; public Material[] mats; public bool model; }
@@ -42,11 +43,13 @@ namespace FogOfWar
         Mesh orbitMesh;
         readonly List<Vector3> pts = new List<Vector3>();
         readonly List<Color> cols = new List<Color>();
-        Quaternion shipRot = Quaternion.identity;
         float shipLen = 1;
 
-        // camera: orbit around a pivot, distance in km
+        // camera: orbit around a pivot, distance in km; or chase / cockpit views that follow the ship's attitude
         enum Pivot { Ship, Target, Sun }
+        enum CamMode { Chase, Orbit, Cockpit }
+        CamMode camMode = CamMode.Chase;
+        float chaseYaw, chasePitch = 14, lookYaw, lookPitch;
         Pivot pivot;
         double camDist = 0.15;
         float yaw = 30, pitch = 12;
@@ -302,7 +305,7 @@ namespace FogOfWar
             {
                 Pos = ep + radial * r,
                 Vel = ev + tangent * Math.Sqrt(e.GM / r),
-                Heading = tangent,
+                Att = Quaternion.LookRotation(Frame.U(tangent), Frame.U(e.Pole)),
                 MaxG = 1,
                 Target = sys["Mars"],
             };
@@ -344,6 +347,7 @@ namespace FogOfWar
 
         void TickInner(float dt)
         {
+            ReadInput(dt);
             double simDt = dt * Warps[warpIdx];
             warpLimited = false;
             // only bodies the ship could reach this frame get per-substep collision checks
@@ -352,10 +356,12 @@ namespace FogOfWar
             foreach (var b in sys.Bodies)
                 if (b.Parent != null && (sys.Pos(b, jd) - ship.Pos).Mag < reach0 + b.Radius * 2) ship.Near.Add(b);
             int steps = 0;
+            // QA-003: a frame budget, so heavy integration lowers the warp instead of the frame rate
+            var budget = System.Diagnostics.Stopwatch.StartNew();
             while (simDt > 1e-9)
             {
-                if (++steps > MaxSubsteps) { warpLimited = true; break; }
-                if (ship.Landed != null && !ship.DriveLit && !ship.Autopilot)
+                if (++steps > MaxSubsteps || budget.Elapsed.TotalMilliseconds > 10) { warpLimited = true; break; }
+                if (ship.Landed != null && ship.ThrottleCmd == 0 && !ship.PlanActive && !ship.ManualInput)
                 {
                     ship.Step(sys, jd, simDt, reference); // riding the surface: no dynamics to resolve
                     jd += simDt / 86400; simDt = 0;
@@ -374,13 +380,14 @@ namespace FogOfWar
                 jd += h / 86400;
                 simDt -= h;
             }
-            if (warpLimited && warpIdx > 0) warpIdx--;
+            if (warpLimited) { limitedAt = Time.realtimeSinceStartup; if (warpIdx > 0) warpIdx--; }
             reference = Ship.Dominant(sys, ship.Pos, jd);
         }
 
         // Drive off (or the autopilot parked in orbit): ride a two-body conic around the dominant body. Exact at any
         // warp; other bodies' pulls are ignored until the next burn (patched conics).
-        bool Coasting() => ship.Landed == null && (ship.Autopilot ? ship.Phase == "in orbit" && ship.Throttle == 0 : !ship.DriveLit);
+        bool Coasting() => ship.Landed == null && ship.RcsInput.sqrMagnitude == 0 &&
+            (ship.PlanActive ? ship.Throttle == 0 && (ship.Phase == "in orbit" || ship.Phase == "velocity matched") : ship.ThrottleCmd == 0);
 
         double Coast(double maxDt)
         {
@@ -395,10 +402,12 @@ namespace FogOfWar
             double jd1 = jd + chunk / 86400;
             ship.Pos = sys.Pos(dom, jd1) + r1;
             ship.Vel = sys.Vel(dom, jd1) + v1;
-            ship.Phase = ship.Autopilot ? "in orbit" : "coasting";
+            ship.Throttle = 0; // nothing fires on a coast arc
+            if (!ship.PlanActive) ship.Phase = "coasting";
+            ship.Turn(sys, jd1, chunk, dom);
             ship.CheckTouchdown(sys, jd1);
-            // the autopilot re-checks its orbit after each arc and burns again if it has drifted
-            if (ship.Autopilot) ship.Step(sys, jd1, 0.001, dom);
+            // the autopilot re-checks its plan after each arc and burns again if it has drifted
+            if (ship.PlanActive) ship.Step(sys, jd1, 0.001, dom);
             return chunk;
         }
 
@@ -413,8 +422,10 @@ namespace FogOfWar
                 best = Math.Min(best, 0.01 * Math.Sqrt(r * r * r / b.GM));
             }
             double h = best;
-            if (ship.Throttle > 0 || ship.Autopilot) h = Math.Min(h, 30);
-            if (ship.Autopilot && ship.Target != null)
+            if (ship.ThrottleCmd > 0 || ship.PlanActive || ship.RcsInput.sqrMagnitude > 0) h = Math.Min(h, 30);
+            // rotating under pilot control at low warp: small steps so the rigid-body dynamics stay smooth
+            if (ship.RotInput.sqrMagnitude > 0 || ship.AngVel.sqrMagnitude > 0) h = Math.Min(h, 0.05);
+            if (ship.PlanActive)
             {
                 double d = (sys.Pos(ship.Target, jd) - ship.Pos).Mag;
                 double v = (ship.Vel - sys.Vel(ship.Target, jd)).Mag + 1e-6;
@@ -435,9 +446,9 @@ namespace FogOfWar
             }
         }
 
-        Vector3 OffsetDir()
+        static Vector3 OffsetDir(float yawDeg, float pitchDeg)
         {
-            float y = yaw * Mathf.Deg2Rad, p = pitch * Mathf.Deg2Rad;
+            float y = yawDeg * Mathf.Deg2Rad, p = pitchDeg * Mathf.Deg2Rad;
             return new Vector3(Mathf.Sin(y) * Mathf.Cos(p), Mathf.Sin(p), -Mathf.Cos(y) * Mathf.Cos(p));
         }
 
@@ -461,11 +472,27 @@ namespace FogOfWar
         void LateInner(float dt)
         {
             camDist = Math.Max(camDist, MinCamDist()); // targets change size under a fixed camera distance
-            var off = OffsetDir();
-            var pw = PivotW();
-            camW = pw + Frame.FromU(off) * camDist;
+            var mode = pivot == Pivot.Ship ? camMode : CamMode.Orbit;
             Cam.transform.position = Vector3.zero;
-            Cam.transform.rotation = Quaternion.LookRotation(-off, Vector3.up);
+            if (mode == CamMode.Chase)
+            {
+                // behind and above the ship, turning with it
+                var off = ship.Att * OffsetDir(chaseYaw, chasePitch);
+                camW = ship.Pos + Frame.FromU(off) * camDist;
+                Cam.transform.rotation = Quaternion.LookRotation(-off, ship.Att * Vector3.up);
+            }
+            else if (mode == CamMode.Cockpit)
+            {
+                camW = ship.Pos + ship.Heading * 0.02;
+                Cam.transform.rotation = ship.Att * Quaternion.Euler(lookPitch, lookYaw, 0);
+            }
+            else
+            {
+                var off = OffsetDir(yaw, pitch);
+                camW = PivotW() + Frame.FromU(off) * camDist;
+                Cam.transform.rotation = Quaternion.LookRotation(-off, Vector3.up);
+            }
+            shipModel.gameObject.SetActive(mode != CamMode.Cockpit);
 
             var sunW = sys.Pos(sys.Sun, jd);
             foreach (var v in vis)
@@ -503,9 +530,7 @@ namespace FogOfWar
             // ship
             var shipPos = Map(ship.Pos, out double ks);
             shipT.localPosition = shipPos;
-            var want = Quaternion.LookRotation(Frame.U(ship.Heading), Mathf.Abs(Vector3.Dot(Frame.U(ship.Heading), Vector3.up)) > 0.98f ? Vector3.right : Vector3.up);
-            shipRot = Quaternion.RotateTowards(shipRot, want, dt * 120f * Mathf.Max(1, (float)Warps[warpIdx] / 10f));
-            shipT.localRotation = shipRot;
+            shipT.localRotation = ship.Att;
             float realLen = 0.052f; // km
             shipT.localScale = Vector3.one * (float)(realLen * ks / shipLen);
             Shader.SetGlobalVector("_FOWSunDir", Frame.U((sunW - ship.Pos).Norm));
@@ -559,242 +584,5 @@ namespace FogOfWar
             orbitMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 1e7f);
         }
 
-        // ---------------------------------------------------------------- input and UI
-
-        public override bool HandleDrag(Vector2 delta, int button)
-        {
-            yaw -= delta.x * 0.25f;
-            pitch = Mathf.Clamp(pitch + delta.y * 0.25f, -89, 89);
-            return true;
-        }
-
-        public override bool HandleZoom(float wheel)
-        {
-            camDist = Math.Min(Math.Max(camDist * Math.Exp(wheel * 0.12), MinCamDist()), 2e10);
-            return true;
-        }
-
-        double MinCamDist()
-        {
-            if (pivot == Pivot.Ship) return 0.03;
-            if (pivot == Pivot.Target && ship.Target != null) return ship.Target.Radius * 1.2;
-            return sys.Sun.Radius * 1.5;
-        }
-
-        void SetPivot(Pivot p, double dist)
-        {
-            pivot = p;
-            camDist = Math.Max(dist, MinCamDist());
-        }
-
-        public override void OnGUIOverlay()
-        {
-            if (Prof) swGui.Start();
-            try { OverlayInner(); } finally { if (Prof) swGui.Stop(); }
-        }
-
-        void OverlayInner()
-        {
-            var e = Event.current;
-            if (e.type == EventType.KeyDown && !App.InputLocked)
-            {
-                switch (e.keyCode)
-                {
-                    case KeyCode.Space: ship.Autopilot = false; ship.DriveLit = !ship.DriveLit; e.Use(); break;
-                    case KeyCode.F: ship.Autopilot = false; ship.Attitude = Attitude.Hold; ship.Heading = -ship.Heading; e.Use(); break;
-                    case KeyCode.P: TogglePlot(); e.Use(); break;
-                    case KeyCode.T: NextTarget(); e.Use(); break;
-                    case KeyCode.LeftBracket: warpIdx = Math.Max(0, warpIdx - 1); e.Use(); break;
-                    case KeyCode.RightBracket: warpIdx = Math.Min(Warps.Length - 1, warpIdx + 1); e.Use(); break;
-                    case KeyCode.M: ToggleMap(); e.Use(); break;
-                }
-            }
-            DrawLabels();
-        }
-
-        void TogglePlot()
-        {
-            if (ship.Autopilot) { ship.Autopilot = false; ship.Throttle = 0; return; }
-            if (ship.Target == null) return;
-            ship.Autopilot = true; ship.DriveLit = false; ship.Landed = null;
-        }
-
-        void NextTarget()
-        {
-            SetTarget(targets[(targetIdx + 1) % targets.Count]);
-        }
-
-        void SetTarget(Body b)
-        {
-            ship.Target = b;
-            targetIdx = targets.IndexOf(b);
-            if (pivot == Pivot.Target) camDist = b.Radius * 4;
-        }
-
-        void ToggleMap()
-        {
-            if (pivot == Pivot.Sun) SetPivot(Pivot.Ship, 0.16);
-            else { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
-        }
-
-        GUIStyle labelStyle, labelOn;
-        readonly List<(Vector2 c, float r, float d)> occluders = new List<(Vector2, float, float)>();
-
-        void DrawLabels()
-        {
-            if (labelStyle == null)
-            {
-                labelStyle = new GUIStyle { fontSize = 12, normal = { textColor = new Color(0.75f, 0.8f, 0.95f, 0.85f) } };
-                labelOn = new GUIStyle(labelStyle) { fontStyle = FontStyle.Bold, normal = { textColor = PanelUI.Accent } };
-            }
-            float ui = Mathf.Clamp(Screen.height / 1000f, 0.85f, 2.2f);
-            float pxPerRad = Screen.height / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
-            var placed = new List<Vector2>();
-            // discs of bodies big enough on screen to hide labels of things behind them
-            occluders.Clear();
-            foreach (var v in vis)
-            {
-                var p = v.t.localPosition; float d = p.magnitude;
-                var sp = Cam.WorldToScreenPoint(p);
-                if (sp.z <= 0 || d < 1e-6f) continue;
-                float rpx = v.t.localScale.y / d * pxPerRad / ui;
-                if (rpx > 4) occluders.Add((new Vector2(sp.x / ui, (Screen.height - sp.y) / ui), rpx, d));
-            }
-
-            // ship first so it wins overlaps
-            Label("You", shipT.localPosition, 0.05, null, ui, pxPerRad, placed, true);
-            foreach (var v in vis) Label(v.b.Name, v.t.localPosition, v.t.localScale.y, v.b, ui, pxPerRad, placed, false);
-        }
-
-        void Label(string name, Vector3 renderPos, double renderRadius, Body b, float ui, float pxPerRad, List<Vector2> placed, bool force)
-        {
-            float dist = renderPos.magnitude;
-            if (dist < 1e-6f) return;
-            var sp = Cam.WorldToScreenPoint(renderPos);
-            if (sp.z <= 0) return;
-            float rpx = (float)renderRadius / dist * pxPerRad;
-            bool tgt = b != null && b == ship.Target;
-            if (rpx > 40 && !tgt) return; // big enough to recognise
-            // hundreds of small moons: name them only when the camera is close to them
-            if (b != null && !tgt && b.Parent != null && b.Parent != sys.Sun && b.Radius < 100 && dist > 2e4 * renderRadius) return;
-            var g = new Vector2(sp.x / ui, (Screen.height - sp.y) / ui);
-            foreach (var (c, cr, cd) in occluders)
-                if (cd < dist * 0.999f && (c - g).magnitude < cr) return;
-            if (!force && !tgt)
-                foreach (var q in placed) if ((q - g).sqrMagnitude < 14 * 14) return;
-            placed.Add(g);
-            var style = tgt ? labelOn : labelStyle;
-            GUI.color = tgt ? PanelUI.Accent : new Color(0.75f, 0.8f, 0.95f, 0.9f);
-            GUI.DrawTexture(new Rect(g.x - 2, g.y - 2, 4, 4), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            var r = new Rect(g.x + 6, g.y - 8, 140, 16);
-            if (b != null && GUI.Button(r, name, style)) SetTarget(b);
-            else if (b == null) GUI.Label(r, name, style);
-        }
-
-        public override void Readouts(List<Readout> list)
-        {
-            var date = Frame.UtcFromTdb(jd);
-            list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
-            list.Add(new Readout("Time compression", WarpNames[warpIdx] + (warpLimited ? " (limited)" : ""), warpLimited ? Tone.Bad : Tone.Normal));
-            var refPos = sys.Pos(reference, jd);
-            double alt = (ship.Pos - refPos).Mag - reference.Radius;
-            list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
-            list.Add(new Readout("Speed vs " + reference.Name, Fmt.Num((ship.Vel - sys.Vel(reference, jd)).Mag, 3) + " km/s"));
-            list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
-            list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
-            list.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
-            // jet power P = ½·m·a·vₑ for a 500 t ship and a D–He³-class exhaust; no known physics sheds that heat
-            if (ship.Throttle > 0) list.Add(new Readout("Jet power (fictional efficiency)", Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW", Tone.Bad));
-            if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "outside 2000–2100: approximate", Tone.Bad));
-            if (ship.Target != null)
-            {
-                var tp = sys.Pos(ship.Target, jd);
-                var r = tp - ship.Pos;
-                var vr = ship.Vel - sys.Vel(ship.Target, jd);
-                double closing = D3.Dot(vr, r.Norm);
-                list.Add(new Readout("Target", ship.Target.Name + (ship.Target.SizeEstimated ? " (size unknown, shown 2 km)" : ""), Tone.Hot));
-                if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
-                list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
-                list.Add(new Readout("Closing speed", Fmt.Num(closing, 3) + " km/s", closing > 0 ? Tone.Cold : Tone.Normal));
-                list.Add(new Readout("Flip-and-burn at " + Fmt.Num(ship.MaxG, 2) + " g", Dur(ship.EtaSeconds(sys, jd))));
-            }
-            double rAu = ship.Pos.Mag / Frame.AU;
-            if (rAu > 1.7 && rAu < 5.6 && beltView.NearestIndex >= 0)
-                list.Add(new Readout("Nearest belt rock (1 % sample)", Km(beltView.NearestKm) + ", " + Fmt.Num(belt.RadiusKm[beltView.NearestIndex] * 2, 1) + " km wide"));
-            if (faintRings) list.Add(new Readout("Faint rings", "brightened ×1000 (not real)", Tone.Bad));
-            list.Add(new Readout("Autopilot", ship.Autopilot ? ship.Phase : ship.Landed != null ? ship.Phase : "off", ship.Autopilot ? Tone.Hot : Tone.Normal));
-        }
-
-        static string Km(double km) => km > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : km >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
-
-        static string Dur(double s)
-        {
-            if (s < 120) return Fmt.Num(s, 0) + " s";
-            if (s < 7200) return Fmt.Num(s / 60, 1) + " min";
-            if (s < 172800) return Fmt.Num(s / 3600, 1) + " h";
-            return Fmt.Num(s / 86400, 1) + " days";
-        }
-
-        public override void Controls(PanelUI ui)
-        {
-            int b = ui.Buttons(ship.Autopilot ? "Cut drive" : "Plot & burn", ship.DriveLit ? "Drive off" : "Drive on", "Flip");
-            if (b == 0) TogglePlot();
-            if (b == 1) { ship.Autopilot = false; ship.DriveLit = !ship.DriveLit; }
-            if (b == 2) { ship.Autopilot = false; ship.Attitude = Attitude.Hold; ship.Heading = -ship.Heading; }
-
-            GUILayout.Label("Drive", ui.label);
-            var gl = new string[Gs.Length];
-            for (int i = 0; i < Gs.Length; i++) gl[i] = (Math.Abs(ship.MaxG - Gs[i]) < 1e-6 ? "● " : "") + Fmt.Num(Gs[i], 1) + " g" + (Gs[i] >= 10 ? " (juice: fictional)" : "");
-            int gi = ui.Buttons(gl);
-            if (gi >= 0) ship.MaxG = Gs[gi];
-
-            GUILayout.Label("Point the ship", ui.label);
-            int ai = ui.Buttons("Prograde", "Retrograde", "At target", "Away");
-            if (ai >= 0) { ship.Autopilot = false; ship.Attitude = ai == 0 ? Attitude.Prograde : ai == 1 ? Attitude.Retrograde : ai == 2 ? Attitude.Target : Attitude.AntiTarget; }
-
-            GUILayout.Label("Time compression", ui.label);
-            var wl = new string[Warps.Length];
-            for (int i = 0; i < Warps.Length; i++) wl[i] = (i == warpIdx ? "● " : "") + WarpNames[i];
-            int wi = ui.Buttons(wl);
-            if (wi >= 0) warpIdx = wi;
-
-            beltView.Visible = ui.Toggle("Show the asteroid belt (a 1 % sample: real rocks are ~1 million km apart)", beltView.Visible);
-            showHist = ui.Toggle("Belt semi-major axis histogram", showHist);
-            if (showHist)
-            {
-                ui.Image(beltHist, 90);
-                GUILayout.Label("1.6 → 5.6 AU. Kirkwood gaps (Jupiter resonances 4:1, 3:1, 5:2, 7:3, 2:1) at 2.06, 2.50, 2.82, 2.96, 3.28 AU; Hildas at 3.97 (3:2); Trojans at 5.2 (1:1). The gaps are in orbit size, so they don't show as empty rings in space.", ui.note);
-            }
-            faintRings = ui.Toggle("Brighten faint rings ×1000 (Jupiter, Uranus, Neptune)", faintRings);
-            GUILayout.Label("Camera", ui.label);
-            int ci = ui.Buttons("Ship", "Target", "System map");
-            if (ci == 0) SetPivot(Pivot.Ship, 0.16);
-            if (ci == 1 && ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4);
-            if (ci == 2) { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
-
-            // target picker: choose a planet, then its moons (largest first; tiny ones are clickable by label)
-            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid);
-            var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
-            int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
-            if (si >= 0) SetTarget(planets[si]);
-            if (sel != null)
-            {
-                var moons = sys.Bodies.FindAll(x => x.Parent == sel && x.Radius >= 10);
-                moons.Sort((x, y) => y.Radius.CompareTo(x.Radius));
-                int small = sys.Bodies.FindAll(x => x.Parent == sel).Count - moons.Count;
-                if (moons.Count > 0)
-                {
-                    var mnames = moons.ConvertAll(m => (m == ship.Target ? "● " : "") + m.Name).ToArray();
-                    int mi = ui.Buttons(mnames);
-                    if (mi >= 0) SetTarget(moons[mi]);
-                }
-                if (small > 0) GUILayout.Label(small + " smaller moons: click their labels in view", ui.label);
-            }
-            var rocks = sys.Bodies.FindAll(x => x.Asteroid);
-            GUILayout.Label("Asteroids", ui.label);
-            int ri = ui.Buttons(rocks.ConvertAll(x => (x == ship.Target ? "● " : "") + x.Name).ToArray());
-            if (ri >= 0) SetTarget(rocks[ri]);
-        }
     }
 }

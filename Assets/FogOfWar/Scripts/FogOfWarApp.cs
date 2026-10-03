@@ -3,7 +3,8 @@ using UnityEngine;
 
 namespace FogOfWar
 {
-    // Owns the camera, the scene list and the IMGUI shell (scene rail on the left, instrument panel on the right).
+    // Owns the camera, the scenes and the IMGUI shell. The game boots into the open world (Open System) behind a main
+    // menu; the eight original physics scenes live in an "Observatory" submenu with their own scene rail.
     public class FogOfWarApp : MonoBehaviour
     {
         public Camera Cam { get; private set; }
@@ -15,17 +16,29 @@ namespace FogOfWar
         SimScene current;
         int currentIndex = -1;
         public int SceneCount => scenes.Length;
+        public int GameIndex => scenes.Length - 1;
         public SimScene Current => current;
         public bool InputLocked;
+        public float UiScale => uiScale;
+        public bool UnderPanel(Vector2 guiPoint) => panelRect.Contains(guiPoint) || railRect.Contains(guiPoint) || menuRect.Contains(guiPoint);
+
+        enum Screen { None, Main, Observatory, Controls }
+        Screen menu = Screen.Main;
+        bool gameStarted;
+        public bool MenuOpen => menu != Screen.None;
+        public bool InGame => currentIndex == GameIndex;
+        public bool HelpOpen;
+
         readonly PanelUI ui = new PanelUI();
         readonly List<Readout> readouts = new List<Readout>();
         float readoutTimer;
         bool showUI = true;
-        Vector2 panelScroll, railScroll;
-        Rect railRect, panelRect;
+        Vector2 panelScroll, railScroll, menuScroll, helpScroll;
+        Rect railRect, panelRect, menuRect;
         bool dragging; int dragButton;
         float uiScale = 1;
         float simTime;
+        Controls.Action? rebinding; int rebindSlot;
 
         void Awake()
         {
@@ -51,13 +64,18 @@ namespace FogOfWar
                 new NegativeMassScene(), new TidesScene(), new MarsScene(), new MeteorScene(), new OpenSystemScene(),
             };
             Quality = PlayerPrefs.GetInt("fow-quality", 1);
-            Activate(Mathf.Clamp(PlayerPrefs.GetInt("fow-scene", 0), 0, scenes.Length - 1));
+            // the open world runs behind the main menu
+            Activate(GameIndex);
+            menu = Screen.Main;
             Tour.StartIfRequested(this);
             QA.StartIfRequested(this);
         }
 
+        // Switch scene (closes any menu). The open world is the game; the rest are Observatory scenes.
         public void Activate(int i)
         {
+            menu = Screen.None;
+            if (i == GameIndex) gameStarted = true;
             if (i == currentIndex) return;
             current?.Exit();
             currentIndex = i;
@@ -67,15 +85,28 @@ namespace FogOfWar
             current.Enter(this);
             readoutTimer = 0;
             panelScroll = Vector2.zero;
-            PlayerPrefs.SetInt("fow-scene", i);
         }
+
+        // Rebuild a scene from scratch (New game).
+        public void Restart(int i)
+        {
+            current?.Exit();
+            currentIndex = -1;
+            Activate(i);
+        }
+
+        public void OpenMenu() => menu = Screen.Main;
+        // QA: 0 none, 1 main, 2 observatory, 3 controls
+        public void ShowMenu(int which) => menu = (Screen)which;
 
         void Update()
         {
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             simTime += dt;
             Shader.SetGlobalFloat("_SimTime", simTime);
-            current?.Tick(dt);
+            if (Controls.Pressed(Controls.Action.Help) && rebinding == null) HelpOpen = !HelpOpen;
+            // the game pauses under its menu; Observatory scenes keep animating behind theirs
+            if (!(MenuOpen && InGame)) current?.Tick(dt);
         }
 
         void LateUpdate()
@@ -97,27 +128,38 @@ namespace FogOfWar
         void OnGUI()
         {
             ui.Build();
-            uiScale = Mathf.Clamp(Screen.height / 1000f, 0.85f, 2.2f);
+            // scale to whichever of width or height is tighter, so portrait and ultrawide screens both fit
+            uiScale = Mathf.Clamp(Mathf.Min(UnityEngine.Screen.height / 1000f, UnityEngine.Screen.width / 1500f), 0.7f, 2.2f);
             GUI.matrix = Matrix4x4.Scale(new Vector3(uiScale, uiScale, 1));
-            float W = Screen.width / uiScale, H = Screen.height / uiScale;
+            float W = UnityEngine.Screen.width / uiScale, H = UnityEngine.Screen.height / uiScale;
             var e = Event.current;
             // An unattended tour must not be steered by stray clicks or keys.
             if (InputLocked && (e.isMouse || e.isKey || e.type == EventType.ScrollWheel)) e.Use();
 
+            if (rebinding != null && e.type == EventType.KeyDown && e.keyCode != KeyCode.None)
+            {
+                if (e.keyCode != KeyCode.Escape) Controls.Set(rebinding.Value, rebindSlot, e.keyCode == KeyCode.Delete || e.keyCode == KeyCode.Backspace ? KeyCode.None : e.keyCode);
+                rebinding = null; e.Use();
+            }
             if (e.type == EventType.KeyDown) HandleKey(e);
 
-            if (showUI)
+            menuRect = Rect.zero;
+            if (MenuOpen) { railRect = panelRect = Rect.zero; DrawMenu(W, H); }
+            else if (showUI)
             {
-                DrawRail(W, H);
+                if (!InGame) DrawRail(W, H); else railRect = Rect.zero;
                 DrawPanel(W, H);
-                GUI.Label(new Rect(W / 2 - 300, H - 30, 600, 20), "drag to orbit · scroll to zoom · 1–9 switch scene · H hide panels · F11 fullscreen · Esc quit", ui.hint);
+                GUI.Label(new Rect(W / 2 - 360, H - 30, 720, 20), InGame
+                    ? "F1 controls · drag to look · scroll to zoom · Esc menu · F2 hide panels"
+                    : "drag to orbit · scroll to zoom · 1–8 switch scene · H hide panels · Esc menu", ui.hint);
             }
             else { railRect = panelRect = Rect.zero; }
 
-            current?.OnGUIOverlay();
+            if (!MenuOpen) current?.OnGUIOverlay();
+            if (HelpOpen) DrawHelp(W, H);
 
             // Camera input from whatever the panels didn't consume.
-            bool overUI = railRect.Contains(e.mousePosition) || panelRect.Contains(e.mousePosition);
+            bool overUI = railRect.Contains(e.mousePosition) || panelRect.Contains(e.mousePosition) || menuRect.Contains(e.mousePosition);
             switch (e.type)
             {
                 case EventType.MouseDown when !overUI:
@@ -133,24 +175,138 @@ namespace FogOfWar
 
         void HandleKey(Event e)
         {
-            if (e.keyCode == KeyCode.H) { showUI = !showUI; e.Use(); }
-            else if (e.keyCode == KeyCode.F11) { Screen.fullScreen = !Screen.fullScreen; e.Use(); }
-            else if (e.keyCode == KeyCode.Escape) { Application.Quit(); e.Use(); }
-            else if (e.keyCode >= KeyCode.Alpha1 && e.keyCode <= KeyCode.Alpha9 && e.keyCode - KeyCode.Alpha1 < scenes.Length) { Activate(e.keyCode - KeyCode.Alpha1); e.Use(); }
+            if (rebinding != null) return;
+            if (e.keyCode == KeyCode.Escape)
+            {
+                if (HelpOpen) HelpOpen = false;
+                else if (menu == Screen.Controls || menu == Screen.Observatory) menu = Screen.Main;
+                else if (MenuOpen) { if (gameStarted && InGame) menu = Screen.None; }
+                else menu = Screen.Main;
+                e.Use();
+            }
+            else if (e.keyCode == KeyCode.F11) { UnityEngine.Screen.fullScreen = !UnityEngine.Screen.fullScreen; e.Use(); }
+            else if (e.keyCode == KeyCode.F2 || (!InGame && e.keyCode == KeyCode.H)) { showUI = !showUI; e.Use(); }
+            else if (!InGame && !MenuOpen && e.keyCode >= KeyCode.Alpha1 && e.keyCode <= KeyCode.Alpha8) { Activate(e.keyCode - KeyCode.Alpha1); e.Use(); }
         }
+
+        // ------------------------------------------------------------------------------------------------ menus
+
+        void DrawMenu(float W, float H)
+        {
+            float w = Mathf.Min(560, W - 32), h = Mathf.Min(H - 64, menu == Screen.Main ? 560 : H - 64);
+            menuRect = new Rect((W - w) / 2, (H - h) / 2, w, h);
+            GUILayout.BeginArea(menuRect, ui.panel);
+            ui.AvailWidth = w - 40;
+            menuScroll = GUILayout.BeginScrollView(menuScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+            GUILayout.BeginVertical(GUILayout.Width(ui.AvailWidth));
+            GUILayout.Label("FOG OF WAR", ui.brand);
+            GUILayout.Label("OBSERVATORY", ui.brandAccent);
+            GUILayout.Space(6);
+            switch (menu)
+            {
+                case Screen.Main: MainMenu(); break;
+                case Screen.Observatory: ObservatoryMenu(); break;
+                case Screen.Controls: ControlsMenu(); break;
+            }
+            GUILayout.EndVertical();
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
+        void MainMenu()
+        {
+            GUILayout.Label("The solar system at true scale and today's date. Take the ship anywhere from Mercury to Neptune.", ui.body);
+            GUILayout.Space(8);
+            if (gameStarted && InGame && GUILayout.Button("Resume", ui.choice)) menu = Screen.None;
+            if (GUILayout.Button("New game", ui.choice)) { Restart(GameIndex); }
+            bool hasSave = OpenSystemScene.HasSave;
+            GUI.enabled = hasSave;
+            if (GUILayout.Button(hasSave ? "Continue (" + OpenSystemScene.SaveSummary + ")" : "Continue (no save yet)", ui.choice))
+            {
+                Activate(GameIndex);
+                (current as OpenSystemScene)?.LoadGame();
+            }
+            GUI.enabled = true;
+            if (gameStarted && InGame && GUILayout.Button("Save game", ui.choice)) (current as OpenSystemScene)?.SaveGame();
+            GUILayout.Space(6);
+            if (GUILayout.Button("Observatory scenes", ui.choice)) menu = Screen.Observatory;
+            if (GUILayout.Button("Controls", ui.choice)) menu = Screen.Controls;
+            if (GUILayout.Button("Quit", ui.choice)) Application.Quit();
+        }
+
+        void ObservatoryMenu()
+        {
+            GUILayout.Label("Eight physics scenes, each on the real equations.", ui.body);
+            for (int i = 0; i < GameIndex; i++)
+            {
+                if (GUILayout.Button($"{i + 1}. {scenes[i].Title}", ui.choice)) Activate(i);
+                GUILayout.Label(scenes[i].Short, ui.sceneSub);
+            }
+            GUILayout.Space(6);
+            if (GUILayout.Button("Back", ui.choice)) menu = Screen.Main;
+        }
+
+        void ControlsMenu()
+        {
+            GUILayout.Label("Click a key slot, then press the new key. Esc cancels; Delete clears the slot.", ui.body);
+            foreach (var a in Controls.All)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Controls.Label[a], ui.label, GUILayout.Width(ui.AvailWidth * 0.5f));
+                for (int s = 0; s < 2; s++)
+                {
+                    bool waiting = rebinding == a && rebindSlot == s;
+                    var k = Controls.Get(a, s);
+                    string text = waiting ? "press a key…" : k == KeyCode.None ? "—" : k.ToString();
+                    if (GUILayout.Button(text, waiting ? ui.choiceOn : ui.button, GUILayout.Width(ui.AvailWidth * 0.24f))) { rebinding = a; rebindSlot = s; }
+                }
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.Label("Fixed keys: 1–9 attitude holds in flight (off, prograde, retrograde, normal, anti-normal, radial out, radial in, target, anti-target) · Esc menu · F2 hide panels · F11 fullscreen.", ui.note);
+            GUILayout.Space(6);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Reset to defaults", ui.button)) Controls.ResetDefaults();
+            if (GUILayout.Button("Back", ui.button)) { rebinding = null; menu = Screen.Main; }
+            GUILayout.EndHorizontal();
+        }
+
+        void DrawHelp(float W, float H)
+        {
+            float w = Mathf.Min(520, W - 32), h = Mathf.Min(H - 64, 760);
+            var r = new Rect((W - w) / 2, (H - h) / 2, w, h);
+            GUILayout.BeginArea(r, ui.panel);
+            ui.AvailWidth = w - 40;
+            helpScroll = GUILayout.BeginScrollView(helpScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+            GUILayout.BeginVertical(GUILayout.Width(ui.AvailWidth));
+            GUILayout.Label("CONTROLS", ui.title);
+            foreach (var a in Controls.All)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Controls.Label[a], ui.label, GUILayout.Width(ui.AvailWidth * 0.6f));
+                GUILayout.Label(Controls.Keys(a), ui.value);
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.Label("1–9: hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. Mouse: drag to look around, scroll to zoom. Change keys under Esc → Controls.", ui.note);
+            GUILayout.Space(6);
+            if (GUILayout.Button("Close (F1)", ui.button)) HelpOpen = false;
+            GUILayout.EndVertical();
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+            menuRect = r;
+        }
+
+        // ------------------------------------------------------------------------------------------------ panels
 
         void DrawRail(float W, float H)
         {
-            float w = 290;
+            float w = Mathf.Min(290, W * 0.3f);
             GUILayout.BeginArea(new Rect(16, 16, w, H - 32));
             GUILayout.Label("FOG OF WAR", ui.brand);
             GUILayout.Label("OBSERVATORY", ui.brandAccent);
-            GUILayout.Space(4);
-            GUILayout.Label("Everything we've argued about in this project, run on the real equations.", ui.sceneSub);
             GUILayout.Space(10);
-            GUILayout.BeginVertical(ui.panel);
-            railScroll = GUILayout.BeginScrollView(railScroll, GUIStyle.none, GUIStyle.none);
-            for (int i = 0; i < scenes.Length; i++)
+            GUILayout.BeginVertical(ui.panel, GUILayout.ExpandHeight(false));
+            railScroll = GUILayout.BeginScrollView(railScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(false), GUILayout.MaxHeight(H - 180));
+            for (int i = 0; i < GameIndex; i++)
             {
                 bool on = i == currentIndex;
                 GUILayout.BeginVertical();
@@ -162,23 +318,26 @@ namespace FogOfWar
                 GUILayout.EndVertical();
                 GUILayout.Space(2);
             }
+            GUILayout.Space(6);
+            if (GUILayout.Button("◀ MAIN MENU", ui.sceneBtn)) menu = Screen.Main;
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
-            var listRect = GUILayoutUtility.GetLastRect();
+            var box = GUILayoutUtility.GetLastRect();
             GUILayout.EndArea();
-            railRect = new Rect(16, 16, w, listRect.yMax);
+            railRect = new Rect(16, 16, w, box.yMax);
         }
 
         void DrawPanel(float W, float H)
         {
-            float w = Mathf.Min(390, W * 0.32f);
+            float w = Mathf.Min(InGame ? 430 : 390, W * (InGame ? 0.4f : 0.32f));
             panelRect = new Rect(W - w - 16, 16, w, H - 32);
             GUILayout.BeginArea(panelRect, ui.panel);
-            ui.AvailWidth = w - 40;
+            ui.AvailWidth = w - 48;
             panelScroll = GUILayout.BeginScrollView(panelScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
+            GUILayout.BeginVertical(GUILayout.Width(ui.AvailWidth));
             GUILayout.Label(current.Eyebrow.ToUpperInvariant(), ui.eyebrow);
             GUILayout.Label(current.Title.ToUpperInvariant(), ui.title);
-            GUILayout.Label(current.Blurb, ui.body);
+            if (!InGame) GUILayout.Label(current.Blurb, ui.body);
 
             ui.Section("Readouts");
             foreach (var r in readouts)
@@ -187,21 +346,25 @@ namespace FogOfWar
                 GUILayout.Label(r.label, ui.label, GUILayout.Width(ui.AvailWidth * 0.48f));
                 var prev = ui.value.normal.textColor;
                 ui.value.normal.textColor = ui.ToneColor(r.tone);
-                GUILayout.Label(r.value, ui.value);
+                GUILayout.Label(r.value, ui.value, GUILayout.Width(ui.AvailWidth * 0.5f));
                 ui.value.normal.textColor = prev;
                 GUILayout.EndHorizontal();
                 GUILayout.Space(2);
             }
 
-            ui.Section("Controls");
+            ui.Section(InGame ? "Ship and navigation" : "Controls");
             current.Controls(ui);
 
-            ui.Section("Ray-trace quality");
-            int q = GUILayout.Toolbar(Quality, new[] { "Fast", "Balanced", "Sharp" }, ui.button);
-            if (q != Quality) { Quality = q; PlayerPrefs.SetInt("fow-quality", q); }
+            if (!InGame)
+            {
+                ui.Section("Ray-trace quality");
+                int q = GUILayout.Toolbar(Quality, new[] { "Fast", "Balanced", "Sharp" }, ui.button);
+                if (q != Quality) { Quality = q; PlayerPrefs.SetInt("fow-quality", q); }
+            }
 
             if (!string.IsNullOrEmpty(current.Note)) GUILayout.Label(current.Note, ui.note);
             GUILayout.Space(8);
+            GUILayout.EndVertical();
             GUILayout.EndScrollView();
             GUILayout.EndArea();
         }

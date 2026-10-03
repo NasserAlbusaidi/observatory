@@ -45,7 +45,7 @@ namespace FogOfWar
         {
             var f = o.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (f == null) throw new MissingFieldException(o.GetType().Name, field);
-            f.SetValue(o, Convert.ChangeType(value, f.FieldType));
+            f.SetValue(o, f.FieldType.IsEnum ? Enum.ToObject(f.FieldType, value) : Convert.ChangeType(value, f.FieldType));
         }
 
         static void Call(object o, string method) =>
@@ -71,11 +71,20 @@ namespace FogOfWar
             double jd = (double)t.GetField("jd", F).GetValue(s);
             belt.Update(jd + 1.0 / 86400); var p1 = belt.Pos[k];
             belt.Update(jd); var p0 = belt.Pos[k];
-            ship.Autopilot = false; ship.DriveLit = false; ship.Landed = null;
+            ship.Plan = OpenWorld.Plan.None; ship.ThrottleCmd = 0; ship.Landed = null;
             ship.Pos = p0 + new OpenWorld.D3(belt.RadiusKm[k] * 6 + 1, 0, belt.RadiusKm[k] * 2);
             ship.Vel = p1 - p0;
             var pivot = Enum.ToObject(t.GetNestedType("Pivot", BindingFlags.NonPublic), 0);
             t.GetMethod("SetPivot", F).Invoke(s, new object[] { pivot, belt.RadiusKm[k] * 9.0 });
+        }
+
+        static object Ship(SimScene s) => s.GetType().GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
+        static object PivotShip(SimScene s) => Enum.ToObject(s.GetType().GetNestedType("Pivot", BindingFlags.NonPublic), 0);
+        static void Invoke(object o, string method, params object[] args)
+        {
+            foreach (var m in o.GetType().GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+                if (m.Name == method && m.GetParameters().Length == args.Length) { m.Invoke(o, args); return; }
+            throw new MissingMethodException(o.GetType().Name, method);
         }
 
         // name, action, seconds to let it run before the screenshot
@@ -131,6 +140,23 @@ namespace FogOfWar
             },
             [typeof(OpenSystemScene)] = new (string, Action<SimScene>, float)[]
             {
+                ("pitch-held", s => { Controls.Hold(Controls.Action.PitchUp, true); }, 1.5f),
+                ("assist-stops-rotation", s => { Controls.Hold(Controls.Action.PitchUp, false); }, 3f),
+                ("assist-off-yaw", s => { Set(Ship(s), "FlightAssist", false); Controls.Hold(Controls.Action.YawRight, true); }, 1f),
+                ("assist-off-keeps-spinning", s => { Controls.Hold(Controls.Action.YawRight, false); }, 2f),
+                ("hold-prograde", s => { Set(Ship(s), "FlightAssist", true); Invoke(s, "SetHold", OpenWorld.Hold.Prograde); }, 6f),
+                ("throttle-full", s => Controls.Tap(Controls.Action.ThrottleFull), 2f),
+                ("throttle-cut", s => Controls.Tap(Controls.Action.ThrottleCut), 1f),
+                ("rcs-forward", s => Controls.Hold(Controls.Action.RcsForward, true), 2f),
+                ("rcs-release", s => { Controls.Hold(Controls.Action.RcsForward, false); Invoke(s, "SetHold", OpenWorld.Hold.Off); }, 1f),
+                ("flip", s => Controls.Tap(Controls.Action.Flip), 8f),
+                ("cam-orbit", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
+                ("cam-cockpit", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
+                ("cam-chase", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
+                ("match-velocity-moon", s => { View(s, "Moon", 4); Set(s, "selectedPlan", OpenWorld.Plan.MatchVelocity); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 2); Invoke(s, "SetPivot", PivotShip(s), 0.16); }, 10f),
+                ("hold-station", s => { Invoke(s, "TogglePlan"); Set(s, "selectedPlan", OpenWorld.Plan.HoldStation); Invoke(s, "TogglePlan"); }, 6f),
+                ("save", s => { Invoke(s, "TogglePlan"); Set(s, "warpIdx", 0); ((OpenSystemScene)s).SaveGame(); }, 1f),
+                ("load", s => { Set(s, "jd", 2451545.0); ((OpenSystemScene)s).LoadGame(); }, 1f),
                 ("map", s => Call(s, "ToggleMap"), 3),
                 ("ship", s => Call(s, "ToggleMap"), 2),
                 ("plot-mars-100k", s => { Call(s, "TogglePlot"); Set(s, "warpIdx", 5); }, 5),
@@ -151,7 +177,7 @@ namespace FogOfWar
                 ("view-enceladus", s => View(s, "Enceladus", 3), 2),
                 ("view-uranus-faint-rings", s => { View(s, "Uranus", 6); Set(s, "faintRings", true); }, 2),
                 ("view-triton", s => { Set(s, "faintRings", false); View(s, "Triton", 3); }, 2),
-                ("autopilot-off", s => { var sh = (OpenWorld.Ship)s.GetType().GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s); sh.Autopilot = false; }, 1),
+                ("autopilot-off", s => { var sh = (OpenWorld.Ship)s.GetType().GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s); sh.Plan = OpenWorld.Plan.None; }, 1),
                 ("belt-map", s => { Set(s, "warpIdx", 0); Call(s, "ToggleMap"); Set(s, "showHist", true); }, 2),
                 ("view-ceres", s => { Call(s, "ToggleMap"); View(s, "Ceres", 3); }, 2),
                 ("view-vesta", s => View(s, "Vesta", 3), 2),
@@ -167,12 +193,38 @@ namespace FogOfWar
             },
         };
 
+        IEnumerator UiPass()
+        {
+            app.Activate(app.GameIndex);
+            yield return new WaitForSecondsRealtime(2f);
+            log.WriteLine($"screen {UnityEngine.Screen.width}x{UnityEngine.Screen.height}, ui scale {app.UiScale:F2}");
+            foreach (var (name, m) in new[] { ("menu-main", 1), ("menu-observatory", 2), ("menu-controls", 3) })
+            { app.ShowMenu(m); yield return new WaitForSecondsRealtime(0.5f); yield return Shot("ui-" + name); }
+            app.ShowMenu(0);
+            yield return new WaitForSecondsRealtime(0.5f); yield return Shot("ui-game");
+            app.HelpOpen = true; yield return new WaitForSecondsRealtime(0.5f); yield return Shot("ui-help"); app.HelpOpen = false;
+            app.Activate(1); yield return new WaitForSecondsRealtime(1f); yield return Shot("ui-observatory-scene");
+            log.WriteLine($"done: {errors} errors, {bad} bad readouts");
+            log.Close(); log = null;
+            Application.Quit();
+        }
+
         IEnumerator Start()
         {
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowui") >= 0)
+            {
+                Directory.CreateDirectory(dir);
+                log = new StreamWriter(Path.Combine(dir, "qa.txt")) { AutoFlush = true };
+                app = GetComponent<FogOfWarApp>();
+                app.InputLocked = true; Controls.Locked = true;
+                yield return UiPass();
+                yield break;
+            }
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "qa.txt")) { AutoFlush = true };
             app = GetComponent<FogOfWarApp>();
             app.InputLocked = true;
+            Controls.Locked = true;
             int startQuality = app.Quality;
 
             for (int i = 0; i < app.SceneCount; i++)

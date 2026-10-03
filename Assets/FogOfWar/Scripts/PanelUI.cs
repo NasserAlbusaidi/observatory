@@ -74,7 +74,7 @@ namespace FogOfWar
             sceneSub = new GUIStyle { font = font, fontSize = 12, normal = { textColor = InkDim }, padding = new RectOffset(10, 10, 0, 7), wordWrap = true };
             sceneSubOn = new GUIStyle(sceneSub);
             // The built-in skin's toggle draws "on" and "off" the same at runtime, so the check box is drawn by Toggle().
-            toggle = new GUIStyle { font = font, fontSize = 13, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(24, 0, 3, 3), normal = { textColor = Ink }, hover = { textColor = Accent } };
+            toggle = new GUIStyle { font = font, fontSize = 13, alignment = TextAnchor.MiddleLeft, wordWrap = true, padding = new RectOffset(24, 0, 3, 3), normal = { textColor = Ink }, hover = { textColor = Accent } };
             checkOff = Box(new Color(1, 1, 1, 0.06f), new Color(0.63f, 0.69f, 0.9f, 0.45f));
             checkOn = Box(Accent, Accent);
             hint = new GUIStyle { font = font, fontSize = 12, normal = { textColor = InkDim }, alignment = TextAnchor.MiddleCenter };
@@ -113,11 +113,11 @@ namespace FogOfWar
         public float Slider(string text, float v, float min, float max, Func<float, string> fmt, float step = 0)
         {
             GUILayout.BeginHorizontal();
-            GUILayout.Label(text, label);
+            GUILayout.Label(text, label, GUILayout.Width(AvailWidth * 0.62f));
             GUILayout.FlexibleSpace();
-            GUILayout.Label(fmt(v), value, GUILayout.ExpandWidth(false));
+            GUILayout.Label(fmt(v), value, GUILayout.Width(AvailWidth * 0.36f));
             GUILayout.EndHorizontal();
-            float nv = GUILayout.HorizontalSlider(v, min, max, sliderStyle, thumbStyle);
+            float nv = GUILayout.HorizontalSlider(v, min, max, sliderStyle, thumbStyle, GUILayout.Width(AvailWidth));
             if (step > 0) nv = Mathf.Round(nv / step) * step;
             GUILayout.Space(8);
             return nv;
@@ -126,7 +126,7 @@ namespace FogOfWar
         public bool Toggle(string text, bool v)
         {
             var content = new GUIContent(text);
-            var r = GUILayoutUtility.GetRect(content, toggle);
+            var r = GUILayoutUtility.GetRect(content, toggle, GUILayout.Width(AvailWidth));
             if (GUI.Button(r, content, toggle)) v = !v;
             GUI.DrawTexture(new Rect(r.x + 2, r.y + (r.height - 14) / 2, 14, 14), v ? checkOn : checkOff);
             GUILayout.Space(4);

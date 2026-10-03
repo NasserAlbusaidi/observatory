@@ -1,0 +1,426 @@
+using System;
+using System.Collections.Generic;
+using FogOfWar.OpenWorld;
+using UnityEngine;
+using A = FogOfWar.Controls.Action;
+using Ctl = FogOfWar.Controls;
+
+namespace FogOfWar
+{
+    // Open System: pilot input, the ship and nav-computer panel, the flight HUD, labels, readouts and save games.
+    public partial class OpenSystemScene
+    {
+        static readonly string[] HoldNames = { "Off", "Prograde", "Retrograde", "Normal", "Anti-normal", "Radial out", "Radial in", "Target", "Anti-target", "Flip" };
+        static readonly string[] PlanNames = { "", "Brachistochrone (fast)", "Match velocity", "Hold station" };
+
+        // ---------------------------------------------------------------- pilot input (polled every frame)
+
+        void ReadInput(float dt)
+        {
+            bool live = !App.MenuOpen && !App.HelpOpen;
+            ship.RotInput = live ? new Vector3(Ctl.Axis(A.PitchUp, A.PitchDown), Ctl.Axis(A.YawLeft, A.YawRight), Ctl.Axis(A.RollRight, A.RollLeft)) : Vector3.zero;
+            ship.RcsInput = live ? new Vector3(Ctl.Axis(A.RcsLeft, A.RcsRight), Ctl.Axis(A.RcsDown, A.RcsUp), Ctl.Axis(A.RcsBack, A.RcsForward)) : Vector3.zero;
+            if (!live) return;
+
+            double th = ship.ThrottleCmd;
+            if (Ctl.Held(A.ThrottleUp)) th += dt * 0.5;
+            if (Ctl.Held(A.ThrottleDown)) th -= dt * 0.5;
+            if (Ctl.Pressed(A.ThrottleFull)) th = 1;
+            if (Ctl.Pressed(A.ThrottleCut)) th = 0;
+            th = Math.Max(0, Math.Min(1, th));
+            if (th != ship.ThrottleCmd) { ship.ThrottleCmd = th; if (ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "pilot override"; } }
+
+            if (Ctl.Pressed(A.FlightAssist)) ship.FlightAssist = !ship.FlightAssist;
+            if (Ctl.Pressed(A.Flip)) Flip();
+            if (Ctl.Pressed(A.Engage)) TogglePlan();
+            if (Ctl.Pressed(A.NextTarget)) NextTarget();
+            if (Ctl.Pressed(A.WarpUp)) warpIdx = Math.Min(Warps.Length - 1, warpIdx + 1);
+            if (Ctl.Pressed(A.WarpDown)) warpIdx = Math.Max(0, warpIdx - 1);
+            if (Ctl.Pressed(A.Map)) ToggleMap();
+            if (Ctl.Pressed(A.CameraMode)) CycleCamera();
+            if (Ctl.Pressed(A.QuickSave)) SaveGame();
+            if (!Ctl.Locked)
+                for (int i = 0; i < 9; i++)
+                    if (Input.GetKeyDown(KeyCode.Alpha1 + i)) SetHold((Hold)i);
+            // warping with the stick held makes no sense: drop to 1× while flying by hand
+            if (ship.ManualInput && warpIdx > 1) warpIdx = 1;
+        }
+
+        void Flip() { ship.Plan = Plan.None; ship.CustomDir = -ship.Heading; ship.Hold = Hold.Custom; }
+
+        void SetHold(Hold h) { ship.Hold = h; if (h != Hold.Off) ship.Plan = Plan.None; }
+
+        void TogglePlan()
+        {
+            if (ship.PlanActive) { ship.Plan = Plan.None; ship.Throttle = 0; ship.Phase = "plan aborted"; return; }
+            if (ship.Target == null) return;
+            ship.Plan = selectedPlan;
+            ship.Landed = null; ship.ThrottleCmd = 0; ship.Hold = Hold.Off;
+            if (selectedPlan == Plan.HoldStation) ship.StationOffset = ship.Pos - sys.Pos(ship.Target, jd);
+        }
+
+        Plan selectedPlan = Plan.Brachistochrone;
+
+        // kept for QA scripts
+        void TogglePlot() { selectedPlan = Plan.Brachistochrone; TogglePlan(); }
+
+        void CycleCamera()
+        {
+            if (pivot != Pivot.Ship) { SetPivot(Pivot.Ship, 0.16); camMode = CamMode.Chase; return; }
+            camMode = camMode == CamMode.Chase ? CamMode.Orbit : camMode == CamMode.Orbit ? CamMode.Cockpit : CamMode.Chase;
+            lookYaw = lookPitch = 0;
+        }
+
+        public override bool HandleDrag(Vector2 delta, int button)
+        {
+            var mode = pivot == Pivot.Ship ? camMode : CamMode.Orbit;
+            if (mode == CamMode.Chase) { chaseYaw -= delta.x * 0.25f; chasePitch = Mathf.Clamp(chasePitch + delta.y * 0.25f, -89, 89); }
+            else if (mode == CamMode.Cockpit) { lookYaw += delta.x * 0.2f; lookPitch = Mathf.Clamp(lookPitch + delta.y * 0.2f, -80, 80); }
+            else { yaw -= delta.x * 0.25f; pitch = Mathf.Clamp(pitch + delta.y * 0.25f, -89, 89); }
+            return true;
+        }
+
+        public override bool HandleZoom(float wheel)
+        {
+            if (pivot == Pivot.Ship && camMode == CamMode.Cockpit) { Cam.fieldOfView = Mathf.Clamp(Cam.fieldOfView * Mathf.Exp(wheel * 0.05f), 10, 90); return true; }
+            camDist = Math.Min(Math.Max(camDist * Math.Exp(wheel * 0.12), MinCamDist()), 2e10);
+            return true;
+        }
+
+        double MinCamDist()
+        {
+            if (pivot == Pivot.Ship) return 0.03;
+            if (pivot == Pivot.Target && ship.Target != null) return ship.Target.Radius * 1.2;
+            return sys.Sun.Radius * 1.5;
+        }
+
+        void SetPivot(Pivot p, double dist)
+        {
+            pivot = p;
+            camDist = Math.Max(dist, MinCamDist());
+        }
+
+        void NextTarget() => SetTarget(targets[(targetIdx + 1) % targets.Count]);
+
+        void SetTarget(Body b)
+        {
+            if (ship.PlanActive && ship.Target != b) { ship.Plan = Plan.None; ship.Phase = "plan aborted (new target)"; }
+            ship.Target = b;
+            targetIdx = targets.IndexOf(b);
+            if (pivot == Pivot.Target) camDist = b.Radius * 4;
+        }
+
+        void ToggleMap()
+        {
+            if (pivot == Pivot.Sun) SetPivot(Pivot.Ship, 0.16);
+            else { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
+        }
+
+        // ---------------------------------------------------------------- HUD and labels
+
+        public override void OnGUIOverlay()
+        {
+            if (Prof) swGui.Start();
+            try { DrawLabels(); DrawHud(); } finally { if (Prof) swGui.Stop(); }
+        }
+
+        GUIStyle labelStyle, labelOn, hudStyle, hudBig;
+        readonly List<(Vector2 c, float r, float d)> occluders = new List<(Vector2, float, float)>();
+
+        void Styles()
+        {
+            if (labelStyle != null) return;
+            labelStyle = new GUIStyle { fontSize = 12, normal = { textColor = new Color(0.75f, 0.8f, 0.95f, 0.85f) } };
+            labelOn = new GUIStyle(labelStyle) { fontStyle = FontStyle.Bold, normal = { textColor = PanelUI.Accent } };
+            hudStyle = new GUIStyle { fontSize = 13, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.85f, 0.9f, 1f, 0.95f) } };
+            hudBig = new GUIStyle(hudStyle) { fontSize = 18, fontStyle = FontStyle.Bold };
+        }
+
+        // Screen point (GUI units) of a direction from the camera, or null if behind it.
+        Vector2? ScreenDir(Vector3 dirRender, float ui)
+        {
+            var sp = Cam.WorldToScreenPoint(dirRender.normalized * 10f);
+            if (sp.z <= 0) return null;
+            return new Vector2(sp.x / ui, (UnityEngine.Screen.height - sp.y) / ui);
+        }
+
+        void Marker(Vector2? p, string glyph, Color c, string tag)
+        {
+            if (!p.HasValue) return;
+            var g = p.Value;
+            GUI.color = c;
+            GUI.Label(new Rect(g.x - 20, g.y - 12, 40, 24), glyph, hudBig);
+            if (tag != null) GUI.Label(new Rect(g.x - 60, g.y + 10, 120, 16), tag, hudStyle);
+            GUI.color = Color.white;
+        }
+
+        void DrawHud()
+        {
+            Styles();
+            float ui = App.UiScale;
+            float W = UnityEngine.Screen.width / ui, H = UnityEngine.Screen.height / ui;
+            if (pivot == Pivot.Ship)
+            {
+                // flight markers: nose, velocity vs the dominant body, target direction
+                var v = ship.Vel - sys.Vel(reference, jd);
+                if (v.Sqr > 1e-10)
+                {
+                    Marker(ScreenDir(Frame.U(v), ui), "O", new Color(0.6f, 1f, 0.6f), "prograde");
+                    Marker(ScreenDir(-Frame.U(v), ui), "X", new Color(1f, 0.6f, 0.5f), "retrograde");
+                }
+                Marker(ScreenDir(Frame.U(ship.Heading), ui), "+", Color.white, null);
+                if (ship.Target != null) Marker(ScreenDir(Frame.U(sys.Pos(ship.Target, jd) - camW), ui), "[ ]", PanelUI.Accent, null);
+            }
+
+            // bottom-centre flight strip
+            float w = Mathf.Min(520, W - 40), x = (W - w) / 2, y = H - 98;
+            GUI.color = new Color(0, 0, 0, 0.45f);
+            GUI.DrawTexture(new Rect(x, y, w, 62), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            // throttle bar: commanded (outline) and applied (fill)
+            var bar = new Rect(x + 10, y + 8, w - 20, 10);
+            GUI.color = new Color(1, 1, 1, 0.15f); GUI.DrawTexture(bar, Texture2D.whiteTexture);
+            GUI.color = new Color(1f, 0.71f, 0.28f, 0.9f); GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * (float)ship.Throttle, bar.height), Texture2D.whiteTexture);
+            GUI.color = Color.white; GUI.DrawTexture(new Rect(bar.x + bar.width * (float)ship.ThrottleCmd - 1, bar.y - 3, 2, bar.height + 6), Texture2D.whiteTexture);
+            var vRef = (ship.Vel - sys.Vel(reference, jd)).Mag;
+            string l1 = $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} g of {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num(vRef, 3)} km/s vs {reference.Name}   ·   {WarpNames[warpIdx]}";
+            string l2 = $"ASSIST {(ship.FlightAssist ? "ON" : "OFF")}   ·   HOLD {HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)]}   ·   " +
+                        (ship.PlanActive ? $"NAV {PlanNames[(int)ship.Plan]}: {ship.Phase}" : $"NAV idle ({ship.Phase})") + $"   ·   CAM {(pivot == Pivot.Ship ? camMode.ToString() : pivot.ToString())}";
+            GUI.Label(new Rect(x, y + 22, w, 18), l1, hudStyle);
+            GUI.Label(new Rect(x, y + 40, w, 18), l2, hudStyle);
+        }
+
+        void DrawLabels()
+        {
+            Styles();
+            float ui = App.UiScale;
+            float pxPerRad = UnityEngine.Screen.height / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
+            var placed = new List<Vector2>();
+            // discs of bodies big enough on screen to hide labels of things behind them
+            occluders.Clear();
+            foreach (var v in vis)
+            {
+                var p = v.t.localPosition; float d = p.magnitude;
+                var sp = Cam.WorldToScreenPoint(p);
+                if (sp.z <= 0 || d < 1e-6f) continue;
+                float rpx = v.t.localScale.y / d * pxPerRad / ui;
+                if (rpx > 4) occluders.Add((new Vector2(sp.x / ui, (UnityEngine.Screen.height - sp.y) / ui), rpx, d));
+            }
+
+            // ship first so it wins overlaps
+            if (!(pivot == Pivot.Ship && camMode == CamMode.Cockpit)) Label("You", shipT.localPosition, 0.05, null, ui, pxPerRad, placed, true);
+            foreach (var v in vis) Label(v.b.Name, v.t.localPosition, v.t.localScale.y, v.b, ui, pxPerRad, placed, false);
+        }
+
+        void Label(string name, Vector3 renderPos, double renderRadius, Body b, float ui, float pxPerRad, List<Vector2> placed, bool force)
+        {
+            float dist = renderPos.magnitude;
+            if (dist < 1e-6f) return;
+            var sp = Cam.WorldToScreenPoint(renderPos);
+            if (sp.z <= 0) return;
+            float rpx = (float)renderRadius / dist * pxPerRad;
+            bool tgt = b != null && b == ship.Target;
+            if (rpx > 40 && !tgt) return; // big enough to recognise
+            // hundreds of small moons: name them only when the camera is close to them
+            if (b != null && !tgt && b.Parent != null && b.Parent != sys.Sun && b.Radius < 100 && dist > 2e4 * renderRadius) return;
+            var g = new Vector2(sp.x / ui, (UnityEngine.Screen.height - sp.y) / ui);
+            if (App.UnderPanel(g)) return; // labels stay off the panels
+            foreach (var (c, cr, cd) in occluders)
+                if (cd < dist * 0.999f && (c - g).magnitude < cr) return;
+            if (!force && !tgt)
+                foreach (var q in placed) if ((q - g).sqrMagnitude < 14 * 14) return;
+            placed.Add(g);
+            var style = tgt ? labelOn : labelStyle;
+            GUI.color = tgt ? PanelUI.Accent : new Color(0.75f, 0.8f, 0.95f, 0.9f);
+            GUI.DrawTexture(new Rect(g.x - 2, g.y - 2, 4, 4), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            var r = new Rect(g.x + 6, g.y - 8, 140, 16);
+            if (b != null && GUI.Button(r, name, style)) SetTarget(b);
+            else if (b == null) GUI.Label(r, name, style);
+        }
+
+        // ---------------------------------------------------------------- readouts
+
+        public override void Readouts(List<Readout> list)
+        {
+            var date = Frame.UtcFromTdb(jd);
+            list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
+            bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
+            list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? " (limited by the frame budget)" : ""), limited ? Tone.Bad : Tone.Normal));
+            var refPos = sys.Pos(reference, jd);
+            double alt = (ship.Pos - refPos).Mag - reference.Radius;
+            list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
+            list.Add(new Readout("Speed vs " + reference.Name, Fmt.Num((ship.Vel - sys.Vel(reference, jd)).Mag, 3) + " km/s"));
+            list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
+            list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
+            list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
+            list.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
+            // jet power P = ½·m·a·vₑ for a 500 t ship and a D–He³-class exhaust; no known physics sheds that heat
+            if (ship.Throttle > 0) list.Add(new Readout("Jet power (fictional efficiency)", Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW", Tone.Bad));
+            if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "outside 2000–2100: approximate", Tone.Bad));
+            if (ship.Target != null)
+            {
+                var tp = sys.Pos(ship.Target, jd);
+                var r = tp - ship.Pos;
+                var vr = ship.Vel - sys.Vel(ship.Target, jd);
+                double closing = D3.Dot(vr, r.Norm);
+                list.Add(new Readout("Target", ship.Target.Name + (ship.Target.SizeEstimated ? " (size unknown, shown 2 km)" : ""), Tone.Hot));
+                if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
+                list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
+                list.Add(new Readout("Relative speed", Fmt.Num(vr.Mag, 3) + " km/s"));
+                list.Add(new Readout("Closing speed", Fmt.Num(closing, 3) + " km/s", closing > 0 ? Tone.Cold : Tone.Normal));
+            }
+            double rAu = ship.Pos.Mag / Frame.AU;
+            if (rAu > 1.7 && rAu < 5.6 && beltView.NearestIndex >= 0)
+                list.Add(new Readout("Nearest belt rock (1 % sample)", Km(beltView.NearestKm) + ", " + Fmt.Num(belt.RadiusKm[beltView.NearestIndex] * 2, 1) + " km wide"));
+            if (faintRings) list.Add(new Readout("Faint rings", "brightened ×1000 (not real)", Tone.Bad));
+            list.Add(new Readout("Nav computer", ship.PlanActive ? PlanNames[(int)ship.Plan] + ": " + ship.Phase : ship.Landed != null ? ship.Phase : "idle", ship.PlanActive ? Tone.Hot : Tone.Normal));
+        }
+
+        static string Km(double km) => km > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : km >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
+
+        static string Dur(double s)
+        {
+            if (s < 120) return Fmt.Num(s, 0) + " s";
+            if (s < 7200) return Fmt.Num(s / 60, 1) + " min";
+            if (s < 172800) return Fmt.Num(s / 3600, 1) + " h";
+            return Fmt.Num(s / 86400, 1) + " days";
+        }
+
+        // ---------------------------------------------------------------- panel
+
+        public override void Controls(PanelUI ui)
+        {
+            // --- ship
+            GUILayout.Label("Throttle (" + Ctl.Keys(A.ThrottleUp) + " / " + Ctl.Keys(A.ThrottleDown) + ", " + Ctl.Keys(A.ThrottleFull) + " full, " + Ctl.Keys(A.ThrottleCut) + " cut)", ui.label);
+            float th = GUILayout.HorizontalSlider((float)ship.ThrottleCmd, 0, 1);
+            if (Mathf.Abs(th - (float)ship.ThrottleCmd) > 1e-4f) { ship.ThrottleCmd = th; if (ship.PlanActive) ship.Plan = Plan.None; }
+            GUILayout.Space(6);
+            GUILayout.Label("Drive limit", ui.label);
+            var gl = new string[Gs.Length];
+            for (int i = 0; i < Gs.Length; i++) gl[i] = (Math.Abs(ship.MaxG - Gs[i]) < 1e-6 ? "● " : "") + Fmt.Num(Gs[i], 1) + " g" + (Gs[i] >= 10 ? " (juice: fictional)" : "");
+            int gi = ui.Buttons(gl);
+            if (gi >= 0) ship.MaxG = Gs[gi];
+            ship.FlightAssist = ui.Toggle("Flight assist (" + Ctl.Keys(A.FlightAssist) + "): stop rotating when the stick is released", ship.FlightAssist);
+            int fb = ui.Buttons("Flip (" + Ctl.Keys(A.Flip) + ")", "Kill rotation");
+            if (fb == 0) Flip();
+            if (fb == 1) { ship.AngVel = Vector3.zero; ship.Hold = Hold.Off; }
+
+            GUILayout.Label("Attitude hold (keys 1–9)", ui.label);
+            var hl = new string[9];
+            for (int i = 0; i < 9; i++) hl[i] = ((int)ship.Hold == i ? "● " : "") + HoldNames[i];
+            int hi = ui.Buttons(hl);
+            if (hi >= 0) SetHold((Hold)hi);
+
+            // --- nav computer
+            ui.Section("Nav computer");
+            if (ship.Target != null)
+            {
+                var tp = sys.Pos(ship.Target, jd);
+                double d = Math.Max((tp - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
+                GUILayout.Label($"Target: {ship.Target.Name}", ui.label);
+                GUILayout.Label($"Brachistochrone at {Fmt.Num(ship.MaxG, 1)} g: {Dur(2 * Math.Sqrt(d / ship.AMax))}, Δv ≈ {Fmt.Num(2 * Math.Sqrt(d * ship.AMax), 0)} km/s, peak {Fmt.Num(Math.Sqrt(d * ship.AMax), 0)} km/s", ui.note);
+                if (ship.Target.Parent == sys.Sun && reference == sys.Sun || ship.Target.Parent == sys.Sun)
+                {
+                    var (dv, t) = Ship.Hohmann(ship.Pos.Mag, tp.Mag, sys.Sun.GM);
+                    GUILayout.Label($"Economy reference (Hohmann, circular orbits): {Dur(t)}, Δv ≈ {Fmt.Num(dv, 1)} km/s", ui.note);
+                }
+            }
+            else GUILayout.Label("No target: pick one below or click a label.", ui.label);
+            var pl = new[] { Plan.Brachistochrone, Plan.MatchVelocity, Plan.HoldStation };
+            int pi = ui.Buttons(Array.ConvertAll(pl, p => (selectedPlan == p ? "● " : "") + PlanNames[(int)p]));
+            if (pi >= 0) selectedPlan = pl[pi];
+            int eb = ui.Buttons(ship.PlanActive ? "Abort plan (" + Ctl.Keys(A.Engage) + ")" : "Engage plan (" + Ctl.Keys(A.Engage) + ")");
+            if (eb == 0) TogglePlan();
+
+            // --- time and view
+            ui.Section("Time and view");
+            var wl = new string[Warps.Length];
+            for (int i = 0; i < Warps.Length; i++) wl[i] = (i == warpIdx ? "● " : "") + WarpNames[i];
+            int wi = ui.Buttons(wl);
+            if (wi >= 0) warpIdx = wi;
+            int ci = ui.Buttons((pivot == Pivot.Ship && camMode == CamMode.Chase ? "● " : "") + "Chase", (pivot == Pivot.Ship && camMode == CamMode.Orbit ? "● " : "") + "Orbit ship",
+                (pivot == Pivot.Ship && camMode == CamMode.Cockpit ? "● " : "") + "Cockpit", (pivot == Pivot.Target ? "● " : "") + "Target", (pivot == Pivot.Sun ? "● " : "") + "System map");
+            if (ci >= 0 && ci <= 2) { SetPivot(Pivot.Ship, 0.16); camMode = (CamMode)(ci == 0 ? 0 : ci == 1 ? 1 : 2); lookYaw = lookPitch = 0; Cam.fieldOfView = 55; }
+            if (ci == 3 && ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4);
+            if (ci == 4) { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
+            beltView.Visible = ui.Toggle("Show the asteroid belt (a 1 % sample: real rocks are ~1 million km apart)", beltView.Visible);
+            showHist = ui.Toggle("Belt semi-major axis histogram", showHist);
+            if (showHist)
+            {
+                ui.Image(beltHist, 90);
+                GUILayout.Label("1.6 → 5.6 AU. Kirkwood gaps (Jupiter resonances 4:1, 3:1, 5:2, 7:3, 2:1) at 2.06, 2.50, 2.82, 2.96, 3.28 AU; Hildas at 3.97 (3:2); Trojans at 5.2 (1:1). The gaps are in orbit size, so they don't show as empty rings in space.", ui.note);
+            }
+            faintRings = ui.Toggle("Brighten faint rings ×1000 (Jupiter, Uranus, Neptune)", faintRings);
+
+            // --- targets
+            ui.Section("Targets");
+            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid);
+            var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
+            int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
+            if (si >= 0) SetTarget(planets[si]);
+            if (sel != null && !sel.Asteroid)
+            {
+                var moons = sys.Bodies.FindAll(x => x.Parent == sel && x.Radius >= 10);
+                moons.Sort((x, y) => y.Radius.CompareTo(x.Radius));
+                int small = sys.Bodies.FindAll(x => x.Parent == sel).Count - moons.Count;
+                if (moons.Count > 0)
+                {
+                    int mi = ui.Buttons(moons.ConvertAll(m => (m == ship.Target ? "● " : "") + m.Name).ToArray());
+                    if (mi >= 0) SetTarget(moons[mi]);
+                }
+                if (small > 0) GUILayout.Label(small + (small == 1 ? " smaller moon" : " smaller moons") + ": click the labels in view", ui.label);
+            }
+            var rocks = sys.Bodies.FindAll(x => x.Asteroid);
+            GUILayout.Label("Asteroids", ui.label);
+            int ri = ui.Buttons(rocks.ConvertAll(x => (x == ship.Target ? "● " : "") + x.Name).ToArray());
+            if (ri >= 0) SetTarget(rocks[ri]);
+
+            ui.Section("Game");
+            int sb = ui.Buttons("Save (" + Ctl.Keys(A.QuickSave) + ")", "Load", "Main menu");
+            if (sb == 0) SaveGame();
+            if (sb == 1 && HasSave) LoadGame();
+            if (sb == 2) App.OpenMenu();
+        }
+
+        // ---------------------------------------------------------------- save games
+
+        const string SaveKey = "fow-save-v1";
+        public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
+        public static string SaveSummary
+        {
+            get
+            {
+                try
+                {
+                    var s = JsonUtility.FromJson<Ship.SaveData>(PlayerPrefs.GetString(SaveKey));
+                    return Frame.UtcFromTdb(s.jd).ToString("yyyy-MM-dd") + (string.IsNullOrEmpty(s.target) ? "" : ", target " + s.target);
+                }
+                catch (Exception) { return "unreadable"; }
+            }
+        }
+
+        public void SaveGame()
+        {
+            PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(ship.ToSave(jd, warpIdx)));
+            PlayerPrefs.Save();
+            ship.Phase = "game saved";
+        }
+
+        public void LoadGame()
+        {
+            if (!HasSave) return;
+            Ship.SaveData s;
+            try { s = JsonUtility.FromJson<Ship.SaveData>(PlayerPrefs.GetString(SaveKey)); }
+            catch (Exception e) { Debug.LogWarning("Fog of War: could not read the save: " + e.Message); return; }
+            jd = s.jd;
+            ship.FromSave(s, sys);
+            warpIdx = Mathf.Clamp(s.warp, 0, Warps.Length - 1);
+            if (ship.Target != null) targetIdx = targets.IndexOf(ship.Target);
+            reference = Ship.Dominant(sys, ship.Pos, jd);
+            SetPivot(Pivot.Ship, 0.16);
+            camMode = CamMode.Chase;
+            ship.Phase = "game loaded";
+        }
+    }
+}
