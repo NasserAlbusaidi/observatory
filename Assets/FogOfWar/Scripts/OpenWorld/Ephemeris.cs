@@ -70,7 +70,8 @@ namespace FogOfWar.OpenWorld
         public double LaplaceRa = double.NaN, LaplaceDec;
         public bool Synchronous;            // spins once per orbit, prime meridian facing the parent
         public bool SizeEstimated;          // no measured radius; shown at a nominal size (labelled)
-        public bool Barycentric;            // ephemeris gives the system barycentre; subtract the big moons' pull
+        public bool Barycentric;
+        public bool Asteroid;               // a named small body orbiting the Sun            // ephemeris gives the system barycentre; subtract the big moons' pull
         public List<Body> MassiveMoons = new List<Body>();
 
         // Pole of the reference plane the elements are measured in (Laplace or spin pole; mean orbit pole otherwise).
@@ -181,6 +182,7 @@ namespace FogOfWar.OpenWorld
     [Serializable] class ArtBody { public string name; public float meanRadiusKm; }
     [Serializable] class ArtBodies { public ArtBody[] items; }
     [Serializable] class PlanetJson { public float meanRadiusKm; }
+    [Serializable] class OscJson { public double epochJd, e, qAu, tpJd, node, w, i; }
 
     public class SolarSystem
     {
@@ -296,6 +298,45 @@ namespace FogOfWar.OpenWorld
             }
         }
 
+        // Named asteroids: JPL Horizons fits (Tools/horizons/fit.mjs), with osculating elements at the end of the fitted
+        // span as the fallback. GM: Ceres, Vesta, Pallas, Hygiea from Dawn and astrometry; radii: IAU / NASA, replaced by
+        // the shape model's volume radius where the art pack has one.
+        static void LoadAsteroids(SolarSystem s)
+        {
+            // name, GM km³/s², mean radius km, rotation period h (negative = retrograde), pole RA, Dec, W0
+            var list = new (string name, double gm, double r, double rotH, double ra, double dec, double w0)[]
+            {
+                ("Ceres", 62.6284, 469.7, 9.074170, 291.418, 66.764, 170.65), ("Vesta", 17.2882, 262.7, 5.342128, 309.031, 42.235, 285.39),
+                ("Pallas", 13.63, 256.5, 7.8132, 30, -16, 0), ("Hygiea", 5.78, 216.5, 13.82, 0, 90, 0), ("Psyche", 1.53, 111, 4.196, 0, 90, 0),
+                ("Ida", 0.0028, 15.7, 4.634, 168.76, -87.12, 274.05), ("Mathilde", 0.0069, 26.4, 417.7, 0, 90, 0), ("Gaspra", 0, 6.1, 7.042, 9.47, 26.7, 83.67),
+                ("Eros", 4.46e-4, 8.42, 5.270, 11.35, 17.22, 326.07), ("Itokawa", 0, 0.165, 12.132, 90.53, -66.3, 0),
+                ("Ryugu", 0, 0.448, -7.6326, 96.4, -66.4, 0), ("Bennu", 4.89e-9, 0.245, -4.296, 85.65, -60.17, 0),
+                // large main-belt bodies and the Trojan Hektor: GM from published mass estimates (±10–30 %), radii
+                // replaced by the shape models' volume radii; poles not modelled
+                ("Juno", 1.82, 127, 7.21, 0, 90, 0), ("Eunomia", 2.1, 135, 6.083, 0, 90, 0), ("Lutetia", 0.114, 49, 8.168, 52, 12, 0),
+                ("Euphrosyne", 1.1, 134, 5.53, 0, 90, 0), ("Cybele", 0.91, 119, 6.07, 0, 90, 0), ("Sylvia", 0.99, 136, 5.18, 0, 90, 0),
+                ("Davida", 2.2, 149, 5.13, 0, 90, 0), ("Hektor", 0.53, 113, 6.92, 0, 90, 0), ("Interamnia", 2.5, 166, 8.73, 0, 90, 0),
+            };
+            foreach (var (name, gm, r, rotH, ra, dec, w0) in list)
+            {
+                var el = Resources.Load<TextAsset>("Ephem/" + name + ".elements");
+                var b = new Body
+                {
+                    Name = name, Parent = s.Sun, GM = gm, Radius = r, Look = Look.Rocky, Asteroid = true, Texture = "Planets/" + name + "/Color",
+                    ColA = new Color(0.33f, 0.31f, 0.29f), ColB = new Color(0.5f, 0.48f, 0.45f),
+                    PoleRa = ra, PoleDec = dec, W0 = w0, Wd = 360 / (Math.Abs(rotH) / 24) * Math.Sign(rotH),
+                };
+                if (el != null)
+                {
+                    var o = JsonUtility.FromJson<OscJson>(el.text);
+                    double a = o.qAu / (1 - o.e) * Frame.AU, n = Math.Sqrt(s.Sun.GM / (a * a * a)) * 86400 * 180 / Math.PI; // °/day
+                    b.A = a; b.E = o.e; b.I = o.i; b.Node = o.node; b.Peri = o.node + o.w; b.L = b.Peri + n * (o.epochJd - o.tpJd);
+                    b.dL = n; b.EpochJd = o.epochJd;
+                }
+                s.Bodies.Add(b);
+            }
+        }
+
         // Fallback elements: JPL "Keplerian Elements for Approximate Positions of the Major Planets", table 1
         // (1800–2050), a (AU), e, I, L, ϖ, Ω with rates per Julian century. Only used outside the Chebyshev span.
         static Body Planet(string name, double a, double da, double e, double de, double i, double di, double L, double dL,
@@ -354,6 +395,7 @@ namespace FogOfWar.OpenWorld
 
             foreach (var g in new[] { "Jupiter", "Saturn", "Uranus", "Neptune" }) s[g].Barycentric = true;
             LoadSatellites(s);
+            LoadAsteroids(s);
 
             foreach (var b in s.Bodies)
             {

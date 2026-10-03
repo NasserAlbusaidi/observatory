@@ -853,5 +853,195 @@
   ],
   "colourNote": "sRGB display value = srgb(albedo x class hue)",
   "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Ceres",
+  "parent": "Sun",
+  "diametersKm": [
+   969.57,
+   967.08,
+   899.93
+  ],
+  "meanRadiusKm": 469.7749,
+  "class": "C",
+  "geometricAlbedo": 0.09,
+  "colour": [
+   0.3318,
+   0.327,
+   0.322
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "shape model ceres_128_o.tab (NASA PDS SBN / NAIF, public domain)"
+ },
+ {
+  "name": "Juno",
+  "parent": "Sun",
+  "diametersKm": [
+   320,
+   267,
+   200
+  ],
+  "meanRadiusKm": 128.786,
+  "class": "S",
+  "geometricAlbedo": 0.24,
+  "colour": [
+   0.5687,
+   0.5222,
+   0.4754
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Interamnia",
+  "parent": "Sun",
+  "diametersKm": [
+   362,
+   348,
+   310
+  ],
+  "meanRadiusKm": 169.637,
+  "class": "C",
+  "geometricAlbedo": 0.07,
+  "colour": [
+   0.2934,
+   0.289,
+   0.2845
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Davida",
+  "parent": "Sun",
+  "diametersKm": [
+   357,
+   294,
+   231
+  ],
+  "meanRadiusKm": 144.715,
+  "class": "C",
+  "geometricAlbedo": 0.07,
+  "colour": [
+   0.2934,
+   0.289,
+   0.2845
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Sylvia",
+  "parent": "Sun",
+  "diametersKm": [
+   385,
+   262,
+   232
+  ],
+  "meanRadiusKm": 143.017,
+  "class": "C",
+  "geometricAlbedo": 0.04,
+  "colour": [
+   0.2209,
+   0.2174,
+   0.2139
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Eunomia",
+  "parent": "Sun",
+  "diametersKm": [
+   357,
+   255,
+   212
+  ],
+  "meanRadiusKm": 134.117,
+  "class": "S",
+  "geometricAlbedo": 0.25,
+  "colour": [
+   0.5794,
+   0.5321,
+   0.4845
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Euphrosyne",
+  "parent": "Sun",
+  "diametersKm": [
+   294,
+   280,
+   248
+  ],
+  "meanRadiusKm": 136.654,
+  "class": "C",
+  "geometricAlbedo": 0.05,
+  "colour": [
+   0.2478,
+   0.244,
+   0.2401
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Cybele",
+  "parent": "Sun",
+  "diametersKm": [
+   302,
+   290,
+   232
+  ],
+  "meanRadiusKm": 136.438,
+  "class": "C",
+  "geometricAlbedo": 0.07,
+  "colour": [
+   0.2934,
+   0.289,
+   0.2845
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Lutetia",
+  "parent": "Sun",
+  "diametersKm": [
+   121,
+   101,
+   75
+  ],
+  "meanRadiusKm": 48.569,
+  "class": "M",
+  "geometricAlbedo": 0.19,
+  "colour": [
+   0.4731,
+   0.4731,
+   0.4753
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
+ },
+ {
+  "name": "Hektor",
+  "parent": "Sun",
+  "diametersKm": [
+   370,
+   195,
+   195
+  ],
+  "meanRadiusKm": 120.705,
+  "class": "red",
+  "geometricAlbedo": 0.03,
+  "colour": [
+   0.2266,
+   0.1792,
+   0.1534
+  ],
+  "colourNote": "sRGB display value = srgb(albedo x class hue)",
+  "source": "procedural (seeded by name)"
  }
 ]

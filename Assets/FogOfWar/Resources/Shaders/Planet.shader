@@ -30,6 +30,9 @@ Shader "FogOfWar/Planet"
             float4 _ColA, _ColB, _Atmo;
             float _Kind, _Seed, _HasTex, _Gain, _Haze;
             float4 _HazeCol;
+            // shape models: look the map up in the body frame (Prime/North aligned), not the mesh's import space
+            float4x4 _WorldToBody;
+            float _UseBodyFrame;
             float3 _SunDir;
             sampler2D _MainTex;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
@@ -73,7 +76,7 @@ Shader "FogOfWar/Planet"
 
             float4 frag(v2f i) : SV_Target
             {
-                float3 p = normalize(i.op);
+                float3 p = normalize(_UseBodyFrame > 0.5 ? mul(_WorldToBody, float4(i.wp, 1.0)).xyz : i.op);
                 float3 n = normalize(i.n);
                 float3 l = normalize(_SunDir);
                 float3 vdir = normalize(_WorldSpaceCameraPos - i.wp);

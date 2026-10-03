@@ -61,6 +61,23 @@ namespace FogOfWar
             s.GetType().GetMethod("SetPivot", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(s, new object[] { pivot, b.Radius * radii });
         }
 
+        // Open System: park the ship (stationary relative to it) beside a belt rock and frame it.
+        static void BeltRock(SimScene s, int k)
+        {
+            var t = s.GetType();
+            const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
+            var belt = (OpenWorld.Belt)t.GetField("belt", F).GetValue(s);
+            var ship = (OpenWorld.Ship)t.GetField("ship", F).GetValue(s);
+            double jd = (double)t.GetField("jd", F).GetValue(s);
+            belt.Update(jd + 1.0 / 86400); var p1 = belt.Pos[k];
+            belt.Update(jd); var p0 = belt.Pos[k];
+            ship.Autopilot = false; ship.DriveLit = false; ship.Landed = null;
+            ship.Pos = p0 + new OpenWorld.D3(belt.RadiusKm[k] * 6 + 1, 0, belt.RadiusKm[k] * 2);
+            ship.Vel = p1 - p0;
+            var pivot = Enum.ToObject(t.GetNestedType("Pivot", BindingFlags.NonPublic), 0);
+            t.GetMethod("SetPivot", F).Invoke(s, new object[] { pivot, belt.RadiusKm[k] * 9.0 });
+        }
+
         // name, action, seconds to let it run before the screenshot
         static readonly Dictionary<Type, (string, Action<SimScene>, float)[]> Steps = new Dictionary<Type, (string, Action<SimScene>, float)[]>
         {
@@ -134,6 +151,12 @@ namespace FogOfWar
                 ("view-enceladus", s => View(s, "Enceladus", 3), 2),
                 ("view-uranus-faint-rings", s => { View(s, "Uranus", 6); Set(s, "faintRings", true); }, 2),
                 ("view-triton", s => { Set(s, "faintRings", false); View(s, "Triton", 3); }, 2),
+                ("autopilot-off", s => { var sh = (OpenWorld.Ship)s.GetType().GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s); sh.Autopilot = false; }, 1),
+                ("belt-map", s => { Set(s, "warpIdx", 0); Call(s, "ToggleMap"); Set(s, "showHist", true); }, 2),
+                ("view-ceres", s => { Call(s, "ToggleMap"); View(s, "Ceres", 3); }, 2),
+                ("view-vesta", s => View(s, "Vesta", 3), 2),
+                ("plot-ceres-1M", s => { View(s, "Ceres", 4); Call(s, "TogglePlot"); Set(s, "warpIdx", 6); }, 12),
+                ("belt-rock", s => { Call(s, "TogglePlot"); Set(s, "warpIdx", 0); BeltRock(s, 1234); }, 2),
                 ("plot-titan-1M", s => { View(s, "Titan", 6); Call(s, "TogglePlot"); Set(s, "warpIdx", 6); }, 15),
             },
             [typeof(MeteorScene)] = new (string, Action<SimScene>, float)[]

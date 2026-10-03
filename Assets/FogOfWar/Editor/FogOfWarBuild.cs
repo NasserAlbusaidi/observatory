@@ -31,6 +31,15 @@ namespace FogOfWar.EditorTools
 
         static void ApplyPlayerSettings()
         {
+            // The open world draws its belt with GPU instancing from materials made at runtime, so the build can't see
+            // that instancing is used and would strip those shader variants. Keep them.
+            var gs = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset");
+            if (gs.Length > 0)
+            {
+                var so = new SerializedObject(gs[0]);
+                var p = so.FindProperty("m_InstancingStripping");
+                if (p != null && p.intValue != 2) { p.intValue = 2; so.ApplyModifiedPropertiesWithoutUndo(); }
+            }
             PlayerSettings.companyName = "Nasser";
             PlayerSettings.productName = "Fog of War Observatory";
             PlayerSettings.colorSpace = ColorSpace.Linear;

@@ -103,36 +103,26 @@ namespace FogOfWar
                     v.t = holder; v.model = true;
                     var rs = go.GetComponentsInChildren<Renderer>();
                     var ms = new List<Material>();
-                    foreach (var r in rs) foreach (var m in r.sharedMaterials) { Own(m); ms.Add(m); }
+                    var mapped = b.Texture != null && Resources.Load<Texture2D>(b.Texture) != null ? PlanetMaterial(b) : null;
+                    foreach (var r in rs)
+                    {
+                        if (mapped != null) { var arr = new Material[r.sharedMaterials.Length]; for (int i = 0; i < arr.Length; i++) arr[i] = mapped; r.sharedMaterials = arr; ms.Add(mapped); continue; }
+                        foreach (var m in r.sharedMaterials) { Own(m); ms.Add(m); }
+                    }
                     v.mats = ms.ToArray();
                 }
                 else
                 {
-                    var m = OwnMat(Gfx.Mat("Planet"));
-                    m.SetColor("_ColA", b.ColA); m.SetColor("_ColB", b.ColB); m.SetColor("_Atmo", b.Atmo);
-                    m.SetFloat("_Kind", b.Look == Look.Rocky ? 0 : b.Look == Look.Cloudy ? 1 : b.Look == Look.Gas ? 2 : 3);
-                    m.SetFloat("_Seed", b.Name.GetHashCode() % 97);
-                    if (b.Name == "Titan")
-                    {
-                        // the art map is the 938 nm surface; in visible light Titan is an orange haze ball
-                        m.SetColor("_Atmo", new Color(0.9f, 0.62f, 0.3f, 0.9f));
-                        m.SetColor("_HazeCol", new Color(0.78f, 0.55f, 0.28f));
-                        m.SetFloat("_Haze", 0.85f);
-                    }
-                    if (b.Texture != null && Art.Bind(m, ("_MainTex", b.Texture)))
-                    {
-                        // Planets/<Body> maps are contrast-stretched per body; geometric albedo sets the absolute
-                        // level (perceptual curve, 0.3 → ×1). Older Textures/ maps are already absolute.
-                        var json = Resources.Load<TextAsset>("Planets/" + b.Name + "/Body");
-                        float ga = json != null ? JsonUtility.FromJson<BodyJson>(json.text).geometricAlbedo : 0;
-                        m.SetFloat("_Gain", ga > 0 && b.Texture.StartsWith("Planets/") ? Mathf.Pow(ga / 0.3f, 0.6f) : 1f);
-                    }
+                    var m = PlanetMaterial(b);
                     v.t = Gfx.Obj(b.Name, Root, sphere, m).transform;
                     v.mats = new[] { m };
                 }
                 vis.Add(v);
             }
             BuildRings();
+            belt = new Belt(sys);
+            beltView = new BeltView(belt, o => Own(o));
+            beltHist = Own(belt.HistogramTexture());
             // biggest first, so labels of large bodies win overlaps
             vis.Sort((x, y) => y.b.Radius.CompareTo(x.b.Radius));
             foreach (var b in sys.Bodies) if (b.Parent != null && b.Radius >= 100) ship.Obstacles.Add(b);
@@ -145,6 +135,11 @@ namespace FogOfWar
             stars.localRotation = Frame.StarsToRender;
 
         }
+
+        Belt belt;
+        BeltView beltView;
+        Texture2D beltHist;
+        bool showHist;
 
         class RingVis { public Vis planet; public Transform t; public Material m; public double outerKm; }
         [Serializable] class RingJson { public float innerKm, outerKm; }
@@ -202,6 +197,30 @@ namespace FogOfWar
                 // Saturn's rings are bright for real; the others are τ ≈ 10⁻⁶–10⁻¹ and nearly invisible unless boosted
                 r.m.SetFloat("_TauGain", faintRings && pv.b.Name != "Saturn" ? 1000f : 1f);
             }
+        }
+
+        Material PlanetMaterial(Body b)
+        {
+            var m = OwnMat(Gfx.Mat("Planet"));
+            m.SetColor("_ColA", b.ColA); m.SetColor("_ColB", b.ColB); m.SetColor("_Atmo", b.Atmo);
+            m.SetFloat("_Kind", b.Look == Look.Rocky ? 0 : b.Look == Look.Cloudy ? 1 : b.Look == Look.Gas ? 2 : 3);
+            m.SetFloat("_Seed", b.Name.GetHashCode() % 97);
+            if (b.Name == "Titan")
+            {
+                // the art map is the 938 nm surface; in visible light Titan is an orange haze ball
+                m.SetColor("_Atmo", new Color(0.9f, 0.62f, 0.3f, 0.9f));
+                m.SetColor("_HazeCol", new Color(0.78f, 0.55f, 0.28f));
+                m.SetFloat("_Haze", 0.85f);
+            }
+            if (b.Texture != null && Art.Bind(m, ("_MainTex", b.Texture)))
+            {
+                // Planets/<Body> maps are contrast-stretched per body; geometric albedo sets the absolute
+                // level (perceptual curve, 0.3 → ×1). Older Textures/ maps are already absolute.
+                var json = Resources.Load<TextAsset>("Planets/" + b.Name + "/Body");
+                float ga = json != null ? JsonUtility.FromJson<BodyJson>(json.text).geometricAlbedo : 0;
+                m.SetFloat("_Gain", ga > 0 && b.Texture.StartsWith("Planets/") ? Mathf.Pow(ga / 0.3f, 0.6f) : 1f);
+            }
+            return m;
         }
 
         string ModelFor(Body b)
@@ -462,6 +481,7 @@ namespace FogOfWar
                     // the holder is the body frame, so the IAU pole and prime meridian orient it like any planet
                     b.Axes(jd, out _, out var east, out var pole);
                     v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
+                    foreach (var m in v.mats) { m.SetMatrix("_WorldToBody", v.t.worldToLocalMatrix); m.SetFloat("_UseBodyFrame", 1); }
                 }
                 else
                 {
@@ -502,6 +522,7 @@ namespace FogOfWar
 
             PlaceRings(sunW);
             DrawOrbits();
+            beltView.Draw(jd, camW, ship.Pos, sunW, Cam, Map);
         }
 
 
@@ -520,6 +541,7 @@ namespace FogOfWar
                 var c = tgt ? new Color(1f, 0.71f, 0.28f, 0.75f) : isMoon ? new Color(0.5f, 0.6f, 0.85f, 0.35f) : new Color(0.45f, 0.55f, 0.85f, 0.4f);
                 // planet orbits fade out when the camera is in close: from a ship they'd be streaks across the screen
                 if (!isMoon) c.a *= Mathf.Lerp(tgt ? 0.3f : 0f, 1f, Mathf.Clamp01((float)(Math.Log10(Math.Max(camDist, 1)) - 3) / 4f));
+                if (b.Asteroid && !tgt) c.a *= 0.25f; // two dozen named asteroids: keep their orbits in the background
                 const int N = 180;
                 double period = 360 / Math.Max(Math.Abs(b.dL), 1e-9); // days
                 Vector3 prev = default;
@@ -697,6 +719,9 @@ namespace FogOfWar
                 list.Add(new Readout("Closing speed", Fmt.Num(closing, 3) + " km/s", closing > 0 ? Tone.Cold : Tone.Normal));
                 list.Add(new Readout("Flip-and-burn at " + Fmt.Num(ship.MaxG, 2) + " g", Dur(ship.EtaSeconds(sys, jd))));
             }
+            double rAu = ship.Pos.Mag / Frame.AU;
+            if (rAu > 1.7 && rAu < 5.6 && beltView.NearestIndex >= 0)
+                list.Add(new Readout("Nearest belt rock (1 % sample)", Km(beltView.NearestKm) + ", " + Fmt.Num(belt.RadiusKm[beltView.NearestIndex] * 2, 1) + " km wide"));
             if (faintRings) list.Add(new Readout("Faint rings", "brightened ×1000 (not real)", Tone.Bad));
             list.Add(new Readout("Autopilot", ship.Autopilot ? ship.Phase : ship.Landed != null ? ship.Phase : "off", ship.Autopilot ? Tone.Hot : Tone.Normal));
         }
@@ -734,6 +759,13 @@ namespace FogOfWar
             int wi = ui.Buttons(wl);
             if (wi >= 0) warpIdx = wi;
 
+            beltView.Visible = ui.Toggle("Show the asteroid belt (a 1 % sample: real rocks are ~1 million km apart)", beltView.Visible);
+            showHist = ui.Toggle("Belt semi-major axis histogram", showHist);
+            if (showHist)
+            {
+                ui.Image(beltHist, 90);
+                GUILayout.Label("1.6 → 5.6 AU. Kirkwood gaps (Jupiter resonances 4:1, 3:1, 5:2, 7:3, 2:1) at 2.06, 2.50, 2.82, 2.96, 3.28 AU; Hildas at 3.97 (3:2); Trojans at 5.2 (1:1). The gaps are in orbit size, so they don't show as empty rings in space.", ui.note);
+            }
             faintRings = ui.Toggle("Brighten faint rings ×1000 (Jupiter, Uranus, Neptune)", faintRings);
             GUILayout.Label("Camera", ui.label);
             int ci = ui.Buttons("Ship", "Target", "System map");
@@ -742,7 +774,7 @@ namespace FogOfWar
             if (ci == 2) { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
 
             // target picker: choose a planet, then its moons (largest first; tiny ones are clickable by label)
-            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun);
+            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid);
             var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
             int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
             if (si >= 0) SetTarget(planets[si]);
@@ -759,6 +791,10 @@ namespace FogOfWar
                 }
                 if (small > 0) GUILayout.Label(small + " smaller moons: click their labels in view", ui.label);
             }
+            var rocks = sys.Bodies.FindAll(x => x.Asteroid);
+            GUILayout.Label("Asteroids", ui.label);
+            int ri = ui.Buttons(rocks.ConvertAll(x => (x == ship.Target ? "● " : "") + x.Name).ToArray());
+            if (ri >= 0) SetTarget(rocks[ri]);
         }
     }
 }

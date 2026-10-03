@@ -28,6 +28,28 @@ const BODIES = [
   { name: "Saturn", cmd: "6", center: "500@10", seg: 32, n: 9 },
   { name: "Uranus", cmd: "7", center: "500@10", seg: 32, n: 8 },
   { name: "Neptune", cmd: "8", center: "500@10", seg: 32, n: 8 },
+  // named asteroids (heliocentric). Near-Earth ones get shorter segments for their planetary encounters.
+  { name: "Ceres", cmd: "1;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Pallas", cmd: "2;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Vesta", cmd: "4;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Hygiea", cmd: "10;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Psyche", cmd: "16;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Ida", cmd: "243;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Mathilde", cmd: "253;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Gaspra", cmd: "951;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Eros", cmd: "433;", center: "500@10", seg: 8, n: 12, asteroid: true },
+  { name: "Itokawa", cmd: "25143;", center: "500@10", seg: 8, n: 12, asteroid: true },
+  { name: "Ryugu", cmd: "162173;", center: "500@10", seg: 8, n: 12, asteroid: true },
+  { name: "Bennu", cmd: "101955;", center: "500@10", seg: 8, n: 12, asteroid: true },
+  { name: "Juno", cmd: "3;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Eunomia", cmd: "15;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Lutetia", cmd: "21;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Euphrosyne", cmd: "31;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Cybele", cmd: "65;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Sylvia", cmd: "87;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Davida", cmd: "511;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Hektor", cmd: "624;", center: "500@10", seg: 32, n: 10, asteroid: true },
+  { name: "Interamnia", cmd: "704;", center: "500@10", seg: 32, n: 10, asteroid: true },
 ];
 
 const MAX_LINES = 50000;
@@ -90,9 +112,12 @@ async function fitBody(b) {
   const stepMin = Math.round((b.seg * 1440) / (2.5 * b.n));
   const perChunkDays = Math.floor((MAX_LINES * stepMin) / 1440 / b.seg) * b.seg;
   const rows = [];
+  let first = null;
   for (let s = JD0; s < JD1; s += perChunkDays) {
     const e = Math.min(s + perChunkDays, JD1);
-    const chunk = parse(await fetchChunk(b, s, e, stepMin));
+    const text = await fetchChunk(b, s, e, stepMin);
+    first ??= text;
+    const chunk = parse(text);
     for (const r of chunk) if (!rows.length || r[0] > rows[rows.length - 1][0] + 1e-9) rows.push(r);
     process.stdout.write(`\r  ${b.name}: ${rows.length} samples`);
   }
@@ -120,6 +145,26 @@ async function fitBody(b) {
   head.writeUInt32LE(nSeg, 24); head.writeUInt32LE(b.n, 28);
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, b.name + ".bytes"), Buffer.concat([head, Buffer.from(coefs.buffer)]));
+  if (b.asteroid) {
+    // Fallback outside the fitted span: osculating elements from the state at the last samples (positions → velocity
+    // by central difference), heliocentric ecliptic J2000.
+    const MU = 1.32712440018e11, AU = 1.495978707e8, D = Math.PI / 180;
+    const k = rows.length - 2, dt = (rows[k + 1][0] - rows[k - 1][0]) * 86400;
+    const r = rows[k].slice(1), v = [0, 1, 2].map(d => (rows[k + 1][d + 1] - rows[k - 1][d + 1]) / dt);
+    const cr = (p, q) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]];
+    const dt3 = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2], mag = p => Math.hypot(...p);
+    const h = cr(r, v), rm = mag(r), hm = mag(h);
+    const ev = cr(v, h).map((x, d) => x / MU - r[d] / rm), e = mag(ev);
+    const sma = 1 / (2 / rm - dt3(v, v) / MU);
+    const nv = [-h[1], h[0], 0];
+    const node = Math.atan2(nv[1], nv[0]), inc = Math.acos(h[2] / hm);
+    const w = Math.atan2(dt3(cr(nv, ev), h) / hm, dt3(nv, ev));
+    const nu = Math.atan2(dt3(cr(ev, r), h) / hm, dt3(ev, r));
+    const E = 2 * Math.atan(Math.sqrt((1 - e) / (1 + e)) * Math.tan(nu / 2)), M = E - e * Math.sin(E);
+    const n = Math.sqrt(MU / sma ** 3); // rad/s
+    const el = { epochJd: rows[k][0], e, qAu: (sma * (1 - e)) / AU, tpJd: rows[k][0] - M / n / 86400, node: node / D, w: w / D, i: inc / D };
+    fs.writeFileSync(path.join(OUT, b.name + ".elements.json"), JSON.stringify(el));
+  }
   console.log(`\r  ${b.name}: ${rows.length} samples, ${nSeg} segments × ${b.n} coefs, max fit error ${maxErr.toFixed(4)} km`);
 }
 
