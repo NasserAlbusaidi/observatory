@@ -123,6 +123,9 @@ namespace FogOfWar
                 S("sb-wd-imbh",           new Vector3(0, 6f, 30f), 50, Tde(1, 6f, -1, 60, untilR: 1, logMass: 3f), ui: true),
                 // the main tour's path, and the same throw played in real time (40 s of 60 fps frames)
                 S("sb-tour-repro",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 500); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-follow-8s",         Vector3.zero, 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 480; i++) B(s).Tick(1f / 60); }), ui: true, free: true),
+                S("sb-follow-16s",        Vector3.zero, 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 960; i++) B(s).Tick(1f / 60); }), ui: true, free: true),
+                S("sb-follow-30s",        Vector3.zero, 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 1800; i++) B(s).Tick(1f / 60); }), ui: true, free: true),
                 S("sb-stream-3s",         new Vector3(0, 12f, 30f), 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 180; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
                 S("sb-stream-6s",         new Vector3(0, 12f, 30f), 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 360; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
                 S("sb-tour-flare",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 4.2e5); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
@@ -176,7 +179,8 @@ namespace FogOfWar
                 Time.timeScale = 1;
                 try { s.setup?.Invoke(app.Current); }
                 catch (Exception e) { log.WriteLine($"{s.name}: setup threw {e.InnerException?.Message ?? e.Message}"); errors++; }
-                app.Orbit.enabled = false;
+                if (!s.free) app.Orbit.enabled = false;
+                else if (app.Orbit.enabled) app.Orbit.Snap();   // follow-camera shots: jump to where the camera is heading
                 cam.fieldOfView = s.fov;
                 var baseRot = s.free ? Quaternion.identity : Quaternion.LookRotation(s.look - s.pos, Vector3.up) * Quaternion.Euler(0, 0, s.roll);
                 if (!s.free) cam.transform.SetPositionAndRotation(s.pos, baseRot);
@@ -273,10 +277,23 @@ namespace FogOfWar
             // One throw-away render per configuration first, so the first row does not carry the warm-up (audit #56).
             cam.targetTexture = rt; cam.Render();
             Time.timeScale = 1;
+            // second pass (audit #62): a busy sandbox: one shredded star's debris, two intact white dwarfs and a probe
+            // (three bodies tested on every ray step), from the same camera
+            foreach (bool busy in new[] { false, true })
+            {
             Default(app.Current);
+            if (busy)
+            {
+                var bs = (BlackHoleScene)app.Current;
+                Set(bs, "periRs", 5f); bs.Throw(0); bs.AdvanceUntilBody(1, 40);
+                Set(bs, "warpTarget", -1f); Set(bs, "logWarp", 0f);
+                bs.Throw(1); bs.Throw(1); bs.DropProbe(1);
+            }
+            app.Orbit.enabled = false;
             foreach (var res in new[] { new Vector2Int(1920, 1080), new Vector2Int(2560, 1440), new Vector2Int(3840, 2160) })
                 foreach (int q in new[] { 0, 1, 2 })
                 {
+                    if (busy && !((res.x == 1920 && q == 1) || (res.x == 3840 && q == 2))) continue;
                     app.Quality = q;
                     var trt = new RenderTexture(res.x, res.y, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                     trt.Create();
@@ -291,10 +308,11 @@ namespace FogOfWar
                     for (int k = 0; k < N; k++) cam.Render();
                     ReadOne(trt, small);
                     float ms = (Time.realtimeSinceStartup - t0) * 1000 / N;
-                    log.WriteLine($"timing {res.x}x{res.y} quality {q}: {ms:0.0} ms per frame");
+                    log.WriteLine($"timing{(busy ? " (busy sandbox)" : "")} {res.x}x{res.y} quality {q}: {ms:0.0} ms per frame");
                     cam.targetTexture = null;
                     trt.Release(); Destroy(trt); Destroy(small);
                 }
+            }
 
             cam.targetTexture = null;
             if (shell != null) shell.Surface = null;

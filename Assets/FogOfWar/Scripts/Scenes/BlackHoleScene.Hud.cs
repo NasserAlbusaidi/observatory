@@ -80,7 +80,7 @@ namespace FogOfWar
             // debris: frame the inner half of it (median r of every 8th particle, doubled)
             hudRs.Clear();
             for (int i = 0; i < nParts; i += 8) if (parts[i].alive) hudRs.Add(parts[i].r);
-            if (hudRs.Count > 0) { hudRs.Sort(); want = Math.Max(want, Math.Min(hudRs[hudRs.Count / 2] * 2, 1500)); }
+            if (hudRs.Count > 0) { hudRs.Sort(); want = Math.Max(want, Math.Min(hudRs[hudRs.Count / 2] * 2, 8000)); }
             mapR = want > mapR * 1.5 || want < mapR / 1.5 ? want : mapR + (want - mapR) * 0.08;
             Ui.Text(mapScale, $"edge {mapR / 2:0} rs, drawn flat (not lensed)");
             mapPlot.MarkDirtyRepaint();

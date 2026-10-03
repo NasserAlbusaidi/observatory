@@ -67,7 +67,7 @@ namespace FogOfWar
         }
 
         const int MaxParts = 12000, NR = 448, NP = 512;
-        const double TexRMax = 2000;   // M: the outgoing stream stays drawn while it stretches
+        const double TexRMax = 8000;   // M: the outgoing stream stays drawn to its apocentre
         Geo[] parts;
         float[] pTemp, pHeat, pBase;
         byte[] pPhase;
@@ -82,7 +82,7 @@ namespace FogOfWar
 
         int throwKind;
         float periRs = 5f, logWarp = 1.5f;
-        bool guides = true, ride, diskAutoOff;
+        bool guides = true, ride, diskAutoOff, follow = true, followOn;
         double autoWarpFrom = -1;
         // after a break-up the warp is held for a few seconds so the stream can be seen stretching, then ramped up to
         // warpTarget (audit #46)
@@ -117,7 +117,8 @@ namespace FogOfWar
         {
             bodies.Clear(); probes.Clear(); nParts = 0; riding = null; ride = false;
             if (diskAutoOff) disk = true;
-            diskAutoOff = false; autoWarpFrom = -1; warpTarget = -1;
+            diskAutoOff = false; autoWarpFrom = -1; warpTarget = -1; debrisMedR = -1;
+            if (followOn) { Orbit.target = Vector3.zero; Orbit.distance = 24; followOn = false; }
             camVel = new Vector4(0, 0, 0, 1);
             lightCurve.Clear(); lum = fallbackRate = fallbackAcc = accreted = 0; heatScale = 1e-9; curveT = 0; lastDE = 0; simT = 0;
             Orbit.enabled = true;
@@ -208,8 +209,46 @@ namespace FogOfWar
             {
                 double tmin = 2 * Math.PI * Math.Pow(1 / (2 * dE), 1.5);
                 float target = (float)Math.Min(6, Math.Log10(tmin / 20));
-                if (target > logWarp) { autoWarpFrom = logWarp; warpTarget = target; warpHold = 4f; }
+                if (target > logWarp) { autoWarpFrom = logWarp; warpTarget = target; warpHold = 2f; debrisOut = 1; }
             }
+        }
+
+        // Median radius, centre (world, rs units) and the still-outgoing fraction of the bound debris that has not come
+        // back yet (phases 0 and 1); every 4th particle.
+        double debrisMedR = -1, debrisOut = 1;
+        Vector3 debrisCentre;
+        readonly List<double> trackR = new List<double>();
+        void TrackDebris()
+        {
+            trackR.Clear();
+            double sx = 0, sz = 0; int bound = 0, back = 0;
+            for (int i = 0; i < nParts; i += 4)
+            {
+                ref var p = ref parts[i];
+                if (!p.alive || p.E >= 1) continue;
+                bound++;
+                if (pPhase[i] == 2) { back++; continue; }
+                trackR.Add(p.r);
+                sx += p.r * Math.Cos(p.phi); sz += p.r * Math.Sin(p.phi);
+            }
+            if (trackR.Count == 0) { debrisMedR = -1; debrisOut = bound > 0 ? 0 : 1; return; }
+            trackR.Sort();
+            debrisMedR = trackR[trackR.Count / 2];
+            debrisOut = (double)trackR.Count / Math.Max(bound, 1);
+            debrisCentre = new Vector3((float)(sx / trackR.Count), 0, (float)(sz / trackR.Count)) * 0.5f;
+        }
+
+        // "Camera follows the debris": the orbit camera aims between the hole and the debris and backs off to keep both
+        // in view; drag still turns it (audit #46, #63).
+        void FollowCamera(float dt)
+        {
+            if (!follow || riding != null || warpTarget <= 0 || debrisMedR <= 0) { followOn = false; return; }
+            followOn = true;
+            Orbit.maxDistance = 1200;
+            float k = 1 - Mathf.Exp(-dt * 2.5f);
+            Orbit.target = Vector3.Lerp(Orbit.target, debrisCentre * 0.5f, k);
+            float want = Mathf.Clamp(debrisCentre.magnitude * 1.5f + 10, 24, 1100);
+            Orbit.distance = Mathf.Lerp(Orbit.distance, want, k);
         }
 
         // Kill the oldest n live particles (they were added first, and compaction keeps the order).
@@ -321,10 +360,19 @@ namespace FogOfWar
         void TickSandbox(float dt)
         {
             double a = A;
+            // After a break-up the warp follows the bound debris (audit #46): one local orbital time r^{3/2} (at the
+            // debris's median radius) passes in about two seconds of play. The stream is watched passing pericentre,
+            // stretching on its way out, turning round and coming back; the warp tops out at warpTarget far away and
+            // drops again as the debris returns. It lets go once most of the bound debris is back.
             if (warpTarget > 0)
             {
                 if (warpHold > 0) warpHold -= dt;
-                else { logWarp = Mathf.Min(warpTarget, logWarp + dt * 1.2f); if (logWarp >= warpTarget) warpTarget = -1; }
+                if (debrisOut < 0.1) { logWarp = Mathf.Max(logWarp, 1.5f); warpTarget = -1; }
+                else if (debrisMedR > 0)
+                {
+                    float want = (float)Math.Log10(Math.Pow(Math.Max(debrisMedR, 8), 1.5) / 2);
+                    logWarp = Mathf.Clamp(want, 0.8f, warpTarget);
+                }
             }
             double h = dt * Math.Pow(10, logWarp);
             simT += h;
@@ -370,6 +418,7 @@ namespace FogOfWar
                 if (pHeat[i] > heatMax) heatMax = pHeat[i];
             }
             heatScale = Math.Max(heatScale * Math.Exp(-h / 3000), heatMax);
+            TrackDebris();
             if (nParts > MaxParts / 2 && simRng.NextDouble() < 0.02) CompactParticles();
 
             foreach (var p in probes) StepProbe(p, h, dt);
@@ -429,7 +478,8 @@ namespace FogOfWar
                 ref var p = ref parts[i];
                 if (!p.alive || p.r > TexRMax) continue;
                 double fh = pHeat[i] / hs;
-                float w = (float)((pBase[i] + 1.5 * fh * pBase[i] * 4) * 100 / Math.Max(p.r * p.r, 1));
+                // per unit length, not area: a stream that stretches as it climbs stays visible (display choice)
+                float w = (float)((pBase[i] + 1.5 * fh * pBase[i] * 4) * 500 / Math.Max(p.r, 1));
                 float T = pTemp[i] + 15000f * (float)Math.Pow(Math.Max(fh, 0), 0.25);
                 p.FourVelocity(a, out _, out double ur, out double uph);
                 double u = (Math.Log(p.r) - lnMin) * inv * NR - 0.5;
@@ -461,7 +511,7 @@ namespace FogOfWar
             m.SetFloat("_GuideOn", guides ? 1 : 0);
 
             int n = 0;
-            var pos = new Vector4[4]; var axis = new Vector4[4]; var col = new Vector4[4]; var vel = new Vector4[4];
+            var pos = new Vector4[4]; var axis = new Vector4[4]; var col = new Vector4[4]; var vel = new Vector4[4]; var rad = new Vector4[4];
             foreach (var b in bodies)
             {
                 if (b.state != 0 || n >= 4 || b.Rm > 40) continue;
@@ -484,7 +534,9 @@ namespace FogOfWar
                 vel[n] = new Vector4((float)ut, (float)ur, (float)uph, 0);
                 n++;
             }
+            for (int i = 0; i < n; i++) rad[i] = new Vector4(Mathf.Sqrt(Mathf.Max(((Vector3)pos[i]).sqrMagnitude - (float)(a * a), 0)), pos[i].w * Mathf.Max(axis[i].w, 1) * 1.2f + 0.05f, 0, 0);
             m.SetInt("_NB", n);
+            m.SetVectorArray("_BRad", rad);
             m.SetVectorArray("_BPos", pos); m.SetVectorArray("_BAxis", axis); m.SetVectorArray("_BCol", col); m.SetVectorArray("_BVel", vel);
         }
 
@@ -568,7 +620,7 @@ namespace FogOfWar
                 rmin = Math.Min(rmin, parts[i].r); rmax = Math.Max(rmax, parts[i].r);
             }
             string b = bodies.Count > 0 ? $" body r={bodies[bodies.Count - 1].g.r:0.0} rt={bodies[bodies.Count - 1].rt:0.0} state={bodies[bodies.Count - 1].state}" : "";
-            return $"t={simT:0} parts {nParts} alive {alive} nan {nan} circ {ph2} r {rmin:0.0}..{rmax:0.0} heat {heatScale:0.0e0} lum {lum:0.00e0}{b}";
+            return $"cam d={Orbit.distance:0.0} tgt={Orbit.target} follow={followOn} warp={logWarp:0.00} t={simT:0} parts {nParts} alive {alive} nan {nan} circ {ph2} r {rmin:0.0}..{rmax:0.0} heat {heatScale:0.0e0} lum {lum:0.00e0}{b}";
         }
 
         // Run until the ridden probe is within r (M units).
@@ -729,6 +781,7 @@ namespace FogOfWar
             ui.Section("Sandbox: probes and light");
             int k = ui.Buttons(ProbeNames);
             if (k >= 0) DropProbe(k);
+            follow = ui.Toggle("Camera follows the debris", follow);
             bool r = ui.Toggle("Ride along with the probe", ride);
             if (r != ride)
             {

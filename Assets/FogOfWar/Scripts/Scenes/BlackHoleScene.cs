@@ -53,6 +53,7 @@ namespace FogOfWar
         {
             SyncMass();
             TickSandbox(dt);
+            FollowCamera(dt);
         }
 
         void SyncMass()
@@ -87,7 +88,7 @@ namespace FogOfWar
             // brighter, which would clip to white; part of that is taken out so the structure stays visible
             mat.SetFloat("_Gain", (float)System.Math.Pow(FluxPeak0 / FluxPeak().f, 0.6));
             mat.SetFloat("_SwirlRate", 15);   // disc pattern speed, sped up: ISCO period ≈ 6 s instead of 92 GM/c³
-            mat.SetFloat("_StepK", App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.12f);
+            mat.SetFloat("_StepK", App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.15f);   // Sharp 0.12 cost 4K over 16 ms (audit #61)
             mat.SetFloat("_Disk", disk ? 1 : 0);
             mat.SetFloat("_Doppler", doppler ? 1 : 0);
             mat.SetFloat("_Lens", lens ? 1 : 0);

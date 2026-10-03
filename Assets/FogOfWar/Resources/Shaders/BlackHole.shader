@@ -45,6 +45,7 @@ Shader "FogOfWar/BlackHole"
             // bodies: position (world, M units) and radius; stretch axis and factor; temperature, emissivity, kind; 4-velocity
             int _NB;
             float4 _BPos[4], _BAxis[4], _BCol[4], _BVel[4];
+            float4 _BRad[4];               // body's Boyer-Lindquist r and its reach (drawn radius x stretch), for a cheap test
 
             // ---- disc ------------------------------------------------------------------------------------------------
 
@@ -266,7 +267,7 @@ Shader "FogOfWar/BlackHole"
                 float rCap = _RH + 1e-3;
                 float projR = 1e-3, projT = 1e-3 * (q + b * b + 1.0);
                 bool plane = _Disk > 0.5 || _DebrisRange.z > 0.5 || _GuideOn > 0.5;
-                float3 pPrev = _NB > 0 ? toCart(s.x, s.z, ph, a) : 0;
+                float3 pPrev = 0;
 
                 float3 col = 0;
                 float trans = 1.0, crossings = 0.0;
@@ -289,8 +290,16 @@ Shader "FogOfWar/BlackHole"
 
                     // solid bodies along this segment (straight chord: segments are short where bending is strong)
                     float tBody = 2.0; float3 nrm = 0; int hitI = -1; float3 pNext = 0;
+                    bool nearBody = false;
                     if (_NB > 0)
                     {
+                        // only steps whose radial span reaches a body pay for the Cartesian chord (audit #62)
+                        float rlo = min(s.x, sn.x), rhi = max(s.x, sn.x);
+                        [loop] for (int bj = 0; bj < _NB; bj++) nearBody = nearBody || (_BRad[bj].x + _BRad[bj].y >= rlo && _BRad[bj].x - _BRad[bj].y <= rhi);
+                    }
+                    if (nearBody)
+                    {
+                        pPrev = toCart(s.x, s.z, ph, a);
                         pNext = toCart(sn.x, sn.z, phn, a);
                         [loop] for (int bi = 0; bi < _NB; bi++)
                         {
@@ -348,7 +357,7 @@ Shader "FogOfWar/BlackHole"
                         trans = 0;
                         break;
                     }
-                    s = sn; ph = phn; pPrev = pNext;
+                    s = sn; ph = phn;
                     if (s.x < rCap) break;
                     if (s.x > _RMax && s.y > 0.0) { escaped = true; break; }
                 }
