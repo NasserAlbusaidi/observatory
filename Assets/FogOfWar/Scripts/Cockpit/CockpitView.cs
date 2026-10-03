@@ -129,6 +129,37 @@ namespace FogOfWar.Cockpit
 
         public bool Visible => on;
 
+        // True when a screen point (pixels, origin bottom-left) shows the hull-camera display, not the cabin around it.
+        // The HUD keeps its world markers to the display: a marker drawn over a wall or an MFD would mark nothing.
+        public bool OnDisplay(Vector3 screen)
+        {
+            if (!on) return true;
+            var ray = cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0));
+            var o = root.InverseTransformPoint(ray.origin);
+            var d = root.InverseTransformDirection(ray.direction);
+            if (d.z <= 1e-4f) return false;
+            float t = (CockpitMesh.WallZ - o.z) / d.z;
+            var p = o + d * t;
+            return Mathf.Abs(p.x) <= CockpitMesh.HalfW && p.y >= CockpitMesh.Bottom && p.y <= CockpitMesh.Top;
+        }
+
+        // Screen height (pixels from the bottom) of the top of the MFD row, for HUD panels that must sit above it;
+        // 0 when the row is out of view.
+        public float ConsoleTop()
+        {
+            if (!on) return 0;
+            float top = 0;
+            var rot = CockpitMesh.MfdRotation(Vector3.zero);
+            foreach (var m in CockpitMesh.MfdCentres)
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    var p = m + rot * new Vector3(s * (CockpitMesh.MfdW / 2 + 0.03f), CockpitMesh.MfdH / 2 + 0.035f, 0);
+                    var sp = cam.WorldToScreenPoint(root.TransformPoint(p));
+                    if (sp.z > 0 && sp.x >= 0 && sp.x <= cam.pixelWidth) top = Mathf.Max(top, sp.y);
+                }
+            return Mathf.Clamp(top, 0, cam.pixelHeight);
+        }
+
         public void Dispose()
         {
             if (main != null) main.cullingMask |= 1 << Layer;

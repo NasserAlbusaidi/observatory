@@ -88,12 +88,21 @@ namespace FogOfWar
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowuidump") >= 0) Dump(shell.HudLayer, 0);
                 if (size == sizes[0] && Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcapturetest") >= 0) yield return CaptureTest();
                 Controls.Tap(Controls.Action.ThrottleCut);
-                // cockpit view (chase → orbit → cockpit), then back to chase
-                Controls.Tap(Controls.Action.CameraMode); yield return null;
-                Controls.Tap(Controls.Action.CameraMode); yield return Wait(0.5f);
-                yield return Shot(app, shell, camRT, uiRT, tag, "06f-cockpit");
-                Controls.Tap(Controls.Action.CameraMode); yield return null;
                 var os = app.Current as OpenSystemScene;
+                if (os != null)
+                {
+                    // cockpit view: straight ahead, then looking down at the console (HUD must stay off the MFDs)
+                    var setCam = typeof(OpenSystemScene).GetMethod("SetCam", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var lookPitch = typeof(OpenSystemScene).GetField("lookPitch", BindingFlags.Instance | BindingFlags.NonPublic);
+                    setCam.Invoke(os, new object[] { 2 });
+                    yield return Wait(0.5f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06f-cockpit");
+                    lookPitch.SetValue(os, 22f);
+                    yield return Wait(0.3f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06g-cockpit-look-down");
+                    setCam.Invoke(os, new object[] { 0 });
+                    yield return null;
+                }
                 os?.ShowConsoleTab(5);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
                 os?.ShowCodex(1);

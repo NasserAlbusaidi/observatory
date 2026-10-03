@@ -219,7 +219,7 @@ namespace FogOfWar
         {
             var sp = Cam.WorldToScreenPoint(dirRender.normalized * 10f);
             at = hudShell.ScreenToHud(sp);
-            bool on = sp.z > 0 && sp.x >= 0 && sp.y >= 0 && sp.x <= Cam.pixelWidth && sp.y <= Cam.pixelHeight;
+            bool on = sp.z > 0 && sp.x >= 0 && sp.y >= 0 && sp.x <= Cam.pixelWidth && sp.y <= Cam.pixelHeight && CockpitShows(sp);
             Ui.Show(m, on);
             if (on) m.style.translate = new Translate(at.x, at.y);
             return on;
@@ -241,7 +241,7 @@ namespace FogOfWar
             var rel = tw - camW;
             var dir = Frame.U(rel);
             var sp = Cam.WorldToScreenPoint(dir.normalized * 10f);
-            bool inView = sp.z > 0 && sp.x >= 0 && sp.y >= 0 && sp.x <= Cam.pixelWidth && sp.y <= Cam.pixelHeight;
+            bool inView = sp.z > 0 && sp.x >= 0 && sp.y >= 0 && sp.x <= Cam.pixelWidth && sp.y <= Cam.pixelHeight && CockpitShows(sp);
             string dist = Km((tw - ship.Pos).Mag - ship.Target.Radius);
             if (inView)
             {
@@ -269,7 +269,7 @@ namespace FogOfWar
                 d.Normalize();
                 float hw = hudShell.HudWidth / 2 - 60, hh = hudShell.H / 2 - 90;
                 float k = Mathf.Min(hw / Mathf.Max(Mathf.Abs(d.x), 1e-4f), hh / Mathf.Max(Mathf.Abs(d.y), 1e-4f));
-                var at = new Vector2(hudShell.HudWidth / 2 + d.x * k, hudShell.H / 2 - d.y * k);
+                var at = OntoDisplay(new Vector2(hudShell.HudWidth / 2 + d.x * k, hudShell.H / 2 - d.y * k));
                 mkEdge.style.translate = new Translate(at.x, at.y);
                 float deg = Mathf.Atan2(-d.y, d.x) * Mathf.Rad2Deg; // screen y grows downward
                 mkEdge.Q("chev").style.rotate = new Rotate(deg + 45);

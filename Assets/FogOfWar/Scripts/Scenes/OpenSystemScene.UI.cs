@@ -219,7 +219,7 @@ namespace FogOfWar
             float dist = renderPos.magnitude;
             if (dist < 1e-6f) return;
             var sp = Cam.WorldToScreenPoint(renderPos);
-            if (sp.z <= 0) return;
+            if (sp.z <= 0 || !CockpitShows(sp)) return;
             float rpx = (float)renderRadius / dist * pxPerRad;
             bool tgt = b != null && b == ship.Target;
             if (rpx > 40 && !tgt) return; // big enough to recognise
