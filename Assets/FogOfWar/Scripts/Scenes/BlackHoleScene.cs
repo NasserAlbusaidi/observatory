@@ -19,6 +19,7 @@ namespace FogOfWar
         int massIdx = 1;
         bool disk = true, doppler = true, lens = true, clumpy = true;
         float outer = 13, temp = 4800, spin;
+        public void SetSpin(float a) => spin = Mathf.Clamp(a, 0, 0.998f); // tour
         float peakSpin = -1; (double r, double f) peak;
         static readonly double FluxPeak0 = Kerr.FluxPeak(0).f;
         (double r, double f) FluxPeak() { if (peakSpin != spin) { peakSpin = spin; peak = Kerr.FluxPeak(spin); } return peak; }
