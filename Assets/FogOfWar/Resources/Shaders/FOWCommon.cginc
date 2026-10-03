@@ -183,7 +183,9 @@ float3 displayToOutput(float3 c)
 // multiplies its output by its own sunlight (irr: 1 at 1 AU, inverse square) times the exposure; self-luminous
 // light (city lights, glows) by the exposure alone.
 float _FOWExposure;
-float fowSunlit(float irr) { return irr * _FOWExposure; }
+// Capped at 1: a sunlit surface never shows brighter than fully exposed sunlight, so the extra exposure the camera
+// takes in an eclipse lifts the ship and glowing light only, not the sunlit planets in view (min(exposure, 1/irr)).
+float fowSunlit(float irr) { return min(irr * _FOWExposure, 1.0); }
 // The same scale applied to display-space colour before displayToOutput(), for shaders that add lit and glowing
 // terms there: a sum keeps today's look exactly when the scale is 1.
 float fowDisplayGain(float k) { return pow(max(k, 0.0), 1.0 / 2.2); }

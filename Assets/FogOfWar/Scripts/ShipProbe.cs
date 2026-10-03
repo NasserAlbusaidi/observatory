@@ -67,6 +67,17 @@ namespace FogOfWar
                 yield return Shot($"{v.body}-{v.tag}");
             }
             if (fps.Count > 0) log.WriteLine($"fps over all views: min {fps.Min():F0}, mean {fps.Average():F0}");
+            // photo mode stacks PhotoFX on the same camera as the open world's bloom: check both still draw
+            Park(s, "Earth", 35f, 0f);
+            yield return new WaitForSecondsRealtime(2f);
+            Capture.TogglePhoto();
+            yield return new WaitForSecondsRealtime(1f);
+            log.WriteLine($"  photo mode active {Capture.PhotoActive}, bloom {(app.Cam.GetComponent<OpenWorld.Bloom>()?.enabled ?? false)}");
+            yield return Shot("photo");
+            Capture.TestApproach();
+            yield return new WaitForSecondsRealtime(1f);
+            yield return Shot("photo-hull");
+            Capture.TogglePhoto();
             log.Close();
             Application.Quit();
         }
