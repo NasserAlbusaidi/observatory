@@ -255,6 +255,43 @@ namespace FogOfWar
                 yield return Shot("c09-rescued");
             }
 
+            // 10. an intercept: back to Luna, then catch a ship under thrust between two inner ports
+            ship.MaxG = 1; // the arrival tests left it at 0.3 g
+            yield return Trip(sys.Moon, 0, "back to Luna", () => career.Docked?.Name == "Luna" && ship.Phase == "in orbit", 3, 60);
+            Check(career.Docked?.Name == "Luna", "docked at Luna for the intercept");
+            if (career.Docked != null)
+            {
+                career.BuyFuel(ship, 1000);
+                var inner = new[] { "Earth orbit", "Luna", "Mars orbit" };
+                Contract ic = null;
+                for (int seed = 1; seed < 500 && ic == null; seed++)
+                {
+                    var cand = career.Intercept(new System.Random(seed), sys, jd);
+                    if (cand != null && Array.IndexOf(inner, cand.RunFrom) >= 0 && Array.IndexOf(inner, cand.RunTo) >= 0 && cand.RunTo != "Luna") ic = cand;
+                }
+                Check(ic != null, "an inner-system intercept can be posted");
+                if (ic != null)
+                {
+                    var probe = Career.MakeRunner(ic, sys);
+                    double e0 = (probe.Path(ic.T0 + 1e-7) - sys.PosAt(sys[Career.PortAt(ic.RunFrom).Body], ic.T0)).Mag;
+                    double e1 = (probe.Path(ic.T1 - 1e-7) - sys.PosAt(sys[Career.PortAt(ic.RunTo).Body], ic.T1)).Mag;
+                    double peak = Career.RunnerPeakG(probe, ic);
+                    Check(e0 < 50 && e1 < 50 && peak > 0.1 && peak < 0.4, $"runner course: leaves {ic.RunFrom} ({e0:F1} km off), reaches {ic.RunTo} ({e1:F1} km off), peak {peak:F3} g");
+                    career.Accept(ic, jd);
+                    var runner = sys[ic.To];
+                    double c4 = career.Credits;
+                    yield return Trip(runner, 0, "intercept " + ic.To, () => ic.Dwell > 0 || !career.Active.Contains(ic), 5, 150);
+                    Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.2);
+                    Put("warpIdx", 0);
+                    yield return new WaitForSecondsRealtime(1.5f);
+                    yield return Shot("c10-intercept");
+                    Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 0), 0.16);
+                    yield return Fly(() => !career.Active.Contains(ic), 2, 60);
+                    State("after intercept");
+                    Check(!career.Active.Contains(ic) && career.Credits > c4 && sys[ic.To] == null, $"cargo handed over in flight and paid ({career.Credits - c4:N0} cr)");
+                }
+            }
+
             State("end");
             log.WriteLine($"done: {fails} failed checks");
             log.Close();
