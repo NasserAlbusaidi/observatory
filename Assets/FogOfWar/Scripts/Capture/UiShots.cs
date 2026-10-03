@@ -100,6 +100,16 @@ namespace FogOfWar
                     lookPitch.SetValue(os, 22f);
                     yield return Wait(0.3f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06g-cockpit-look-down");
+                    // QA-050: photo mode from the cockpit starts outside the hull and the free camera moves
+                    lookPitch.SetValue(os, 0f);
+                    Capture.TogglePhoto();
+                    yield return Wait(0.5f);
+                    log.WriteLine("    cockpit photo start: " + Capture.RigState);
+                    Capture.TestFly(new Vector3(0, 0.6f, -6f), 1f, 30f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06h-cockpit-photo-moved");
+                    log.WriteLine("    cockpit photo after move: " + Capture.RigState);
+                    Capture.TogglePhoto();
+                    yield return null;
                     setCam.Invoke(os, new object[] { 0 });
                     yield return null;
                 }
