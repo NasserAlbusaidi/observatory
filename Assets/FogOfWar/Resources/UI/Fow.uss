@@ -246,3 +246,9 @@
 
 .panel-head, .row { flex-shrink: 0; }
 .job-title { flex-grow: 1; flex-shrink: 1; white-space: normal; margin-right: 8px; }
+
+/* codex achievements */
+.feat { align-items: flex-start; padding: 7px 8px; margin-bottom: 4px; border-left-width: 2px; border-color: rgba(150, 175, 255, 0.15); background-color: rgba(0, 0, 0, 0.18); }
+.feat.got { border-color: rgb(255, 181, 71); background-color: rgba(255, 181, 71, 0.07); }
+.feat-mark { width: 22px; font-size: 16px; color: rgb(141, 148, 179); }
+.feat.got > .feat-mark { color: rgb(255, 181, 71); }

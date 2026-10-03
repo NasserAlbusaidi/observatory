@@ -86,6 +86,13 @@ namespace FogOfWar
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowuidump") >= 0) Dump(shell.HudLayer, 0);
                 if (size == sizes[0] && Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcapturetest") >= 0) yield return CaptureTest();
                 Controls.Tap(Controls.Action.ThrottleCut);
+                var os = app.Current as OpenSystemScene;
+                os?.ShowConsoleTab(5);
+                yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
+                os?.ShowCodex(1);
+                yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
+                os?.ShowCodex(0);
+                os?.ShowConsoleTab(0);
                 Controls.Tap(Controls.Action.Help);
                 yield return Wait(0.3f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "07-help");

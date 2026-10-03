@@ -86,7 +86,7 @@ namespace FogOfWar
             var sb = new StringBuilder();
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
               .Append(career.Docked?.Name).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
-              .Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append('|').Append(Math.Round(jd, 2));
+              .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append('|').Append(Math.Round(jd, 2));
             foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell));
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
             return sb.ToString();
@@ -150,12 +150,14 @@ namespace FogOfWar
                     var head = Ui.E(card, "row");
                     Ui.L(head, j.Title.ToUpperInvariant(), "t-h3", "f-cond", "job-title");
                     Ui.L(head, $"{j.Pay:N0} cr", "t-val", "f-mono", "accent");
-                    string what = j.Kind == JobKind.Survey
-                        ? $"Survey {j.To}: {Fmt.Num(100 * j.Dwell / j.DwellNeeded, 0)} % scanned. Stay within {Km(Career.ScanRange(sys[j.To]))} with the drive off."
+                    string what = j.Kind == JobKind.Rescue
+                        ? (j.Dwell > 0 ? $"Crew crossing over: {Fmt.Num(100 * j.Dwell / Career.TransferSeconds, 0)} %" : $"Match velocity within {Career.RescueKm:N0} km and {Career.RescueKms * 1000:N0} m/s, drive off, then hold.")
+                        : j.Kind == JobKind.Survey
+                        ? $"Survey {j.To}: {Fmt.Num(100 * j.Dwell / j.DwellNeeded, 0)} % scanned. Stay within {Km(career.Codex.ScanRange(sys[j.To]))} with the drive off."
                         : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To}" : $"{j.Tonnes:N0} t to {j.To}";
                     Ui.L(card, what, "t-note");
                     Ui.L(card, left >= 0 ? "Due in " + Days(left) : "LATE by " + Days(-left), "t-label", "f-mono", left >= 0 ? "dim" : "warn");
-                    var body = j.Kind == JobKind.Survey ? sys[j.To] : sys[Career.PortAt(j.To)?.Body ?? ""];
+                    var body = career.TargetOf(j);
                     var row = Ui.E(card, "row");
                     row.style.marginTop = 6;
                     var st = Ui.B(row, "Set target", () => { if (body != null) SetTarget(body); }, "small");
@@ -184,13 +186,16 @@ namespace FogOfWar
                 }
                 if (career.TankLevel < Career.MaxTankLevel)
                     Ui.B(row, $"Tank +{Career.TankStep:N0} t ({Career.TankCost:N0} cr)", () => career.BuyTank(ship));
+                if (career.Codex.SensorLevel == 0)
+                    Ui.B(row, $"Sensors: ×2 range, ½ scan time ({Codex.SensorCost:N0} cr)", () => career.BuySensors());
 
                 Ui.Section(c, "Contract board (refreshes each day)");
                 if (career.Board.Count == 0) Ui.L(c, "No work posted.", "t-note");
                 foreach (var job in career.Board.ToArray())
                 {
                     var j = job;
-                    var dest = j.Kind == JobKind.Survey ? sys[j.To] : sys[Career.PortAt(j.To).Body];
+                    var dest = career.TargetOf(j);
+                    if (dest == null) continue;
                     double d = Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0);
                     Career.Trip(d, career.DriveRating * Ship.G0, 1, ship.Mass + j.Load, out double t, out _, out double fuel);
                     var card = Ui.E(c, "panel", "soft");
@@ -198,7 +203,7 @@ namespace FogOfWar
                     var head = Ui.E(card, "row");
                     Ui.L(head, j.Title.ToUpperInvariant(), "t-h3", "f-cond", "job-title");
                     Ui.L(head, $"{j.Pay:N0} cr", "t-val", "f-mono", "accent");
-                    string what = j.Kind == JobKind.Survey ? $"Survey {j.To}" : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To} (max 1 g)" : $"{j.Tonnes:N0} t to {j.To}";
+                    string what = j.Kind == JobKind.Rescue ? "Find the derelict and take the crew off" : j.Kind == JobKind.Survey ? $"Survey {j.To}" : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To} (max 1 g)" : $"{j.Tonnes:N0} t to {j.To}";
                     Ui.L(card, what, "t-body");
                     Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {career.DriveRating:0} g: {Dur(t)}, {fuel:N1} t", "t-note", "f-mono");
                     bool ok = career.CanAccept(j, out string why);
@@ -219,7 +224,7 @@ namespace FogOfWar
                 if (short_) Ui.L(c, "Not enough reaction mass. Coast, lower the g, or refuel.", "t-body", "warn");
                 foreach (var j in career.Active)
                 {
-                    var body = j.Kind == JobKind.Survey ? sys[j.To] : sys[Career.PortAt(j.To)?.Body ?? ""];
+                    var body = career.TargetOf(j);
                     if (body != ship.Target) continue;
                     double arrive = t / 86400 + (j.Kind == JobKind.Survey ? j.DwellNeeded / 86400 : 0);
                     bool onTime = jd + arrive <= j.DeadlineJd;

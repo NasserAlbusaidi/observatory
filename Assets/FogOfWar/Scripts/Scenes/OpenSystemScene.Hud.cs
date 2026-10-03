@@ -30,6 +30,8 @@ namespace FogOfWar
         VisualElement moonsBox, histBox, dataBox;
         Body moonsFor;
         bool consoleOpen = true;
+        Tabs consoleTabs;
+        public void ShowConsoleTab(int i) => consoleTabs?.Select(i); // review shots
         float dataT;
         readonly List<Readout> hudReadouts = new List<Readout>();
         bool hudTargetsDirty = true;
@@ -317,11 +319,13 @@ namespace FogOfWar
             var tabs = new Tabs(true);
             tabs.style.flexShrink = 1;
             consoleBody.Add(tabs);
+            consoleTabs = tabs;
             tabs.Add("Jobs", Scroll(JobsTab));
             tabs.Add("Flight", Scroll(FlightTab));
             tabs.Add("Nav", Scroll(NavTab));
             tabs.Add("Targets", Scroll(TargetsTab));
             tabs.Add("View", Scroll(ViewTab));
+            tabs.Add("Codex", Scroll(CodexTab));
             tabs.Add("Data", Scroll(DataTab));
             Ui.Show(consoleBody, consoleOpen); Ui.Text(consoleToggle, consoleOpen ? "–" : "+");
         }
@@ -568,6 +572,7 @@ namespace FogOfWar
             segG.Value = Array.FindIndex(Gs, g => Math.Abs(g - ship.MaxG) < 1e-6);
             UpdateDriveLimit();
             UpdateJobs();
+            UpdateCodex();
             swAssist.Value = ship.FlightAssist;
             for (int i = 0; i < holdBtns.Count; i++) Ui.SetClass(holdBtns[i], "on", (int)ship.Hold == i);
             segWarp.Value = warpIdx;
