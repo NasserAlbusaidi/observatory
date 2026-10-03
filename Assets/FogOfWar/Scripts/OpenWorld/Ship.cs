@@ -76,6 +76,7 @@ namespace FogOfWar.OpenWorld
         // Advance by h seconds at Julian date jd (the start of the step).
         public void Step(SolarSystem sys, double jd, double h, Body reference)
         {
+            dominant = reference;
             var g = sys.Gravity(Pos, jd);
             if (RotInput.sqrMagnitude > 0 && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
 
@@ -321,9 +322,11 @@ namespace FogOfWar.OpenWorld
 
         // If the two-body arc around the body we're inside would come within 10 % of its surface, burn radially out and
         // along the motion (raising periapsis) until it won't.
+        Body dominant; // the scene's per-frame dominant body, passed into Step
+
         D3? Clearance(SolarSystem sys, double jd)
         {
-            var dom = Dominant(sys, Pos, jd);
+            var dom = dominant ?? Dominant(sys, Pos, jd);
             foreach (var b in Obstacles)
                 if (Climb(sys, jd, b) is D3 c) return c;
             return Obstacles.Contains(dom) ? null : Climb(sys, jd, dom);

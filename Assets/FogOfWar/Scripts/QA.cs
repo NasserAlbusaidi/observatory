@@ -310,8 +310,12 @@ namespace FogOfWar
 
             log.WriteLine("rapid scene switching, 5 rounds");
             long mem0 = GC.GetTotalMemory(true);
-            for (int round = 0; round < 5; round++)
+            // QA-026: log the heap after every round, so a leak (steady growth) is told apart from caches that level off
+            for (int round = 0; round < 20; round++)
+            {
                 for (int i = 0; i < app.SceneCount; i++) { app.Activate(i); yield return null; yield return null; }
+                if (round % 4 == 3) { yield return Resources.UnloadUnusedAssets(); log.WriteLine($"    after round {round + 1}: managed heap {GC.GetTotalMemory(true) / 1048576} MB"); }
+            }
             yield return Resources.UnloadUnusedAssets();
             log.WriteLine($"    managed heap {mem0 / 1048576} MB -> {GC.GetTotalMemory(true) / 1048576} MB");
 

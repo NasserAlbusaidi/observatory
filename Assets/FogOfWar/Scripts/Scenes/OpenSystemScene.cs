@@ -324,7 +324,7 @@ namespace FogOfWar
 
         protected override void Teardown()
         {
-            Cam.nearClipPlane = 0.05f;
+            if (Cam != null) Cam.nearClipPlane = 0.05f; // on quit the camera may already be gone
             Orbit.enabled = true;
             vis.Clear();
         }
