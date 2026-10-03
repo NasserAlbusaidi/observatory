@@ -15,6 +15,7 @@ Shader "FogOfWar/Rock"
             #include "UnityCG.cginc"
             #include "FOWCommon.cginc"
             float3 _RockSunDir;
+            float _FOWSunIrr;   // rocks drawn near the camera see the ship's sunlight
             UNITY_INSTANCING_BUFFER_START(Props)
                 UNITY_DEFINE_INSTANCED_PROP(float4, _Col)
             UNITY_INSTANCING_BUFFER_END(Props)
@@ -33,7 +34,7 @@ Shader "FogOfWar/Rock"
             float4 frag(v2f i) : SV_Target
             {
                 float3 n = normalize(i.n), l = normalize(_RockSunDir), vdir = normalize(_WorldSpaceCameraPos - i.wp);
-                return float4(displayToOutput(i.col.rgb * (0.01 + regolith(n, l, vdir))), 1.0);
+                return float4(displayToOutput(i.col.rgb * (0.01 + regolith(n, l, vdir))) * fowSunlit(_FOWSunIrr), 1.0);
             }
             ENDCG
         }

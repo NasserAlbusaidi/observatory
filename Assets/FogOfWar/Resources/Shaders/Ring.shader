@@ -9,6 +9,7 @@ Shader "FogOfWar/Ring"
         _MainTex ("Profile", 2D) = "black" {}
         _Inner ("Inner radius / outer", Float) = 0.5
         _TauGain ("Optical depth gain", Float) = 1
+        _SunIrr ("Sunlight, 1 AU = 1", Float) = 1
     }
     SubShader
     {
@@ -25,6 +26,7 @@ Shader "FogOfWar/Ring"
             sampler2D _MainTex;
             float _Inner, _TauGain, _PlanetR;
             float3 _SunDir, _PlanetPos;
+            float _SunIrr;
             struct appdata { float4 vertex : POSITION; };
             struct v2f { float4 pos : SV_POSITION; float2 op : TEXCOORD0; float3 wp : TEXCOORD1; float3 n : TEXCOORD2; };
             v2f vert(appdata v)
@@ -56,7 +58,7 @@ Shader "FogOfWar/Ring"
                 float mu0 = abs(dot(n, l));
                 float light = shadow * saturate(0.15 + mu0 * 3.0);
                 float3 col = t.rgb * light;
-                return float4(displayToOutput(col) * opacity, opacity);
+                return float4(displayToOutput(col) * fowSunlit(_SunIrr) * opacity, opacity);
             }
             ENDCG
         }
