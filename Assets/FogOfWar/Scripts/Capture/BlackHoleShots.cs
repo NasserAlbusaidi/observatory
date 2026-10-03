@@ -51,15 +51,40 @@ namespace FogOfWar
         public struct Shot
         {
             public string name; public Vector3 pos, look; public float fov, roll, run; public Action<SimScene> setup;
+            public bool ui, free;   // composite the UI Toolkit layer; leave the camera to the scene (ride-along)
         }
 
-        static Shot S(string name, Vector3 pos, float fov, Action<SimScene> setup = null, float roll = 0, Vector3 look = default, float run = 0)
-            => new Shot { name = name, pos = pos, fov = fov, setup = setup, roll = roll, look = look, run = run };
+        static Shot S(string name, Vector3 pos, float fov, Action<SimScene> setup = null, float roll = 0, Vector3 look = default, float run = 0, bool ui = false, bool free = false)
+            => new Shot { name = name, pos = pos, fov = fov, setup = setup, roll = roll, look = look, run = run, ui = ui, free = free };
 
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
             Set(s, "spin", 0f); Set(s, "clumpy", true);
+            var b = (BlackHoleScene)s;
+            Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
+        };
+        static BlackHoleScene B(SimScene s) => (BlackHoleScene)s;
+        // throw kind at pericentre periRs; untilR > 0: run until it is that close (M) or broken, then `run` more M
+        static Action<SimScene> Tde(int kind, float periRs, int massIdx, double run, float logWarp = 1.5f, double untilR = 0, float logMass = 0) => s =>
+        {
+            Default(s); Set(s, "massIdx", massIdx); Set(s, "throwKind", kind); Set(s, "periRs", periRs); Set(s, "guides", true);
+            Call(s, "SyncMass");
+            if (logMass > 0) Set(s, "logMass", logMass);
+            B(s).Throw(kind);
+            if (untilR > 0) B(s).AdvanceUntilBody(untilR);
+            Set(s, "logWarp", logWarp);
+            if (run > 0) B(s).Advance(run);
+            Set(s, "logWarp", 0f);
+        };
+        static Action<SimScene> Orbit(int probe, double run) => s =>
+        {
+            Default(s); Set(s, "disk", false); Set(s, "guides", true);
+            B(s).DropProbe(probe); Set(s, "logWarp", 2.3f); B(s).Advance(run); Set(s, "logWarp", 0f);
+        };
+        static Action<SimScene> Ride(double r) => s =>
+        {
+            Default(s); Set(s, "ride", true); B(s).DropProbe(4); B(s).AdvanceUntilRide(r); Set(s, "logWarp", 0f);
         };
         static Action<SimScene> With(Action<SimScene> extra) => s => { Default(s); extra(s); };
 
@@ -84,6 +109,21 @@ namespace FogOfWar
                 S("bh-kerr-0.998-nodisk", new Vector3(0, 0.0f, 24f), 30, With(s => { Set(s, "spin", 0.998f); Set(s, "disk", false); })),
                 S("bh-schw-nodisk",      new Vector3(0, 0.0f, 24f), 30, With(s => Set(s, "disk", false))),
                 S("bh-no-doppler",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "doppler", false))),
+                // sandbox
+                S("sb-sun-sgra-approach", new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 1, 0, untilR: 30), ui: true),
+                S("sb-sun-sgra-shred",    new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 1, 12, untilR: 1), ui: true),
+                S("sb-sun-sgra-stream",   new Vector3(0, 9f, 34f), 55, Tde(0, 5f, 1, 120, untilR: 1), ui: true),
+                S("sb-sun-sgra-return",   new Vector3(0, 14f, 40f), 55, Tde(0, 5f, 1, 4.2e5, 3.6f), ui: true),
+                S("sb-sun-sgra-disc",     new Vector3(0, 3f, 26f), 50, Tde(0, 5f, 1, 6e5, 3.7f), ui: true),
+                S("sb-sun-m87-whole",     new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 2, 0, untilR: 12), ui: true),
+                S("sb-wd-imbh",           new Vector3(0, 6f, 30f), 50, Tde(1, 6f, -1, 60, untilR: 1, logMass: 3f), ui: true),
+                S("sb-cloud",             new Vector3(0, 7f, 32f), 50, Tde(5, 6f, 1, 260), ui: true),
+                S("sb-orbit-precess",     new Vector3(0, 30f, 12f), 55, Orbit(1, 4000), ui: true),
+                S("sb-zoom-whirl",        new Vector3(0, 30f, 12f), 55, Orbit(2, 2500), ui: true),
+                S("sb-photon-orbit",      new Vector3(0, 30f, 12f), 55, Orbit(5, 60), ui: true),
+                S("sb-ride-fall-20rs",    Vector3.zero, 70, Ride(40), free: true),
+                S("sb-ride-fall-3rs",     Vector3.zero, 70, Ride(6), free: true),
+                S("sb-ride-fall-1.1rs",   Vector3.zero, 70, Ride(2.2), free: true),
             };
             l.AddRange(Extra);
             return l;
@@ -111,11 +151,10 @@ namespace FogOfWar
             var shell = UiShell.Instance;
             var cam = app.Cam;
             var rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-            var uiRT = withUi && shell != null ? new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) : null;
+            var uiRT = shell != null ? new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) : null;
             rt.Create();
             cam.targetTexture = rt;
             if (uiRT != null) shell.Surface = uiRT;
-            else app.ShowUI = false;
             var tex = new Texture2D(W, H, TextureFormat.RGBA32, false, false);
             var acc = new float[W * H * 3];
             log.WriteLine($"{W}x{H}, {SS} samples, colorspace {QualitySettings.activeColorSpace}, gpu {SystemInfo.graphicsDeviceName}");
@@ -128,10 +167,10 @@ namespace FogOfWar
                 catch (Exception e) { log.WriteLine($"{s.name}: setup threw {e.InnerException?.Message ?? e.Message}"); errors++; }
                 app.Orbit.enabled = false;
                 cam.fieldOfView = s.fov;
-                var baseRot = Quaternion.LookRotation(s.look - s.pos, Vector3.up) * Quaternion.Euler(0, 0, s.roll);
-                cam.transform.SetPositionAndRotation(s.pos, baseRot);
+                var baseRot = s.free ? Quaternion.identity : Quaternion.LookRotation(s.look - s.pos, Vector3.up) * Quaternion.Euler(0, 0, s.roll);
+                if (!s.free) cam.transform.SetPositionAndRotation(s.pos, baseRot);
                 float until = Time.realtimeSinceStartup + 0.6f + s.run;
-                while (Time.realtimeSinceStartup < until) { cam.transform.SetPositionAndRotation(s.pos, baseRot); yield return null; }
+                while (Time.realtimeSinceStartup < until) { if (!s.free) cam.transform.SetPositionAndRotation(s.pos, baseRot); yield return null; }
                 Time.timeScale = 0;   // freeze the disc while sub-frames accumulate
 
                 Array.Clear(acc, 0, acc.Length);
@@ -140,14 +179,14 @@ namespace FogOfWar
                 for (int k = 0; k < SS; k++)
                 {
                     float jx = SS == 1 ? 0 : Halton(k + 1, 2) - 0.5f, jy = SS == 1 ? 0 : Halton(k + 1, 3) - 0.5f;
-                    cam.transform.SetPositionAndRotation(s.pos, baseRot * Quaternion.Euler(-jy * pix, jx * pix, 0));
+                    if (!s.free) cam.transform.SetPositionAndRotation(s.pos, baseRot * Quaternion.Euler(-jy * pix, jx * pix, 0));
                     yield return null;
                     yield return new WaitForEndOfFrame();
                     cam.Render();
                     ReadInto(rt, tex);
                     var px = tex.GetPixels32();
                     for (int p = 0, q = 0; p < px.Length; p++, q += 3) { acc[q] += px[p].r; acc[q + 1] += px[p].g; acc[q + 2] += px[p].b; }
-                    if (k == 0 && uiRT != null) { ReadInto(uiRT, tex); uiPx = tex.GetPixels32(); }
+                    if (k == 0 && uiRT != null && (s.ui || withUi)) { ReadInto(uiRT, tex); uiPx = tex.GetPixels32(); }
                 }
                 var outPx = new Color32[W * H];
                 for (int p = 0, q = 0; p < outPx.Length; p++, q += 3)
@@ -163,7 +202,7 @@ namespace FogOfWar
                 }
                 tex.SetPixels32(outPx);
                 File.WriteAllBytes(Path.Combine(dir, s.name + ".png"), tex.EncodeToPNG());
-                log.WriteLine($"{s.name}");
+                log.WriteLine($"{s.name}  {((BlackHoleScene)app.Current).DebugSummary()}");
             }
 
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.

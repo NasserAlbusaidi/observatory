@@ -39,6 +39,17 @@ namespace FogOfWar
             return Num(y, 0) + " yr";
         }
 
+        // seconds → "42 ms", "3.4 s", "5.2 min", "3.1 h", then days and years
+        public static string Duration(double s)
+        {
+            double a = System.Math.Abs(s);
+            if (a < 1) return Num(s * 1000, 2) + " ms";
+            if (a < 120) return Num(s, 2) + " s";
+            if (a < 7200) return Num(s / 60, 1) + " min";
+            if (a < 2 * 86400) return Num(s / 3600, 1) + " h";
+            return Years(s / Phys.yr);
+        }
+
         // 0.999999123 → "0.999999123 c"
         public static string Beta(double b, double oneMinus)
         {
