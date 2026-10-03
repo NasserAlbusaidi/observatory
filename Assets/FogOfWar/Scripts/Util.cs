@@ -191,6 +191,7 @@ namespace FogOfWar
             if (verts.Count > 65000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             m.SetVertices(verts); m.SetNormals(norms); m.SetUVs(0, uvs); m.SetTriangles(tris, 0);
             m.RecalculateBounds();
+            m.RecalculateUVDistributionMetrics(); // mip streaming sizes the planet maps from this
             return m;
         }
 
@@ -270,9 +271,10 @@ namespace FogOfWar
         }
 
         // Background stars for the mesh-based scenes: the real sky from the Bright Star Catalogue when the art pack is
-        // present (one shared mesh and material for every scene), `count` random stars otherwise.
-        static Mesh catalogueMesh;
-        static Material catalogueMat;
+        // present (one shared mesh and material for every scene), over the real Milky Way (Sky/MilkyWay) when that map
+        // is there; `count` random stars otherwise.
+        static Mesh catalogueMesh, skySphere;
+        static Material catalogueMat, milkyWayMat;
 
         public static GameObject Starfield(Transform parent, int count = 5000, float gain = 1f)
         {
@@ -281,7 +283,16 @@ namespace FogOfWar
             {
                 if (catalogueMesh == null) catalogueMesh = StarMesh(cat.dirs, cat.temps, cat.mags);
                 if (catalogueMat == null) catalogueMat = StarMat(1f);
-                return Obj("Starfield", parent, catalogueMesh, catalogueMat);
+                var field = Obj("Starfield", parent, catalogueMesh, catalogueMat);
+                // the diffuse Milky Way (real map) behind the catalogue points, turning with them
+                var mw = Art.Tex("Sky/MilkyWay");
+                if (mw != null)
+                {
+                    if (skySphere == null) { skySphere = UVSphere(64, 32); skySphere.bounds = new Bounds(Vector3.zero, Vector3.one * 1e7f); }
+                    if (milkyWayMat == null) { milkyWayMat = Mat("SkyMap"); milkyWayMat.SetTexture("_MainTex", mw); }
+                    Obj("Milky Way", field.transform, skySphere, milkyWayMat);
+                }
+                return field;
             }
             var dirs = new List<Vector3>(); var temps = new List<float>(); var mags = new List<float>();
             for (int i = 0; i < count; i++)

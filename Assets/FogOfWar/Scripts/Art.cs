@@ -29,6 +29,8 @@ namespace FogOfWar
             Shader.SetGlobalTexture("_SkyA", ok ? a : Texture2D.blackTexture);
             Shader.SetGlobalTexture("_SkyB", ok ? b : Texture2D.blackTexture);
             Shader.SetGlobalFloat("_FOWHasSky", ok ? 1 : 0);
+            Shader.SetGlobalFloat("_SkyAW", ok ? a.width : 1);
+            Shader.SetGlobalFloat("_SkyBW", ok ? b.width : 1);
             SkyFacing(Quaternion.identity);
         }
 

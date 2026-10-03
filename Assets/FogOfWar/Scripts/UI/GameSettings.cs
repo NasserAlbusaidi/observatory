@@ -29,6 +29,9 @@ namespace FogOfWar
         public static int DisplayMode { get => I("display", 0); set => SetI("display", value); } // 0 borderless, 1 exclusive, 2 windowed
         public static bool VSync { get => I("vsync", 1) == 1; set => SetI("vsync", value ? 1 : 0); }
         public static int FrameCap { get => I("fpscap", 120); set => SetI("fpscap", value); } // 0 = unlimited
+        // Texture detail caps planet and sky maps: 0 full (8K), 1 half (4K), 2 quarter (2K). Mip streaming budget follows.
+        public static int TextureDetail { get => I("tex-detail", 0); set => SetI("tex-detail", Mathf.Clamp(value, 0, 2)); }
+        static readonly int[] StreamBudgetMb = { 2048, 1024, 512 };
 
         // audio: levels for the ship's sound (ShipAudio applies them every frame, menus included)
         public static float Master { get => F("vol-master", 0.8f); set => SetF("vol-master", Mathf.Clamp01(value)); }
@@ -63,6 +66,9 @@ namespace FogOfWar
         {
             QualitySettings.vSyncCount = VSync ? 1 : 0;
             Application.targetFrameRate = FrameCap > 0 ? FrameCap : -1;
+            QualitySettings.globalTextureMipmapLimit = TextureDetail;
+            QualitySettings.streamingMipmapsActive = true;
+            QualitySettings.streamingMipmapsMemoryBudget = StreamBudgetMb[TextureDetail];
             AudioListener.volume = SilentOutput ? 0 : 1; // Master is applied in the ship synth, so the audio check can meter it
             AudioListener.pause = false;
         }

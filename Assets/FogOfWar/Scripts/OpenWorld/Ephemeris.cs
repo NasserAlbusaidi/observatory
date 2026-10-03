@@ -378,13 +378,13 @@ namespace FogOfWar.OpenWorld
             // Moon fallback: mean elements referred to the ecliptic with nodal and apsidal precession (≈ 6,000 km error).
             s.Moon = new Body
             {
-                Name = "Moon", Parent = s.Earth, GM = 4902.8, Radius = 1738.1, Flattening = 0.0012, Look = Look.Rocky, ColA = new Color(0.5f, 0.5f, 0.5f), ColB = new Color(0.7f, 0.69f, 0.67f), Texture = "Textures/Moon_Color",
+                Name = "Moon", Parent = s.Earth, GM = 4902.8, Radius = 1738.1, Flattening = 0.0012, Look = Look.Rocky, ColA = new Color(0.5f, 0.5f, 0.5f), ColB = new Color(0.7f, 0.69f, 0.67f), Texture = "Planets/Moon/Color",
                 A = 384400, E = 0.0549, I = 5.145, Node = 125.0445, dNode = -0.0529538083, Peri = 83.3532, dPeri = 0.1114040803, L = 218.3165, dL = 13.17639648,
                 PoleRa = 269.9949, PoleDec = 66.5392, W0 = 38.3213, Wd = 13.17635815,
             };
             s.Bodies.Add(s.Moon);
             P(Planet("Mars", 1.52371034, 0.00001847, 0.09339410, 0.00007882, 1.84969142, -0.00813131, -4.55343205, 19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343),
-                42828.37, 3396.2, 0.00589, 1.956e-3, Look.Rocky, new Color(0.6f, 0.3f, 0.16f), new Color(0.82f, 0.55f, 0.36f), 317.681, 52.887, 176.630, 350.89198226, "Textures/Mars_Color", new Color(0.9f, 0.6f, 0.45f, 0.25f));
+                42828.37, 3396.2, 0.00589, 1.956e-3, Look.Rocky, new Color(0.6f, 0.3f, 0.16f), new Color(0.82f, 0.55f, 0.36f), 317.681, 52.887, 176.630, 350.89198226, "Planets/Mars/Color", new Color(0.9f, 0.6f, 0.45f, 0.25f));
             // Giants: positions are system barycentres. Saturn rotation is the IAU System III (radio) period.
             P(Planet("Jupiter", 5.20288700, -0.00011607, 0.04838624, -0.00013253, 1.30439695, -0.00183714, 34.39644051, 3034.74612775, 14.72847983, 0.21252668, 100.47390909, 0.20469106),
                 126686534, 71492, 0.06487, 1.4697e-2, Look.Gas, new Color(0.78f, 0.66f, 0.52f), new Color(0.95f, 0.9f, 0.82f), 268.057, 64.495, 284.95, 870.536, "Planets/Jupiter/Color");

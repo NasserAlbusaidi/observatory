@@ -114,6 +114,17 @@ float4 tex2DSphere(sampler2D s, float3 p)
     return tex2Dgrad(s, uv, dx, dy);
 }
 
+// Relief normal from a tangent-space normal map (east = +x, north = +y), in object space for unit-sphere point p.
+// Only red and green are read and z is rebuilt, so BC5 (two-channel) maps work.
+float3 sphereNormal(sampler2D s, float3 p)
+{
+    float2 xy = tex2DSphere(s, p).rg * 2.0 - 1.0;
+    float z = sqrt(saturate(1.0 - dot(xy, xy)));
+    float3 east = normalize(float3(-p.z, 0.0, p.x) + float3(1e-5, 0, 0));
+    float3 north = cross(east, p);
+    return normalize(xy.x * east + xy.y * north + max(z, 0.2) * p);
+}
+
 // A colour texture sampled by the GPU is already linear in Linear projects; convert it back to display values so it
 // mixes with the rest of the shader maths, which is authored in display space and ends with displayToOutput().
 float3 texToDisplay(float3 c)
@@ -130,9 +141,13 @@ float3 texToDisplay(float3 c)
 sampler2D _SkyA, _SkyB;
 float _FOWHasSky;
 float4x4 _SkyRot;   // world direction → sky-map direction, so a scene can choose which part of the real sky sits behind it
-float3 skyTex(sampler2D s, float3 d)
+float _SkyAW, _SkyBW;   // map widths in texels (Art.BindSky)
+// px = angular size of one screen pixel (radians); the mip level makes one texel cover about one pixel, so an 8K sky
+// doesn't sparkle in small windows. Explicit lod keeps the RA 12h seam free of derivative artefacts.
+float3 skyTex(sampler2D s, float3 d, float px, float w)
 {
-    float3 c = tex2Dlod(s, float4(SkyUV(mul((float3x3)_SkyRot, d)), 0, 0)).rgb;
+    float lod = max(0.0, log2(px * w / 6.2831853));
+    float3 c = tex2Dlod(s, float4(SkyUV(mul((float3x3)_SkyRot, d)), 0, lod)).rgb;
 #ifdef UNITY_COLORSPACE_GAMMA
     c = pow(max(c, 0), 2.2);   // tonemap() re-applies the 1/2.2 in gamma projects
 #endif
@@ -140,8 +155,8 @@ float3 skyTex(sampler2D s, float3 d)
     return -log(1.0 - c) / 1.15;
 }
 
-float3 skyA(float3 d, float px) { return _FOWHasSky > 0.5 ? skyTex(_SkyA, d) : skyAProc(d, px); }
-float3 skyB(float3 d, float px) { return _FOWHasSky > 0.5 ? skyTex(_SkyB, d) : skyBProc(d, px); }
+float3 skyA(float3 d, float px) { return _FOWHasSky > 0.5 ? skyTex(_SkyA, d, px, _SkyAW) : skyAProc(d, px); }
+float3 skyB(float3 d, float px) { return _FOWHasSky > 0.5 ? skyTex(_SkyB, d, px, _SkyBW) : skyBProc(d, px); }
 
 // Filmic-ish exposure curve; output is linear, Unity handles the sRGB write in linear projects.
 float3 tonemap(float3 c)

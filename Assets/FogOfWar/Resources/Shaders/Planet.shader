@@ -1,6 +1,7 @@
 // Generic world for the open system. Object space: +Y north pole, +X prime meridian (SkyUV / tex2DSphere layout).
 // _HasTex = 1 samples an equirectangular colour map; otherwise _Kind picks a procedural look from _ColA/_ColB:
 // 0 rocky, 1 cloud deck (Venus), 2 banded gas giant, 3 ice giant. _Atmo adds a lit limb glow (alpha = strength).
+// _HasNormal = 1 shades relief from a normal map made from the body's real DEM (Moon, Mercury, Mars).
 Shader "FogOfWar/Planet"
 {
     Properties
@@ -15,6 +16,8 @@ Shader "FogOfWar/Planet"
         _Haze ("Haze cover", Float) = 0
         _HazeCol ("Haze colour", Color) = (0.8,0.6,0.3,1)
         _MainTex ("Colour map", 2D) = "white" {}
+        _HasNormal ("Has normal map", Float) = 0
+        _NormalTex ("Relief normal map", 2D) = "bump" {}
     }
     SubShader
     {
@@ -28,13 +31,13 @@ Shader "FogOfWar/Planet"
             #include "UnityCG.cginc"
             #include "FOWCommon.cginc"
             float4 _ColA, _ColB, _Atmo;
-            float _Kind, _Seed, _HasTex, _Gain, _Haze;
+            float _Kind, _Seed, _HasTex, _Gain, _Haze, _HasNormal;
             float4 _HazeCol;
             // shape models: look the map up in the body frame (Prime/North aligned), not the mesh's import space
             float4x4 _WorldToBody;
             float _UseBodyFrame;
             float3 _SunDir;
-            sampler2D _MainTex;
+            sampler2D _MainTex, _NormalTex;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
             struct v2f { float4 pos : SV_POSITION; float3 n : TEXCOORD0; float3 op : TEXCOORD1; float3 wp : TEXCOORD2; };
             v2f vert(appdata v)
@@ -92,6 +95,12 @@ Shader "FogOfWar/Planet"
                 float diff = max(ndl, 0.0);
                 // gas and cloud decks scatter light past the terminator
                 float soft = _Kind > 0.5 ? smoothstep(-0.15, 0.25, ndl) * 0.9 + diff * 0.1 : regolith(n, l, vdir);
+                if (_HasNormal > 0.5 && _UseBodyFrame < 0.5 && _Kind < 0.5)
+                {
+                    // relief lights the slopes; the sphere's own normal still sets where night begins
+                    float3 nr = normalize(mul((float3x3)unity_ObjectToWorld, sphereNormal(_NormalTex, p)));
+                    soft = regolith(nr, l, vdir) * smoothstep(-0.03, 0.06, ndl);
+                }
                 float rim = pow(1.0 - saturate(dot(n, vdir)), 3.0);
                 float3 col = albedo * (0.012 + soft) + _Atmo.rgb * rim * _Atmo.a * saturate(ndl + 0.35);
                 return float4(displayToOutput(col), 1.0);
