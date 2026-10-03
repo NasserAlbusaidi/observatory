@@ -136,6 +136,7 @@ namespace FogOfWar.OpenWorld
 
         public void Tick(SolarSystem sys, Ship ship, double jd, double simDt)
         {
+            this.ship = ship; this.jd = jd;
             Apply(ship);
             Notes.RemoveAll(n => UnityEngine.Time.realtimeSinceStartup - n.Time > 8);
             Discover(sys, ship, jd, simDt);
@@ -144,10 +145,23 @@ namespace FogOfWar.OpenWorld
             Docked = FindDock(sys, ship, jd, was);
             if (Docked != was) OnEvent?.Invoke(Docked != null ? Happening.Docked : Happening.Undocked, (Docked ?? was).Name);
             bool dry = ship.Fuel <= 0;
-            if (dry && !wasDry) OnEvent?.Invoke(Happening.TankDry, "");
+            if (dry && !wasDry)
+            {
+                DropWarp = true;
+                // out there with no reaction mass, a rendezvous can't be flown: end those jobs now (QA-041)
+                for (int i = Active.Count - 1; i >= 0; i--)
+                {
+                    var c = Active[i];
+                    if (c.Kind != JobKind.Intercept && c.Kind != JobKind.Rescue) continue;
+                    Active.RemoveAt(i); Failed++; RemoveDerelict(c);
+                    Say(Happening.JobFailed, "Tank dry: " + c.Title + " failed", false);
+                }
+                Say(Happening.TankDry, $"Reaction mass gone. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
+            }
             wasDry = dry;
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
             Scan(sys, ship, jd, simDt);
+            TransferInProgress = false;
             Rescues(sys, ship, jd, simDt);
             Intercepts(sys, ship, jd, simDt);
             Expire(jd);
@@ -224,6 +238,7 @@ namespace FogOfWar.OpenWorld
             Credits += pay; Earned += pay; Done++;
             Active.Remove(c);
             RemoveDerelict(c);
+            if (c.Kind == JobKind.Rescue || c.Kind == JobKind.Intercept) DropWarp = true;
             Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid, $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
         }
 
@@ -265,6 +280,12 @@ namespace FogOfWar.OpenWorld
             if (Docked == null) why = "dock first";
             else if (Active.Count >= MaxActive) why = $"{MaxActive} jobs at most";
             else if (CargoTonnes + c.Load > HoldTonnes) why = "hold full";
+            else if (ship != null && (c.Kind == JobKind.Intercept || c.Kind == JobKind.Rescue))
+            {
+                // no port out there to refuel at: even a 50 % coast must fit in what is in the tank
+                double need = NeedTonnes(c, 0.5);
+                if (need > ship.Fuel * 0.95) why = $"needs ≈ {need:N0} t of reaction mass even with a coast, {ship.Fuel:N0} t aboard";
+            }
             return why == null;
         }
 

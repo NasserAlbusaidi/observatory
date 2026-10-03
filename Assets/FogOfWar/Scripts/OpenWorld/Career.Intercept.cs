@@ -14,6 +14,28 @@ namespace FogOfWar.OpenWorld
         const double RunnerG = 0.25;
         const string RunnerPrefix = "Runner ";
 
+        Ship ship;   // last seen in Tick: the ship accept checks and estimates are made for
+        double jd;
+
+        // Reaction mass to reach a job's target and match it: a flip-and-burn at the drive rating, capped at a fraction
+        // f of the brachistochrone peak, plus the velocity to cancel. Rocket equation at the ship's mass with the load.
+        public double NeedTonnes(Contract c, double f, double? mass = null)
+        {
+            var b = TargetOf(c);
+            if (b == null || ship == null) return 0;
+            double a = (c.Kind == JobKind.Passengers ? Math.Min(DriveRating, PassengerG) : DriveRating) * Ship.G0;
+            double d = Math.Max((Sys.PosAt(b, jd) - ship.Pos).Mag - Ship.Standoff(b), 0);
+            double match = c.Kind == JobKind.Intercept || c.Kind == JobKind.Rescue ? (ship.Vel - Vel(Sys, b, jd)).Mag : 0;
+            double dv = 2 * Math.Max(0.05, Math.Min(f, 1)) * Math.Sqrt(a * d) + match;
+            double m = mass ?? ship.Mass + c.Load;
+            return m * (1 - Math.Exp(-dv / Ship.Ve));
+        }
+
+        // Time compression the scene must respect: capped while cargo or crew cross over, dropped when the tank runs dry
+        // or a job ends out there.
+        public bool TransferInProgress { get; private set; }
+        public bool DropWarp;
+
         static readonly string[] Runners = { "courier Halcyon", "liner Meridian", "freighter Okavango", "tanker Ross 128", "packet Wren", "hauler Tisiphone" };
 
         internal Contract Intercept(System.Random rng, SolarSystem sys, double jd)
@@ -34,6 +56,9 @@ namespace FogOfWar.OpenWorld
             c.Title = $"Deliver {c.Tonnes:N0} t of {Goods[rng.Next(Goods.Length)].ToLowerInvariant()} to the {hull}, under thrust from {from.Name} to {to.Name}";
             var b = MakeRunner(c, sys);
             double gap = (sys.PosAt(b, jd) - sys.PosAt(sys[Docked.Body], jd)).Mag;
+            // post only what a full tank can fly at full burn, with a margin (QA-041)
+            previews[c.Id] = b;
+            if (NeedTonnes(c, 1, DryMass + TankCapacity + c.Tonnes) > TankCapacity * 0.9) { previews.Remove(c.Id); return null; }
             c.Pay = Math.Round(RefPay(gap, c.Tonnes, out _, 1) * 1.6 / 100) * 100 + 3000;
             c.Days = c.T1 - jd;
             return c;
@@ -75,7 +100,7 @@ namespace FogOfWar.OpenWorld
                 if (c.Kind != JobKind.Intercept) continue;
                 if (jd >= c.T1)
                 {
-                    Active.RemoveAt(i); Failed++; RemoveDerelict(c);
+                    Active.RemoveAt(i); Failed++; RemoveDerelict(c); DropWarp = true;
                     Say(Happening.JobFailed, $"Missed: the {c.To.Substring(RunnerPrefix.Length)} reached {c.RunTo}", false);
                     continue;
                 }
@@ -83,7 +108,9 @@ namespace FogOfWar.OpenWorld
                 if (b == null) continue;
                 bool alongside = (ship.Pos - sys.Pos(b, jd)).Mag < InterceptKm && (ship.Vel - sys.Vel(b, jd)).Mag < InterceptKms;
                 if (!alongside) { c.Dwell = 0; continue; }
-                c.Dwell += simDt;
+                // the hold is checked frame by frame, so each frame counts for at most 30 s and time compression is capped
+                TransferInProgress = true;
+                c.Dwell += Math.Min(simDt, 30);
                 if (c.Dwell >= CrossSeconds) Complete(c, jd, "Cargo handed over to the " + c.To.Substring(RunnerPrefix.Length) + " in flight");
             }
         }

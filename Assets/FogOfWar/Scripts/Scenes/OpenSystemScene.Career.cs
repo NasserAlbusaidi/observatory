@@ -147,6 +147,15 @@ namespace FogOfWar
             planWasActive = ship.PlanActive;
             planTarget = ship.Target;
             career.Tick(sys, ship, jd, simDt);
+            // QA-041: a job ending out there, or a dry tank, drops time compression; a crossing caps it at 100×
+            if (career.DropWarp) { warpIdx = 0; career.DropWarp = false; }
+            if (career.TransferInProgress && warpIdx > 2) warpIdx = 2;
+            // a finished job's ship is gone from the system: stop flying toward it
+            if (ship.Target != null && Career.IsCraft(ship.Target) && !sys.Bodies.Contains(ship.Target))
+            {
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Target = null; ship.Phase = "job done: target released";
+            }
+            if (ship.Dry && ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "out of reaction mass"; }
             TickSound(achievedDt: simDt);
             TickTutorial();
         }

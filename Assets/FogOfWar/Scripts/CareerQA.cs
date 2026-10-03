@@ -88,6 +88,40 @@ namespace FogOfWar
             log.WriteLine($"  {tag}: est {estT / 3600:F1} h, Δv {estDv:F0} km/s, {estFuel:F2} t  |  flew {(jd - jd0) * 24:F1} h, Δv {ship.DvUsed - dv0:F0} km/s, {fuel0 - ship.Fuel:F2} t  cap {ship.CruiseCap:F0} km/s");
         }
 
+        // QA-041: the long Ganymede-to-Vesta intercept taken from Earth with a 200 t tank, flown at 100k×.
+        IEnumerator Repro041()
+        {
+            Contract ic = null;
+            for (int seed = 1; seed < 3000 && ic == null; seed++)
+            {
+                var cand = career.Intercept(new System.Random(seed), sys, jd);
+                if (cand != null && cand.RunFrom == "Ganymede" && cand.RunTo == "Vesta") ic = cand;
+            }
+            log.WriteLine($"job: {ic?.Title} pay {ic?.Pay}");
+            if (ic == null) { log.Close(); Application.Quit(); yield break; }
+            career.Accept(ic, jd);
+            log.WriteLine($"accepted: {career.Active.Contains(ic)}");
+            if (!career.Active.Contains(ic)) { log.Close(); Application.Quit(); yield break; }
+            Call("SetTarget", sys[ic.To]);
+            Put("selectedPlan", Plan.Brachistochrone);
+            Call("TogglePlan");
+            Put("warpIdx", 5);
+            float t0 = Time.realtimeSinceStartup, next = 0;
+            double cr = career.Credits;
+            while (Time.realtimeSinceStartup - t0 < 90)
+            {
+                var b = sys[ic.To];
+                if (Time.realtimeSinceStartup - t0 > next || career.Credits != cr)
+                {
+                    next += 1; cr = career.Credits;
+                    log.WriteLine($"  {Frame.UtcFromTdb(jd):MM-dd HH:mm} warp {Get<int>("warpIdx")} cr {career.Credits:N0} fuel {ship.Fuel:F1} phase {ship.Phase} active {career.Active.Contains(ic)} dwell {ic.Dwell:F0}" +
+                        (b != null ? $" dist {(ship.Pos - sys.Pos(b, jd)).Mag:N0} vrel {(ship.Vel - sys.Vel(b, jd)).Mag:F2}" : " (runner gone)") + $" sun {ship.Pos.Mag / Frame.AU:F2} AU");
+                }
+                yield return null;
+            }
+            log.Close(); Application.Quit();
+        }
+
         IEnumerator Start()
         {
             Directory.CreateDirectory(dir);
@@ -99,6 +133,7 @@ namespace FogOfWar
             app.Restart(app.GameIndex);
             yield return new WaitForSecondsRealtime(1.5f);
             s = (OpenSystemScene)app.Current;
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
             Check(!ship.UnlimitedFuel && Math.Abs(ship.Fuel - 200) < 1e-6, "tank full, reaction mass is limited");
@@ -270,6 +305,67 @@ namespace FogOfWar
                     if (cand != null && Array.IndexOf(inner, cand.RunFrom) >= 0 && Array.IndexOf(inner, cand.RunTo) >= 0 && cand.RunTo != "Luna") ic = cand;
                 }
                 Check(ic != null, "an inner-system intercept can be posted");
+
+                // QA-041 (1): a job the tank can't fly is refused on accept
+                if (ic != null)
+                {
+                    double keep = ship.Fuel;
+                    ship.Fuel = 3;
+                    yield return null;
+                    bool ok = career.CanAccept(ic, out string why);
+                    Check(!ok && why != null && why.Contains("needs"), $"infeasible intercept refused: {why}");
+                    ship.Fuel = keep;
+                    yield return null;
+                }
+
+                // QA-041 (2): a 204 km/s flyby within 500 km never pays, even at 100k×
+                if (ic != null)
+                {
+                    var fly = ic;
+                    var copy = JsonUtility.FromJson<Contract>(JsonUtility.ToJson(fly)); copy.Id += 100000; copy.To += "x";
+                    career.Accept(copy, jd);
+                    var rb = sys[copy.To];
+                    double cf = career.Credits;
+                    var keepPos = ship.Pos; var keepVel = ship.Vel;
+                    ship.Plan = Plan.None; ship.Landed = null;
+                    Put("warpIdx", 5);
+                    for (int f = 0; f < 30 && rb != null; f++)
+                    {
+                        var rv = Career.MakeRunner(copy, sys);
+                        var tv = (rv.Path(jd + 30.0 / 86400) - rv.Path(jd - 30.0 / 86400)) / 60.0;
+                        var along = tv.Mag > 0 ? tv.Norm : new D3(1, 0, 0);
+                        ship.Pos = rb.Path(jd) + along * 100; ship.Vel = tv + along * 204; // passing at 204 km/s, 100 km off
+                        yield return null;
+                    }
+                    Put("warpIdx", 0);
+                    Check(career.Credits == cf && career.Active.Contains(copy) && copy.Dwell == 0, $"204 km/s flyby does not pay (dwell {copy.Dwell:F0} s)");
+                    career.Abandon(copy);
+                    ship.Pos = keepPos; ship.Vel = keepVel;
+                    yield return null;
+                }
+
+                // QA-041 (3): a dry tank fails a rendezvous job, drops time compression and stops the autopilot
+                if (ic != null)
+                {
+                    var dry = ic;
+                    var copy = JsonUtility.FromJson<Contract>(JsonUtility.ToJson(dry)); copy.Id += 200000; copy.To += "y";
+                    career.Accept(copy, jd);
+                    Call("SetTarget", sys[copy.To]);
+                    Put("selectedPlan", Plan.Brachistochrone);
+                    Call("TogglePlan");
+                    Put("warpIdx", 5);
+                    double keep = ship.Fuel;
+                    yield return null;
+                    ship.Fuel = 0;
+                    yield return null; yield return null;
+                    Check(!career.Active.Contains(copy) && Get<int>("warpIdx") == 0 && !ship.PlanActive && sys[copy.To] == null,
+                        $"dry tank: job failed, warp {Get<int>("warpIdx")}, plan {(ship.PlanActive ? "on" : "off")}");
+                    Check(career.Notes.Exists(n => n.Text.Contains("emergency tender")), "dry tank offers the emergency tender");
+                    ship.Fuel = keep;
+                    ship.Plan = Plan.None;
+                    Call("SetTarget", sys.Moon);
+                    yield return Trip(sys.Moon, 0, "back to Luna again", () => career.Docked?.Name == "Luna" && ship.Phase == "in orbit", 3, 60);
+                }
                 if (ic != null)
                 {
                     var probe = Career.MakeRunner(ic, sys);
@@ -289,6 +385,7 @@ namespace FogOfWar
                     yield return Fly(() => !career.Active.Contains(ic), 2, 60);
                     State("after intercept");
                     Check(!career.Active.Contains(ic) && career.Credits > c4 && sys[ic.To] == null, $"cargo handed over in flight and paid ({career.Credits - c4:N0} cr)");
+                    Check(ship.Target == null && !ship.PlanActive, "after the handover the autopilot lets the runner go");
                 }
             }
 
