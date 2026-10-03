@@ -1,0 +1,23 @@
+{
+ "name": "Venus",
+ "equatorialRadiusKm": 6051.8,
+ "polarRadiusKm": 6051.8,
+ "flattening": 0.0,
+ "obliquityDeg": 177.36,
+ "rotationHours": -5832.6,
+ "geometricAlbedo": 0.689,
+ "bondAlbedo": 0.77,
+ "colourSource": "Magellan C3-MDIR radar mosaic (USGS). Radar brightness, tinted; Venus's visible face is Clouds.jpg",
+ "tint": [
+  1.0,
+  0.72,
+  0.42
+ ],
+ "sourceFile": "Venus_Magellan_C3-MDIR_Global_Mosaic_2025m.tif",
+ "licence": "public domain (NASA / USGS Astrogeology / PDS)",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "colourNote": "map brightness is relative (contrast-stretched); use geometricAlbedo for absolute brightness",
+ "height": "Height.png",
+ "clouds": "Clouds.jpg: visible cloud tops (modelled after Venus Express / Pioneer Venus imagery), fully opaque",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

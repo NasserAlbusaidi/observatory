@@ -186,3 +186,12 @@ float3 primaryRay(float2 ndc, out float px)
 }
 
 #endif
+
+// Airless regolith (Moon, Mercury, rocky moons, asteroids): Lommel–Seeliger, flat to the limb, with a simple
+// opposition surge. Scaled ×2 so a sub-solar point seen face-on matches Lambert's 1.
+float regolith(float3 n, float3 l, float3 v)
+{
+    float mu0 = max(dot(n, l), 0.0), mu = max(dot(n, v), 0.0);
+    float g = acos(clamp(dot(l, v), -1.0, 1.0));
+    return 2.0 * mu0 / (mu0 + mu + 1e-4) * (0.8 + 0.5 * exp(-g / 0.1));
+}

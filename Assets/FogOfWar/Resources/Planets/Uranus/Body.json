@@ -1,0 +1,12 @@
+{
+ "name": "Uranus",
+ "equatorialRadiusKm": 25559,
+ "polarRadiusKm": 24973,
+ "flattening": 0.022927,
+ "obliquityDeg": 97.77,
+ "rotationHours": -17.24,
+ "geometricAlbedo": 0.488,
+ "bondAlbedo": 0.3,
+ "source": "modelled from Voyager 2 / Hubble / Keck imagery: near-featureless haze, brighter polar hood",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

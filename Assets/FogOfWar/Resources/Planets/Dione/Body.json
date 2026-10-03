@@ -1,0 +1,21 @@
+{
+ "name": "Dione",
+ "meanRadiusKm": 561.4,
+ "equatorialRadiusKm": 561.4,
+ "polarRadiusKm": 561.4,
+ "flattening": 0.0,
+ "parent": "Saturn",
+ "geometricAlbedo": 1.0,
+ "rotation": "synchronous",
+ "colourSource": "Cassini / Voyager mosaic, 154 m (USGS)",
+ "tint": [
+  0.92,
+  0.91,
+  0.89
+ ],
+ "sourceFile": "Dione_Cassini_Voyager_mosaic_global_154m.tif",
+ "licence": "public domain (NASA / USGS Astrogeology / PDS)",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "colourNote": "map brightness is relative (contrast-stretched); use geometricAlbedo for absolute brightness",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

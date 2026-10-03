@@ -1,0 +1,21 @@
+{
+ "name": "Mimas",
+ "meanRadiusKm": 198.2,
+ "equatorialRadiusKm": 198.2,
+ "polarRadiusKm": 198.2,
+ "flattening": 0.0,
+ "parent": "Saturn",
+ "geometricAlbedo": 0.96,
+ "rotation": "synchronous",
+ "colourSource": "Cassini ISS DLR basemap (USGS archive)",
+ "tint": [
+  0.93,
+  0.92,
+  0.9
+ ],
+ "sourceFile": "Cassini_DLR/MI_170630_DLR_basemap_degrees.tif",
+ "licence": "public domain (NASA / USGS Astrogeology / PDS)",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "colourNote": "map brightness is relative (contrast-stretched); use geometricAlbedo for absolute brightness",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

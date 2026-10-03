@@ -27,7 +27,7 @@ Shader "FogOfWar/BlackHole"
                 float prof = x * x * x * max(1.0 - sqrt(x), 0.0);
                 float tempRel = pow(prof / 0.0567, 0.25);
                 float om = 0.9 * pow(rr, -1.5);
-                float ang = _SimTime * om * 6.0;
+                float ang = -_SimTime * om * 6.0; // sign makes the swirl carry the Doppler-bright side toward us; ×6 is sped up
                 float2 q = float2(cos(ang) * hit.x - sin(ang) * hit.z, sin(ang) * hit.x + cos(ang) * hit.z);
                 float turb = fbm(float3(q * 1.3, rr * 0.6));
                 float streaks = fbm(float3(q * 0.35 * rr, 1.0));

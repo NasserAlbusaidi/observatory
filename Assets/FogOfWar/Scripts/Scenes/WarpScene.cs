@@ -133,7 +133,9 @@ namespace FogOfWar
             list.Add(new Readout("Time dilation inside", "none (γ = 1)"));
             list.Add(new Readout("Proxima Centauri in", Fmt.Years(4.24 / v)));
             list.Add(new Readout("Bubble radius", (R * 33).ToString("0") + " m"));
-            list.Add(new Readout("Wall thickness ≈", (33 / sigma).ToString("0.0") + " m"));
+            // Pfenning & Ford 1997: Δ = (1 + tanh²σR)² / (2σ tanh σR), ≈ 2/σ for a thin wall
+            double th = System.Math.Tanh(sigma * R);
+            list.Add(new Readout("Wall thickness ≈", (33 * System.Math.Pow(1 + th * th, 2) / (2 * sigma * th)).ToString("0.0") + " m"));
             list.Add(new Readout("Negative energy, relative", Fmt.Num(rel, 2) + "× default", Tone.Cold));
             list.Add(new Readout("Crew can steer the front?", v > 1 ? "no (beyond their horizon)" : "yes", v > 1 ? Tone.Bad : Tone.Normal));
         }

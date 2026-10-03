@@ -1,0 +1,21 @@
+{
+ "name": "Triton",
+ "meanRadiusKm": 1353.4,
+ "equatorialRadiusKm": 1353.4,
+ "polarRadiusKm": 1353.4,
+ "flattening": 0.0,
+ "parent": "Neptune",
+ "geometricAlbedo": 0.76,
+ "rotation": "synchronous",
+ "colourSource": "Voyager 2 colour mosaic with gap fill, 600 m (USGS). The unimaged north is filled, not mapped",
+ "tint": [
+  1.0,
+  0.88,
+  0.82
+ ],
+ "sourceFile": "Triton_Voyager2_ClrMosaic_GlobalFill_600m.tif",
+ "licence": "public domain (NASA / USGS Astrogeology / PDS)",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "colourNote": "map brightness is relative (contrast-stretched); use geometricAlbedo for absolute brightness",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

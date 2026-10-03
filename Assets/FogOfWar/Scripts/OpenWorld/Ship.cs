@@ -30,10 +30,9 @@ namespace FogOfWar.OpenWorld
             Body best = sys.Sun; double bestSoi = double.MaxValue;
             foreach (var b in sys.Bodies)
             {
-                if (b.Parent == null || b == sys.Emb) continue;
-                double parentGM = b == sys.Moon ? sys.Earth.GM : b.Parent.GM;
+                if (b.Parent == null) continue;
+                double parentGM = b.Parent.GM;
                 double soi = b.A * Math.Pow(b.GM / parentGM, 0.4);
-                if (b == sys.Earth) soi = sys.Emb.A * Math.Pow(b.GM / sys.Sun.GM, 0.4);
                 soi = Math.Max(soi, b.Radius * 1.5);
                 if (soi < bestSoi && (sys.Pos(b, jd) - p).Mag < soi) { best = b; bestSoi = soi; }
             }
@@ -82,10 +81,10 @@ namespace FogOfWar.OpenWorld
             // Touchdown: anything that hits a surface stops on it (no crash model yet).
             foreach (var b in sys.Bodies)
             {
-                if (b == sys.Sun || b == sys.Emb) continue;
+                if (b == sys.Sun) continue;
                 var bp = sys.Pos(b, jd + h / 86400);
                 var r = Pos - bp;
-                double R = b.Radius * Math.Max(b.Shape.x, Math.Max(b.Shape.y, b.Shape.z)) * 0.98;
+                double R = b.Radius * Math.Max(b.Shape.x, Math.Max(b.Shape.y, b.Shape.z)) * (1 - b.Flattening) * 0.98;
                 if (r.Mag < R)
                 {
                     Pos = bp + r.Norm * b.Radius * 1.0001;
@@ -151,7 +150,7 @@ namespace FogOfWar.OpenWorld
         {
             foreach (var b in sys.Bodies)
             {
-                if (b == Target || b == sys.Emb || b.Parent == null) continue;
+                if (b == Target || b.Parent == null) continue;
                 var c = sys.Pos(b, jd);
                 var rel = c - Pos;
                 double d = rel.Mag;

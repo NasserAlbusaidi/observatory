@@ -13,7 +13,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Your Universe Sandbox Mars. Crank the greenhouse and watch <color=#FFB547>energy in</color> against <color=#69D2FF>energy out</color>. While they differ the planet is still heating or cooling, whatever the thermometer says right now.\n\n" +
             "The relief is real Mars (MOLA laser altimetry): Olympus Mons, Tharsis, Hellas, Valles Marineris. Lapse rate times elevation is why the peaks freeze while the basins cook, and why the global average describes almost nowhere.";
-        public override string Note => "Equilibrium dial: watch the in/out gap, not the temperature. A big greenhouse makes a runaway that keeps climbing long after you stop touching it.";
+        public override string Note => "Equilibrium dial: watch the in/out gap, not the thermometer. A big greenhouse takes decades to finish warming. (No water-vapour feedback is modelled, so there is no true runaway. Map: simple model, not a GCM.)";
 
         const double S = 586, R = 3.3895e6;
         float tau = 2.8f, albedo = 0.22f, lapse = 6.5f, relief = 8, cwarp = 2;
@@ -134,8 +134,8 @@ namespace FogOfWar
 
         public override void Controls(PanelUI ui)
         {
-            int b = ui.Buttons("Mars today", "Habitable-ish", "Runaway");
-            if (b == 0) { tau = 0.05f; albedo = 0.25f; lapse = 2.5f; years = 0; }
+            int b = ui.Buttons("Mars today", "Habitable-ish", "Hothouse (τ = 12)");
+            if (b == 0) { tau = 0.13f; albedo = 0.25f; lapse = 2.5f; years = 0; }
             if (b == 1) { tau = 2.8f; albedo = 0.22f; lapse = 6.5f; years = 0; }
             if (b == 2) { tau = 12f; albedo = 0.2f; lapse = 6.8f; years = 0; }
             tau = ui.Slider("Greenhouse optical depth τ", tau, 0, 15, v => v.ToString("0.00"), 0.05f);

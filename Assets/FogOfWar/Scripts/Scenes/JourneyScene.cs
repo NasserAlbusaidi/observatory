@@ -18,8 +18,8 @@ namespace FogOfWar
         public override string Note => "Why mass is a bitch: the speed never reaches 1. Every extra 9 costs more rapidity, and the perfect-rocket fuel ratio grows exponentially with rapidity.";
 
         const double G_LY = 1.0323; // 1 g in ly/yr²
-        static readonly string[] DestNames = { "Proxima Centauri (4.24 ly)", "Galactic centre (26,000 ly)", "The video's 220,000 ly crossing", "Andromeda (2.54 million ly)" };
-        static readonly double[] Dests = { 4.24, 26000, 220000, 2537000 };
+        static readonly string[] DestNames = { "Proxima Centauri (4.24 ly)", "Galactic centre (26,670 ly)", "The video's 220,000 ly crossing", "Andromeda (2.54 million ly)" };
+        static readonly double[] Dests = { 4.24, 26670, 220000, 2537000 };
         // Real directions on the sky (RA, Dec in degrees). The 220,000 ly crossing heads through the galactic centre.
         static readonly Vector2[] DestRaDec = { new Vector2(217.429f, -62.680f), new Vector2(266.405f, -28.936f), new Vector2(266.405f, -28.936f), new Vector2(10.685f, 41.269f) };
         int dest = 2;

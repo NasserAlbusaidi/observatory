@@ -19,7 +19,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Every planet and moon is where it really is today, on its real orbit. Your ship has a fusion drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b>, and it flies a brachistochrone, burning toward the target, flipping at the midpoint and braking the rest of the way, then parks in orbit.\n\n" +
             "Crank time compression to cross the system. At 1 g, Mars is a few days away; Neptune is a few weeks.";
-        public override string Note => "Keys: Space drive on/off · F flip · P plot & burn · T next target · [ ] time compression · M system map. Drag to orbit the camera, scroll to zoom from 20 m to the whole system.";
+        public override string Note => "Positions: JPL Horizons fits, 2000–2100 (TDB). Drive efficiency and high-g endurance are fictional; trajectories and Δv are real. Keys: Space drive on/off · F flip · P plot & burn · T next target · [ ] time compression · M system map. Drag to orbit the camera, scroll to zoom from 20 m to the whole system.";
 
         const double LinearLimit = 1e5;     // km rendered 1:1 around the camera
         static readonly double[] Warps = { 1, 10, 100, 1e3, 1e4, 1e5, 1e6 };
@@ -57,8 +57,8 @@ namespace FogOfWar
         protected override void Build()
         {
             sys = SolarSystem.Build();
-            targets = sys.Bodies.FindAll(b => b != sys.Sun && b != sys.Emb);
-            jd = Frame.JulianDate(DateTime.UtcNow);
+            targets = sys.Bodies.FindAll(b => b != sys.Sun);
+            jd = Frame.JulianDateTdb(DateTime.UtcNow);
             warpIdx = 0;
 
             Orbit.enabled = false;
@@ -66,10 +66,10 @@ namespace FogOfWar
             Cam.farClipPlane = 4e6f;
             Cam.fieldOfView = 55;
 
+            LoadArtBodies();
             var sphere = Own(Gfx.UVSphere(128, 64));
             foreach (var b in sys.Bodies)
             {
-                if (b == sys.Emb) continue;
                 var v = new Vis { b = b };
                 if (b.Look == Look.Sun)
                 {
@@ -90,9 +90,14 @@ namespace FogOfWar
                 }
                 else if (Resources.Load<GameObject>("Models/Bodies/" + b.Name) != null)
                 {
-                    // irregular body from the art pack: mean radius 1, +X long axis toward the parent
-                    var go = Models.Spawn("Bodies/" + b.Name, Root, b.ColA);
-                    v.t = go.transform; v.model = true;
+                    // irregular body from the art pack: mean radius 1 (volume-equivalent), body frame given by its
+                    // Prime / North markers (the FBX axis conversion can't be trusted). Scaled by meanRadiusKm.
+                    var holder = new GameObject(b.Name).transform;
+                    holder.SetParent(Root, false);
+                    var go = Models.Spawn("Bodies/" + b.Name, holder, b.ColA);
+                    AlignToMarkers(go.transform);
+                    if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0) b.Radius = info.meanRadiusKm;
+                    v.t = holder; v.model = true;
                     var rs = go.GetComponentsInChildren<Renderer>();
                     var ms = new List<Material>();
                     foreach (var r in rs) foreach (var m in r.sharedMaterials) { Own(m); ms.Add(m); }
@@ -104,7 +109,14 @@ namespace FogOfWar
                     m.SetColor("_ColA", b.ColA); m.SetColor("_ColB", b.ColB); m.SetColor("_Atmo", b.Atmo);
                     m.SetFloat("_Kind", b.Look == Look.Rocky ? 0 : b.Look == Look.Cloudy ? 1 : b.Look == Look.Gas ? 2 : 3);
                     m.SetFloat("_Seed", b.Name.GetHashCode() % 97);
-                    if (b.Texture != null) Art.Bind(m, ("_MainTex", b.Texture));
+                    if (b.Texture != null && Art.Bind(m, ("_MainTex", b.Texture)))
+                    {
+                        // Planets/<Body> maps are contrast-stretched per body; geometric albedo sets the absolute
+                        // level (perceptual curve, 0.3 → ×1). Older Textures/ maps are already absolute.
+                        var json = Resources.Load<TextAsset>("Planets/" + b.Name + "/Body");
+                        float ga = json != null ? JsonUtility.FromJson<BodyJson>(json.text).geometricAlbedo : 0;
+                        m.SetFloat("_Gain", ga > 0 && b.Texture.StartsWith("Planets/") ? Mathf.Pow(ga / 0.3f, 0.6f) : 1f);
+                    }
                     v.t = Gfx.Obj(b.Name, Root, sphere, m).transform;
                     v.mats = new[] { m };
                 }
@@ -120,6 +132,32 @@ namespace FogOfWar
 
             BuildShip();
             PlaceShipNearEarth();
+        }
+
+        [Serializable] class BodyJson { public float geometricAlbedo; }
+        [Serializable] class ArtBody { public string name; public float meanRadiusKm; public float geometricAlbedo; }
+        [Serializable] class ArtBodies { public ArtBody[] items; }
+        readonly Dictionary<string, ArtBody> art = new Dictionary<string, ArtBody>();
+
+        void LoadArtBodies()
+        {
+            art.Clear();
+            var ta = Resources.Load<TextAsset>("Models/Bodies/Bodies");
+            if (ta == null) return;
+            foreach (var a in JsonUtility.FromJson<ArtBodies>("{\"items\":" + ta.text + "}").items) art[a.name] = a;
+        }
+
+        // Rotate a body model inside its holder so its Prime marker lies on +X and North on +Y (the body frame).
+        static void AlignToMarkers(Transform model)
+        {
+            var prime = Models.FindDeep(model, "Prime");
+            var north = Models.FindDeep(model, "North");
+            if (prime == null || north == null) return;
+            var px = (prime.position - model.position).normalized;
+            var ny = north.position - model.position;
+            ny = (ny - Vector3.Dot(ny, px) * px).normalized;
+            var frame = Quaternion.LookRotation(Vector3.Cross(px, ny), ny); // maps +X→prime, +Y→north
+            model.localRotation = Quaternion.Inverse(frame) * model.localRotation;
         }
 
         static Mesh Quad()
@@ -212,7 +250,7 @@ namespace FogOfWar
             double best = double.MaxValue;
             foreach (var b in sys.Bodies)
             {
-                if (b == sys.Emb || b.GM < 1e-3) continue;
+                if (b.GM < 1e-3) continue;
                 double r = Math.Max((sys.Pos(b, jd) - ship.Pos).Mag, b.Radius);
                 best = Math.Min(best, 0.01 * Math.Sqrt(r * r * r / b.GM));
             }
@@ -258,6 +296,7 @@ namespace FogOfWar
 
         public override void LateTick(float dt)
         {
+            camDist = Math.Max(camDist, MinCamDist()); // targets change size under a fixed camera distance
             var off = OffsetDir();
             var pw = PivotW();
             camW = pw + Frame.FromU(off) * camDist;
@@ -275,13 +314,13 @@ namespace FogOfWar
                 if (v.model)
                 {
                     v.t.localScale = Vector3.one * s;
-                    // tidally locked: long axis (+X) toward the parent, +Y along the parent's pole
-                    var toParent = Frame.U((sys.Pos(b.Parent, jd) - bw).Norm);
-                    v.t.localRotation = LockedRotation(toParent, Frame.U(b.Parent.Pole));
+                    // the holder is the body frame, so the IAU pole and prime meridian orient it like any planet
+                    b.Axes(jd, out _, out var east, out var pole);
+                    v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
                 }
                 else
                 {
-                    v.t.localScale = b.Shape * s;
+                    v.t.localScale = Vector3.Scale(b.Shape, new Vector3(1, (float)(1 - b.Flattening), 1)) * s;
                     b.Axes(jd, out var prime, out var east, out var pole);
                     v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
                 }
@@ -319,26 +358,18 @@ namespace FogOfWar
             DrawOrbits();
         }
 
-        static Quaternion LockedRotation(Vector3 toParent, Vector3 up)
-        {
-            // model +X → toParent, +Y → up (made perpendicular)
-            var y = (up - Vector3.Dot(up, toParent) * toParent).normalized;
-            if (y.sqrMagnitude < 1e-6f) y = Vector3.up;
-            var z = Vector3.Cross(toParent, y);
-            return Quaternion.LookRotation(z, y);
-        }
 
         void DrawOrbits()
         {
             pts.Clear(); cols.Clear();
             foreach (var b in sys.Bodies)
             {
-                if (b.Parent == null || b == sys.Earth) continue;
+                if (b.Parent == null) continue;
                 bool isMoon = b.Parent != sys.Sun;
                 // moons' orbits only when the camera is near enough to see them as more than a dot
-                var parentW = isMoon ? sys.Pos(b == sys.Moon ? sys.Earth : b.Parent, jd) : D3.Zero;
+                var parentW = isMoon ? sys.Pos(b.Parent, jd) : D3.Zero;
                 if (isMoon && (parentW - camW).Mag > b.A * 400) continue;
-                bool tgt = ship.Target == b || (b == sys.Emb && ship.Target == sys.Earth);
+                bool tgt = ship.Target == b;
                 var c = tgt ? new Color(1f, 0.71f, 0.28f, 0.75f) : isMoon ? new Color(0.5f, 0.6f, 0.85f, 0.35f) : new Color(0.45f, 0.55f, 0.85f, 0.4f);
                 // planet orbits fade out when the camera is in close: from a ship they'd be streaks across the screen
                 if (!isMoon) c.a *= Mathf.Lerp(tgt ? 0.3f : 0f, 1f, Mathf.Clamp01((float)(Math.Log10(Math.Max(camDist, 1)) - 3) / 4f));
@@ -348,13 +379,13 @@ namespace FogOfWar
                 for (int i = 0; i <= N; i++)
                 {
                     double t = jd + period * i / N;
-                    var p = parentW + b.Local(t);
+                    // the real (perturbed) path relative to the parent, drawn around where the parent is now
+                    var p = parentW + sys.PosAt(b, t) - (isMoon ? sys.PosAt(b.Parent, t) : D3.Zero);
                     var q = Map(p, out _);
                     if (i > 0) { pts.Add(prev); pts.Add(q); cols.Add(c); cols.Add(c); }
                     prev = q;
                 }
             }
-            // a short prediction of the ship's coast arc relative to its dominant body
             Gfx.SetLines(orbitMesh, pts, cols);
             orbitMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 1e7f);
         }
@@ -415,8 +446,14 @@ namespace FogOfWar
 
         void NextTarget()
         {
-            targetIdx = (targetIdx + 1) % targets.Count;
-            ship.Target = targets[targetIdx];
+            SetTarget(targets[(targetIdx + 1) % targets.Count]);
+        }
+
+        void SetTarget(Body b)
+        {
+            ship.Target = b;
+            targetIdx = targets.IndexOf(b);
+            if (pivot == Pivot.Target) camDist = b.Radius * 4;
         }
 
         void ToggleMap()
@@ -474,13 +511,13 @@ namespace FogOfWar
             GUI.DrawTexture(new Rect(g.x - 2, g.y - 2, 4, 4), Texture2D.whiteTexture);
             GUI.color = Color.white;
             var r = new Rect(g.x + 6, g.y - 8, 140, 16);
-            if (b != null && GUI.Button(r, name, style)) { ship.Target = b; targetIdx = targets.IndexOf(b); }
+            if (b != null && GUI.Button(r, name, style)) SetTarget(b);
             else if (b == null) GUI.Label(r, name, style);
         }
 
         public override void Readouts(List<Readout> list)
         {
-            var date = Frame.FromJulian(jd);
+            var date = Frame.UtcFromTdb(jd);
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             list.Add(new Readout("Time compression", WarpNames[warpIdx] + (warpLimited ? " (limited)" : ""), warpLimited ? Tone.Bad : Tone.Normal));
             var refPos = sys.Pos(reference, jd);
@@ -490,13 +527,16 @@ namespace FogOfWar
             list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
+            // jet power P = ½·m·a·vₑ for a 500 t ship and a D–He³-class exhaust; no known physics sheds that heat
+            if (ship.Throttle > 0) list.Add(new Readout("Jet power (fictional efficiency)", Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW", Tone.Bad));
+            if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "outside 2000–2100: approximate", Tone.Bad));
             if (ship.Target != null)
             {
                 var tp = sys.Pos(ship.Target, jd);
                 var r = tp - ship.Pos;
                 var vr = ship.Vel - sys.Vel(ship.Target, jd);
                 double closing = D3.Dot(vr, r.Norm);
-                list.Add(new Readout("Target", ship.Target.Name + (ship.Target.PhaseApprox ? " (phase approx.)" : ""), Tone.Hot));
+                list.Add(new Readout("Target", ship.Target.Name, Tone.Hot));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
                 list.Add(new Readout("Closing speed", Fmt.Num(closing, 3) + " km/s", closing > 0 ? Tone.Cold : Tone.Normal));
                 list.Add(new Readout("Flip-and-burn at " + Fmt.Num(ship.MaxG, 2) + " g", Dur(ship.EtaSeconds(sys, jd))));
@@ -523,7 +563,7 @@ namespace FogOfWar
 
             GUILayout.Label("Drive", ui.label);
             var gl = new string[Gs.Length];
-            for (int i = 0; i < Gs.Length; i++) gl[i] = (Math.Abs(ship.MaxG - Gs[i]) < 1e-6 ? "● " : "") + Fmt.Num(Gs[i], 1) + " g" + (Gs[i] >= 10 ? " (juice)" : "");
+            for (int i = 0; i < Gs.Length; i++) gl[i] = (Math.Abs(ship.MaxG - Gs[i]) < 1e-6 ? "● " : "") + Fmt.Num(Gs[i], 1) + " g" + (Gs[i] >= 10 ? " (juice: fictional)" : "");
             int gi = ui.Buttons(gl);
             if (gi >= 0) ship.MaxG = Gs[gi];
 
@@ -546,7 +586,7 @@ namespace FogOfWar
             var names = new string[targets.Count];
             for (int i = 0; i < targets.Count; i++) names[i] = (targets[i].Parent != sys.Sun ? "   " : "") + targets[i].Name;
             int ti = ui.Choice("Target", targetIdx, names);
-            if (ti != targetIdx) { targetIdx = ti; ship.Target = targets[ti]; }
+            if (ti != targetIdx) SetTarget(targets[ti]);
         }
     }
 }

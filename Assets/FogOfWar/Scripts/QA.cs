@@ -51,6 +51,16 @@ namespace FogOfWar
         static void Call(object o, string method) =>
             o.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Invoke(o, null);
 
+        // Open System: aim the target camera at a named body.
+        static void View(SimScene s, string body, double radii)
+        {
+            var sys = (OpenWorld.SolarSystem)s.GetType().GetField("sys", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
+            var b = sys[body];
+            s.GetType().GetMethod("SetTarget", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(s, new object[] { b });
+            var pivot = Enum.ToObject(s.GetType().GetNestedType("Pivot", BindingFlags.NonPublic), 1);
+            s.GetType().GetMethod("SetPivot", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(s, new object[] { pivot, b.Radius * radii });
+        }
+
         // name, action, seconds to let it run before the screenshot
         static readonly Dictionary<Type, (string, Action<SimScene>, float)[]> Steps = new Dictionary<Type, (string, Action<SimScene>, float)[]>
         {
@@ -111,6 +121,10 @@ namespace FogOfWar
                 ("mars-target-cam", s => { Set(s, "warpIdx", 0); s.GetType().GetMethod("SetPivot", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(s, new object[] { Enum.ToObject(s.GetType().GetNestedType("Pivot", BindingFlags.NonPublic), 1), 15000.0 }); }, 3),
                 ("phobos-hold", s => { Call(s, "TogglePlot"); Set(s, "targetIdx", 8); Call(s, "NextTarget"); Call(s, "TogglePlot"); Set(s, "warpIdx", 3); }, 12),
                 ("jupiter-1M", s => { Call(s, "TogglePlot"); Set(s, "targetIdx", 4); Call(s, "NextTarget"); Call(s, "TogglePlot"); Set(s, "warpIdx", 6); }, 12),
+                ("view-venus", s => { Set(s, "warpIdx", 0); View(s, "Venus", 3.5); }, 2),
+                ("view-saturn", s => View(s, "Saturn", 4), 2),
+                ("view-earth", s => View(s, "Earth", 3), 2),
+                ("view-phobos", s => View(s, "Phobos", 4), 2),
             },
             [typeof(MeteorScene)] = new (string, Action<SimScene>, float)[]
             {

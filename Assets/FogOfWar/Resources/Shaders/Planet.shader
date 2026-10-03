@@ -11,6 +11,7 @@ Shader "FogOfWar/Planet"
         _Kind ("Kind", Float) = 0
         _Seed ("Seed", Float) = 0
         _HasTex ("Has texture", Float) = 0
+        _Gain ("Map gain", Float) = 1
         _MainTex ("Colour map", 2D) = "white" {}
     }
     SubShader
@@ -25,7 +26,7 @@ Shader "FogOfWar/Planet"
             #include "UnityCG.cginc"
             #include "FOWCommon.cginc"
             float4 _ColA, _ColB, _Atmo;
-            float _Kind, _Seed, _HasTex;
+            float _Kind, _Seed, _HasTex, _Gain;
             float3 _SunDir;
             sampler2D _MainTex;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
@@ -73,11 +74,17 @@ Shader "FogOfWar/Planet"
                 float3 n = normalize(i.n);
                 float3 l = normalize(_SunDir);
                 float3 vdir = normalize(_WorldSpaceCameraPos - i.wp);
-                float3 albedo = _HasTex > 0.5 ? texToDisplay(tex2DSphere(_MainTex, p).rgb) : procedural(p);
+                float3 albedo = procedural(p);
+                if (_HasTex > 0.5)
+                {
+                    float4 t = tex2DSphere(_MainTex, p);
+                    // a cloud deck map (Venus) is single-channel opacity: tint it between the two deck colours
+                    albedo = (_Kind > 0.5 && _Kind < 1.5) ? lerp(_ColA.rgb, _ColB.rgb, t.r) : texToDisplay(t.rgb) * _Gain;
+                }
                 float ndl = dot(n, l);
                 float diff = max(ndl, 0.0);
                 // gas and cloud decks scatter light past the terminator
-                float soft = _Kind > 0.5 ? smoothstep(-0.15, 0.25, ndl) * 0.9 + diff * 0.1 : diff;
+                float soft = _Kind > 0.5 ? smoothstep(-0.15, 0.25, ndl) * 0.9 + diff * 0.1 : regolith(n, l, vdir);
                 float rim = pow(1.0 - saturate(dot(n, vdir)), 3.0);
                 float3 col = albedo * (0.012 + soft) + _Atmo.rgb * rim * _Atmo.a * saturate(ndl + 0.35);
                 return float4(displayToOutput(col), 1.0);

@@ -36,7 +36,8 @@ Shader "FogOfWar/Stars"
                 float3 d2 = ctp * _Fwd + sqrt(max(0.0, 1.0 - ctp * ctp)) * perp;
                 float D = _Gamma * (1.0 + _Beta * ct);
                 float T = v.uv2.x * D;
-                float b = v.uv2.y * visB(T) / visB(v.uv2.x) * _Gain;
+                // point sources: aberration shrinks each star's solid angle by D², so flux carries a 1/D² (McKinley & Doherty 1979)
+                float b = v.uv2.y * visB(T) / visB(v.uv2.x) / (D * D) * _Gain;
                 o.col = blackbody(T);
                 o.a = saturate(b);
                 float size = clamp(1.2 + 1.6 * log(1.0 + b * 4.0), 0.0, 14.0) * _SizePx;

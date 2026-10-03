@@ -1,0 +1,22 @@
+{
+ "name": "Ceres",
+ "meanRadiusKm": 469.7,
+ "equatorialRadiusKm": 469.7,
+ "polarRadiusKm": 469.7,
+ "flattening": 0.0,
+ "parent": "Sun",
+ "geometricAlbedo": 0.09,
+ "rotation": "see note",
+ "note": "rotation 9.074 h",
+ "colourSource": "Dawn FC DLR mosaic, 20 ppd (USGS)",
+ "tint": [
+  0.95,
+  0.95,
+  0.97
+ ],
+ "sourceFile": "Ceres_Dawn_FC_DLR_global_20ppd_Oct2015.tif",
+ "licence": "public domain (NASA / USGS Astrogeology / PDS)",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "colourNote": "map brightness is relative (contrast-stretched); use geometricAlbedo for absolute brightness",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

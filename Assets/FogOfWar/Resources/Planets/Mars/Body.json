@@ -1,0 +1,13 @@
+{
+ "name": "Mars",
+ "equatorialRadiusKm": 3396.2,
+ "polarRadiusKm": 3376.2,
+ "flattening": 0.005889,
+ "obliquityDeg": 25.19,
+ "rotationHours": 24.6229,
+ "geometricAlbedo": 0.17,
+ "bondAlbedo": 0.25,
+ "colourSource": "NASA 3D Resources Mars colour; Height = MGS MOLA MEGDR; same files as Textures/Mars_*",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

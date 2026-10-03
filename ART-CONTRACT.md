@@ -20,3 +20,40 @@ What the Unity code expects from Blender output, so art can drop in without code
 
 ## Anything new
 Send the code thread the path in `/mnt/project-files/space-sim-art/` and which scene it belongs to.
+
+## Open System (scene 9): open-world contract
+
+Adopts the art side's `OPEN-WORLD-ART.md` naming. The code is the source of truth for physical values
+(radii, flattening, poles, rotation, orbits); art files carry looks only.
+
+### Maps: `Planets/<Body>/`
+- Loaded by name: `Planets/<Body>/Color` (any image type). Already wired: Mercury, Venus, Jupiter, Saturn, Uranus, Neptune.
+  Earth keeps `Textures/Earth_*`, the Moon `Textures/Moon_Color`, Mars `Textures/Mars_Color`.
+  Major moons (increment 2) will load `Planets/<Moon>/Color` with the same convention.
+- Layout: equirectangular, longitude 0 at the centre, east to the right, north up; object +Y = IAU north pole,
+  +X = prime meridian (`SkyUV`). The globe is rendered as an oblate spheroid from the code's equatorial radius and
+  flattening, so draw maps on the sphere, not pre-squashed.
+- `Height.png` + `Height.json` (km = minKm + grey·(maxKm − minKm)) and `Clouds.png`: imported linear, single channel;
+  heights uncompressed and CPU-readable. Not yet displaced in the open world (Mars scene only).
+- Without a map, the body renders procedurally from its two colours, so any map is a drop-in.
+
+### Rings: `Rings/<Planet>_Rings.png` + `.json`
+- Imported as uncompressed RGBA half, linear, clamped, no mips (FogOfWarArtImport).
+- Alpha is optical depth on a log scale: `a = (log10 τ + 9) / 10` over τ = 10⁻⁹…10, a = 0 means no ring;
+  decode τ = 10^(10a − 9). (Linear 16-bit alpha lost Jupiter's rings, τ ≈ 10⁻⁶, and left
+  Neptune's Galle/Lassell on a handful of grey levels.) The shader applies the slant path τ/|μ| itself.
+- Rows 0–1 lit face, rows 2–3 unlit/forward scatter (as drafted). Rendered in increment 2.
+
+### Irregular bodies: `Models/Bodies/<Name>.fbx`
+- Mean radius 1, +Y north, +X long axis (toward the parent when locked). The code scales by the body's mean radius
+  and locks +X to the parent. Phobos and Deimos are wired; the rest arrive with their moon systems.
+- `Bodies.json`: `diametersKm` (full axes), `meanRadiusKm`, `geometricAlbedo`. Mean radii follow IAU
+  or the shape-model volume.
+
+### Asteroid set: `Models/Asteroids/Asteroid00..31.fbx`
+- Used for the belt, Trojans and tiny moons in increment 3 (GPU instanced). Mean radius 1, under ~2k tris.
+
+### Player ship: `Models/PlayerShip.fbx` + `PlayerShip.json`
+- Wired. The code aligns `Nose` to the direction of thrust, scales to `lengthM` (52 m), pulses `Engine` from its
+  origin at the nozzle, and draws the drive plume behind it. `Cockpit`, `RCS_*` and `PDC_*` are reserved for the
+  cockpit camera, RCS puffs and point-defence turrets.

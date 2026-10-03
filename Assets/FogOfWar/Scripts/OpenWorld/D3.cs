@@ -53,6 +53,10 @@ namespace FogOfWar.OpenWorld
             Quaternion.LookRotation(U(EqToEcl(new D3(0, 1, 0))), U(EqToEcl(new D3(0, 0, 1))));
 
         public static double JulianDate(DateTime utc) => utc.ToOADate() + 2415018.5;
+        // TDB − UTC = 32.184 s + 37 leap seconds (TAI − UTC since 2017). JPL ephemerides and IAU rotation models use TDB.
+        public const double TdbMinusUtc = 69.184 / 86400;
+        public static double JulianDateTdb(DateTime utc) => JulianDate(utc) + TdbMinusUtc;
+        public static DateTime UtcFromTdb(double jdTdb) => FromJulian(jdTdb - TdbMinusUtc);
         public static DateTime FromJulian(double jd) => DateTime.FromOADate(jd - 2415018.5);
     }
 }

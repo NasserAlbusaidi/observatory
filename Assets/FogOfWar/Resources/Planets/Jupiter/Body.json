@@ -1,0 +1,12 @@
+{
+ "name": "Jupiter",
+ "equatorialRadiusKm": 71492,
+ "polarRadiusKm": 66854,
+ "flattening": 0.064874,
+ "obliquityDeg": 3.13,
+ "rotationHours": 9.925,
+ "geometricAlbedo": 0.538,
+ "bondAlbedo": 0.343,
+ "source": "Cassini ISS colour map PIA07782, Dec 2000 (NASA/JPL/Space Science Institute, public domain)",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

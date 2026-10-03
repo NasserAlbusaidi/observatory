@@ -1,0 +1,14 @@
+{
+ "name": "Umbriel",
+ "meanRadiusKm": 584.7,
+ "equatorialRadiusKm": 584.7,
+ "polarRadiusKm": 584.7,
+ "flattening": 0.0,
+ "parent": "Uranus",
+ "geometricAlbedo": 0.26,
+ "rotation": "synchronous",
+ "colourSource": "modelled: Voyager 2 saw only the southern hemispheres; features placed approximately",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "colourNote": "map brightness is relative; use geometricAlbedo for absolute brightness",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}

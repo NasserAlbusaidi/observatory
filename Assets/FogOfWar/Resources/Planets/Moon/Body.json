@@ -1,0 +1,21 @@
+{
+ "name": "Moon",
+ "equatorialRadiusKm": 1738.1,
+ "polarRadiusKm": 1736.0,
+ "flattening": 0.001208,
+ "obliquityDeg": 6.68,
+ "rotationHours": 655.72,
+ "geometricAlbedo": 0.12,
+ "bondAlbedo": 0.11,
+ "colourSource": "Kaguya Terrain Camera morning mosaic, 64 ppd (USGS/JAXA archive)",
+ "tint": [
+  1.0,
+  0.975,
+  0.94
+ ],
+ "sourceFile": "Lunar_Kaguya_TC_Morning_Global_64ppd_v04.tif",
+ "licence": "public domain (NASA / USGS Astrogeology / PDS)",
+ "convention": "equirect, lon 0 at u=0.5, east right, north up",
+ "colourNote": "map brightness is relative (contrast-stretched); use geometricAlbedo for absolute brightness",
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+}
