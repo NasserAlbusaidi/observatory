@@ -15,11 +15,20 @@ namespace FogOfWar
 
         public string TutorialText { get; private set; } // read by the HUD; null when no lesson is running
 
-        void StartTutorial() { lesson = Lesson.Turn; turned = burned = false; }
+        void StartTutorial() { lesson = Lesson.Turn; turned = burned = false; career.TutorialStep = 1; }
+
+        // After Continue: pick up the saved lesson, or stay quiet when the save had finished or skipped it (QA-051).
+        void ResumeTutorial()
+        {
+            int step = career.TutorialStep;
+            lesson = step > 0 && step <= (int)Lesson.Done && !career.Sandbox ? (Lesson)(step - 1) : Lesson.Done;
+            turned = burned = false;
+            if (lesson == Lesson.Done) TutorialText = null;
+        }
 
         void TickTutorial()
         {
-            if (lesson == Lesson.Done || career.Active.Find(x => x.Tutorial) == null) { lesson = Lesson.Done; TutorialText = null; return; }
+            if (lesson == Lesson.Done || career.Sandbox || career.Active.Find(x => x.Tutorial) == null) { lesson = Lesson.Done; TutorialText = null; career.TutorialStep = 0; return; }
             switch (lesson)
             {
                 case Lesson.Turn:
@@ -47,6 +56,7 @@ namespace FogOfWar
                     break;
             }
             TutorialText = Text(lesson);
+            career.TutorialStep = (int)lesson + 1;
         }
 
         string Text(Lesson l)

@@ -408,6 +408,38 @@ namespace FogOfWar
                 Check(career.Active.Exists(c => c.Kind == JobKind.Rescue) && exceptions == before, $"new game with a rescue active: {exceptions - before} exceptions");
             }
 
+            // QA-051: Continue keeps the tutorial where the save left it, and a skipped tutorial stays skipped
+            {
+                app.Restart(app.GameIndex);
+                yield return new WaitForSecondsRealtime(1f);
+                s = (OpenSystemScene)app.Current;
+                yield return null;
+                string running = JsonUtility.ToJson(career.ToSave(ship));        // lesson 1 of 7 in progress
+                Call("SkipTutorial");
+                yield return null;
+                string skipped = JsonUtility.ToJson(career.ToSave(ship));
+                Check(s.TutorialText == null && career.TutorialStep == 0, "skip ends the tutorial");
+                foreach (var (saved, wantOn, what) in new[] { (skipped, false, "skipped"), (running, true, "in progress") })
+                {
+                    app.Restart(app.GameIndex);
+                    yield return new WaitForSecondsRealtime(1f);
+                    s = (OpenSystemScene)app.Current;
+                    career.FromSave(JsonUtility.FromJson<CareerSave>(saved), ship);
+                    Call("ResumeTutorial");
+                    yield return null; yield return null;
+                    Check((s.TutorialText != null) == wantOn, $"Continue on a save with the tutorial {what}: card {(s.TutorialText != null ? "shown" : "hidden")}");
+                }
+                // a save from before the tutorial was saved (no field) counts as done
+                app.Restart(app.GameIndex);
+                yield return new WaitForSecondsRealtime(1f);
+                s = (OpenSystemScene)app.Current;
+                var old = JsonUtility.FromJson<CareerSave>(skipped.Replace("\"tutorial\":0,", ""));
+                career.FromSave(old, ship);
+                Call("ResumeTutorial");
+                yield return null;
+                Check(s.TutorialText == null, "an older save without tutorial state stays quiet");
+            }
+
             State("end");
             log.WriteLine($"done: {fails} failed checks");
             log.Close();

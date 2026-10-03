@@ -456,9 +456,10 @@ namespace FogOfWar
         {
             foreach (var old in career.Active.ToArray()) career.Abandon(old); // drop this session's derelicts from the system
             career = new Career { Sys = sys };
-            if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); return; }
+            if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); ResumeTutorial(); return; }
             try { career.FromSave(JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey)), ship); }
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the career save: " + e.Message); career.StartNew(jd); ship.Fuel = career.TankCapacity; }
+            ResumeTutorial();
         }
     }
 }
