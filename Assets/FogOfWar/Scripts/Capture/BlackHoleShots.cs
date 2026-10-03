@@ -59,7 +59,7 @@ namespace FogOfWar
 
         static readonly Action<SimScene> Default = s =>
         {
-            Set(s, "massIdx", 1); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
+            Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
             Set(s, "spin", 0f); Set(s, "clumpy", true);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
@@ -118,6 +118,10 @@ namespace FogOfWar
                 S("sb-sun-sgra-disc",     new Vector3(0, 3f, 26f), 50, Tde(0, 5f, 1, 6e5, 3.7f), ui: true),
                 S("sb-sun-m87-whole",     new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 2, 0, untilR: 12), ui: true),
                 S("sb-wd-imbh",           new Vector3(0, 6f, 30f), 50, Tde(1, 6f, -1, 60, untilR: 1, logMass: 3f), ui: true),
+                // the main tour's path, and the same throw played in real time (40 s of 60 fps frames)
+                S("sb-tour-repro",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 500); }), ui: true),
+                S("sb-tour-flare",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 4.2e5); }), ui: true),
+                S("sb-play-40s",          new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); for (int i = 0; i < 40 * 60; i++) B(s).Tick(1f / 60); }), ui: true),
                 S("sb-cloud",             new Vector3(0, 7f, 32f), 50, Tde(5, 6f, 1, 260), ui: true),
                 S("sb-orbit-precess",     new Vector3(0, 30f, 12f), 55, Orbit(1, 4000), ui: true),
                 S("sb-zoom-whirl",        new Vector3(0, 30f, 12f), 55, Orbit(2, 2500), ui: true),

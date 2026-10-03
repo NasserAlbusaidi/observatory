@@ -39,7 +39,7 @@ namespace FogOfWar
             public Spec spec; public Geo g;
             public double rt, Rm;          // tidal radius and body radius, M units
             public int state;              // 0 intact, 1 shredded, 2 swallowed whole, 3 flew past
-            public double stretch = 1, tDisrupt = -1, dE;
+            public double stretch = 1, tDisrupt = -1, dE, rp;
         }
 
         class Probe
@@ -68,7 +68,8 @@ namespace FogOfWar
 
         int throwKind;
         float periRs = 5f, logWarp = 1.5f;
-        bool guides = true, ride;
+        bool guides = true, ride, diskAutoOff;
+        double autoWarpFrom = -1;
         double simT, accreted, heatScale = 1e-9;
         // light curve: (sim time in M, luminosity / Eddington) and the fallback rate in kg per M of time
         readonly List<Vector2> lightCurve = new List<Vector2>();
@@ -97,6 +98,8 @@ namespace FogOfWar
         void ClearSandbox()
         {
             bodies.Clear(); probes.Clear(); nParts = 0; riding = null; ride = false;
+            if (diskAutoOff) disk = true;
+            diskAutoOff = false; autoWarpFrom = -1;
             camVel = new Vector4(0, 0, 0, 1);
             lightCurve.Clear(); lum = fallbackRate = fallbackAcc = accreted = 0; heatScale = 1e-9; curveT = 0; lastDE = 0; simT = 0;
             Orbit.enabled = true;
@@ -122,12 +125,12 @@ namespace FogOfWar
             double nu0 = Math.Acos(Math.Max(-1, Math.Min(1, 2 * rp / r0 - 1)));
             g.phi = -Math.PI / 2 - nu0;
             g.t = simT;
-            var b = new Body { spec = s, g = g, rt = rt, Rm = Rm };
+            var b = new Body { spec = s, g = g, rt = rt, Rm = Rm, rp = rp };
             if (bodies.Count >= 3) bodies.RemoveAt(0);
             bodies.Add(b);
             if (s.cloud) Shred(b, r0);
             else if (rt > r0) Shred(b, rt);       // already torn apart on the way in, long before it gets here
-            if (s.star || s.cloud) disk = false;  // tidal disruptions happen around quiet holes; the disk would hide them
+            if ((s.star || s.cloud) && disk) { disk = false; diskAutoOff = true; }  // TDEs happen around quiet holes; the disk would hide them
         }
 
         // Break a body into debris at its current position. rDis is where the tide won: it sets the energy spread.
@@ -145,6 +148,14 @@ namespace FogOfWar
             double Rvis = Math.Min(b.Rm, 1.0);
             double dE = b.spec.cloud ? 0 : b.Rm / (rDis * rDis);
             b.dE = dE; lastDE = Math.Max(lastDE, dE);
+            // The bound debris first comes back after t_min = 2π (GM/2ΔE)^{3/2}: 85 days for the Sun at Sgr A*, hours of real
+            // time at the default warp. Raise the warp so the return and the flare arrive about 20 s after the break-up.
+            if (dE > 0)
+            {
+                double tmin = 2 * Math.PI * Math.Pow(1 / (2 * dE), 1.5);
+                float want = (float)Math.Min(6, Math.Log10(tmin / 20));
+                if (want > logWarp) { autoWarpFrom = logWarp; logWarp = want; }
+            }
             var rng = new System.Random(1234 + bodies.Count);
             for (int i = 0; i < n; i++)
             {
@@ -434,11 +445,28 @@ namespace FogOfWar
             m.SetVectorArray("_BPos", pos); m.SetVectorArray("_BAxis", axis); m.SetVectorArray("_BCol", col); m.SetVectorArray("_BVel", vel);
         }
 
-        // Run the sandbox forward (shots and QA): t in M.
+        // The disk the flare feeds: thin, out to the circularisation radius 2 r_p of the latest shredded star, brightness and
+        // temperature following the flare luminosity L/L_Edd (a display model: real TDE disks peak in the UV and X-rays).
+        bool FlareDisk(out float outerRs, out float tempK, out float gain)
+        {
+            outerRs = tempK = gain = 0;
+            if (lum < 1e-3 || nParts == 0) return false;
+            Body src = null;
+            for (int i = bodies.Count - 1; i >= 0; i--) if (bodies[i].state == 1 && !bodies[i].spec.cloud) { src = bodies[i]; break; }
+            if (src == null) return false;
+            outerRs = (float)Math.Max(src.rp, Kerr.Isco(A) * 0.5 + 1);   // 2 r_p in M is r_p in rs
+            tempK = (float)Math.Max(2500, Math.Min(40000, 9000 * Math.Pow(lum, 0.25)));
+            gain = (float)Math.Min(1, Math.Sqrt(lum));
+            return true;
+        }
+
+        // Run the sandbox forward by t of sim time (M), in ordinary frames at the current warp (shots, tours and QA).
+        // The warp can change on the way (a break-up raises it), so this runs to a target time, not a frame count.
         public void Advance(double t, float frame = 1f / 30)
         {
-            int steps = Math.Max(1, (int)Math.Ceiling(t / (frame * Math.Pow(10, logWarp))));
-            for (int i = 0; i < steps; i++) TickSandbox(frame);
+            double end = simT + t;
+            for (int i = 0; i < 200000 && simT < end; i++)
+                TickSandbox((float)Math.Min(frame, (end - simT) / Math.Pow(10, logWarp) + 1e-6));
         }
 
         // Run until the newest body is within r (M units) or has broken up, then on for `after` (shots and QA).
@@ -504,6 +532,9 @@ namespace FogOfWar
                 }
                 list.Add(new Readout("Swallowed so far", Fmt.Num(accreted / Phys.Msun, 3) + " suns"));
             }
+            if (diskAutoOff && !disk) list.Add(new Readout("Accretion disk", "switched off for the throw (a quiet hole)"));
+            if (!disk && FlareDisk(out float fo, out _, out _)) list.Add(new Readout("Flare disk", "forming out to 2 r_p = " + fo.ToString("0.0") + " rs (model)", Tone.Hot));
+            if (autoWarpFrom >= 0) list.Add(new Readout("Time warp", "raised so the debris returns in ~20 s"));
             list.Add(new Readout("Sim clock", Fmt.Duration(simT * Tunit) + " (1 s = " + Fmt.Duration(Math.Pow(10, logWarp) * Tunit) + ")"));
             if (probes.Count > 0) ProbeSummary(list, probes[probes.Count - 1]);
         }
