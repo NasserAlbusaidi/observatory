@@ -289,7 +289,8 @@ namespace FogOfWar
                 if (mw != null)
                 {
                     if (skySphere == null) { skySphere = UVSphere(64, 32); skySphere.bounds = new Bounds(Vector3.zero, Vector3.one * 1e7f); }
-                    if (milkyWayMat == null) { milkyWayMat = Mat("SkyMap"); milkyWayMat.SetTexture("_MainTex", mw); }
+                    // dimmed: these scenes are exposed for sunlit bodies, so the galaxy is a faint glow behind the stars
+                    if (milkyWayMat == null) { milkyWayMat = Mat("SkyMap"); milkyWayMat.SetTexture("_MainTex", mw); milkyWayMat.SetFloat("_Gain", 0.3f); }
                     Obj("Milky Way", field.transform, skySphere, milkyWayMat);
                 }
                 return field;
