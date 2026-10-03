@@ -1,5 +1,6 @@
 // Mars surface temperature / terrain map. Elevation (km) arrives in uv2.x; geometry is displaced on the CPU.
-// T = global mean − lapse rate × elevation + latitude term.
+// T = global mean − lapse rate × elevation + latitude term (MarsScene.cs). Liquid water needs local pressure above the
+// triple point and T below the local boiling point.
 Shader "FogOfWar/Mars"
 {
     SubShader
@@ -14,7 +15,7 @@ Shader "FogOfWar/Mars"
             #include "UnityCG.cginc"
             #include "FOWCommon.cginc"
             float3 _FOWSunDir;
-            float _Tmean, _Lapse, _Mode, _Sea, _Tau, _HasTex;
+            float _Tmean, _Lapse, _Mode, _Sea, _Tau, _HasTex, _LatDT, _P0;
             sampler2D _MarsTex;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; float2 uv2 : TEXCOORD1; };
             struct v2f { float4 pos : SV_POSITION; float3 n : TEXCOORD0; float h : TEXCOORD1; float lat : TEXCOORD2; float3 op : TEXCOORD3; };
@@ -43,7 +44,7 @@ Shader "FogOfWar/Mars"
             }
             float4 frag(v2f i) : SV_Target
             {
-                float latTerm = 25.0 * cos(i.lat) * cos(i.lat) - 20.0;
+                float latTerm = _LatDT * (cos(i.lat) * cos(i.lat) - 2.0 / 3.0);
                 float T = _Tmean - _Lapse * i.h + latTerm;
                 float light = 0.25 + 0.85 * max(dot(normalize(i.n), normalize(_FOWSunDir)), 0.0);
                 float3 col;
@@ -55,7 +56,9 @@ Shader "FogOfWar/Mars"
                 {
                     float3 rock = _HasTex > 0.5 ? texToDisplay(tex2DSphere(_MarsTex, i.op).rgb) * 1.1
                                                 : lerp(float3(0.42, 0.18, 0.08), float3(0.78, 0.45, 0.25), smoothstep(-4.0, 10.0, i.h));
-                    bool liquid = T > 0.0 && T < 100.0 && i.h < _Sea && _Tau > 0.3;
+                    float p = _P0 * exp(-i.h / 11.1);
+                    float boil = 1.0 / (1.0 / 373.15 - 8.314 / 40660.0 * log(max(p, 1e-3) / 1013.25)) - 273.15;
+                    bool liquid = p > 6.117 && T > 0.0 && T < boil && i.h < _Sea;
                     bool ice = T <= 0.0 && i.h < _Sea + 2.0 && _Tau > 0.3;
                     if (liquid) rock = lerp(float3(0.05, 0.2, 0.4), float3(0.1, 0.35, 0.5), smoothstep(_Sea - 6.0, _Sea, i.h));
                     else if (ice || (abs(i.lat) > 1.35 && _HasTex < 0.5)) rock = float3(0.92, 0.94, 0.98);

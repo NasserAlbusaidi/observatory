@@ -172,7 +172,7 @@ namespace FogOfWar
             },
             [typeof(MarsScene)] = new (string, Action<SimScene>, float)[]
             {
-                ("today", s => { Set(s, "tau", 0.05f); Set(s, "albedo", 0.25f); Set(s, "lapse", 2.5f); Set(s, "years", 0.0); Set(s, "cwarp", 10f); }, 6),
+                ("today", s => { Set(s, "tau", 0.05f); Set(s, "albedo", 0.25f); Set(s, "lapse", 2.5f); Set(s, "pressure", 6.1f); Set(s, "years", 0.0); Set(s, "cwarp", 10f); }, 6),
                 ("runaway-terrain", s => { Set(s, "tau", 12f); Set(s, "albedo", 0.2f); Set(s, "lapse", 6.8f); Set(s, "years", 0.0); Set(s, "mode", 1); }, 8),
                 ("relief-max", s => Set(s, "relief", 20f), 2),
                 ("flat-icy", s => { Set(s, "relief", 0f); Set(s, "tau", 0f); Set(s, "albedo", 0.6f); Set(s, "lapse", 0f); }, 6),
@@ -237,6 +237,7 @@ namespace FogOfWar
             },
             [typeof(MeteorScene)] = new (string, Action<SimScene>, float)[]
             {
+                ("geminids-night", s => { Set(s, "shower", 2); Set(s, "timeWarp", 600f); }, 20),
                 ("storm-600x", s => { Set(s, "shower", 3); Set(s, "timeWarp", 600f); }, 8),
                 ("far-tx", s => Set(s, "txKm", 2600f), 5),
                 ("near-tx-nopaths", s => { Set(s, "txKm", 200f); Set(s, "paths", false); }, 5),

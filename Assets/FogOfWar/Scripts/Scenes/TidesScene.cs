@@ -12,7 +12,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Earth and Moon at <color=#FFB547>true scale</color>: the Moon really is that far and that small. Tidal stretching scales with 1/d³, so a small nudge does very little and a big one does a lot.\n\n" +
             "The blue shell is the ocean's tidal bulge, exaggerated about a million times so you can see it. Zoom out to find the Moon. Drag it inside the Roche limit and Earth's tides tear it into a ring of rubble.";
-        public override string Note => "1,000 km closer is roughly where the Moon was about 25 million years ago, at today's 3.8 cm/yr recession rate. Tides 0.8% stronger and a month 2.6 hours shorter. Nobody would notice without instruments.";
+        public override string Note => "1,000 km closer is roughly where the Moon was about 25 million years ago, at today's 3.8 cm/yr recession rate. Tides 0.8% stronger and a month 2.6 hours shorter. Nobody would notice without instruments. The view is drawn in the Moon's orbital plane, which is tilted 5.1° to Earth's orbit.";
 
         const float RE = 6371, D0 = 384400, ROCHE = 18470; // km
         const double ME = 5.972e24, MM = 7.342e22;
@@ -22,7 +22,7 @@ namespace FogOfWar
         Mesh ringMesh;
         Material ringMat;
         const int NR = 5000;
-        readonly float[] ra = new float[NR], rr = new float[NR], ry = new float[NR];
+        readonly float[] ra = new float[NR], rr = new float[NR], ry = new float[NR], drift = new float[NR];
         readonly Vector3[] rv = new Vector3[NR * 4];
         float ang, spin, broken;
         // Solid chunks from the art pack's Rubble.fbx riding along with a subset of the dust particles.
@@ -143,12 +143,16 @@ namespace FogOfWar
             if (showRing)
             {
                 var right = Cam.transform.right * 0.06f; var up = Cam.transform.up * 0.06f;
-                float t = Time.time;
+                double moonRate = 1 / Period(d);
                 for (int i = 0; i < NR; i++)
                 {
                     float spread = (ra[i] - Mathf.PI) * broken;
-                    float a = ang + spread + t * 0.05f / Mathf.Pow(rr[i], 1.5f);
-                    float r = dU * (1 + (rr[i] - 1) * broken);
+                    float k = 1 + (rr[i] - 1) * broken;
+                    // Kepler shear on the same clock as the Moon: each particle drifts from the Moon's phase at the
+                    // difference of their mean motions
+                    drift[i] = (drift[i] + (float)(dt * warp * 2 * System.Math.PI * (1 / Period(d * k) - moonRate))) % (2 * Mathf.PI);
+                    float a = ang + spread + drift[i];
+                    float r = dU * k;
                     var p = new Vector3(Mathf.Cos(a) * r, ry[i] * dU * 0.3f, Mathf.Sin(a) * r);
                     rv[i * 4] = p - right - up; rv[i * 4 + 1] = p + right - up; rv[i * 4 + 2] = p + right + up; rv[i * 4 + 3] = p - right + up;
                 }

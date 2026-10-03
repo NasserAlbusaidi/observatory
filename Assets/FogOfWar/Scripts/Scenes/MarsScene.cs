@@ -4,7 +4,10 @@ using UnityEngine;
 namespace FogOfWar
 {
     // Terraformed-Mars energy balance. Absorbed = S(1−A)πR²; emitted = 4πR²σT⁴/(1 + ¾τ) (grey-atmosphere greenhouse).
-    // Local temperature = global mean − lapse rate × elevation + latitude term; the mean relaxes with thermal inertia.
+    // Local temperature = global mean − effective lapse rate × elevation + latitude term; the mean relaxes with thermal
+    // inertia. Heuristics (labelled in the Note): pole–equator contrast ΔT = 70 K / (1 + ¾τ), applied as ΔT(cos²lat − ⅔) so
+    // it leaves the mean alone; the lapse rate fades as Γ·¾τ/(1 + ¾τ) because thin air barely couples to the ground.
+    // Liquid water needs local pressure above the triple point (6.117 mbar) and boils by Clausius–Clapeyron.
     public class MarsScene : SimScene
     {
         public override string Title => "Terraform Mars";
@@ -13,10 +16,17 @@ namespace FogOfWar
         public override string Blurb =>
             "Your Universe Sandbox Mars. Crank the greenhouse and watch <color=#FFB547>energy in</color> against <color=#69D2FF>energy out</color>. While they differ the planet is still heating or cooling, whatever the thermometer says right now.\n\n" +
             "The relief is real Mars (MOLA laser altimetry): Olympus Mons, Tharsis, Hellas, Valles Marineris. Lapse rate times elevation is why the peaks freeze while the basins cook, and why the global average describes almost nowhere.";
-        public override string Note => "Equilibrium dial: watch the in/out gap, not the thermometer. A big greenhouse takes decades to finish warming. (No water-vapour feedback is modelled, so there is no true runaway. Map: simple model, not a GCM.)";
+        public override string Note => "Equilibrium dial: watch the in/out gap, not the thermometer. A big greenhouse takes decades to finish warming. (No water-vapour feedback is modelled, so there is no true runaway. Map: simple model, not a GCM. The pole–equator contrast and the lapse rate shrink as the air thins; both are heuristics. Water is liquid only where the local pressure is above 6.1 mbar, and it boils lower on high ground.)";
 
         const double S = 586, R = 3.3895e6;
-        float tau = 2.8f, albedo = 0.22f, lapse = 6.5f, relief = 8, cwarp = 2;
+        float tau = 2.8f, albedo = 0.22f, lapse = 6.5f, relief = 8, cwarp = 2, pressure = 1000; // pressure: mbar at datum
+        const double ScaleH = 11.1, Triple = 6.117; // km, mbar
+
+        double LatDT => 70 / (1 + 0.75 * tau);
+        double LapseEff => lapse * 0.75 * tau / (1 + 0.75 * tau);
+        static double Pressure(double p0, double hKm) => p0 * System.Math.Exp(-hKm / ScaleH);
+        // boiling point (°C) at p mbar: 1/T = 1/373.15 − (R/L) ln(p/1013.25), L = 40.66 kJ/mol
+        static double Boil(double p) => 1 / (1 / 373.15 - 8.314 / 40660 * System.Math.Log(p / 1013.25)) - 273.15;
         int mode;
         double Tk = 210, years;
         Mesh mesh; Vector3[] baseV, verts; float[] H;
@@ -98,7 +108,9 @@ namespace FogOfWar
             Tk += (Target() - Tk) * (1 - System.Math.Exp(-step * 0.35));
             years += step * 6;
             mat.SetFloat("_Tmean", (float)(Tk - 273.15));
-            mat.SetFloat("_Lapse", lapse);
+            mat.SetFloat("_Lapse", (float)LapseEff);
+            mat.SetFloat("_LatDT", (float)LatDT);
+            mat.SetFloat("_P0", pressure);
             mat.SetFloat("_Mode", mode);
             mat.SetFloat("_Sea", -1);
             mat.SetFloat("_Tau", tau);
@@ -115,9 +127,11 @@ namespace FogOfWar
             {
                 var v = baseV[i];
                 double lat = System.Math.Asin(Mathf.Clamp(v.y, -1, 1));
-                double T = Tk - 273.15 - lapse * H[i] + 25 * System.Math.Cos(lat) * System.Math.Cos(lat) - 20;
+                double c = System.Math.Cos(lat);
+                double T = Tk - 273.15 - LapseEff * H[i] + LatDT * (c * c - 2.0 / 3);
                 mn = System.Math.Min(mn, T); mx = System.Math.Max(mx, T); sum += T;
-                if (T > 0 && T < 100) liquid++;
+                double p = Pressure(pressure, H[i]);
+                if (p > Triple && T > 0 && T < Boil(p)) liquid++;
             }
             double gap = (ein - eout) / ein;
             list.Add(new Readout("Energy in", (ein / 1e15).ToString("0.00") + " PW", Tone.Hot));
@@ -127,6 +141,9 @@ namespace FogOfWar
             list.Add(new Readout("Global average", (sum / samples.Count).ToString("0.0") + " °C"));
             list.Add(new Readout("Hottest spot", mx.ToString("0") + " °C", Tone.Hot));
             list.Add(new Readout("Coldest spot", mn.ToString("0") + " °C", Tone.Cold));
+            list.Add(new Readout("Surface pressure (datum)", Fmt.Num(pressure, pressure < 100 ? 1 : 0) + " mbar" + (pressure < Triple ? " (below water's triple point)" : "")));
+            list.Add(new Readout("Water boils at (datum)", pressure < Triple ? "no liquid phase" : Boil(pressure).ToString("0") + " °C"));
+            list.Add(new Readout("Pole–equator contrast", LatDT.ToString("0") + " K"));
             list.Add(new Readout("Surface where water is liquid", (100.0 * liquid / samples.Count).ToString("0") + "%"));
             list.Add(new Readout("Equilibrium target", (Target() - 273.15).ToString("0.0") + " °C"));
             list.Add(new Readout("Years since change", Fmt.Num(years, 0)));
@@ -135,12 +152,13 @@ namespace FogOfWar
         public override void Controls(PanelUI ui)
         {
             int b = ui.Buttons("Mars today", "Habitable-ish", "Hothouse (τ = 12)");
-            if (b == 0) { tau = 0.13f; albedo = 0.25f; lapse = 2.5f; years = 0; }
-            if (b == 1) { tau = 2.8f; albedo = 0.22f; lapse = 6.5f; years = 0; }
-            if (b == 2) { tau = 12f; albedo = 0.2f; lapse = 6.8f; years = 0; }
+            if (b == 0) { tau = 0.13f; albedo = 0.25f; lapse = 4.5f; pressure = 6.1f; years = 0; }
+            if (b == 1) { tau = 2.8f; albedo = 0.22f; lapse = 6.5f; pressure = 1000; years = 0; }
+            if (b == 2) { tau = 12f; albedo = 0.2f; lapse = 6.8f; pressure = 3000; years = 0; }
             tau = ui.Slider("Greenhouse optical depth τ", tau, 0, 15, v => v.ToString("0.00"), 0.05f);
             albedo = ui.Slider("Albedo (reflectivity)", albedo, 0.05f, 0.6f, v => v.ToString("0.00"), 0.01f);
-            lapse = ui.Slider("Lapse rate", lapse, 0, 10, v => v.ToString("0.0") + " °C/km", 0.1f);
+            pressure = ui.Slider("Surface pressure", pressure, 1, 5000, v => Fmt.Num(v, v < 100 ? 1 : 0) + " mbar", 0.5f);
+            lapse = ui.Slider("Lapse rate (thick air)", lapse, 0, 10, v => v.ToString("0.0") + " °C/km", 0.1f);
             mode = ui.Choice("Map", mode, new[] { "Surface temperature", "Terrain, water and ice" });
             relief = ui.Slider("Relief exaggeration", relief, 0, 20, v => v.ToString("0.0") + "×", 0.5f);
             cwarp = ui.Slider("Climate time warp", cwarp, 0.1f, 10, v => v.ToString("0.0") + "×", 0.1f);
