@@ -24,7 +24,10 @@ namespace FogOfWar.EditorTools
             if (assetPath.Contains("_Height") || assetPath.Contains("_Clouds") || assetPath.Contains("_Ocean"))
             {
                 ti.textureType = TextureImporterType.SingleChannel;
-                ti.singleChannelComponent = TextureImporterSingleChannelComponent.Red;
+                var s = new TextureImporterSettings();
+                ti.ReadTextureSettings(s);
+                s.singleChannelComponent = TextureImporterSingleChannelComponent.Red;
+                ti.SetTextureSettings(s);
             }
             if (assetPath.Contains("_Height"))
             {
