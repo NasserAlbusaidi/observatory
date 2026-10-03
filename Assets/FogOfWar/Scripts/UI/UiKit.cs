@@ -210,6 +210,7 @@ namespace FogOfWar.UI
         readonly VisualElement fill, knob, track;
         float min, max, val;
         public Action<float> Changed;
+        public Action<float> Display; // value readout; also follows SetValueWithoutNotify
         bool dragging;
 
         public FowSlider(float min, float max, float value, Action<float> changed)
@@ -232,7 +233,7 @@ namespace FogOfWar.UI
             float w = Mathf.Max(resolvedStyle.width, 1);
             float v = Mathf.Lerp(min, max, Mathf.Clamp01(x / w));
             if (Mathf.Abs(v - val) < 1e-6f) return;
-            val = v; Place(); Changed?.Invoke(val);
+            val = v; Place(); Display?.Invoke(val); Changed?.Invoke(val);
         }
 
         public float Value { get => val; set { SetValueWithoutNotify(value); Changed?.Invoke(val); } }
@@ -241,6 +242,7 @@ namespace FogOfWar.UI
         {
             val = Mathf.Clamp(v, min, max);
             Place();
+            Display?.Invoke(val);
         }
 
         public bool Dragging => dragging;

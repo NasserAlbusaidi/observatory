@@ -31,6 +31,8 @@ namespace FogOfWar
         public static void KeyEvent(KeyCode k) => runner?.KeyEvent(k);
         public static void KeyUp(KeyCode k) => runner?.KeyUp(k);
         // tests: fly the photo camera as WASD/QE would
+        public static string RigState => runner == null ? "" : $"distance {runner.RigDistance:0.000}, roll slider {runner.RollShown:0}";
+        public static void TestApproach() => runner?.TestApproach();
         public static void TestFly(Vector3 local, float seconds, float roll) => runner?.TestFly(local, seconds, roll);
 
         public static void OpenFolder()
