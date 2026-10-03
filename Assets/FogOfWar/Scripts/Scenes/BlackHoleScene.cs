@@ -93,7 +93,7 @@ namespace FogOfWar
             mat.SetFloat("_Lens", lens ? 1 : 0);
             mat.SetFloat("_Outer", outer);
             mat.SetFloat("_Temp", temp);
-            mat.SetInt("_Steps", App.Quality == 2 ? 1500 : 1000);
+            mat.SetInt("_Steps", App.Quality == 2 ? 1200 : 1000);   // 1500 put 4K Sharp over 16 ms (audit #61)
             // a tidal disruption flare with the steady disk off: the returning debris feeds a new thin disk out to the
             // circularisation radius 2 r_p; its accretion rate follows the flare luminosity (in Eddington units)
             if (!disk && FlareDisk(out float fOuter, out float fTemp, out float fGain))
@@ -161,15 +161,18 @@ namespace FogOfWar
         {
             int mi = ui.Choice("Black hole", massIdx, MassNames);
             if (mi != massIdx) { massIdx = mi; SyncMass(); }
-            float lm = ui.Slider("Mass (any)", logMass, 0.5f, 10.9f, v => Fmt.Num(System.Math.Pow(10, v), 2) + " suns", 0.01f);
-            if (Mathf.Abs(lm - logMass) > 1e-4f) { logMass = lm; massIdx = shownMassIdx = -1; }
+            // the slider rounds to its 0.01 step every frame; compare with the rounded value so a preset's exact mass is
+            // only replaced when the player actually moves the slider (audit #54)
+            float shown = Mathf.Round(logMass / 0.01f) * 0.01f;
+            float lm = ui.Slider("Mass (any)", shown, 0.5f, 10.9f, v => Fmt.Num(System.Math.Pow(10, v), 2) + " suns", 0.01f);
+            if (Mathf.Abs(lm - shown) > 1e-4f) { logMass = lm; massIdx = shownMassIdx = -1; }
             spin = ui.Slider("Spin (a/M)", spin, 0, 0.998f, v => v.ToString("0.000"), 0.001f);
             disk = ui.Toggle("Accretion disk", disk);
             doppler = ui.Toggle("Doppler beaming + redshift", doppler);
             lens = ui.Toggle("Gravitational lensing", lens);
             clumpy = ui.Toggle("Clumpy gas texture", clumpy);
             outer = ui.Slider("Disk outer radius", outer, 6, 20, v => v.ToString("0.0") + " rs", 0.5f);
-            temp = ui.Slider(spin > 0.001f ? "Disk temperature (peak at spin 0)" : "Peak disk temperature", temp, 2500, 20000, v => Fmt.Num(v, 0) + " K", 100);
+            temp = ui.Slider(spin > 0.001f ? "Accretion rate (as spin-0 peak temp.)" : "Peak disk temperature", temp, 2500, 20000, v => Fmt.Num(v, 0) + " K", 100);
             SandboxControls(ui);
         }
     }

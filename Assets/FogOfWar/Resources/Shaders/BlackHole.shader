@@ -120,7 +120,12 @@ Shader "FogOfWar/BlackHole"
                 float ut = (-B - disc) / (2.0 * A);
                 if (ut < 0.0) ut = (-B + disc) / (2.0 * A);
                 float g = EF / max(emitterE(ut, ur, uph, b, pr), 1e-4);
-                if (_Doppler < 0.5) g = EF * sqrt(max(1.0 - 2.0 / r, 1e-4));
+                if (_Doppler < 0.5)
+                {
+                    float Dz = max(r * r - 2.0 * r + a * a, 1e-4);
+                    float S2z = (r * r + a * a) * (r * r + a * a) - a * a * Dz;
+                    g = EF * sqrt(r * r * Dz / S2z) / max(1.0 - 2.0 * a * r / S2z * b, 1e-4);
+                }
                 alpha = 1.0 - exp(-t.x * 3.0);
                 return blackbody(T * g) * pow(g, 4.0) * t.x * _DebrisRange.w;
             }

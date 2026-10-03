@@ -17,6 +17,8 @@ namespace FogOfWar
         VisualElement mapPlot, curvePlot, curveBox;
         Label mapScale, curveLabel;
         double mapR = 40;
+        readonly List<double> hudRs = new List<double>();
+        readonly HashSet<int> hudCells = new HashSet<int>();
 
         static readonly Color CHorizon = new Color(0.9f, 0.92f, 1f, 0.9f), CErgo = new Color(0.6f, 0.66f, 0.9f, 0.5f);
         static readonly Color CPhoton = new Color32(0x69, 0xD2, 0xFF, 0xE0), CIsco = new Color32(0xFF, 0xB5, 0x47, 0xE0);
@@ -76,13 +78,13 @@ namespace FogOfWar
             foreach (var p in probes) if (p.g.alive || p.trail.Count > 0) want = Math.Max(want, Math.Min(p.g.r, 300) * 1.15);
             foreach (var b in bodies) if (b.state == 0) want = Math.Max(want, Math.Min(b.g.r, 300) * 1.1);
             // debris: frame the inner half of it (median r of every 8th particle, doubled)
-            var rs = new List<double>();
-            for (int i = 0; i < nParts; i += 8) if (parts[i].alive) rs.Add(parts[i].r);
-            if (rs.Count > 0) { rs.Sort(); want = Math.Max(want, Math.Min(rs[rs.Count / 2] * 2, 300)); }
+            hudRs.Clear();
+            for (int i = 0; i < nParts; i += 8) if (parts[i].alive) hudRs.Add(parts[i].r);
+            if (hudRs.Count > 0) { hudRs.Sort(); want = Math.Max(want, Math.Min(hudRs[hudRs.Count / 2] * 2, 1500)); }
             mapR = want > mapR * 1.5 || want < mapR / 1.5 ? want : mapR + (want - mapR) * 0.08;
             Ui.Text(mapScale, $"edge {mapR / 2:0} rs, drawn flat (not lensed)");
             mapPlot.MarkDirtyRepaint();
-            bool curve = lightCurve.Count > 1;
+            bool curve = lightCurve.Count > 1 && lum > 1e-4;   // not an empty plot while the debris is still out (audit #57)
             Ui.Show(curveBox, curve);
             if (curve)
             {
@@ -117,7 +119,7 @@ namespace FogOfWar
             for (int i = 0; i < nParts; i++) if (parts[i].alive && parts[i].r < mapR * 1.4) nDots++;
             int stride = Math.Max(1, nDots / 2500);
             // one square per 2-pixel cell: overlapping squares in one path make the tessellator blow up
-            var cells = new HashSet<int>();
+            var cells = hudCells; cells.Clear();
             for (int phase = 0; phase < 3 && nDots > 0; phase++)
             {
                 pt.fillColor = phase == 2 ? new Color(1f, 0.55f, 0.25f, 0.95f) : phase == 1 ? new Color(0.55f, 0.65f, 1f, 0.8f) : new Color(1f, 0.88f, 0.65f, 0.9f);
@@ -218,7 +220,7 @@ namespace FogOfWar
             double td = -1;
             foreach (var b in bodies) if (b.tDisrupt >= 0) td = Math.Max(td, b.tDisrupt);
             float tp = lightCurve[peakI].x;
-            if (td >= 0 && tp > td && peakI < lightCurve.Count - 2)
+            if (td >= 0 && tp > td && tp < t1)
             {
                 pt.strokeColor = new Color(1, 1, 1, 0.55f); pt.lineWidth = 1;
                 for (float t = tp; t < t1; t += (t1 - tp) / 24)

@@ -16,6 +16,7 @@ namespace FogOfWar
         public bool photon, alive, inside; // inside: crossed the horizon (proper time keeps running for the probe)
         public double periPhi;             // φ at the latest pericentre (w = 0 going up), interpolated inside the step
         public int peris;
+        public double apoR;                // r at the latest apocentre (0: none yet)
 
         public double Mu2 => photon ? 0 : 1;
 
@@ -60,7 +61,9 @@ namespace FogOfWar
             // hold r'² = R away from turning points
             double Rn = R(r, a);
             if (Rn > 1e-6 * r * r * r * r) w = (w < 0 ? -1 : 1) * Math.Sqrt(Rn);
-            if (w0 < 0 && w >= 0)
+            if (w0 > 0 && w <= 0) apoR = r;
+            // a pericentre only counts after a real radial swing: on a circular orbit w is round-off and flips at random
+            if (w0 < 0 && w >= 0 && (apoR == 0 || apoR - r > 1e-3 * r))
             {
                 // pericentre inside this step: w is close to linear in λ there, and so is φ
                 double f = -w0 / Math.Max(w - w0, 1e-300);
@@ -75,11 +78,20 @@ namespace FogOfWar
             return dt;
         }
 
-        // Advance by dt of coordinate (far-away) time. Outside the horizon only: far away nothing ever crosses it, so the
-        // particle stops just outside and is flagged inside (it is too redshifted to see).
-        public int AdvanceT(double a, double dt, double k = 0.08, int maxSteps = 400)
+        // Radius at which the particle counts as fallen in. Matter: 1.01 r₊. Light: a tenth of the way from r₊ to the
+        // prograde photon orbit, which at high spin sits only 0.01 M above r₊.
+        public double InsideRadius(double a)
         {
-            double rh = Kerr.Horizon(a), target = t + dt;
+            double rh = Kerr.Horizon(a);
+            return photon ? rh + 0.1 * (Kerr.PhotonOrbit(a) - rh) : rh * 1.01;
+        }
+
+        // Advance by dt of coordinate (far-away) time. Outside the horizon only: far away nothing ever crosses it, so the
+        // particle stops just outside and is flagged inside (it is too redshifted to see). With stopR > 0 it also stops
+        // as soon as it comes inside stopR on the way in (a body reaching its tidal radius mid-frame).
+        public int AdvanceT(double a, double dt, double k = 0.08, int maxSteps = 400, double stopR = 0)
+        {
+            double rin = InsideRadius(a), target = t + dt;
             int n = 0;
             while (alive && !inside && t < target && n < maxSteps)
             {
@@ -88,7 +100,8 @@ namespace FogOfWar
                 if (td > 0 && h * td > target - t) h = (target - t) / td;
                 Step(a, h);
                 n++;
-                if (r < rh * 1.01) inside = true;
+                if (r < rin) inside = true;
+                if (stopR > 0 && r <= stopR) break;
             }
             return n;
         }
@@ -166,7 +179,7 @@ namespace FogOfWar
                 g.E -= dE; g.L -= dL;
                 if (Math.Abs(dE) + Math.Abs(dL) < 1e-13) break;
             }
-            g.r = ra; g.w = 0;
+            g.r = ra; g.w = 0; g.apoR = ra;
             return g;
         }
 

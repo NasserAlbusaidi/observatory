@@ -122,9 +122,11 @@ namespace FogOfWar
                 S("sb-sun-m87-whole",     new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 2, 0, untilR: 12), ui: true),
                 S("sb-wd-imbh",           new Vector3(0, 6f, 30f), 50, Tde(1, 6f, -1, 60, untilR: 1, logMass: 3f), ui: true),
                 // the main tour's path, and the same throw played in real time (40 s of 60 fps frames)
-                S("sb-tour-repro",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 500); }), ui: true),
-                S("sb-tour-flare",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 4.2e5); }), ui: true),
-                S("sb-play-40s",          new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); for (int i = 0; i < 40 * 60; i++) B(s).Tick(1f / 60); }), ui: true),
+                S("sb-tour-repro",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 500); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-stream-3s",         new Vector3(0, 12f, 30f), 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 180; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-stream-6s",         new Vector3(0, 12f, 30f), 60, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(1); for (int i = 0; i < 360; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-tour-flare",        new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); B(s).AdvanceUntilBody(0, 4.2e5); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
+                S("sb-play-40s",          new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "periRs", 5f); B(s).Throw(0); for (int i = 0; i < 40 * 60; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
                 S("sb-cloud",             new Vector3(0, 7f, 32f), 50, Tde(5, 6f, 1, 260), ui: true),
                 S("sb-orbit-precess",     new Vector3(0, 30f, 12f), 55, Orbit(1, 4000), ui: true),
                 S("sb-zoom-whirl",        new Vector3(0, 30f, 12f), 55, Orbit(2, 2500), ui: true),
@@ -238,7 +240,38 @@ namespace FogOfWar
                 log.WriteLine($"precession at warp 10^{lw}: {bs.LastProbeShift():0.00}° per orbit after {frames + 120} frames");
             }
 
+            // sandbox play-through at 60 fps, as a player would: three Suns at Sgr A* thrown one after another, each after
+            // the previous flare (so later throws start at the raised warp), then a circular probe and photon launches
+            {
+                Default(app.Current);
+                var bs = (BlackHoleScene)app.Current;
+                Set(bs, "periRs", 5f);
+                var lumF = typeof(BlackHoleScene).GetField("lum", F);
+                for (int throwN = 1; throwN <= 3; throwN++)
+                {
+                    bs.Throw(0);
+                    double peak = 0; int f = 0;
+                    for (; f < 60 * 60; f++) { bs.Tick(1f / 60); peak = Math.Max(peak, (double)lumF.GetValue(bs)); }
+                    log.WriteLine($"throw {throwN}: after {f / 60} s  peak {peak:0.0} L_Edd  {bs.DebugSummary()}");
+                }
+                Default(app.Current);
+                bs.DropProbe(0); for (int k = 0; k < 60 * 30; k++) bs.Tick(1f / 60);
+                log.WriteLine($"circle at the ISCO: shift {bs.LastProbeShift()} (NaN = no false pericentres)");
+                foreach (float sp in new[] { 0f, 0.9f, 0.998f })
+                    foreach (int kind in new[] { 5, 6 })
+                    {
+                        Default(app.Current); Set(bs, "spin", sp); Set(bs, "logWarp", 1f);
+                        bs.DropProbe(kind); for (int k = 0; k < 60 * 30; k++) bs.Tick(1f / 60);
+                        var probes = (System.Collections.IList)typeof(BlackHoleScene).GetField("probes", F).GetValue(bs);
+                        var pr = probes[probes.Count - 1];
+                        var st = pr.GetType().GetField("status").GetValue(pr); var te = pr.GetType().GetField("turnsEnd").GetValue(pr);
+                        log.WriteLine($"light spin {sp} kind {kind}: {st}, turns {te}");
+                    }
+            }
+
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.
+            // One throw-away render per configuration first, so the first row does not carry the warm-up (audit #56).
+            cam.targetTexture = rt; cam.Render();
             Time.timeScale = 1;
             Default(app.Current);
             foreach (var res in new[] { new Vector2Int(1920, 1080), new Vector2Int(2560, 1440), new Vector2Int(3840, 2160) })
