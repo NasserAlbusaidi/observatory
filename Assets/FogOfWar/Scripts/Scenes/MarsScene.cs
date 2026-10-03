@@ -5,7 +5,7 @@ namespace FogOfWar
 {
     // Terraformed-Mars energy balance. Absorbed = S(1−A)πR²; emitted = 4πR²σT⁴/(1 + ¾τ) (grey-atmosphere greenhouse).
     // Local temperature = global mean − effective lapse rate × elevation + latitude term; the mean relaxes with thermal
-    // inertia. Heuristics (labelled in the Note): pole–equator contrast ΔT = 70 K / (1 + ¾τ), applied as ΔT(cos²lat − ⅔) so
+    // inertia. Heuristics (labelled in the Note): pole–equator contrast ΔT = 70 K / (1 + 0.283 log₁₀(P / 6.1 mbar)), from 70 K on today's Mars to ≈43 K at 1 bar, since a heavier atmosphere carries more heat poleward; applied as ΔT(cos²lat − ⅔) so
     // it leaves the mean alone; the lapse rate fades as Γ·¾τ/(1 + ¾τ) because thin air barely couples to the ground.
     // Liquid water needs local pressure above the triple point (6.117 mbar) and boils by Clausius–Clapeyron.
     public class MarsScene : SimScene
@@ -16,13 +16,13 @@ namespace FogOfWar
         public override string Blurb =>
             "Your Universe Sandbox Mars. Crank the greenhouse and watch <color=#FFB547>energy in</color> against <color=#69D2FF>energy out</color>. While they differ the planet is still heating or cooling, whatever the thermometer says right now.\n\n" +
             "The relief is real Mars (MOLA laser altimetry): Olympus Mons, Tharsis, Hellas, Valles Marineris. Lapse rate times elevation is why the peaks freeze while the basins cook, and why the global average describes almost nowhere.";
-        public override string Note => "Equilibrium dial: watch the in/out gap, not the thermometer. A big greenhouse takes decades to finish warming. (No water-vapour feedback is modelled, so there is no true runaway. Map: simple model, not a GCM. The pole–equator contrast and the lapse rate shrink as the air thins; both are heuristics. Water is liquid only where the local pressure is above 6.1 mbar, and it boils lower on high ground.)";
+        public override string Note => "Equilibrium dial: watch the in/out gap, not the thermometer. A big greenhouse takes decades to finish warming. (No water-vapour feedback is modelled, so there is no true runaway. Map: simple model, not a GCM. Thicker air carries more heat to the poles, so the pole–equator contrast shrinks as pressure rises; the lapse rate fades as the greenhouse thins. Both are heuristics. Water is liquid only where the local pressure is above 6.1 mbar, and it boils lower on high ground.)";
 
         const double S = 586, R = 3.3895e6;
         float tau = 2.8f, albedo = 0.22f, lapse = 6.5f, relief = 8, cwarp = 2, pressure = 1000; // pressure: mbar at datum
         const double ScaleH = 11.1, Triple = 6.117; // km, mbar
 
-        double LatDT => 70 / (1 + 0.75 * tau);
+        double LatDT => 70 / (1 + 0.283 * System.Math.Log10(System.Math.Max(pressure, 6.1) / 6.1));
         double LapseEff => lapse * 0.75 * tau / (1 + 0.75 * tau);
         static double Pressure(double p0, double hKm) => p0 * System.Math.Exp(-hKm / ScaleH);
         // boiling point (°C) at p mbar: 1/T = 1/373.15 − (R/L) ln(p/1013.25), L = 43.3 kJ/mol, fitted to the triple point and 100 °C at 1 atm

@@ -43,7 +43,8 @@ namespace FogOfWar
                 ("_OceanTex", "Textures/Earth_Ocean"), ("_NormalTex", "Textures/Earth_Normal"));
             earth = Gfx.Obj("Earth", Root, sphere, earthMat).transform;
             earth.localRotation = Quaternion.Euler(0, 0, 23.4f);
-            bulge = Gfx.Obj("Tidal bulge", Root, sphere, OwnMat(Gfx.Unlit(new Color(0.23f, 0.63f, 1f, 0.3f)))).transform;
+            // additive and faint: the shell draws both faces, and Earth must stay visible through it (QA-043)
+            bulge = Gfx.Obj("Tidal bulge", Root, sphere, OwnMat(Gfx.Unlit(new Color(0.23f, 0.63f, 1f, 0.14f), true))).transform;
             var moonMat = OwnMat(Gfx.Mat("Moon"));
             Art.Bind(moonMat, ("_MoonTex", "Textures/Moon_Color"));
             moon = Gfx.Obj("Moon", Root, sphere, moonMat).transform;
@@ -197,7 +198,7 @@ namespace FogOfWar
             if (b == 0) d = D0; else if (b == 1) d = D0 - 1000; else if (b == 2) d = D0 / 2; else if (b == 3) d = 16000;
             d = ui.Slider("Moon distance", d, 12000, 500000, v => Fmt.Num(v, 0) + " km", 100);
             exag = ui.Slider("Bulge exaggeration", exag, 1e5f, 2e6f, v => (v / 1e6f).ToString("0.00") + " million×", 5e4f);
-            warp = ui.Slider("Time warp", warp, 0, 200000, v => Fmt.Num(v, 0) + "×", 1000);
+            warp = ui.Slider("Time warp", warp, 0, 200000, v => v < 1 ? "paused" : Fmt.Num(v, 0) + "×", 1000);
             bigMoon = ui.Toggle("Show the Moon 3× bigger", bigMoon);
         }
     }
