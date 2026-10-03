@@ -222,6 +222,19 @@ namespace FogOfWar
                 Default(app.Current);
             }
 
+            // perihelion shift of the 14 M × 60 M probe at every time warp, 60 fps frames (exact: 60.15° at spin 0)
+            foreach (float lw in new[] { 0f, 1f, 2f, 3f, 4f, 5f, 6f })
+            {
+                Default(app.Current);
+                var bs = (BlackHoleScene)app.Current;
+                bs.DropProbe(1);
+                Set(bs, "logWarp", lw);
+                int frames = 0;
+                for (; frames < 60 * 600 && (double.IsNaN(bs.LastProbeShift()) || frames < 120); frames++) bs.Tick(1f / 60);
+                for (int k = 0; k < 120; k++) bs.Tick(1f / 60);
+                log.WriteLine($"precession at warp 10^{lw}: {bs.LastProbeShift():0.00}° per orbit after {frames + 120} frames");
+            }
+
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.
             Time.timeScale = 1;
             Default(app.Current);

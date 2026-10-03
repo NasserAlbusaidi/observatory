@@ -47,6 +47,19 @@ namespace FogOfWar
             public string name; public Geo g; public bool photon;
             public readonly List<Vector2> trail = new List<Vector2>();
             public readonly List<double> periPhi = new List<double>();
+            public readonly List<int> periN = new List<int>();   // pericentre count at each sample: at high warp several
+                                                                 // pericentres can pass in one frame
+            // perihelion shift per orbit from the last two samples, averaged over the orbits between them
+            public bool Shift(out double perOrbit)
+            {
+                perOrbit = 0;
+                int k = periPhi.Count;
+                if (k < 2) return false;
+                int dn = periN[k - 1] - periN[k - 2];
+                if (dn <= 0) return false;
+                perOrbit = (periPhi[k - 1] - periPhi[k - 2] - 2 * Math.PI * dn) / dn;
+                return true;
+            }
             public double t0, tau0, tauHorizon = -1;
             public int peris;
             public string status = "orbiting";
@@ -356,7 +369,7 @@ namespace FogOfWar
             ref var g = ref p.g;
             if (!g.alive) return;
             double w0 = g.w;
-            if (!g.inside) g.AdvanceT(a, simT - g.t);
+            if (!g.inside) g.AdvanceT(a, simT - g.t, 0.08, 20000);   // few probes: let them keep up with any warp
             else if (!p.photon && a < 0.01)
             {
                 // past the horizon only the probe's own clock means anything: keep falling on proper time (radial
@@ -365,7 +378,7 @@ namespace FogOfWar
                 if (!g.alive) p.status = "reached the singularity";
             }
             if (g.inside && p.tauHorizon < 0) { p.tauHorizon = g.tau; p.status = p.photon ? "fell in" : "crossed the horizon"; if (a >= 0.01) g.alive = false; }
-            if (g.peris > p.peris && !g.inside) { p.peris = g.peris; p.periPhi.Add(g.periPhi); }
+            if (g.peris > p.peris && !g.inside) { p.peris = g.peris; p.periPhi.Add(g.periPhi); p.periN.Add(g.peris); }
             if (g.w > 0 && g.r > 600) { p.status = "escaped"; g.alive = false; }
             var pos = new Vector2((float)(g.r * Math.Cos(g.phi)), (float)(g.r * Math.Sin(g.phi)));
             if (p.trail.Count == 0 || (p.trail[p.trail.Count - 1] - pos).sqrMagnitude > 0.0025f * Mathf.Max(1, pos.sqrMagnitude * 0.01f)) p.trail.Add(pos);
@@ -481,6 +494,13 @@ namespace FogOfWar
             if (after > 0) Advance(after);
         }
 
+        // Perihelion shift per orbit (degrees) of the newest probe, NaN until two pericentres were seen (QA).
+        public double LastProbeShift()
+        {
+            if (probes.Count == 0 || !probes[probes.Count - 1].Shift(out double d)) return double.NaN;
+            return d * 180 / Math.PI;
+        }
+
         public string DebugSummary()
         {
             int alive = 0, nan = 0, ph2 = 0; double rmin = 1e9, rmax = 0;
@@ -545,9 +565,8 @@ namespace FogOfWar
             list.Add(new Readout("Probe", p.name + ": " + p.status));
             if (p.photon) { list.Add(new Readout("Light: turns so far", ((g.phi) / (2 * Math.PI)).ToString("0.0"))); return; }
             list.Add(new Readout("Probe distance", (g.r / 2).ToString("0.00") + " rs"));
-            if (p.periPhi.Count >= 2)
+            if (p.Shift(out double dphi))
             {
-                double dphi = p.periPhi[p.periPhi.Count - 1] - p.periPhi[p.periPhi.Count - 2] - 2 * Math.PI;
                 list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
                 if (p.name == ProbeNames[1])
                 {
@@ -593,9 +612,8 @@ namespace FogOfWar
                 list.Add(new Readout("Inside, r is time", "every path leads to r = 0"));
             }
             else list.Add(new Readout("Inside a spinning hole", "the inner horizon is not modelled"));
-            if (p.periPhi.Count >= 2)
+            if (p.Shift(out double dphi))
             {
-                double dphi = p.periPhi[p.periPhi.Count - 1] - p.periPhi[p.periPhi.Count - 2] - 2 * Math.PI;
                 list.Add(new Readout("Perihelion shift per orbit", (dphi * 180 / Math.PI).ToString("0.0") + "°", Tone.Hot));
             }
         }
