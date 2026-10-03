@@ -100,6 +100,7 @@ namespace FogOfWar
             UI.UiShell.Install(this);
             Capture.Install(this);
             UiShots.StartIfRequested(this);
+            BlackHoleShots.StartIfRequested(this);
             Tour.StartIfRequested(this);
             QA.StartIfRequested(this);
             CareerQA.StartIfRequested(this);
