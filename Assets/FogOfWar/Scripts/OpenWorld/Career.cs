@@ -163,7 +163,7 @@ namespace FogOfWar.OpenWorld
         {
             if (Docked == null || Codex.SensorLevel > 0 || Credits < Codex.SensorCost) return false;
             Credits -= Codex.SensorCost; Codex.SensorLevel = 1;
-            Say("Sensors upgraded: scan range ×2, scan time ÷2");
+            Say("Sensors upgraded: scan range ×2, scan time halved");
             return true;
         }
 

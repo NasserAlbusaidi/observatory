@@ -93,7 +93,7 @@ namespace FogOfWar
                 if (career.DriveLevel < Career.DriveG.Length - 1)
                     up.Add(($"Drive {Career.DriveG[career.DriveLevel + 1]:0} g ({Career.DriveCost[career.DriveLevel + 1]:N0} cr)" + (Career.DriveG[career.DriveLevel + 1] > 3 ? " juice: fictional" : ""), () => career.BuyDrive()));
                 if (career.TankLevel < Career.MaxTankLevel) up.Add(($"Tank +{Career.TankStep:N0} t ({Career.TankCost:N0} cr)", () => career.BuyTank(ship)));
-                if (career.Codex.SensorLevel == 0) up.Add(($"Sensors: range ×2, scan ÷2 ({Codex.SensorCost:N0} cr)", () => career.BuySensors()));
+                if (career.Codex.SensorLevel == 0) up.Add(($"Sensors: range ×2, scan time halved ({Codex.SensorCost:N0} cr)", () => career.BuySensors()));
                 if (up.Count > 0)
                 {
                     int ub = ui.Buttons(up.ConvertAll(u => u.label).ToArray());
@@ -115,7 +115,7 @@ namespace FogOfWar
             int bodies = sys.Bodies.Count - 1;
             ui.Section($"Codex: {cx.Visited.Count} visited, {cx.Scanned.Count} scanned of {bodies}");
             var b = ship.Target;
-            if (b != null && b.Parent != null)
+            if (b != null && b.Parent != null && !Career.IsDerelict(b))
             {
                 bool seen = cx.Visited.Contains(b.Name), scanned = cx.Scanned.Contains(b.Name);
                 GUILayout.Label(b.Name + (scanned ? " (scanned)" : seen ? " (visited)" : " (not visited)"), ui.label);
