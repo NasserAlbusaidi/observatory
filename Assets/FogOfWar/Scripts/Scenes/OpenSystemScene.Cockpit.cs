@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FogOfWar.Cockpit;
 using FogOfWar.OpenWorld;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace FogOfWar
 {
@@ -10,6 +11,7 @@ namespace FogOfWar
     public partial class OpenSystemScene
     {
         CockpitView cockpit;
+        VisualElement flightCluster;
         float mfdT, plotT;
         readonly List<Readout> mfdLines = new List<Readout>();
 
@@ -23,6 +25,9 @@ namespace FogOfWar
             if (cockpit == null) return;
             float dt = Time.unscaledDeltaTime;
             cockpit.Frame(inside, Quaternion.Euler(lookPitch, lookYaw, 0), (float)(ship.Throttle * ship.MaxG), (float)ship.Throttle, ship.RcsLevel, dt);
+            // the MFDs carry the bottom flight cluster's readouts, and in portrait the cluster would sit on top of them
+            if ((flightCluster == null || flightCluster.panel == null) && hudShell != null) flightCluster = hudShell.HudLayer?.Q(className: "flight");
+            if (flightCluster != null) flightCluster.style.visibility = inside ? Visibility.Hidden : Visibility.Visible;
             if (!inside) return;
             if ((mfdT += dt) >= 0.1f) { mfdT = 0; FillMfds(); }
             if ((plotT += dt) >= 0.25f) { plotT = 0; PlotOrbit(); }
@@ -41,7 +46,10 @@ namespace FogOfWar
             mfdLines.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
             mfdLines.Add(new Readout("Assist", ship.FlightAssist ? "on" : "off", ship.FlightAssist ? Tone.Normal : Tone.Bad));
             mfdLines.Add(new Readout("RCS", ship.RcsActive ? "firing" : "idle", ship.RcsActive ? Tone.Hot : Tone.Normal));
-            mfdLines.Add(new Readout("Reaction mass", ship.UnlimitedFuel ? "unmetered" : Fmt.Num(ship.Fuel, 1) + " t", ship.Dry ? Tone.Bad : Tone.Normal));
+            if (career != null && !career.Sandbox && career.TankCapacity > 0)
+                mfdLines.Add(new Readout("Reaction mass", $"{ship.Fuel:N0} / {career.TankCapacity:N0} t", ship.Fuel < 0.15 * career.TankCapacity ? Tone.Bad : Tone.Normal));
+            else mfdLines.Add(new Readout("Reaction mass", ship.UnlimitedFuel ? "unmetered" : Fmt.Num(ship.Fuel, 1) + " t", ship.Dry ? Tone.Bad : Tone.Normal));
+            mfdLines.Add(new Readout("Speed", Fmt.Num((ship.Vel - sys.Vel(reference, jd)).Mag, 3) + " km/s vs " + reference.Name));
             if (g >= 2.5) mfdLines.Add(new Readout("High g", "stay in your couch", Tone.Bad));
             m.Page(0, "DRIVE", mfdLines);
 
