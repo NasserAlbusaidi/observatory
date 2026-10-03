@@ -30,6 +30,9 @@ Shader "FogOfWar/ShipPBR"
             float _FOWSunIrr, _FOWEclipse;
             float4 _FOWShineDir, _FOWShineCol;  // shine: w = angular radius of the body (rad)
             float4 _FOWPlumePos, _FOWPlumeCol;  // plume: w = falloff radius (render units)
+            float4 _FOWFloodPos[4];             // hull floodlights: xyz render position, w = 10 m in render units
+            float4 _FOWFloodDir[4];             // xyz aim, w = cos of the outer cone
+            float4 _FOWFloodCol;                // rgb irradiance at 10 m (0 = off), a = cos of the inner cone
             sampler2D _ShipShadowTex;
             float4x4 _ShipShadowMatrix;         // world -> (u, v, depth) in 0..1, depth 0 at the Sun side
             float4 _ShipShadowParams;           // x texel size, y depth bias, z normal offset (world), w enabled
@@ -116,6 +119,20 @@ Shader "FogOfWar/ShipPBR"
                     float3 dp = _FOWPlumePos.xyz - i.wp;
                     float d2 = dot(dp, dp), r2 = _FOWPlumePos.w * _FOWPlumePos.w;
                     c += brdf(n, v, dp * rsqrt(d2 + 1e-12), albedo, metal, rough) * _FOWPlumeCol.rgb * (r2 / (d2 + r2)) * ao;
+                }
+
+                // hull floodlights: spot cones, inverse square from 10 m
+                if (any(_FOWFloodCol.rgb > 0.0))
+                {
+                    [unroll] for (int k = 0; k < 4; k++)
+                    {
+                        float3 dl = _FOWFloodPos[k].xyz - i.wp;
+                        float d2 = max(dot(dl, dl), 1e-12);
+                        float3 lf = dl * rsqrt(d2);
+                        float cone = smoothstep(_FOWFloodDir[k].w, _FOWFloodCol.a, dot(-lf, _FOWFloodDir[k].xyz));
+                        float r2 = _FOWFloodPos[k].w * _FOWFloodPos[k].w;
+                        c += brdf(n, v, lf, albedo, metal, rough) * _FOWFloodCol.rgb * cone * min(r2 / d2, 16.0);
+                    }
                 }
 
                 c *= _FOWExposure;

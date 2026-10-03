@@ -71,6 +71,20 @@ namespace FogOfWar
             Park(s, "Earth", 35f, 0f, sunward: true);
             yield return new WaitForSecondsRealtime(3f);
             yield return Shot("Earth-sunward");
+            // hull floodlights in Earth's shadow, then in sunlight
+            var lightingField = s.GetType().GetField("lighting", F);
+            if (lightingField?.GetValue(s) is OpenWorld.ShipLighting sl)
+            {
+                sl.Floods = true;
+                foreach (var (tag, ang) in new[] { ("Earth-night-floods", 170f), ("Earth-day-floods", 35f) })
+                {
+                    Park(s, "Earth", ang, 0f);
+                    yield return new WaitForSecondsRealtime(3f);
+                    log.WriteLine($"  {tag}:{Lighting()}");
+                    yield return Shot(tag);
+                }
+                sl.Floods = false;
+            }
             // photo mode stacks PhotoFX on the same camera as the open world's bloom: check both still draw
             Park(s, "Earth", 35f, 0f);
             yield return new WaitForSecondsRealtime(2f);

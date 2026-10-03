@@ -80,6 +80,8 @@ other scenes:
 - `_FOWExposure`: camera exposure, 1 = the tuned look in full sunlight at 1 AU. It adapts toward 1 / (light on the
   ship), clamped to 1/8..64 (-3..+6 stops), and opens at most 2 stops further in an eclipse.
 - `_FOWPlumePos`/`_FOWPlumeCol`: the drive plume as a point light, zero unless the drive fires.
+- `_FOWFloodPos[4]`/`_FOWFloodDir[4]`/`_FOWFloodCol`: four hull floodlights (G toggles, `Controls.Action.Floodlights`),
+  spot cones aimed back at the hull, about 5,000 lux at 10 m; zero while off. They count toward the exposure meter.
 - `_ShipShadowTex`/`_ShipShadowMatrix`/`_ShipShadowParams`: the hull's self-shadow map along the sunlight.
 - Body shaders scale their sunlit output with `fowSunlit(_SunIrr)` (per-material `_SunIrr`, default 1) and their
   self-luminous output by `_FOWExposure` (FOWCommon.cginc). The sky and stars are not exposure-scaled.
