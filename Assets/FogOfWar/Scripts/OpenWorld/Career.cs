@@ -11,7 +11,7 @@ namespace FogOfWar.OpenWorld
         public double FuelPrice; // cr per tonne
     }
 
-    public enum JobKind { Cargo, Passengers, Survey }
+    public enum JobKind { Cargo, Passengers, Survey, Rescue }
 
     [Serializable]
     public class Contract
@@ -27,6 +27,9 @@ namespace FogOfWar.OpenWorld
         public double Dwell, DwellNeeded; // survey: seconds spent in scan range with the drive off
         public bool Tutorial;
         public string Key;               // board slot, so an accepted job doesn't come back the same day
+        // rescue: the derelict's two-body orbit about Parent (Body element conventions, deg and km, at Epoch)
+        public string Parent;
+        public double A, E, I, Node, Peri, L, DL, Epoch;
 
         public double Load => Kind == JobKind.Cargo ? Tonnes : Kind == JobKind.Passengers ? People * Career.PassengerTonnes : 0;
     }
@@ -38,11 +41,13 @@ namespace FogOfWar.OpenWorld
         public int drive, tank, nextId, done, failed;
         public bool sandbox;
         public List<Contract> active = new List<Contract>();
+        public int sensors;
+        public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
     }
 
     // The trucker career: credits, reaction mass, ports, contracts and upgrades. Plain data and rules, no UI; the scene
     // draws it and calls Tick once a frame with the sim time that passed.
-    public class Career
+    public partial class Career
     {
         public static readonly Port[] Ports =
         {
@@ -121,11 +126,45 @@ namespace FogOfWar.OpenWorld
         {
             Apply(ship);
             Notes.RemoveAll(n => UnityEngine.Time.realtimeSinceStartup - n.Time > 8);
+            Discover(sys, ship, jd, simDt);
             if (Sandbox) { Docked = null; return; }
             Docked = FindDock(sys, ship, jd);
-            if (Docked != null) { Deliver(jd); RefreshBoard(sys, ship, jd); }
+            if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
             Scan(sys, ship, jd, simDt);
+            Rescues(sys, ship, jd, simDt);
             Expire(jd);
+            foreach (var t in Codex.CheckFeats(this, ship)) Say("Achievement: " + t);
+        }
+
+        public readonly Codex Codex = new Codex();
+
+        // Visits to every body passed close; a scan of the current target with the drive off. A first scan sells its data.
+        void Discover(SolarSystem sys, Ship ship, double jd, double simDt)
+        {
+            foreach (var b in sys.Bodies)
+            {
+                if (b.Parent == null || IsDerelict(b) || Codex.Visited.Contains(b.Name)) continue;
+                if ((ship.Pos - sys.Pos(b, jd)).Mag < Codex.VisitRange(b)) { Codex.Visited.Add(b.Name); Say("Codex: " + b.Name + " visited"); }
+            }
+            var t = ship.Target;
+            if (t == null || t.Parent == null || IsDerelict(t) || Codex.Scanned.Contains(t.Name)) { Codex.ScanTarget = null; return; }
+            if (Codex.ScanTarget != t.Name) { Codex.ScanTarget = t.Name; Codex.ScanProgress = 0; }
+            if (ship.Throttle > 0 || (ship.Pos - sys.Pos(t, jd)).Mag > Codex.ScanRange(t)) return;
+            Codex.ScanProgress += simDt;
+            if (Codex.ScanProgress < Codex.ScanSeconds) return;
+            Codex.Scanned.Add(t.Name); Codex.Visited.Add(t.Name);
+            if (Sandbox) { Say("Codex: " + t.Name + " scanned"); return; }
+            double v = Codex.DataValue(sys, t, jd);
+            Credits += v; Earned += v;
+            Say($"Codex: {t.Name} scanned. First data sold: +{v:N0} cr");
+        }
+
+        public bool BuySensors()
+        {
+            if (Docked == null || Codex.SensorLevel > 0 || Credits < Codex.SensorCost) return false;
+            Credits -= Codex.SensorCost; Codex.SensorLevel = 1;
+            Say("Sensors upgraded: scan range ×2, scan time ÷2");
+            return true;
         }
 
         // Docked: in a bound orbit close to the port body with the drive off (or sitting on its surface).
@@ -164,6 +203,7 @@ namespace FogOfWar.OpenWorld
             double pay = late ? c.Pay * 0.5 : c.Pay;
             Credits += pay; Earned += pay; Done++;
             Active.Remove(c);
+            RemoveDerelict(c);
             Say($"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
         }
 
@@ -177,9 +217,11 @@ namespace FogOfWar.OpenWorld
                 if (c.Kind != JobKind.Survey) continue;
                 var b = sys[c.To];
                 if (b == null || ship.Throttle > 0) continue;
-                if ((ship.Pos - sys.Pos(b, jd)).Mag > ScanRange(b)) continue;
-                c.Dwell += simDt;
-                if (c.Dwell >= c.DwellNeeded) Complete(c, jd, "Survey of " + c.To + " sent by tight beam");
+                if ((ship.Pos - sys.Pos(b, jd)).Mag > Codex.ScanRange(b)) continue;
+                c.Dwell += simDt * (Codex.SensorLevel > 0 ? 2 : 1);
+                if (c.Dwell < c.DwellNeeded) continue;
+                Codex.Scanned.Add(c.To); Codex.Visited.Add(c.To);
+                Complete(c, jd, "Survey of " + c.To + " sent by tight beam");
             }
         }
 
@@ -190,6 +232,7 @@ namespace FogOfWar.OpenWorld
                 var c = Active[i];
                 if (jd - c.IssuedJd <= 2 * (c.DeadlineJd - c.IssuedJd)) continue;
                 Active.RemoveAt(i); Failed++;
+                RemoveDerelict(c);
                 Say("Contract failed, far past its deadline: " + c.Title, false);
             }
         }
@@ -212,12 +255,14 @@ namespace FogOfWar.OpenWorld
             taken.Add(c.Key);
             c.IssuedJd = jd; c.DeadlineJd = jd + c.Days;
             Active.Add(c);
+            SpawnDerelict(c);
             Say("Accepted: " + c.Title);
         }
 
         public void Abandon(Contract c)
         {
             if (!Active.Remove(c)) return;
+            RemoveDerelict(c);
             Failed++;
             Say("Abandoned: " + c.Title, false);
         }
@@ -236,10 +281,11 @@ namespace FogOfWar.OpenWorld
             for (int i = 0; i < others.Length; i++) { w[i] = 1 / Math.Pow((sys.Pos(sys[others[i].Body], jd) - sys.Pos(here, jd)).Mag, 0.75); wsum += w[i]; }
             Port Pick() { double x = rng.NextDouble() * wsum; for (int i = 0; i < others.Length; i++) if ((x -= w[i]) <= 0) return others[i]; return others[others.Length - 1]; }
 
-            for (int k = 0; k < 6; k++)
+            for (int k = 0; k < 7; k++)
             {
                 var c = k < 3 ? Haul(rng, Pick(), JobKind.Cargo, sys, jd)
                       : k < 5 ? Haul(rng, Pick(), JobKind.Passengers, sys, jd)
+                      : k == 6 ? (rng.NextDouble() < 0.6 ? Rescue(rng, sys, jd) : null)
                       : Survey(rng, sys, jd);
                 if (c == null) continue;
                 c.Key = $"{Docked.Name}/{day}/{k}";
@@ -380,15 +426,22 @@ namespace FogOfWar.OpenWorld
         {
             credits = Credits, earned = Earned, fuel = ship.Fuel, drive = DriveLevel, tank = TankLevel, nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active),
+            sensors = Codex.SensorLevel, visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
+            achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt),
         };
 
         public void FromSave(CareerSave s, Ship ship)
         {
             Credits = s.credits; Earned = s.earned; DriveLevel = Mathf.Clamp(s.drive, 0, DriveG.Length - 1); TankLevel = Mathf.Clamp(s.tank, 0, MaxTankLevel);
             nextId = s.nextId; Done = s.done; Failed = s.failed; Sandbox = s.sandbox;
+            foreach (var c in Active) RemoveDerelict(c);
             Active.Clear(); if (s.active != null) Active.AddRange(s.active);
+            foreach (var c in Active) SpawnDerelict(c);
             Board.Clear(); boardPort = null; taken.Clear();
             foreach (var c in Active) taken.Add(c.Key);
+            Codex.SensorLevel = s.sensors;
+            void Fill(HashSet<string> set, List<string> l) { set.Clear(); if (l != null) set.UnionWith(l); }
+            Fill(Codex.Visited, s.visited); Fill(Codex.Scanned, s.scanned); Fill(Codex.Achieved, s.achieved); Fill(Codex.DockedAt, s.dockedAt);
             ship.Fuel = s.fuel;
             Apply(ship);
         }

@@ -22,7 +22,7 @@ namespace FogOfWar
 
         void InitCareer()
         {
-            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0 };
+            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys };
             career.StartNew(jd);
             ship.Fuel = career.TankCapacity;
             career.Apply(ship);
@@ -62,6 +62,7 @@ namespace FogOfWar
             {
                 GUILayout.Label("Sandbox: unlimited reaction mass, no contracts.", ui.label);
                 career.Sandbox = ui.Toggle("Sandbox", career.Sandbox);
+                CodexPanel(ui);
                 return;
             }
             GUILayout.Label($"{career.Credits:N0} cr   ·   reaction mass {ship.Fuel:N1} / {career.TankCapacity:N0} t   ·   hold {career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t", ui.label);
@@ -88,21 +89,51 @@ namespace FogOfWar
                     if (fb == 0) career.BuyFuel(ship, fill);
                     if (fb == 1) career.BuyFuel(ship, 20);
                 }
-                var up = new List<string>();
-                bool drive = career.DriveLevel < Career.DriveG.Length - 1, tank = career.TankLevel < Career.MaxTankLevel;
-                if (drive) up.Add($"Drive {Career.DriveG[career.DriveLevel + 1]:0} g ({Career.DriveCost[career.DriveLevel + 1]:N0} cr)" + (Career.DriveG[career.DriveLevel + 1] > 3 ? " juice: fictional" : ""));
-                if (tank) up.Add($"Tank +{Career.TankStep:N0} t ({Career.TankCost:N0} cr)");
+                var up = new List<(string label, Action buy)>();
+                if (career.DriveLevel < Career.DriveG.Length - 1)
+                    up.Add(($"Drive {Career.DriveG[career.DriveLevel + 1]:0} g ({Career.DriveCost[career.DriveLevel + 1]:N0} cr)" + (Career.DriveG[career.DriveLevel + 1] > 3 ? " juice: fictional" : ""), () => career.BuyDrive()));
+                if (career.TankLevel < Career.MaxTankLevel) up.Add(($"Tank +{Career.TankStep:N0} t ({Career.TankCost:N0} cr)", () => career.BuyTank(ship)));
+                if (career.Codex.SensorLevel == 0) up.Add(($"Sensors: range ×2, scan ÷2 ({Codex.SensorCost:N0} cr)", () => career.BuySensors()));
                 if (up.Count > 0)
                 {
-                    int ub = ui.Buttons(up.ToArray());
-                    if (ub == 0 && drive) career.BuyDrive();
-                    else if (ub >= 0) career.BuyTank(ship);
+                    int ub = ui.Buttons(up.ConvertAll(u => u.label).ToArray());
+                    if (ub >= 0) up[ub].buy();
                 }
                 ContractBoard(ui);
             }
             else GUILayout.Label("Not docked. Park in orbit at a port to dock: " + string.Join(", ", Array.ConvertAll(Career.Ports, p => p.Name)) + ".", ui.note);
 
             TripPlanner(ui);
+            CodexPanel(ui);
+        }
+
+        bool showFeats;
+
+        void CodexPanel(PanelUI ui)
+        {
+            var cx = career.Codex;
+            int bodies = sys.Bodies.Count - 1;
+            ui.Section($"Codex: {cx.Visited.Count} visited, {cx.Scanned.Count} scanned of {bodies}");
+            var b = ship.Target;
+            if (b != null && b.Parent != null)
+            {
+                bool seen = cx.Visited.Contains(b.Name), scanned = cx.Scanned.Contains(b.Name);
+                GUILayout.Label(b.Name + (scanned ? " (scanned)" : seen ? " (visited)" : " (not visited)"), ui.label);
+                if (seen || scanned) foreach (var line in Codex.Data(sys, b, jd)) GUILayout.Label(line, ui.note);
+                else GUILayout.Label($"Pass within {Km(Codex.VisitRange(b))} to log its data.", ui.note);
+                if (scanned) foreach (var f in Codex.Facts(b.Name)) GUILayout.Label("• " + f, ui.note);
+                else
+                {
+                    string sale = career.Sandbox ? "" : $" First data sells for {Codex.DataValue(sys, b, jd):N0} cr.";
+                    if (cx.ScanTarget == b.Name && cx.ScanProgress > 0)
+                        GUILayout.Label($"Scanning: {Fmt.Num(100 * cx.ScanProgress / cx.ScanSeconds, 0)} %. Keep the drive off within {Km(cx.ScanRange(b))}.{sale}", ui.label);
+                    else GUILayout.Label($"Scan: stay within {Km(cx.ScanRange(b))} with the drive off for {Dur(cx.ScanSeconds)}.{sale}", ui.note);
+                }
+            }
+            showFeats = ui.Toggle($"Achievements ({cx.Achieved.Count} of {Codex.Feats.Length})", showFeats);
+            if (showFeats)
+                foreach (var f in Codex.Feats)
+                    GUILayout.Label((cx.Has(f.Id) ? "✓ " : "· ") + f.Title + ": " + f.How, cx.Has(f.Id) ? ui.label : ui.note);
         }
 
         void ActiveJobs(PanelUI ui)
@@ -113,11 +144,13 @@ namespace FogOfWar
             {
                 double left = c.DeadlineJd - jd;
                 string due = left >= 0 ? "due in " + Days(left) : "LATE by " + Days(-left);
-                string what = c.Kind == JobKind.Survey
-                    ? $"{c.Title}: {Fmt.Num(100 * c.Dwell / c.DwellNeeded, 0)} % scanned (stay within {Km(Career.ScanRange(sys[c.To]))}, drive off)"
+                string what = c.Kind == JobKind.Rescue
+                    ? $"{c.Title}: " + (c.Dwell > 0 ? $"crew crossing over, {Fmt.Num(100 * c.Dwell / Career.TransferSeconds, 0)} %" : $"match velocity within {Career.RescueKm:N0} km and {Career.RescueKms * 1000:N0} m/s, then hold")
+                    : c.Kind == JobKind.Survey
+                    ? $"{c.Title}: {Fmt.Num(100 * c.Dwell / c.DwellNeeded, 0)} % scanned (stay within {Km(career.Codex.ScanRange(sys[c.To]))}, drive off)"
                     : c.Kind == JobKind.Passengers ? $"{c.People} × {c.Title} → {c.To}" : $"{c.Tonnes:N0} t {c.Title} → {c.To}";
                 GUILayout.Label($"{what}   ·   {due}   ·   {c.Pay:N0} cr", left >= 0 ? ui.label : ui.note);
-                var body = c.Kind == JobKind.Survey ? sys[c.To] : sys[Career.PortAt(c.To)?.Body ?? ""];
+                var body = career.TargetOf(c);
                 int b = ui.Buttons((ship.Target == body ? "● " : "") + "Set target", "Abandon");
                 if (b == 0 && body != null) SetTarget(body);
                 if (b == 1) career.Abandon(c);
@@ -131,10 +164,10 @@ namespace FogOfWar
             foreach (var c in career.Board.ToArray())
             {
                 // reaction mass a 1 g full burn would take, for comparison
-                var dest = c.Kind == JobKind.Survey ? sys[c.To] : sys[Career.PortAt(c.To).Body];
+                var dest = career.TargetOf(c);
                 double d = Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0);
                 Career.Trip(d, career.DriveRating * Ship.G0, 1, ship.Mass + c.Load, out double t, out _, out double fuel);
-                string what = c.Kind == JobKind.Survey ? c.Title
+                string what = c.Kind == JobKind.Survey || c.Kind == JobKind.Rescue ? c.Title
                     : c.Kind == JobKind.Passengers ? $"{c.People} × {c.Title} → {c.To} (max 1 g)" : $"{c.Tonnes:N0} t {c.Title} → {c.To}";
                 GUILayout.Label($"{what}\n{c.Pay:N0} cr   ·   {Days(c.Days)} allowed   ·   {Km(d)}   ·   full burn at {career.DriveRating:0} g: {Dur(t)} with parking, {fuel:N1} t", ui.note);
                 bool ok = career.CanAccept(c, out string why);
@@ -154,7 +187,7 @@ namespace FogOfWar
             if (fuel > ship.Fuel) GUILayout.Label("Not enough reaction mass. Coast, lower the g, or refuel.", ui.label);
             foreach (var c in career.Active)
             {
-                var body = c.Kind == JobKind.Survey ? sys[c.To] : sys[Career.PortAt(c.To)?.Body ?? ""];
+                var body = career.TargetOf(c);
                 if (body != ship.Target) continue;
                 double arrive = t / 86400 + (c.Kind == JobKind.Survey ? c.DwellNeeded / 86400 : 0);
                 bool onTime = jd + arrive <= c.DeadlineJd;
@@ -214,7 +247,8 @@ namespace FogOfWar
 
         void LoadCareer()
         {
-            career = new Career();
+            foreach (var old in career.Active.ToArray()) career.Abandon(old); // drop this session's derelicts from the system
+            career = new Career { Sys = sys };
             if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); return; }
             try { career.FromSave(JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey)), ship); }
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the career save: " + e.Message); career.StartNew(jd); ship.Fuel = career.TankCapacity; }
