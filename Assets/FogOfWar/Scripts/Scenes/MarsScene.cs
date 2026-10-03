@@ -50,10 +50,10 @@ namespace FogOfWar
             var uv2 = new Vector2[baseV.Length];
             // Real MOLA-derived relief from the art pack: km = -8.2 + grey × 29.4. Needs Read/Write on the texture,
             // which the FogOfWarArtImport postprocessor sets; without it the procedural planet below is used.
-            var heightTex = Art.Tex("Textures/Mars_Height");
+            var heightTex = Art.Tex("Planets/Mars/Height");
             bool realRelief = heightTex != null && heightTex.isReadable;
             if (heightTex != null && !heightTex.isReadable)
-                Debug.LogWarning("Fog of War: Mars_Height isn't readable. Run Fog of War → 1 to re-import the art, or tick Read/Write on it.");
+                Debug.LogWarning("Fog of War: Planets/Mars/Height isn't readable. Run Fog of War → 1 to re-import the art, or tick Read/Write on it.");
             for (int i = 0; i < baseV.Length; i++)
             {
                 var v = baseV[i];
@@ -77,7 +77,7 @@ namespace FogOfWar
             }
             mesh.uv2 = uv2;
             mat = OwnMat(Gfx.Mat("Mars"));
-            Art.Bind(mat, ("_MarsTex", "Textures/Mars_Color"));
+            Art.Bind(mat, ("_MarsTex", "Planets/Mars/Color"));
             planet = Gfx.Obj("Mars", Root, mesh, mat).transform;
             atmoMat = OwnMat(Gfx.Unlit(new Color(0.5f, 0.7f, 1f, 0f), true));
             var atmo = Gfx.Obj("Atmosphere", Root, Own(Gfx.UVSphere(64, 32)), atmoMat);

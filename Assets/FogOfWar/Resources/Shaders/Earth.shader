@@ -32,11 +32,7 @@ Shader "FogOfWar/Earth"
                 float3 p = normalize(i.op);
                 float3 l = normalize(_FOWSunDir);
                 float3 vdir = normalize(_WorldSpaceCameraPos - i.wp);
-                // relief normal: tangent frame east = d p/d lon, north = d p/d lat on the unit sphere
-                float3 east = normalize(float3(-p.z, 0.0, p.x) + float3(1e-5, 0, 0));
-                float3 north = cross(east, p);
-                float3 tn = tex2DSphere(_NormalTex, p).xyz * 2.0 - 1.0;
-                float3 nObj = normalize(tn.x * east + tn.y * north + max(tn.z, 0.2) * p);
+                float3 nObj = sphereNormal(_NormalTex, p);
                 float3 n = normalize(mul((float3x3)unity_ObjectToWorld, nObj));
                 float3 ng = normalize(i.n);
                 float3 day = texToDisplay(tex2DSphere(_DayTex, p).rgb);

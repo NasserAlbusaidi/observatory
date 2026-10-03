@@ -90,8 +90,8 @@ namespace FogOfWar
                 else if (b.Look == Look.Earth)
                 {
                     var m = OwnMat(Gfx.Mat("Earth"));
-                    Art.Bind(m, ("_DayTex", "Textures/Earth_Day"), ("_NightTex", "Textures/Earth_Night"), ("_CloudTex", "Textures/Earth_Clouds"),
-                        ("_OceanTex", "Textures/Earth_Ocean"), ("_NormalTex", "Textures/Earth_Normal"));
+                    Art.Bind(m, ("_DayTex", "Planets/Earth/Color"), ("_NightTex", "Planets/Earth/Night"), ("_CloudTex", "Planets/Earth/Clouds"),
+                        ("_OceanTex", "Planets/Earth/Ocean"), ("_NormalTex", "Planets/Earth/Normal"));
                     v.t = Gfx.Obj(b.Name, Root, sphere, m).transform;
                     v.mats = new[] { m };
                 }
@@ -221,10 +221,14 @@ namespace FogOfWar
             if (b.Texture != null && Art.Bind(m, ("_MainTex", b.Texture)))
             {
                 // Planets/<Body> maps are contrast-stretched per body; geometric albedo sets the absolute
-                // level (perceptual curve, 0.3 → ×1). Older Textures/ maps are already absolute.
+                // level (perceptual curve, 0.3 → ×1). Maps marked mapIsAbsolute (Mars) are used as they are.
                 var json = Resources.Load<TextAsset>("Planets/" + b.Name + "/Body");
-                float ga = json != null ? JsonUtility.FromJson<BodyJson>(json.text).geometricAlbedo : 0;
-                m.SetFloat("_Gain", ga > 0 && b.Texture.StartsWith("Planets/") ? Mathf.Pow(ga / 0.3f, 0.6f) : 1f);
+                var info = json != null ? JsonUtility.FromJson<BodyJson>(json.text) : null;
+                float ga = info != null && !info.mapIsAbsolute ? info.geometricAlbedo : 0;
+                m.SetFloat("_Gain", ga > 0 ? Mathf.Pow(ga / 0.3f, 0.6f) : 1f);
+                // relief from the body's DEM, where the pipeline made one (Tools/fidelity/normals.py)
+                var nrm = Art.Tex("Planets/" + b.Name + "/Normal");
+                if (nrm != null) { m.SetTexture("_NormalTex", nrm); m.SetFloat("_HasNormal", 1); }
             }
             return m;
         }
@@ -238,7 +242,7 @@ namespace FogOfWar
             return null;
         }
 
-        [Serializable] class BodyJson { public float geometricAlbedo; }
+        [Serializable] class BodyJson { public float geometricAlbedo; public bool mapIsAbsolute; }
         [Serializable] class ArtBody { public string name; public float meanRadiusKm; public float geometricAlbedo; }
         [Serializable] class ArtBodies { public ArtBody[] items; }
         readonly Dictionary<string, ArtBody> art = new Dictionary<string, ArtBody>();

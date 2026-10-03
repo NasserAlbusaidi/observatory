@@ -17,5 +17,7 @@
  "licence": "public domain (NASA / USGS Astrogeology / PDS)",
  "convention": "equirect, lon 0 at u=0.5, east right, north up",
  "colourNote": "map brightness is relative (contrast-stretched); use geometricAlbedo for absolute brightness",
- "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters"
+ "dataSource": "NASA planetary fact sheets / JPL SSD physical parameters",
+ "sourceSize": "23040x11520",
+ "mapSize": "8192x4096"
 }

@@ -1,0 +1,13 @@
+# Public-domain sources for the fidelity maps (NASA Visible Earth / USGS Astrogeology PDS). fetch.py downloads them.
+https://eoimages.gsfc.nasa.gov/images/imagerecords/74000/74117/world.200408.3x21600x10800.png
+https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73934/gebco_08_rev_elev_21600x10800.png
+https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif
+https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898/BlackMarble_2016_3km.jpg
+https://planetarymaps.usgs.gov/mosaic/Mars_Viking_ClrMosaic_global_925m.tif
+https://planetarymaps.usgs.gov/mosaic/Mars_MGS_MOLA_DEM_mosaic_global_463m.tif
+https://planetarymaps.usgs.gov/mosaic/Lunar_LRO_LOLA_DEM_Global_128ppd_v04.cub
+# NASA SVS (svs.gsfc.nasa.gov/4851 Deep Star Maps 2020, /4720 CGI Moon Kit) via the Internet Archive: SVS was unreachable
+# on 2026-10-03; archived byte sizes match the originals.
+https://web.archive.org/web/2024id_/https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/starmap_2020_8k.exr
+https://web.archive.org/web/2024id_/https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/milkyway_2020_8k.exr
+https://web.archive.org/web/2024id_/https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_16k.tif

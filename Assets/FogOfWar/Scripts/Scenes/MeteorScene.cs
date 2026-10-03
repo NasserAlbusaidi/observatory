@@ -80,7 +80,7 @@ namespace FogOfWar
         {
             Shader.SetGlobalVector("_FOWSunDir", new Vector3(0.3f, 1f, -0.2f).normalized);
             var groundMat = OwnMat(Gfx.Mat("Ground"));
-            Art.Bind(groundMat, ("_DayTex", "Textures/Earth_Day"), ("_NightTex", "Textures/Earth_Night"));
+            Art.Bind(groundMat, ("_DayTex", "Planets/Earth/Color"), ("_NightTex", "Planets/Earth/Night"));
             var ground = Gfx.Obj("Earth", Root, Own(Gfx.UVSphere(256, 128, R)), groundMat);
             ground.transform.localPosition = Center;
             ground.transform.localRotation = GlobeRotation();

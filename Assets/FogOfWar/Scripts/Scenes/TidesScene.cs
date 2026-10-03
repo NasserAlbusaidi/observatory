@@ -39,14 +39,14 @@ namespace FogOfWar
             Shader.SetGlobalVector("_FOWSunDir", sun);
             var sphere = Own(Gfx.UVSphere(128, 64));
             var earthMat = OwnMat(Gfx.Mat("Earth"));
-            Art.Bind(earthMat, ("_DayTex", "Textures/Earth_Day"), ("_NightTex", "Textures/Earth_Night"), ("_CloudTex", "Textures/Earth_Clouds"),
-                ("_OceanTex", "Textures/Earth_Ocean"), ("_NormalTex", "Textures/Earth_Normal"));
+            Art.Bind(earthMat, ("_DayTex", "Planets/Earth/Color"), ("_NightTex", "Planets/Earth/Night"), ("_CloudTex", "Planets/Earth/Clouds"),
+                ("_OceanTex", "Planets/Earth/Ocean"), ("_NormalTex", "Planets/Earth/Normal"));
             earth = Gfx.Obj("Earth", Root, sphere, earthMat).transform;
             earth.localRotation = Quaternion.Euler(0, 0, 23.4f);
             // additive and faint: the shell draws both faces, and Earth must stay visible through it (QA-043)
             bulge = Gfx.Obj("Tidal bulge", Root, sphere, OwnMat(Gfx.Unlit(new Color(0.23f, 0.63f, 1f, 0.14f), true))).transform;
             var moonMat = OwnMat(Gfx.Mat("Moon"));
-            Art.Bind(moonMat, ("_MoonTex", "Textures/Moon_Color"));
+            Art.Bind(moonMat, ("_MoonTex", "Planets/Moon/Color"));
             moon = Gfx.Obj("Moon", Root, sphere, moonMat).transform;
 
             var circle = Own(Gfx.LineMesh("Orbit"));

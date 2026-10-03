@@ -151,6 +151,8 @@ namespace FogOfWar.UI
             Ui.FormRow(c, "Frame-rate cap (when v-sync is off)", out ctl);
             int[] caps = { 60, 120, 144, 0 };
             ctl.Add(new Segmented(new[] { "60", "120", "144", "Off" }, Math.Max(0, Array.IndexOf(caps, GameSettings.FrameCap)), i => GameSettings.FrameCap = caps[i]));
+            Ui.FormRow(c, "Texture detail (planet and sky maps: 8K, 4K or 2K)", out ctl);
+            ctl.Add(new Segmented(new[] { "Full", "Half", "Quarter" }, GameSettings.TextureDetail, i => GameSettings.TextureDetail = i));
             Ui.FormRow(c, "Ray-trace quality (black hole, wormhole, warp scenes)", out ctl);
             ctl.Add(new Segmented(new[] { "Fast", "Balanced", "Sharp" }, app.Quality, i => { app.Quality = i; PlayerPrefs.SetInt("fow-quality", i); }));
             Ui.L(c, "Resolution follows the window. F11 toggles fullscreen.", "t-note").style.marginTop = 10;

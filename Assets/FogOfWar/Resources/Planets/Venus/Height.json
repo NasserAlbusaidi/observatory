@@ -1,7 +1,0 @@
-{
- "minKm": -1.646,
- "maxKm": 10.98,
- "datumKm": 6051.0,
- "encoding": "km above the 6051.0 km datum = minKm + grey * (maxKm - minKm)",
- "source": "Magellan altimetry global topography 4641 m v02 (USGS / PDS, public domain)"
-}

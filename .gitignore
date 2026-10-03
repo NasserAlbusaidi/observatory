@@ -26,3 +26,6 @@ crashlytics-build.properties
 /Screenshots/
 /Tools/horizons/cache/
 /Tools/satellites/cache/
+
+# fidelity pipeline
+Tools/fidelity/__pycache__/

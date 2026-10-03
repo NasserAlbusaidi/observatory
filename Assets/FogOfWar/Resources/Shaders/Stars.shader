@@ -27,7 +27,9 @@ Shader "FogOfWar/Stars"
             v2f vert(appdata v)
             {
                 v2f o;
-                float3 d = normalize(v.normal);
+                // the catalogue is built in the equatorial frame; the object's rotation (Frame.StarsToRender in the open
+                // world) turns it into the render frame
+                float3 d = normalize(mul((float3x3)unity_ObjectToWorld, v.normal));
                 float ct = dot(d, _Fwd);
                 float ctp = (ct + _Beta) / (1.0 + _Beta * ct);
                 float3 perp = d - ct * _Fwd;

@@ -1,7 +1,0 @@
-{
- "minKm": -9.572,
- "maxKm": 7.466,
- "datumKm": 2439.4,
- "encoding": "km above the 2439.4 km datum = minKm + grey * (maxKm - minKm)",
- "source": "MESSENGER USGS global DEM 665 m v2 (USGS / PDS, public domain)"
-}

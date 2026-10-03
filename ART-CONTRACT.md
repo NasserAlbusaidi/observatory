@@ -12,9 +12,13 @@ What the Unity code expects from Blender output, so art can drop in without code
 - Keep it under roughly 50k triangles per model.
 
 ## Wired as of the first art pack
-- `Sky/SkyOurs.png`, `Sky/SkyOther.png`: skyA/skyB in FOWCommon.cginc (global `_SkyA`, `_SkyB`, `_SkyRot`).
+- `Sky/SkyOurs.png`, `Sky/SkyOther.png`: skyA/skyB in FOWCommon.cginc (global `_SkyA`, `_SkyB`, `_SkyRot`). Since the
+  fidelity branch, SkyOurs is NASA SVS Deep Star Maps 2020 at 8192x4096 and `Sky/MilkyWay.png` (SVS diffuse Milky Way)
+  draws behind `Gfx.Starfield`; both come from `Tools/fidelity/sky.py`.
 - `Stars/bsc5.csv`: `Art.Catalogue()` feeds `Gfx.Starfield` and the 1g trip.
-- `Textures/Earth_*`: Earth.shader (Tides) and Ground.shader (Meteors). `Moon_Color`: Moon.shader. `Mars_Color` and `Mars_Height`: Mars.shader and MarsScene's relief.
+- `Planets/Earth/{Color,Night,Clouds,Ocean,Normal}`: Earth.shader (open world, Tides) and Ground.shader (Meteors).
+  `Planets/Moon/Color`: Moon.shader. `Planets/Mars/Color` and `Planets/Mars/Height` (16-bit): Mars.shader and
+  MarsScene's relief. The old `Textures/` copies are gone: a missing path silently falls back to the procedural look.
 - `Models/Rubble.fbx` (Tides Roche ring), `Models/TorchShip.fbx` (1g trip chase camera).
 - Each file keeps its name and lookup (`SkyUV`: u = 0.5 + atan2(z,x)/2π, v = 0.5 + asin(y)/π). Swapping in a better file with the same name needs no code change.
 
@@ -28,7 +32,9 @@ Adopts the art side's `OPEN-WORLD-ART.md` naming. The code is the source of trut
 
 ### Maps: `Planets/<Body>/`
 - Loaded by name: `Planets/<Body>/Color` (any image type). Already wired: Mercury, Venus, Jupiter, Saturn, Uranus, Neptune.
-  Earth keeps `Textures/Earth_*`, the Moon `Textures/Moon_Color`, Mars `Textures/Mars_Color`.
+  Every body, Earth, Moon and Mars included, loads from `Planets/<Body>/`. `Planets/<Body>/Normal` (tangent space,
+  east = +x, north = +y, BC5) adds DEM relief on the Moon, Mercury, Mars and Earth. Maps go up to 8192x4096 and are
+  rebuilt by `Tools/fidelity/` (see its README); copying the art pack over them would put the 4K maps back.
   Major moons (increment 2) will load `Planets/<Moon>/Color` with the same convention.
 - Layout: equirectangular, longitude 0 at the centre, east to the right, north up; object +Y = IAU north pole,
   +X = prime meridian (`SkyUV`). The globe is rendered as an oblate spheroid from the code's equatorial radius and
