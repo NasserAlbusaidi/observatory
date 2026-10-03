@@ -105,7 +105,8 @@ namespace FogOfWar.OpenWorld
                 if (b == null) continue;
                 bool alongside = (ship.Pos - sys.Pos(b, jd)).Mag < RescueKm && (ship.Vel - sys.Vel(b, jd)).Mag < RescueKms && ship.Throttle == 0;
                 if (!alongside) { c.Dwell = 0; continue; }
-                c.Dwell += simDt;
+                TransferInProgress = true;
+                c.Dwell += Math.Min(simDt, 30);
                 if (c.Dwell >= TransferSeconds) Complete(c, jd, "Crew of the " + c.Title.Substring(11, c.Title.IndexOf(':') - 11) + " rescued");
             }
         }
