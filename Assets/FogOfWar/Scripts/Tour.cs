@@ -52,6 +52,10 @@ namespace FogOfWar
                     bh.SetSpin(0.998f); yield return Shot($"scene-{s + 1}-kerr"); bh.SetSpin(0);
                     // sandbox: a Sun-like star on the default orbit, run until it breaks up, then on to the flare peak
                     bh.Throw(0); bh.AdvanceUntilBody(0, 4.2e5);
+                    // freeze the auto-raised warp so the shot shows this moment, not ~10⁴ M later (BH audit #55)
+                    const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                    typeof(BlackHoleScene).GetField("logWarp", F).SetValue(bh, 0f);
+                    typeof(BlackHoleScene).GetField("warpTarget", F).SetValue(bh, -1f);
                     log.WriteLine($"  sandbox: {bh.DebugSummary()}");
                     yield return Shot($"scene-{s + 1}-sandbox");
                 }
