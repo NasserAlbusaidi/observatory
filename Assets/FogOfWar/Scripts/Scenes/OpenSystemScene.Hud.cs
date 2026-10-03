@@ -63,7 +63,7 @@ namespace FogOfWar
             rightCol = Ui.E(layer, "col");
             rightCol.style.position = Position.Absolute;
             rightCol.style.top = 18; rightCol.style.right = 20; rightCol.style.width = 380;
-            rightCol.style.bottom = shell.Portrait ? 190 : 56;
+            rightCol.style.bottom = shell.Portrait ? 350 : 56; // portrait: clear the lesson card and flight cluster
             BuildTargetCard(rightCol);
             BuildConsole(rightCol);
 
@@ -88,6 +88,7 @@ namespace FogOfWar
             dvVal = Ui.L(rg, "", "t-big", "f-mono");
             rotVal = Ui.L(rg, "", "t-label", "f-mono");
 
+            BuildLessonCard(layer);
             pills = Ui.E(layer, "pills");
             pills.pickingMode = PickingMode.Ignore;
             pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV"); pCam = Pill("CAM");
@@ -556,6 +557,7 @@ namespace FogOfWar
 
             // pills
             UpdateCareerStrip();
+            UpdateLessonCard();
             SetPill(pAssist, "ASSIST " + (ship.FlightAssist ? "ON" : "OFF"), ship.FlightAssist ? "ok" : "bad");
             SetPill(pHold, "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant(), ship.Hold != Hold.Off ? "cold" : null);
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : "NAV IDLE", ship.PlanActive ? "hot" : null);

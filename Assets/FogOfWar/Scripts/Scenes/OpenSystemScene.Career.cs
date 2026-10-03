@@ -32,13 +32,15 @@ namespace FogOfWar
         }
 
         ShipAudio sound;
-        static bool muted;
+        // the Sound switch in Settings → Audio (and the classic panel) share one saved setting
+        static bool muted { get => !GameSettings.ShipSound; set => GameSettings.ShipSound = !value; }
         float heardNote;
 
         void TickSound()
         {
             if (sound == null) return;
-            sound.Muted = muted || App.MenuOpen;
+            sound.Muted = muted || App.MenuOpen || (GameSettings.MuteInBackground && !Application.isFocused);
+            sound.Hull = GameSettings.Effects; sound.Ambient = GameSettings.Music; sound.Console = GameSettings.Chimes;
             sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, ship.RcsActive, Time.unscaledDeltaTime);
             foreach (var n in career.Notes) if (n.Time > heardNote) { heardNote = n.Time; sound.Notice(n.Good); }
         }
@@ -75,7 +77,8 @@ namespace FogOfWar
         void CareerPanel(PanelUI ui)
         {
             ui.Section("Ship's business");
-            muted = !ui.Toggle("Sound (the drive and RCS as heard through the hull)", !muted);
+            bool on = ui.Toggle("Sound (the drive and RCS as heard through the hull)", !muted);
+            if (on == muted) muted = !on;
             if (career.Sandbox)
             {
                 GUILayout.Label("Sandbox: unlimited reaction mass, no contracts.", ui.label);
