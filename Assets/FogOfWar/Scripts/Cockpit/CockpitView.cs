@@ -35,15 +35,16 @@ namespace FogOfWar.Cockpit
             CockpitMesh.MfdCentres[2] + new Vector3(0, 0.03f, -0.06f),
             new Vector3(-0.78f, -0.05f, 0.55f),                                // 7 side console indicators
         };
+        // The overhead strip lights the cabin; the screens only tint what is right in front of them.
         static readonly Color[] LampNormal =
         {
-            new Color(0.30f, 0.28f, 0.24f), new Color(0.04f, 0.04f, 0.045f), new Color(0.04f, 0.04f, 0.045f), new Color(0.04f, 0.05f, 0.065f),
-            new Color(0.012f, 0.022f, 0.02f), new Color(0.012f, 0.022f, 0.02f), new Color(0.012f, 0.022f, 0.02f), new Color(0.012f, 0.008f, 0.002f),
+            new Color(1.40f, 1.30f, 1.10f), new Color(0.22f, 0.21f, 0.19f), new Color(0.22f, 0.21f, 0.19f), new Color(0.05f, 0.06f, 0.075f),
+            new Color(0.005f, 0.007f, 0.007f), new Color(0.005f, 0.007f, 0.007f), new Color(0.005f, 0.007f, 0.007f), new Color(0.03f, 0.02f, 0.006f),
         };
         static readonly Color[] LampRed =
         {
-            new Color(0.24f, 0.012f, 0.008f), new Color(0.07f, 0.004f, 0.003f), new Color(0.07f, 0.004f, 0.003f), new Color(0.04f, 0.05f, 0.065f),
-            new Color(0.012f, 0.022f, 0.02f), new Color(0.012f, 0.022f, 0.02f), new Color(0.012f, 0.022f, 0.02f), new Color(0.012f, 0.008f, 0.002f),
+            new Color(1.10f, 0.05f, 0.03f), new Color(0.30f, 0.012f, 0.008f), new Color(0.30f, 0.012f, 0.008f), new Color(0.05f, 0.06f, 0.075f),
+            new Color(0.005f, 0.007f, 0.007f), new Color(0.005f, 0.007f, 0.007f), new Color(0.005f, 0.007f, 0.007f), new Color(0.03f, 0.02f, 0.006f),
         };
 
         public CockpitView(Transform parent, Camera main)

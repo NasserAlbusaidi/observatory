@@ -55,7 +55,7 @@ Shader "FogOfWar/Cockpit"
                 [unroll] for (int k = 0; k < LAMPS; k++)
                 {
                     float3 d = _CkLampPos[k].xyz - i.wp;
-                    float r2 = max(dot(d, d), 0.02);
+                    float r2 = max(dot(d, d), 0.06);   // lamps are ~25 cm across: no hot spot on nearby panels
                     float3 l = d * rsqrt(r2);
                     // lamps are strips and panels, not points: a little wrap softens the terminator
                     float w = saturate((dot(n, l) + 0.2) / 1.2);
@@ -64,7 +64,7 @@ Shader "FogOfWar/Cockpit"
                 }
                 float3 albedo = i.col.rgb;
                 // painted metal: seams, and a little low-frequency wear so large panels aren't flat
-                albedo *= lerp(1.0, 0.45, seams(i.op, n));
+                albedo *= lerp(1.0, 0.65, seams(i.op, n));
                 albedo *= 0.85 + 0.3 * vnoise(i.op * 7.0);
                 float3 c = albedo * diff + spec * 0.12;
                 return float4(displayToOutput(c * _CkExposure), 1);
