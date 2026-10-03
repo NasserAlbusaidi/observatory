@@ -52,7 +52,10 @@ namespace FogOfWar
             pills.style.bottom = b;
             if (lessonCard != null) lessonCard.style.bottom = b + 44;
             // QA-049: the target card and ship console column ends above the MFDs (its body scrolls)
-            if (rightCol != null) rightCol.style.bottom = Mathf.Max(colBottom, b);
+            // in portrait the lesson card spans under the column too, so the column also ends above the card
+            float lesson = hudShell.Portrait && lessonCard != null && lessonCard.resolvedStyle.display == DisplayStyle.Flex &&!float.IsNaN(lessonCard.resolvedStyle.height)
+                ? 44 + lessonCard.resolvedStyle.height + 8 : 0;
+            if (rightCol != null) rightCol.style.bottom = Mathf.Max(colBottom, b + lesson);
         }
 
         // HUD world markers and labels: false for a screen point that lands on the cabin instead of the display.
