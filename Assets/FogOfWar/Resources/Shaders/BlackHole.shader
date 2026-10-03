@@ -25,7 +25,7 @@ Shader "FogOfWar/BlackHole"
             #include "FOWCommon.cginc"
 
             float _Disk, _Doppler, _Outer, _Temp, _Lens, _SimTime, _Clumpy, _Gain, _SwirlRate;
-            float _Spin, _RH, _Isco, _FluxMax, _StepK, _RMax;
+            float _Spin, _RH, _Isco, _FluxMax, _StepK, _RMax, _Exposure;
             int _Steps;
             // camera, computed on the CPU in double precision: Boyer–Lindquist position, orthonormal triad (world space),
             // and the ZAMO metric functions there
@@ -356,10 +356,10 @@ Shader "FogOfWar/BlackHole"
                     // the sky is blueshifted by g = EF for this observer: bolometric intensity × g⁴, and an approximate
                     // colour shift (the ratio of blackbody tints for a 6500 K source seen at g × 6500 K)
                     float gs = clamp(EF, 0.05, 20.0);
-                    float3 tint = blackbody(6500.0 * gs) / blackbody(6500.0);
+                    float3 tint = blackbody(6500.0 * clamp(gs, 0.25, 4.0)) / blackbody(6500.0);
                     col += trans * skyA(dir, px) * tint * gs * gs * gs * gs;
                 }
-                return float4(tonemap(col), 1.0);
+                return float4(tonemap(col * _Exposure), 1.0);
             }
             ENDCG
         }

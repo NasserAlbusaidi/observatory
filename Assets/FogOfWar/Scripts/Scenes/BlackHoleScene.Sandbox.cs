@@ -73,6 +73,7 @@ namespace FogOfWar
         readonly List<Vector2> lightCurve = new List<Vector2>();
         double lum, fallbackRate, fallbackAcc, curveT;
         double lastDE;
+        const double LumTau = 2000;   // M: smoothing of the luminosity and fallback readouts
 
         double A => spin;
 
@@ -96,7 +97,7 @@ namespace FogOfWar
         {
             bodies.Clear(); probes.Clear(); nParts = 0; riding = null; ride = false;
             camVel = new Vector4(0, 0, 0, 1);
-            lightCurve.Clear(); lum = fallbackRate = fallbackAcc = accreted = 0; heatScale = 1e-9; curveT = 0; lastDE = 0;
+            lightCurve.Clear(); lum = fallbackRate = fallbackAcc = accreted = 0; heatScale = 1e-9; curveT = 0; lastDE = 0; simT = 0;
             Orbit.enabled = true;
         }
 
@@ -261,7 +262,7 @@ namespace FogOfWar
             if (!g.inside)
             {
                 g.ZamoVelocity(a, out double vr, out double vph);
-                double v2 = Math.Min(vr * vr + vph * vph, 0.999999);
+                double v2 = Math.Min(vr * vr + vph * vph, 0.99);   // the camera stops just outside the horizon; cap γ at 7
                 camVel = new Vector4((float)vr, 0, (float)vph, (float)(1 / Math.Sqrt(1 - v2)));
             }
         }
@@ -321,11 +322,13 @@ namespace FogOfWar
             // luminosity: the heat released by the gas model (E is energy per unit rest mass); Eddington for hydrogen
             double Lw = dissipated * Phys.c * Phys.c / Tunit;
             double Ledd = 1.26e31 * MassKg / Phys.Msun;
-            lum = Mathf.Lerp((float)lum, (float)(Lw / Ledd), 0.2f);
+            // smoothed over sim time (not frames), on about the gas model's own time scale
+            double ema = 1 - Math.Exp(-h / LumTau);
+            lum += (Lw / Ledd - lum) * ema;
             curveT += h;
             if (curveT > 0 && (lightCurve.Count == 0 || simT - lightCurve[lightCurve.Count - 1].x > Math.Max(h, 5)))
             {
-                fallbackRate = fallbackAcc / Math.Max(curveT, 1e-9);
+                fallbackRate += (fallbackAcc / Math.Max(curveT, 1e-9) - fallbackRate) * (1 - Math.Exp(-curveT / LumTau));
                 fallbackAcc = 0; curveT = 0;
                 if (nParts > 0 || lum > 1e-9) lightCurve.Add(new Vector2((float)simT, (float)lum));
                 if (lightCurve.Count > 600) lightCurve.RemoveAt(0);
@@ -358,8 +361,8 @@ namespace FogOfWar
         // Deposit the debris into the polar texture: brightness, temperature and velocity, weighted, per unit area.
         void Splat()
         {
-            Array.Clear(texData, 0, texData.Length);
             if (nParts == 0) return;
+            Array.Clear(texData, 0, texData.Length);
             double a = A;
             double lnMin = Math.Log(Kerr.Horizon(a) * 0.95), lnMax = Math.Log(TexRMax);
             double inv = 1 / (lnMax - lnMin);

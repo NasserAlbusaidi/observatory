@@ -108,6 +108,7 @@ namespace FogOfWar
                 S("bh-kerr-0.998",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "spin", 0.998f))),
                 S("bh-kerr-0.998-nodisk", new Vector3(0, 0.0f, 24f), 30, With(s => { Set(s, "spin", 0.998f); Set(s, "disk", false); })),
                 S("bh-schw-nodisk",      new Vector3(0, 0.0f, 24f), 30, With(s => Set(s, "disk", false))),
+                S("bh-kerr-0.998-guides", new Vector3(0, 0.9f, 24f), 42, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-no-doppler",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "doppler", false))),
                 // sandbox
                 S("sb-sun-sgra-approach", new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 1, 0, untilR: 30), ui: true),
@@ -140,6 +141,7 @@ namespace FogOfWar
 
         IEnumerator Start()
         {
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowbhpanel") >= 0) { yield return PanelShots(); yield break; }
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "bhshots.txt")) { AutoFlush = true };
             var app = GetComponent<FogOfWarApp>();
@@ -205,6 +207,17 @@ namespace FogOfWar
                 log.WriteLine($"{s.name}  {((BlackHoleScene)app.Current).DebugSummary()}");
             }
 
+            // CPU cost of the sandbox: a full star's debris near pericentre, at the default warp
+            {
+                Default(app.Current);
+                var bs = (BlackHoleScene)app.Current;
+                Set(bs, "periRs", 5f); bs.Throw(0); bs.AdvanceUntilBody(1, 120);
+                float c0 = Time.realtimeSinceStartup;
+                for (int k = 0; k < 60; k++) bs.Tick(1f / 60);
+                log.WriteLine($"sandbox tick, 4000 debris particles: {(Time.realtimeSinceStartup - c0) * 1000 / 60:0.00} ms per frame");
+                Default(app.Current);
+            }
+
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.
             Time.timeScale = 1;
             Default(app.Current);
@@ -232,6 +245,39 @@ namespace FogOfWar
 
             cam.targetTexture = null;
             if (shell != null) shell.Surface = null;
+            log.WriteLine($"done, {errors} errors");
+            log.Close(); log = null;
+            Application.Quit();
+        }
+
+        // Windowed run (not batchmode): the IMGUI instrument panel only draws on screen, so capture the real window in
+        // a few sandbox states. Each step runs the panel's OnGUI code for a second before the capture.
+        IEnumerator PanelShots()
+        {
+            Directory.CreateDirectory(dir);
+            log = new StreamWriter(Path.Combine(dir, "bhpanel.txt")) { AutoFlush = true };
+            var app = GetComponent<FogOfWarApp>();
+            app.Activate(1);
+            yield return new WaitForSecondsRealtime(1.5f);
+            var b = (BlackHoleScene)app.Current;
+            Default(b);
+            var steps = new (string, Action)[]
+            {
+                ("panel-default", () => { }),
+                ("panel-tde", () => { Set(b, "periRs", 5f); Set(b, "guides", true); b.Throw(0); b.AdvanceUntilBody(1, 120); Set(b, "logWarp", 1f); }),
+                ("panel-tde-return", () => { Set(b, "logWarp", 3.6f); b.Advance(4.2e5); Set(b, "logWarp", 2.5f); }),
+                ("panel-probe", () => { Default(b); Set(b, "disk", false); Set(b, "guides", true); b.DropProbe(1); Set(b, "logWarp", 2.3f); b.Advance(3000); }),
+                ("panel-ride", () => { Default(b); Set(b, "ride", true); b.DropProbe(4); b.AdvanceUntilRide(10); Set(b, "logWarp", 0.5f); }),
+                ("panel-ride-off", () => { Call(b, "StopRide"); Set(b, "ride", false); }),
+            };
+            foreach (var (name, act) in steps)
+            {
+                try { act(); } catch (Exception e) { log.WriteLine($"{name}: threw {e.InnerException?.Message ?? e.Message}"); errors++; }
+                yield return new WaitForSecondsRealtime(1.2f);
+                ScreenCapture.CaptureScreenshot(Path.Combine(dir, name + ".png"));
+                yield return new WaitForSecondsRealtime(0.5f);
+                log.WriteLine($"{name}  {b.DebugSummary()}");
+            }
             log.WriteLine($"done, {errors} errors");
             log.Close(); log = null;
             Application.Quit();

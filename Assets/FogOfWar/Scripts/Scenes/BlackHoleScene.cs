@@ -73,6 +73,10 @@ namespace FogOfWar
             Gfx.SetRayCamera(mat, Cam);
             Kerr.SetCamera(mat, Cam.transform.position, a);
             mat.SetVector("_CamVel", camVel);
+            // riding a fast probe, everything ahead is blueshifted (brightness ∝ g⁴): the exposure adapts like an eye,
+            // to the boost straight ahead, γ(1 + v)
+            double vv = System.Math.Sqrt(System.Math.Max(1 - 1 / (camVel.w * camVel.w), 0));
+            mat.SetFloat("_Exposure", (float)System.Math.Pow(camVel.w * (1 + vv), -3));
             mat.SetFloat("_Spin", spin);
             mat.SetFloat("_RH", (float)Kerr.Horizon(a));
             mat.SetFloat("_Isco", (float)Kerr.Isco(a));
