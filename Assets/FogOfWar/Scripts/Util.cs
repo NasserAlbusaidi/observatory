@@ -342,7 +342,10 @@ namespace FogOfWar
                 for (int x = 0; x < size; x++)
                 {
                     float dx = (x + 0.5f) / size * 2 - 1, dy = (y + 0.5f) / size * 2 - 1;
-                    float a = Mathf.Exp(-(dx * dx + dy * dy) * 5f);
+                    // the Gaussian is shifted down so it reaches 0 at radius 1: its exp(-5) floor at the edge of the
+                    // quad showed as a square outline around bright glows in a linear-space frame
+                    float edge = Mathf.Exp(-5f);
+                    float a = Mathf.Max(0f, (Mathf.Exp(-(dx * dx + dy * dy) * 5f) - edge) / (1f - edge));
                     px[y * size + x] = new Color(1, 1, 1, a);
                 }
             tex.SetPixels32(px); tex.Apply();

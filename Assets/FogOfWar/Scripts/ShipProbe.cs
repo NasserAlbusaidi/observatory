@@ -67,6 +67,10 @@ namespace FogOfWar
                 yield return Shot($"{v.body}-{v.tag}");
             }
             if (fps.Count > 0) log.WriteLine($"fps over all views: min {fps.Min():F0}, mean {fps.Average():F0}");
+            // looking toward the Sun past the ship: the Sun's core and glow should read white (QA-048)
+            Park(s, "Earth", 35f, 0f, sunward: true);
+            yield return new WaitForSecondsRealtime(3f);
+            yield return Shot("Earth-sunward");
             // photo mode stacks PhotoFX on the same camera as the open world's bloom: check both still draw
             Park(s, "Earth", 35f, 0f);
             yield return new WaitForSecondsRealtime(2f);
@@ -89,7 +93,7 @@ namespace FogOfWar
 
         // Puts the ship in a low orbit around `body`, `sunAngleDeg` from the subsolar point (0 = noon, 180 = midnight),
         // a little above the equator so Saturn's rings don't hide it, and frames it from outside with the planet behind.
-        static void Park(SimScene s, string body, float sunAngleDeg, float throttle)
+        static void Park(SimScene s, string body, float sunAngleDeg, float throttle, bool sunward = false)
         {
             var t = s.GetType();
             var sys = (SolarSystem)t.GetField("sys", F).GetValue(s);
@@ -119,6 +123,7 @@ namespace FogOfWar
             t.GetField("camMode", F).SetValue(s, Enum.ToObject(t.GetNestedType("CamMode", BindingFlags.NonPublic), 1));
             // camera outside the orbit, off to one side and above, looking back past the ship at the planet
             var off = (Frame.U(dir) * 0.75f + Frame.U(tangent) * 0.55f + Frame.U(pole) * 0.35f).normalized;
+            if (sunward) off = (-Frame.U(toSun) + Frame.U(pole) * 0.3f).normalized; // Sun about 17 deg above the ship, inside the portrait view
             t.GetField("yaw", F).SetValue(s, Mathf.Atan2(off.x, -off.z) * Mathf.Rad2Deg);
             t.GetField("pitch", F).SetValue(s, Mathf.Asin(Mathf.Clamp(off.y, -1, 1)) * Mathf.Rad2Deg);
         }
