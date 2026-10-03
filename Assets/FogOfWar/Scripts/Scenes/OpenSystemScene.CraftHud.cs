@@ -56,7 +56,13 @@ namespace FogOfWar
         // review shots: target the first board (or active) job of a kind; false if none is posted
         public bool TestTargetJob(JobKind kind)
         {
-            var c = career.Board.Find(x => x.Kind == kind) ?? career.Active.Find(x => x.Kind == kind);
+            var c = career.Active.Find(x => x.Kind == kind);
+            if (c == null)
+            {
+                // board previews aren't in the system until accepted, so take the job
+                c = career.Board.Find(x => x.Kind == kind && career.CanAccept(x, out _));
+                if (c != null) career.Accept(c, jd);
+            }
             var b = c != null ? career.TargetOf(c) : null;
             if (b == null) return false;
             SetTarget(b);

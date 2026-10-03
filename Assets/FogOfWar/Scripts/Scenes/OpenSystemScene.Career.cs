@@ -428,6 +428,7 @@ namespace FogOfWar
                 foreach (var r in rends) { bounds.Encapsulate(r.bounds); foreach (var m in r.sharedMaterials) Own(m); }
                 wreckLen = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
                 model.localPosition -= bounds.center - wreckT.position;
+                wreckGlow.Clear(); // a rebuilt scene destroyed the last wreck's materials
                 var glow = Models.FindDeep(model, "EmergencyGlow");
                 if (glow != null) foreach (var r in glow.GetComponentsInChildren<Renderer>()) wreckGlow.AddRange(r.sharedMaterials);
             }

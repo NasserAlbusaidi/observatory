@@ -300,7 +300,7 @@ namespace FogOfWar
             tcName.style.flexGrow = 1;
             Ui.B(head, "◀", () => SetTarget(targets[(targetIdx - 1 + targets.Count) % targets.Count]), "small");
             Ui.B(head, "▶", NextTarget, "small");
-            tcSub = Ui.L(tcBody, "", "t-label", "f-condm");
+            tcSub = Ui.L(tcBody, "", "t-label", "f-condm", "tc-sub");
             tcSub.style.marginBottom = 6;
             tcDist = Ui.KV(tcBody, "Distance").value;
             tcRel = Ui.KV(tcBody, "Relative speed").value;
