@@ -255,6 +255,9 @@ namespace FogOfWar.OpenWorld
             bool orbiting = dist < standoff * 1.25 && vrel.Mag < Math.Sqrt(T.GM / Math.Max(dist, 1)) * 2 + 0.5;
             if (!orbiting)
             {
+                // one clearance guard for every body near the path: climb out before anything else
+                var guard = Clearance(sys, jd);
+                if (guard.HasValue) { cruising = false; parked = false; Phase = "climbing clear of " + guardBody.Name; return guard; }
                 double vb = Math.Sqrt(2 * aMax * 0.85 * Math.Max(dist - standoff, 0));
                 // burn–coast–burn: hold the cruise speed on rails until the braking point
                 bool capped = CruiseCap > 0 && vb > CruiseCap;
@@ -279,9 +282,6 @@ namespace FogOfWar.OpenWorld
             var err = vDes - vrel;
             // in orbit, gravity is what keeps us there; otherwise cancel it first, then steer with what is left
             var cmd = orbiting && !hover ? err / tau : Budget(err / tau, gRel);
-            // periapsis guard: if the coast arc around the body we're in would hit it, climb out before anything else
-            var guard = Clearance(sys, jd);
-            if (guard.HasValue && !orbiting) { Phase = "climbing clear of " + guardBody.Name; return guard; }
             if (orbiting && !hover)
             {
                 // Parked when the orbit has the right shape: speed near circular, little radial motion, radius near the
@@ -323,19 +323,32 @@ namespace FogOfWar.OpenWorld
         // along the motion (raising periapsis) until it won't.
         D3? Clearance(SolarSystem sys, double jd)
         {
-            var b = Dominant(sys, Pos, jd);
-            if (b == sys.Sun || b == Target || b.GM < 1) return null;
-            var r = Pos - sys.Pos(b, jd); var v = Vel - sys.Vel(b, jd);
-            double rm = r.Mag, vr = D3.Dot(r, v) / rm;
-            if (vr >= 0 && rm > b.Radius * 1.2) return null; // climbing and clear
-            var h = D3.Cross(r, v);
-            double energy = v.Sqr / 2 - b.GM / rm;
-            double p = h.Sqr / b.GM, e = Math.Sqrt(Math.Max(0, 1 + 2 * energy * h.Sqr / (b.GM * b.GM)));
-            double rp = p / (1 + e);
-            if (rp > b.Radius * 1.1) return null;
-            guardBody = b;
+            var dom = Dominant(sys, Pos, jd);
+            foreach (var b in Obstacles)
+                if (Climb(sys, jd, b) is D3 c) return c;
+            return Obstacles.Contains(dom) ? null : Climb(sys, jd, dom);
+        }
+
+        // Climb away from b when the ship is falling toward it and either (a) its two-body arc would hit the body
+        // (periapsis under 1.1 R), or (b) it is falling too fast to stop above the safe radius with the drive left over
+        // after gravity (the case of a 1 g ship that kills its orbital speed to head for the Moon behind Earth).
+        D3? Climb(SolarSystem sys, double jd, Body b)
+        {
+            if (b == null || b == sys.Sun || b == Target || b.GM < 1) return null;
+            var r = Pos - sys.Pos(b, jd);
+            double rm = r.Mag;
+            if (rm > 40 * b.Radius) return null; // cheap distance cut before the (uncached) velocity lookup
+            var v = Vel - sys.Vel(b, jd);
             var outward = r / rm;
-            var along = v.Sqr > 1e-12 ? (v - outward * vr).Norm : D3.Cross(b.Pole, outward).Norm;
+            double vr = D3.Dot(v, outward), vin = -vr;
+            if (vin <= 0 && rm > b.Radius * 1.2) return null; // climbing and clear
+            double rp = Periapsis(r, v, b.GM), safe = b.Radius * 1.5 + 200;
+            double net = AMax - b.GM / (rm * rm);
+            bool impact = rp < b.Radius * 1.1;
+            bool cannotStop = vin > 0 && rp < safe && rm - safe < vin * vin / Math.Max(net, 1e-9) + 0.3 * safe;
+            if (!impact && !cannotStop) return null;
+            guardBody = b;
+            var along = v.Sqr > 1e-12 && (v - outward * vr).Sqr > 1e-12 ? (v - outward * vr).Norm : D3.Cross(b.Pole, outward).Norm;
             return (outward + along).Norm * AMax;
         }
 
@@ -350,14 +363,6 @@ namespace FogOfWar.OpenWorld
                 double d = rel.Mag;
                 if (d > 40 * b.Radius || d > dist) continue;
                 double safe = b.Radius * 1.5 + 200;
-                // Falling toward it on a path that dips inside the safe radius, and too close to stop with the drive
-                // left over after gravity: climb first. Without this a 1 g ship that kills its orbital speed to head
-                // for a target behind the body falls in (the Moon behind Earth from a 15,000 km orbit).
-                var up = (-rel).Norm;
-                var v = Vel - sys.Vel(b, jd);
-                double vin = -D3.Dot(v, up), net = AMax - b.GM / (d * d);
-                if (vin > 0 && d - safe < vin * vin / Math.Max(net, 1e-9) + 0.3 * safe && Periapsis(-rel, v, b.GM) < safe)
-                { dir = (dir + up * 3).Norm; continue; }
                 if (d < safe) { dir = (dir + (-rel).Norm * 1.5).Norm; continue; } // too close: climb out first
                 double t = D3.Dot(rel, dir);
                 if (t <= 0) continue;

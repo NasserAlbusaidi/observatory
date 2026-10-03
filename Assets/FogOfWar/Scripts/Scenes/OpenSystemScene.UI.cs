@@ -258,8 +258,8 @@ namespace FogOfWar
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
             list.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
-            // jet power P = ½·m·a·vₑ for a 500 t ship and a D–He³-class exhaust; no known physics sheds that heat
-            if (ship.Throttle > 0) list.Add(new Readout("Jet power (fictional efficiency)", Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW", Tone.Bad));
+            // jet power P = ½·m·a·vₑ with the live mass and the D–He³-class exhaust; no known physics sheds that heat
+            if (ship.Throttle > 0) list.Add(new Readout("Jet power (fictional efficiency)", Fmt.Num(0.5 * ship.Mass * 1e3 * ship.Throttle * ship.AMax * 1e3 * Ship.Ve * 1e3 / 1e12, 3) + " TW", Tone.Bad));
             if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "outside 2000–2100: approximate", Tone.Bad));
             if (ship.Target != null)
             {
