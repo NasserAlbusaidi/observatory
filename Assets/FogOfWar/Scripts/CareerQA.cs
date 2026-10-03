@@ -16,7 +16,10 @@ namespace FogOfWar
         StreamWriter log;
         FogOfWarApp app;
         OpenSystemScene s;
-        int fails;
+        int fails, exceptions;
+        void OnEnable() => Application.logMessageReceived += OnLog;
+        void OnDisable() => Application.logMessageReceived -= OnLog;
+        void OnLog(string msg, string stack, LogType type) { if (type == LogType.Exception || type == LogType.Error) { exceptions++; log?.WriteLine("    [" + type + "] " + msg); } }
         float traceEvery = 2; int moonWarp = 3;
         const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
@@ -387,6 +390,22 @@ namespace FogOfWar
                     Check(!career.Active.Contains(ic) && career.Credits > c4 && sys[ic.To] == null, $"cargo handed over in flight and paid ({career.Credits - c4:N0} cr)");
                     Check(ship.Target == null && !ship.PlanActive, "after the handover the autopilot lets the runner go");
                 }
+            }
+
+            // New game while a rescue is active: the rebuilt scene must not touch the old wreck's materials
+            {
+                int before = exceptions;
+                for (int round = 0; round < 2; round++)
+                {
+                    app.Restart(app.GameIndex); // a new career starts docked at Earth orbit
+                    yield return new WaitForSecondsRealtime(1f);
+                    s = (OpenSystemScene)app.Current;
+                    Put("warpIdx", 0);
+                    var wreckJob = career.Rescue(new System.Random(11 + round), sys, jd);
+                    career.Accept(wreckJob, jd);
+                    yield return new WaitForSecondsRealtime(1f); // the wreck is built and drawn
+                }
+                Check(career.Active.Exists(c => c.Kind == JobKind.Rescue) && exceptions == before, $"new game with a rescue active: {exceptions - before} exceptions");
             }
 
             State("end");
