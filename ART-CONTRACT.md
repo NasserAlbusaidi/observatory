@@ -63,3 +63,24 @@ Adopts the art side's `OPEN-WORLD-ART.md` naming. The code is the source of trut
 - Wired. The code aligns `Nose` to the direction of thrust, scales to `lengthM` (52 m), pulses `Engine` from its
   origin at the nozzle, and draws the drive plume behind it. `Cockpit`, `RCS_*` and `PDC_*` are reserved for the
   cockpit camera, RCS puffs and point-defence turrets.
+- Textured (ship-visuals branch): `Models/PlayerShip/PlayerShip_{Albedo,Normal,Mask,Emission}.png`, 4096 (emission
+  2048), from `Blender/ship_pbr.py`. One UV atlas on the hull mesh; `Engine` keeps its glow material. Albedo and
+  emission sRGB; **Normal is object space in Blender axes** (all three channels, BC7, not BC5; ShipPBR converts with
+  `ShipLighting.BlenderToMesh`, checked by Fog of War/Check ship normal map); Mask is linear R metallic, G occlusion,
+  A smoothness. Rendered by `FogOfWar/ShipPBR` (GGX) under `ShipLighting`. Without the texture set the old flat look
+  stays. Every surface is procedural; see `space-sim-art/SHIP-CREDITS.md`.
+
+### Physical lighting (open world)
+`OpenWorld/ShipLighting.cs` sets these shader globals every frame; `FogOfWarApp` resets them to neutral for the
+other scenes:
+- `_FOWSunIrr`: sunlight at the ship, 1 at 1 AU, inverse square. `_FOWEclipse`: fraction of the solar disc hidden
+  by a body, seen from the ship (umbra and penumbra from the overlap of the two discs).
+- `_FOWShineDir` (xyz direction, w angular radius) and `_FOWShineCol` (linear RGB irradiance): planetshine from the
+  brightest sunlit body, a Lambert sphere with Body.json `geometricAlbedo` at its phase angle.
+- `_FOWExposure`: camera exposure, 1 = the tuned look in full sunlight at 1 AU. It adapts toward 1 / (light on the
+  ship), clamped to 1/8..64 (-3..+6 stops), and opens at most 2 stops further in an eclipse.
+- `_FOWPlumePos`/`_FOWPlumeCol`: the drive plume as a point light, zero unless the drive fires.
+- `_ShipShadowTex`/`_ShipShadowMatrix`/`_ShipShadowParams`: the hull's self-shadow map along the sunlight.
+- Body shaders scale their sunlit output with `fowSunlit(_SunIrr)` (per-material `_SunIrr`, default 1) and their
+  self-luminous output by `_FOWExposure` (FOWCommon.cginc). The sky and stars are not exposure-scaled.
+- A subtle bloom (`OpenWorld/Bloom.cs`) runs on the main camera in the open world only; `-fownobloom` disables it.

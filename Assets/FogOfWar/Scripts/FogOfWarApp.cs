@@ -83,6 +83,7 @@ namespace FogOfWar
             // Leftover lights from a default scene don't affect our shaders, but switch them off to avoid confusion.
             foreach (var l in FindObjectsByType<Light>()) l.enabled = false;
             Orbit = new OrbitCamera(Cam);
+            OpenWorld.ShipLighting.ResetGlobals(); // neutral physical-light globals; the open world drives them
             Art.BindSky();
 
             scenes = new SimScene[]

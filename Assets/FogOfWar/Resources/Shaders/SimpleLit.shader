@@ -8,6 +8,7 @@ Shader "FogOfWar/SimpleLit"
         _Spec ("Specular", Float) = 0.4
         _Rim ("Rim", Color) = (0.3,0.5,1,1)
         _Alpha ("Alpha", Float) = 1
+        _SunIrr ("Sunlight, 1 AU = 1", Float) = 1
     }
     SubShader
     {
@@ -20,7 +21,7 @@ Shader "FogOfWar/SimpleLit"
             #include "UnityCG.cginc"
             #include "FOWCommon.cginc"
             float4 _Color, _Emission, _Rim;
-            float _Spec, _Alpha;
+            float _Spec, _Alpha, _SunIrr;
             float3 _FOWSunDir;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
             struct v2f { float4 pos : SV_POSITION; float3 n : TEXCOORD0; float3 wp : TEXCOORD1; };
@@ -40,8 +41,8 @@ Shader "FogOfWar/SimpleLit"
                 float diff = max(dot(n, l), 0.0);
                 float spec = pow(max(dot(n, normalize(l + vdir)), 0.0), 48.0) * _Spec;
                 float rim = pow(1.0 - max(dot(n, vdir), 0.0), 3.0);
-                float3 c = _Color.rgb * (0.08 + diff) + spec + _Rim.rgb * rim * 0.35 + _Emission.rgb;
-                return float4(displayToOutput(c), _Alpha);
+                float3 c = _Color.rgb * (0.08 + diff) + spec + _Rim.rgb * rim * 0.35;
+                return float4(displayToOutput(c * fowDisplayGain(fowSunlit(_SunIrr)) + _Emission.rgb * fowDisplayGain(_FOWExposure)), _Alpha);
             }
             ENDCG
         }

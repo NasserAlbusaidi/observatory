@@ -2,6 +2,10 @@
 // art pack's textures are bound (_HasTex = 1); procedural fbm continents otherwise.
 Shader "FogOfWar/Earth"
 {
+    Properties
+    {
+        _SunIrr ("Sunlight, 1 AU = 1", Float) = 1
+    }
     SubShader
     {
         Tags { "Queue" = "Geometry" "RenderType" = "Opaque" }
@@ -14,6 +18,7 @@ Shader "FogOfWar/Earth"
             #include "UnityCG.cginc"
             #include "FOWCommon.cginc"
             float3 _FOWSunDir;
+            float _SunIrr;
             float _SimTime, _HasTex;
             sampler2D _DayTex, _NightTex, _CloudTex, _OceanTex, _NormalTex;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
@@ -48,9 +53,9 @@ Shader "FogOfWar/Earth"
                 float night = smoothstep(0.08, -0.12, ndl);
                 float rim = pow(1.0 - max(dot(ng, vdir), 0.0), 3.0);
                 float3 col = c * (0.015 + diff) + spec * float3(1.0, 0.9, 0.75)
-                           + lights * float3(1.0, 0.8, 0.55) * night * (1.0 - cloud * 0.7) * 0.9
                            + float3(0.3, 0.55, 1.0) * rim * 0.6 * (0.2 + max(ndl, 0.0));
-                return float4(displayToOutput(col), 1.0);
+                float3 glow = lights * float3(1.0, 0.8, 0.55) * night * (1.0 - cloud * 0.7) * 0.9;
+                return float4(displayToOutput(col * fowDisplayGain(fowSunlit(_SunIrr)) + glow * fowDisplayGain(_FOWExposure)), 1.0);
             }
 
             float4 frag(v2f i) : SV_Target
@@ -72,8 +77,8 @@ Shader "FogOfWar/Earth"
                 float3 night = float3(1.0, 0.7, 0.35) * step(0.53, land) * step(0.5, fbm(p * 18.0)) * 0.12 * smoothstep(0.1, -0.15, ndl);
                 float3 vdir = normalize(_WorldSpaceCameraPos - i.wp);
                 float rim = pow(1.0 - max(dot(n, vdir), 0.0), 3.0);
-                float3 col = c * (0.03 + diff) + night + float3(0.3, 0.55, 1.0) * rim * 0.6 * (0.2 + diff);
-                return float4(displayToOutput(col), 1.0);
+                float3 col = c * (0.03 + diff) + float3(0.3, 0.55, 1.0) * rim * 0.6 * (0.2 + diff);
+                return float4(displayToOutput(col * fowDisplayGain(fowSunlit(_SunIrr)) + night * fowDisplayGain(_FOWExposure)), 1.0);
             }
             ENDCG
         }

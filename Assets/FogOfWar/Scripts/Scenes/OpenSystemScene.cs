@@ -42,6 +42,7 @@ namespace FogOfWar
         Transform shipT, shipModel, engine, plume, sunGlow, stars;
         Vector3 engineScale;
         Material plumeMat, orbitMat;
+        ShipLighting lighting;
         Mesh orbitMesh;
         readonly List<Vector3> pts = new List<Vector3>();
         readonly List<Color> cols = new List<Color>();
@@ -70,6 +71,7 @@ namespace FogOfWar
             Cam.nearClipPlane = 0.003f;
             Cam.farClipPlane = 4e6f;
             Cam.fieldOfView = 55;
+            Bloom.Enable(Cam, true);
 
             LoadArtBodies();
             BuildShip();
@@ -202,6 +204,7 @@ namespace FogOfWar
                 r.m.SetVector("_PlanetPos", pv.t.localPosition);
                 r.m.SetFloat("_PlanetR", pv.t.localScale.x);
                 r.m.SetVector("_SunDir", Frame.U((sunW - sys.Pos(pv.b, jd)).Norm));
+                r.m.SetFloat("_SunIrr", ShipLighting.Irradiance((sunW - sys.Pos(pv.b, jd)).Mag));
                 // Saturn's rings are bright for real; the others are τ ≈ 10⁻⁶–10⁻¹ and nearly invisible unless boosted
                 r.m.SetFloat("_TauGain", faintRings && pv.b.Name != "Saturn" ? 1000f : 1f);
             }
@@ -293,6 +296,10 @@ namespace FogOfWar
             foreach (var r in rends) bounds.Encapsulate(r.bounds);
             shipLen = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
             shipModel.localPosition -= bounds.center - shipT.position;
+            // textured hull (PBR) with physical lighting; without the texture set the flat Models.Spawn look stays
+            var hull = ShipLighting.ApplyHullMaterial(model);
+            if (hull != null && hull.Length > 0) OwnMat(hull[0].sharedMaterial);
+            lighting = new ShipLighting(hull);
             engine = Models.FindDeep(shipModel, "Engine");
             if (engine != null) engineScale = engine.localScale;
 
@@ -333,6 +340,9 @@ namespace FogOfWar
             if (Cam != null) Cam.nearClipPlane = 0.05f; // on quit the camera may already be gone
             Orbit.enabled = true;
             vis.Clear();
+            lighting?.Dispose();
+            lighting = null;
+            Bloom.Enable(Cam, false);
         }
 
         // ---------------------------------------------------------------- simulation
@@ -549,7 +559,8 @@ namespace FogOfWar
                     b.Axes(jd, out var prime, out var east, out var pole);
                     v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
                 }
-                foreach (var m in v.mats) { m.SetVector("_SunDir", sunDir); m.SetVector("_FOWSunDir", sunDir); }
+                float irr = ShipLighting.Irradiance((sunW - bw).Mag);
+                foreach (var m in v.mats) { m.SetVector("_SunDir", sunDir); m.SetVector("_FOWSunDir", sunDir); m.SetFloat("_SunIrr", irr); }
                 if (b == sys.Sun && sunGlow != null)
                 {
                     sunGlow.localPosition = v.t.localPosition;
@@ -578,6 +589,8 @@ namespace FogOfWar
                 float behind = Mathf.Clamp01(Vector3.Dot((shipT.position - Cam.transform.position).normalized, shipT.forward));
                 plumeMat.SetFloat("_Intensity", (0.5f + 0.9f * thr) * Mathf.Lerp(1f, 0.3f, behind));
             }
+            lighting?.Update(sys, jd, ship.Pos, sunW, dt, shipT, shipLen * shipT.lossyScale.x,
+                             shipT.TransformPoint(new Vector3(0, 0, -shipLen * 0.55f)), thr);
 
             PlaceRings(sunW);
             DrawOrbits();

@@ -178,6 +178,16 @@ float3 displayToOutput(float3 c)
 #endif
 }
 
+// Physical light scale for the open world (ShipLighting.cs). _FOWExposure is the camera exposure, 1 = the look the
+// shaders were tuned for in full sunlight at 1 AU; every other scene keeps it at 1 (FogOfWarApp). A sunlit surface
+// multiplies its output by its own sunlight (irr: 1 at 1 AU, inverse square) times the exposure; self-luminous
+// light (city lights, glows) by the exposure alone.
+float _FOWExposure;
+float fowSunlit(float irr) { return irr * _FOWExposure; }
+// The same scale applied to display-space colour before displayToOutput(), for shaders that add lit and glowing
+// terms there: a sum keeps today's look exactly when the scale is 1.
+float fowDisplayGain(float k) { return pow(max(k, 0.0), 1.0 / 2.2); }
+
 // Ray-traced fullscreen setup shared by the wormhole and black hole.
 float3 _CamPos, _CamRight, _CamUp, _CamFwd;
 float _TanFov, _Aspect, _ScreenH;

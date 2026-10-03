@@ -18,6 +18,7 @@ Shader "FogOfWar/Planet"
         _MainTex ("Colour map", 2D) = "white" {}
         _HasNormal ("Has normal map", Float) = 0
         _NormalTex ("Relief normal map", 2D) = "bump" {}
+        _SunIrr ("Sunlight, 1 AU = 1", Float) = 1
     }
     SubShader
     {
@@ -37,6 +38,7 @@ Shader "FogOfWar/Planet"
             float4x4 _WorldToBody;
             float _UseBodyFrame;
             float3 _SunDir;
+            float _SunIrr;
             sampler2D _MainTex, _NormalTex;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
             struct v2f { float4 pos : SV_POSITION; float3 n : TEXCOORD0; float3 op : TEXCOORD1; float3 wp : TEXCOORD2; };
@@ -103,7 +105,7 @@ Shader "FogOfWar/Planet"
                 }
                 float rim = pow(1.0 - saturate(dot(n, vdir)), 3.0);
                 float3 col = albedo * (0.012 + soft) + _Atmo.rgb * rim * _Atmo.a * saturate(ndl + 0.35);
-                return float4(displayToOutput(col), 1.0);
+                return float4(displayToOutput(col) * fowSunlit(_SunIrr), 1.0);
             }
             ENDCG
         }
