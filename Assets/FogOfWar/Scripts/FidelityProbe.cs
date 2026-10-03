@@ -137,7 +137,7 @@ namespace FogOfWar
                 for (int m = 0; m < t.mipmapCount; m++)
                     bytes += (long)GraphicsFormatUtility.ComputeMipmapSize(Math.Max(1, t.width >> m), Math.Max(1, t.height >> m), t.graphicsFormat);
                 total += bytes;
-                rows.Add((bytes, $"  {bytes / 1048576.0,8:F1} MB  {t.width}x{t.height}  {t.graphicsFormat}  mips {t.mipmapCount}  stream {t.streamingMipmaps}  {t.name}"));
+                rows.Add((bytes, $"  {bytes / 1048576.0,8:F1} MB  {t.width}x{t.height}  {t.graphicsFormat}  mips {t.mipmapCount}  stream {t.streamingMipmaps} loaded {(t.streamingMipmaps ? t.loadedMipmapLevel : -1)} desired {(t.streamingMipmaps ? t.desiredMipmapLevel : -1)}  {t.name}"));
             }
             log.WriteLine($"textures >= 256 px: {rows.Count}, {total / 1048576.0:F0} MB if fully resident");
             log.WriteLine($"Texture.currentTextureMemory {Texture.currentTextureMemory / 1048576} MB, desired {Texture.desiredTextureMemory / 1048576} MB, total {Texture.totalTextureMemory / 1048576} MB");

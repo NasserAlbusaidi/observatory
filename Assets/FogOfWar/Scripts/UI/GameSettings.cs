@@ -76,6 +76,8 @@ namespace FogOfWar
             QualitySettings.globalTextureMipmapLimit = level;
             QualitySettings.streamingMipmapsActive = true;
             QualitySettings.streamingMipmapsMemoryBudget = StreamBudgetMb[level];
+            // below Full, drop mips the view doesn't need, so streamed maps already loaded at full size shrink too
+            Texture.streamingTextureDiscardUnusedMips = level > 0;
         }
 
         public static void SetDisplayMode(int mode)
