@@ -63,7 +63,7 @@ namespace FogOfWar
             rightCol = Ui.E(layer, "col");
             rightCol.style.position = Position.Absolute;
             rightCol.style.top = 18; rightCol.style.right = 20; rightCol.style.width = 380;
-            rightCol.style.bottom = shell.Portrait ? 190 : 56;
+            rightCol.style.bottom = shell.Portrait ? 350 : 56; // portrait: clear the lesson card and flight cluster
             BuildTargetCard(rightCol);
             BuildConsole(rightCol);
 

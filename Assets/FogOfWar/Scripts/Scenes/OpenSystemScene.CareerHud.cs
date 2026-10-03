@@ -128,7 +128,7 @@ namespace FogOfWar
                     Ui.B(c, $"Call an emergency tender ({Career.EmergencyTonnes:N0} t, {Career.EmergencyCost:N0} cr)", () => career.EmergencyDrop(ship), "danger");
             }
 
-            var tut = string.IsNullOrEmpty(TutorialText) ? JobHint() : null; // the lesson card covers it while a lesson runs
+            var tut = string.IsNullOrEmpty(TutorialText) ? FirstJobHint() : null; // the lesson card covers it while a lesson runs
             if (tut != null)
             {
                 var p = Ui.E(c, "panel");
@@ -237,7 +237,7 @@ namespace FogOfWar
             }
         }
 
-        string JobHint()
+        string FirstJobHint()
         {
             var c = career.Active.Find(x => x.Tutorial);
             if (c == null) return null;
