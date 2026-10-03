@@ -28,6 +28,7 @@ namespace FogOfWar
         static readonly double FluxPeak0 = Kerr.FluxPeak(0).f;
         (double r, double f) FluxPeak() { if (peakSpin != spin) { peakSpin = spin; peak = Kerr.FluxPeak(spin); } return peak; }
         Material mat;
+        float debugFate;   // review harness only: 1 ray fates, 2 first disc hit
 
         // mass of the hole in kg, and the time and length units GM/c³ (s) and GM/c² (m)
         double MassKg => System.Math.Pow(10, logMass) * Phys.Msun;
@@ -105,6 +106,7 @@ namespace FogOfWar
                 mat.SetFloat("_Gain", fGain * (float)System.Math.Pow(FluxPeak0 / FluxPeak().f, 0.6));
             }
             UploadSandbox(mat);
+            mat.SetFloat("_DebugFate", debugFate);
         }
 
         public override void Readouts(List<Readout> list)

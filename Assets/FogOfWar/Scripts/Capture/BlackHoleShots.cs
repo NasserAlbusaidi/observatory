@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
         };
@@ -108,6 +108,12 @@ namespace FogOfWar
                 S("bh-kerr-0.998",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "spin", 0.998f))),
                 S("bh-kerr-0.998-nodisk", new Vector3(0, 0.0f, 24f), 30, With(s => { Set(s, "spin", 0.998f); Set(s, "disk", false); })),
                 S("bh-schw-nodisk",      new Vector3(0, 0.0f, 24f), 30, With(s => Set(s, "disk", false))),
+                // QA-034 round 7: zoomed in from the default side, guides on, as in QA-Shots\r7\play\11-zoom.png
+                S("bh-kerr-0.998-default-zoom14", new Vector3(0, 1.3f, -14f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                S("bh-kerr-0.998-default-zoom10", new Vector3(0, 0.9f, -10f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                S("bh-kerr-0.998-default-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                S("dbg-fate-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 1f); })),
+                S("dbg-hit-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 2f); })),
                 // QA-034 recheck: the scene's own default camera (Orbit.Set in Build), spin 0.998, clumpy gas on and off
                 S("bh-kerr-0.998-default-cam", new Vector3(0, 2.2f, -24f), 55, With(s => Set(s, "spin", 0.998f))),
                 S("bh-kerr-0.998-default-smooth", new Vector3(0, 2.2f, -24f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "clumpy", false); })),
@@ -160,6 +166,7 @@ namespace FogOfWar
             Controls.Locked = true;
             app.InputLocked = true;
             app.Quality = 2;   // in memory only
+            { int qa = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowbhquality"); if (qa >= 0) app.Quality = int.Parse(Environment.GetCommandLineArgs()[qa + 1]); }
             yield return null;
             app.Activate(1);
             var shell = UiShell.Instance;

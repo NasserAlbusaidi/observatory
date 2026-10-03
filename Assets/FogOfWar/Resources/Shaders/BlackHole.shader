@@ -25,7 +25,7 @@ Shader "FogOfWar/BlackHole"
             #include "FOWCommon.cginc"
 
             float _Disk, _Doppler, _Outer, _Temp, _Lens, _SimTime, _Clumpy, _Gain, _SwirlRate;
-            float _Spin, _RH, _Isco, _FluxMax, _StepK, _RMax, _Exposure;
+            float _Spin, _RH, _Isco, _FluxMax, _StepK, _RMax, _Exposure, _DebugFate;
             int _Steps;
             // camera, computed on the CPU in double precision: Boyer–Lindquist position, orthonormal triad (world space),
             // and the ZAMO metric functions there
@@ -270,18 +270,24 @@ Shader "FogOfWar/BlackHole"
                 float3 pPrev = 0;
 
                 float3 col = 0;
-                float trans = 1.0, crossings = 0.0;
+                float trans = 1.0, crossings = 0.0, firstHit = 0.0, firstG = 0.0; int stepsUsed = 0;
                 bool escaped = false;
+                // A ray that can fall in has R > 0 all the way down to the horizon. If R(rCap) < 0 it has a turning
+                // point outside, and a step that lands inside rCap overshot it: retry that step smaller (QA-034).
+                bool canFall = Rpot(rCap, b, q, a, M) > 0.0;
+                float hScale = 1.0;
                 [loop] for (int k = 0; k < _Steps; k++)
                 {
                     float p1, p2, p3, p4;
                     float4 k1 = deriv(s, b, q, a, M, p1);
-                    float h = _StepK / (abs(s.y) / s.x + sqrt(abs(k1.y) / s.x) + abs(p1) + abs(s.w) / max(abs(sin(s.z)), 1e-7) + sqrt(abs(k1.w)));
+                    float h = hScale * _StepK / (abs(s.y) / s.x + sqrt(abs(k1.y) / s.x) + abs(p1) + abs(s.w) / max(abs(sin(s.z)), 1e-7) + sqrt(abs(k1.w)));
                     float4 k2 = deriv(s + 0.5 * h * k1, b, q, a, M, p2);
                     float4 k3 = deriv(s + 0.5 * h * k2, b, q, a, M, p3);
                     float4 k4 = deriv(s + h * k3, b, q, a, M, p4);
                     float4 sn = s + h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
                     float phn = ph + h / 6.0 * (p1 + 2.0 * p2 + 2.0 * p3 + p4);
+                    if (sn.x < rCap && !canFall && hScale > 1e-3) { hScale *= 0.25; continue; }
+                    hScale = min(hScale * 2.0, 1.0);
                     // hold the first integrals r'² = R(r) and θ'² = Θ(θ) (except near turning points) so errors don't drift
                     float Rn = Rpot(sn.x, b, q, a, M);
                     if (Rn > projR * sn.x * sn.x * sn.x * sn.x) sn.y = (sn.y < 0.0 ? -1.0 : 1.0) * sqrt(Rn);
@@ -310,7 +316,8 @@ Shader "FogOfWar/BlackHole"
                     }
 
                     float e0 = s.z - UNITY_HALF_PI, e1 = sn.z - UNITY_HALF_PI;
-                    if (plane && e0 * e1 < 0.0)
+                    // a step can land exactly on the equator in float (e = 0): a sign test counts that crossing once
+                    if (plane && ((e0 > 0.0) != (e1 > 0.0)))
                     {
                         // equator crossing: cubic Hermite for θ(t), two Newton steps from the linear guess
                         float t = e0 / (e0 - e1);
@@ -326,6 +333,7 @@ Shader "FogOfWar/BlackHole"
                         {
                             float t2 = t * t, t3 = t2 * t;
                             float rHit = (2 * t3 - 3 * t2 + 1) * s.x + (t3 - 2 * t2 + t) * s.y * h + (-2 * t3 + 3 * t2) * sn.x + (t3 - t2) * sn.y * h;
+                            rHit = clamp(rHit, min(s.x, sn.x), max(s.x, sn.x));   // the cubic can overshoot on a long step
                             float phHit = lerp(ph, phn, t);
                             float Dh = max(rHit * rHit - 2.0 * rHit + a * a, 1e-4);
                             float prHit = -lerp(s.y, sn.y, t) / Dh;   // the physical photon's p_r
@@ -341,6 +349,7 @@ Shader "FogOfWar/BlackHole"
                             {
                                 float al;
                                 float3 c = diskColor(rHit, phHit, b, EF, crossings, al);
+                                if (firstHit == 0.0) { firstHit = rHit; firstG = dot(c, 1.0); }
                                 col += trans * c;
                                 trans *= 1.0 - al;
                             }
@@ -357,13 +366,13 @@ Shader "FogOfWar/BlackHole"
                         trans = 0;
                         break;
                     }
-                    s = sn; ph = phn;
+                    s = sn; ph = phn; stepsUsed = k;
                     if (s.x < rCap) break;
                     if (s.x > _RMax && s.y > 0.0) { escaped = true; break; }
                 }
                 // a ray still going after all its steps is circling near the photon orbit; it would almost always leave
                 // again, so take the sky in its current direction rather than black
-                if (!escaped && s.x >= rCap * 1.05 && trans > 0.01 && s.y > 0.0) escaped = true;
+                if (!escaped && trans > 0.01 && (!canFall || (s.x >= rCap * 1.05 && s.y > 0.0))) escaped = true;
                 if (escaped && trans > 0.01)
                 {
                     float3 dir = skyDir(s, ph, b, q, a, M);
@@ -373,6 +382,11 @@ Shader "FogOfWar/BlackHole"
                     float3 tint = blackbody(6500.0 * clamp(gs, 0.25, 4.0)) / blackbody(6500.0);
                     col += trans * skyA(dir, px) * tint * gs * gs * gs * gs;
                 }
+                // debug views for the review harness: 1 = fate (red captured, green escaped, blue out of steps,
+                // white = opaque disc), 2 = first disc hit radius / ISCO and its brightness
+                if (_DebugFate > 1.5) return float4(firstHit / (_Isco * 4.0), saturate(firstG), 0, 1);
+                if (_DebugFate > 0.5)
+                    return trans < 0.01 ? float4(1, 1, 1, 1) : float4(s.x < rCap ? 1 : 0, escaped ? 1 : 0, stepsUsed >= _Steps - 1 ? 1 : 0, 1);
                 return float4(tonemap(col * _Exposure), 1.0);
             }
             ENDCG
