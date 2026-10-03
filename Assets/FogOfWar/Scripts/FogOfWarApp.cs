@@ -15,7 +15,7 @@ namespace FogOfWar
         SimScene current;
         int currentIndex = -1;
         public int SceneCount => scenes.Length;
-        public string SceneTitle => current?.Title;
+        public SimScene Current => current;
         readonly PanelUI ui = new PanelUI();
         readonly List<Readout> readouts = new List<Readout>();
         float readoutTimer;

@@ -142,6 +142,8 @@ namespace FogOfWar
             flip = 0;
         }
 
+        public void ShowChase() { view = 1; ApplyView(); }
+
         void ApplyView()
         {
             ship.gameObject.SetActive(view == 1);

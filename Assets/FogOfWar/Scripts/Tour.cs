@@ -40,21 +40,28 @@ namespace FogOfWar
             for (int s = 0; s < app.SceneCount; s++)
             {
                 app.Activate(s);
-                log.WriteLine($"scene {s + 1}: {app.SceneTitle}");
-                float t0 = Time.realtimeSinceStartup;
-                int f0 = Time.frameCount;
-                yield return new WaitForSecondsRealtime(Dwell);
-                float fps = (Time.frameCount - f0) / (Time.realtimeSinceStartup - t0);
-                yield return new WaitForEndOfFrame();
-                var tex = ScreenCapture.CaptureScreenshotAsTexture();
-                File.WriteAllBytes(Path.Combine(dir, $"scene-{s + 1}.png"), tex.EncodeToPNG());
-                Destroy(tex);
-                log.WriteLine($"  {fps:F0} fps");
+                log.WriteLine($"scene {s + 1}: {app.Current.Title}");
+                yield return Shot($"scene-{s + 1}");
+                // The torch ship only shows in the 1g trip's chase view.
+                if (app.Current is JourneyScene j) { j.ShowChase(); yield return Shot($"scene-{s + 1}-chase"); }
             }
             log.WriteLine($"done, {errors} errors");
             log.Close();
             log = null;
             Application.Quit();
+        }
+
+        IEnumerator Shot(string name)
+        {
+            float t0 = Time.realtimeSinceStartup;
+            int f0 = Time.frameCount;
+            yield return new WaitForSecondsRealtime(Dwell);
+            float fps = (Time.frameCount - f0) / (Time.realtimeSinceStartup - t0);
+            yield return new WaitForEndOfFrame();
+            var tex = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(dir, name + ".png"), tex.EncodeToPNG());
+            Destroy(tex);
+            log.WriteLine($"  {name}: {fps:F0} fps");
         }
     }
 }
