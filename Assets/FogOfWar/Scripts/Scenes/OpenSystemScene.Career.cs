@@ -26,6 +26,21 @@ namespace FogOfWar
             career.StartNew(jd);
             ship.Fuel = career.TankCapacity;
             career.Apply(ship);
+            if (Cam.GetComponent<AudioListener>() == null) Cam.gameObject.AddComponent<AudioListener>();
+            sound = new ShipAudio(Root, o => Own(o)) { Muted = muted };
+            if (!career.Sandbox) StartTutorial();
+        }
+
+        ShipAudio sound;
+        static bool muted;
+        float heardNote;
+
+        void TickSound()
+        {
+            if (sound == null) return;
+            sound.Muted = muted || App.MenuOpen;
+            sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, ship.RcsActive, Time.unscaledDeltaTime);
+            foreach (var n in career.Notes) if (n.Time > heardNote) { heardNote = n.Time; sound.Notice(n.Good); }
         }
 
         void TickCareer(double simDt)
@@ -41,6 +56,8 @@ namespace FogOfWar
             planWasActive = ship.PlanActive;
             planTarget = ship.Target;
             career.Tick(sys, ship, jd, simDt);
+            TickSound();
+            TickTutorial();
         }
 
         void CareerReadouts(List<Readout> list)
@@ -58,6 +75,7 @@ namespace FogOfWar
         void CareerPanel(PanelUI ui)
         {
             ui.Section("Ship's business");
+            muted = !ui.Toggle("Sound (the drive and RCS as heard through the hull)", !muted);
             if (career.Sandbox)
             {
                 GUILayout.Label("Sandbox: unlimited reaction mass, no contracts.", ui.label);
@@ -203,6 +221,7 @@ namespace FogOfWar
             if (c == null) return;
             var moon = sys.Moon;
             string hint;
+            if (TutorialText != null) { GUILayout.Label(TutorialText, ui.body); return; }
             if (ship.Target != moon) hint = $"First job: take the medical supplies to Luna. Set the Moon as the target: press {Ctl.Keys(A.NextTarget)} until it shows, click its label, or use Set target below.";
             else if (!ship.PlanActive) hint = $"Pick Full burn or a coast in the trip planner, then press {Ctl.Keys(A.Engage)} (Engage plan). Raise time compression with {Ctl.Keys(A.WarpUp)}.";
             else hint = "The autopilot burns, flips at the midpoint and brakes, then parks in orbit. In orbit at a port you are docked, and the job pays.";
@@ -215,7 +234,9 @@ namespace FogOfWar
 
         void DrawCareerNotes()
         {
-            if (career == null || career.Notes.Count == 0) return;
+            if (career == null) return;
+            DrawTutorial();
+            if (career.Notes.Count == 0) return;
             if (noteStyle == null) noteStyle = new GUIStyle { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             float ui = App.UiScale;
             float W = UnityEngine.Screen.width / ui;
@@ -236,6 +257,45 @@ namespace FogOfWar
         static string Days(double d) => d < 2 ? Fmt.Num(d * 24, 1) + " h" : Fmt.Num(d, 1) + " days";
 
         // ---------------------------------------------------------------- save
+
+        // ---------------------------------------------------------------- the derelict on a rescue job
+
+        Transform wreckT;
+        readonly List<Material> wreckGlow = new List<Material>();
+        float wreckLen = 1;
+        const float WreckKm = 0.038f;                                        // 38 m container hauler
+        static readonly Vector3 WreckTumble = new Vector3(1.1f, 0.4f, 2.3f); // deg/s, from the art's Derelict.json
+
+        void LateCareer()
+        {
+            var job = career?.Active.Find(x => x.Kind == JobKind.Rescue);
+            var b = job != null ? sys[job.To] : null;
+            if (b == null) { if (wreckT != null) wreckT.gameObject.SetActive(false); return; }
+            if (wreckT == null)
+            {
+                wreckT = new GameObject("Derelict").transform;
+                wreckT.SetParent(Root, false);
+                var model = Models.Spawn("Derelict", wreckT, new Color(0.62f, 0.63f, 0.66f)).transform;
+                Models.AlignMarker(model, "Nose", Vector3.forward);
+                var rends = model.GetComponentsInChildren<Renderer>();
+                var bounds = rends[0].bounds;
+                foreach (var r in rends) { bounds.Encapsulate(r.bounds); foreach (var m in r.sharedMaterials) Own(m); }
+                wreckLen = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+                model.localPosition -= bounds.center - wreckT.position;
+                var glow = Models.FindDeep(model, "EmergencyGlow");
+                if (glow != null) foreach (var r in glow.GetComponentsInChildren<Renderer>()) wreckGlow.AddRange(r.sharedMaterials);
+            }
+            wreckT.gameObject.SetActive(true);
+            wreckT.localPosition = Map(sys.Pos(b, jd), out double k);
+            wreckT.localScale = Vector3.one * (float)(WreckKm * k / wreckLen);
+            // a slow tumble about a fixed axis, on game time
+            float t = (float)(((jd - job.Epoch) * 86400) % 1e6);
+            wreckT.localRotation = Quaternion.AngleAxis(WreckTumble.magnitude * t % 360f, WreckTumble.normalized);
+            // emergency lamps: a 0.6 Hz strobe with random dropouts
+            int beat = Mathf.FloorToInt(Time.time * 0.6f);
+            bool on = Mathf.Repeat(Time.time * 0.6f, 1f) < 0.35f && (beat * 7919 + 13) % 5 != 0;
+            foreach (var m in wreckGlow) m.SetColor("_Emission", on ? new Color(1.2f, 0.12f, 0.08f) : new Color(0.05f, 0.005f, 0.003f));
+        }
 
         const string CareerKey = "fow-career-v1";
 

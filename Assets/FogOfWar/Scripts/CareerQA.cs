@@ -105,6 +105,18 @@ namespace FogOfWar
             Check(career.Active.Count == 1 && career.Active[0].Tutorial, "first job is the Luna run");
             yield return Shot("c01-start");
 
+            // 0. the first-flight lessons, done the way a player does them
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("First flight"), "tutorial starts on a new career");
+            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
+            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("(3/7)"), "turn and let go: flight assist lesson passes");
+            yield return Shot("c00-tutorial");
+            Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
+            Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
+            Call("SetHold", Hold.Prograde); yield return new WaitForSecondsRealtime(0.4f);
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/7)"), "burn and prograde hold lessons pass");
+            Call("SetHold", Hold.Off);
+
             // 1. the first job, full burn to the Moon
             double c0 = career.Credits;
             log.WriteLine($"  Moon vs Earth seen from the ship: {Vector3.Angle(Frame.U(sys.Pos(sys.Moon, jd) - ship.Pos), Frame.U(sys.Pos(sys.Earth, jd) - ship.Pos)):F0} deg");
@@ -112,6 +124,7 @@ namespace FogOfWar
             State("at Luna");
             Check(career.Docked?.Name == "Luna", "docked at Luna after the autopilot parks");
             Check(career.Credits - c0 >= 3000, $"first job paid ({career.Credits - c0:N0} cr)");
+            Check(s.TutorialText == null, "tutorial ends with the first job");
             yield return Shot("c02-luna-docked");
 
             // 2. refuel and take the best-paying cargo job, flown with a 50 % coast
@@ -230,10 +243,16 @@ namespace FogOfWar
                 var wreck = sys[res.To];
                 Check(wreck != null && Career.IsDerelict(wreck), $"derelict is in the system: {res.To} around {res.Parent}");
                 double c3 = career.Credits;
-                yield return Trip(wreck, 0, "rescue " + res.To, () => !career.Active.Contains(res), 4, 120);
+                yield return Trip(wreck, 0, "rescue " + res.To, () => res.Dwell > 0 || !career.Active.Contains(res), 4, 120);
+                // a close look at the wreck while the crew crosses over
+                Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.12);
+                yield return new WaitForSecondsRealtime(1.5f);
+                yield return Shot("c08-derelict");
+                Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 0), 0.16);
+                yield return Fly(() => !career.Active.Contains(res), 3, 60);
                 State("after rescue");
                 Check(!career.Active.Contains(res) && career.Credits > c3 && sys[res.To] == null, $"crew rescued and paid ({career.Credits - c3:N0} cr), wreck removed");
-                yield return Shot("c08-rescue");
+                yield return Shot("c09-rescued");
             }
 
             State("end");

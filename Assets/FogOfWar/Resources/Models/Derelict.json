@@ -1,0 +1,15 @@
+{
+  "lengthM": 38.0,
+  "modelLength": 1.02,
+  "note": "x from -0.52 (nozzle) to +0.50 (nose); scale by lengthM / modelLength",
+  "markers": {
+    "Nose": "front, for alignment",
+    "Dock": "airlock, +Z of the empty points out of the hull; use its position relative to the hull centre for direction"
+  },
+  "emissive": "EmergencyGlow: dim red; meant to flicker (e.g. 0.6 Hz strobe, random dropouts)",
+  "suggestedTumbleDegPerSec": [
+    1.1,
+    0.4,
+    2.3
+  ]
+}
