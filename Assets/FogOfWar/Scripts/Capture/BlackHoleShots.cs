@@ -268,9 +268,10 @@ namespace FogOfWar
                         c /= M - lag;
                         if (c > best) { best = c; lagBest = lag; }
                     }
-                    double mx = 0, mn = double.MaxValue;
-                    foreach (var f in fs) { mx = Math.Max(mx, f); mn = Math.Min(mn, f); }
-                    log.WriteLine($"{s.name}: {fs.Count} samples over {span:0.0} s of disc clock; orbit at {R:0.00} M, expected period {P:0.00} s (readout P/15), measured {lagBest / (M - 1) * span:0.00} s; peak / dip {(mn > 0 ? mx / mn : 0):0.0}");
+                    var sorted = new List<double>(fs); sorted.Sort();
+                    double Q(double p) => sorted[(int)(p * (sorted.Count - 1))];
+                    int zeros = fs.FindAll(f => f <= 1e-3 * Q(0.95)).Count;
+                    log.WriteLine($"{s.name}: {fs.Count} samples over {span:0.0} s of disc clock; orbit at {R:0.00} M, expected period {P:0.00} s (readout P/15), measured {lagBest / (M - 1) * span:0.00} s; spot flux p5/p50/p95 {Q(0.05):0.000}/{Q(0.5):0.000}/{Q(0.95):0.000}, {100.0 * zeros / fs.Count:0}% of samples ~0 (spot hidden)");
                     continue;
                 }
                 if (s.name.StartsWith("hdr-"))

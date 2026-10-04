@@ -77,6 +77,7 @@ namespace FogOfWar
         }
 
         VisualElement spotBox, spotPlot;
+        float[] spotSorted = new float[400];
         Label spotLabel;
 
         // Total light from the spot per frame, normalised to its own peak: one beaming peak per orbit, weaker lensed bumps.
@@ -123,9 +124,12 @@ namespace FogOfWar
             Ui.Show(spotBox, hotSpot && spotCurve.Count > 1);
             if (hotSpot && spotCurve.Count > 1)
             {
-                float mx = 0, mn = float.MaxValue;
-                foreach (var v in spotCurve) { mx = Mathf.Max(mx, v); mn = Mathf.Min(mn, v); }
-                Ui.Text(spotLabel, $"peak / dip ×{(mn > 0 ? mx / mn : 0):0.0}  (beaming, once per orbit)");
+                // 95th over 5th percentile: single readback glitches don't set it; a dip of ~0 means the spot was hidden
+                if (spotSorted.Length < spotCurve.Count) spotSorted = new float[400];
+                spotCurve.CopyTo(spotSorted);
+                System.Array.Sort(spotSorted, 0, spotCurve.Count);
+                float hi = spotSorted[(int)(0.95f * (spotCurve.Count - 1))], lo = spotSorted[(int)(0.05f * (spotCurve.Count - 1))];
+                Ui.Text(spotLabel, lo > 1e-3f * hi ? $"peak / dip ×{hi / lo:0.0}  (beaming, once per orbit)" : "peak once per orbit (beaming); hidden behind the hole or disk part of the time");
                 spotPlot.MarkDirtyRepaint();
             }
             bool curve = lightCurve.Count > 1 && lum > 1e-4;   // not an empty plot while the debris is still out (audit #57)
