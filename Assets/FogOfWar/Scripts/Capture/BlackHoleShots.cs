@@ -240,10 +240,15 @@ namespace FogOfWar
                     while ((double)G("diskClock") - c0 < 2.2 * P && Time.realtimeSinceStartup < giveUp)
                     {
                         yield return null;
+                        cam.Render();   // the harness camera only draws when asked (BHPost measures the spot in OnRenderImage)
                         if (bh.Post.SpotSamples != seen) { seen = bh.Post.SpotSamples; ts.Add((double)G("diskClock") - c0); fs.Add(bh.Post.SpotFlux); }
                     }
                     Time.timeScale = 0;
-                    if (fs.Count < 32) { log.WriteLine($"{s.name}: only {fs.Count} light-curve samples"); errors++; continue; }
+                    if (fs.Count < 32)
+                    {
+                        log.WriteLine($"{s.name}: only {fs.Count} light-curve samples (disc clock moved {(double)G("diskClock") - c0:0.00} s of {2.2 * P:0.00}; post {(bh.Post.enabled ? "on" : "off")}, measuring {bh.Post.MeasureSpot}, async readback {SystemInfo.supportsAsyncGPUReadback})");
+                        errors++; continue;
+                    }
                     // resample on an even clock grid, then the autocorrelation peak between 0.5 and 1.5 expected periods
                     int M = 512; var u = new double[M];
                     double span = ts[ts.Count - 1] - ts[0], mean = 0;
