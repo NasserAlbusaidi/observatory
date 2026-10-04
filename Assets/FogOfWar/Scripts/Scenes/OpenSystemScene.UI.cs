@@ -32,6 +32,7 @@ namespace FogOfWar
             if (th != ship.ThrottleCmd) { ship.ThrottleCmd = th; if (ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "pilot override"; } }
 
             if (Ctl.Pressed(A.FlightAssist)) ship.FlightAssist = !ship.FlightAssist;
+            if (Ctl.Pressed(A.Floodlights) && lighting != null) lighting.Floods = !lighting.Floods;
             if (Ctl.Pressed(A.Flip)) Flip();
             if (Ctl.Pressed(A.Engage)) TogglePlan();
             if (Ctl.Pressed(A.NextTarget)) NextTarget();

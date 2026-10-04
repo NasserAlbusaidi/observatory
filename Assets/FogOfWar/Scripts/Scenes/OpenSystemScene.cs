@@ -83,10 +83,13 @@ namespace FogOfWar
                 var v = new Vis { b = b };
                 if (b.Look == Look.Sun)
                 {
-                    var m = OwnMat(Gfx.Unlit(new Color(1.6f, 1.45f, 1.2f, 1)));
+                    // a 5772 K blackbody against the sRGB (D65) white point: (1, 0.95, 0.91). From space the Sun is
+                    // white; the old warm tints (blue at sRGB 0.6 in the halo) read as orange (QA-048)
+                    var sunWhite = new Color(1f, 0.95f, 0.91f);
+                    var m = OwnMat(Gfx.Unlit(new Color(sunWhite.r * 1.6f, sunWhite.g * 1.6f, sunWhite.b * 1.6f, 1)));
                     v.t = Gfx.Obj(b.Name, Root, sphere, m).transform;
                     v.mats = new[] { m };
-                    var glowMat = OwnMat(Gfx.Unlit(new Color(1f, 0.85f, 0.6f, 0.9f), true));
+                    var glowMat = OwnMat(Gfx.Unlit(new Color(sunWhite.r, sunWhite.g, sunWhite.b, 0.9f), true));
                     glowMat.SetTexture("_MainTex", Own(Gfx.SoftDot(128)));
                     sunGlow = Gfx.Obj("Sun glow", Root, Own(Quad()), glowMat).transform;
                 }

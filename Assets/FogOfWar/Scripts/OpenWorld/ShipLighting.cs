@@ -44,6 +44,24 @@ namespace FogOfWar.OpenWorld
         public float Eclipse { get; private set; }
         public float Exposure => Mathf.Pow(2f, ev);
         public Body ShineBody { get; private set; }
+        public bool Floods;     // hull floodlights, toggled by the pilot
+
+        // Hull floodlights: (position, aim) in the Blender model frame of ship.py (x nose, y port, z up; hull length
+        // 1.1 from -0.60 to +0.50), on booms and masts pointing back at the hull like the ISS's external lights.
+        static readonly (Vector3 pos, Vector3 aim)[] FloodMounts =
+        {
+            (new Vector3(-0.13f, 0.17f, 0.04f), new Vector3(1f, -0.35f, -0.05f)),    // radiator roots, along each flank
+            (new Vector3(-0.13f, -0.17f, 0.04f), new Vector3(1f, 0.35f, -0.05f)),
+            (new Vector3(0.12f, 0f, 0.13f), new Vector3(-1f, 0f, -0.35f)),           // dorsal mast, aft along the spine
+            (new Vector3(0.36f, 0f, -0.13f), new Vector3(-1f, 0f, 0.22f)),           // under the chin, aft along the keel
+        };
+        // Irradiance 10 m from a lamp, in sunlight-at-1-AU units: 0.05 is about 5,000 lux, a strong LED work light.
+        // A 5000 K white.
+        static readonly Color FloodColour = new Color(1f, 0.96f, 0.90f) * 0.05f;
+        const float FloodRefM = 10f, FloodCosOuter = 0.80f, FloodCosInner = 0.92f;
+        static readonly int idFloodPos = Shader.PropertyToID("_FOWFloodPos"), idFloodDir = Shader.PropertyToID("_FOWFloodDir"),
+            idFloodCol = Shader.PropertyToID("_FOWFloodCol");
+        readonly Vector4[] floodPos = new Vector4[4], floodDir = new Vector4[4];
         public Vector3 Shine { get; private set; }
 
         public ShipLighting(Renderer[] hullRenderers)
@@ -104,6 +122,7 @@ namespace FogOfWar.OpenWorld
             Shader.SetGlobalVector(idPlumePos, Vector4.zero);
             Shader.SetGlobalVector(idPlumeCol, Vector4.zero);
             Shader.SetGlobalVector(idShadowParams, Vector4.zero);
+            Shader.SetGlobalVector(idFloodCol, Vector4.zero);
         }
 
         // Sunlight at a heliocentric distance, 1 at 1 AU.
@@ -121,7 +140,9 @@ namespace FogOfWar.OpenWorld
             PlanetShine(sys, jd, shipPos, sunW, out var shineDir, out float shineRad);
 
             float shineLum = Vector3.Dot(Shine, new Vector3(0.2126f, 0.7152f, 0.0722f));
-            float key = Mathf.Max(SunIrr * (1 - Eclipse), shineLum, SunIrr / EclipseHeadroom);
+            // the floodlights meter like any other light on the hull (about their irradiance at 10 m)
+            float floodLum = Floods ? FloodColour.grayscale : 0f;
+            float key = Mathf.Max(SunIrr * (1 - Eclipse) + floodLum, shineLum, SunIrr / EclipseHeadroom);
             float target = Mathf.Log(Mathf.Clamp(1f / Mathf.Max(key, 1e-6f), ExposureMin, ExposureMax), 2f);
             if (float.IsNaN(ev)) ev = target;
             // the eye opens up slowly in the dark and closes quickly in the light
@@ -146,7 +167,29 @@ namespace FogOfWar.OpenWorld
                 Shader.SetGlobalVector(idPlumeCol, Vector4.zero);
             }
 
+            SetFloods(shipT, shipRenderLen);
             RenderShadow(Frame.U(toSun.Norm), shipT.position, shipRenderLen);
+        }
+
+        // Mount points are in the model frame; shipT has the nose on +Z, up on +Y and its origin at the hull's middle
+        // (model x = -0.05), with the ship shipRenderLen long.
+        void SetFloods(Transform shipT, float shipRenderLen)
+        {
+            if (!Floods) { Shader.SetGlobalVector(idFloodCol, Vector4.zero); return; }
+            float k = shipRenderLen / 1.1f;                    // render units per model unit
+            float metre = shipRenderLen / 52f;
+            for (int i = 0; i < FloodMounts.Length; i++)
+            {
+                var (p, a) = FloodMounts[i];
+                var local = new Vector3(p.y, p.z, p.x + 0.05f) * (k / shipT.lossyScale.x);
+                var w = shipT.TransformPoint(local);
+                var d = shipT.TransformDirection(new Vector3(a.y, a.z, a.x)).normalized;
+                floodPos[i] = new Vector4(w.x, w.y, w.z, FloodRefM * metre);
+                floodDir[i] = new Vector4(d.x, d.y, d.z, FloodCosOuter);
+            }
+            Shader.SetGlobalVectorArray(idFloodPos, floodPos);
+            Shader.SetGlobalVectorArray(idFloodDir, floodDir);
+            Shader.SetGlobalVector(idFloodCol, new Vector4(FloodColour.r, FloodColour.g, FloodColour.b, FloodCosInner));
         }
 
         // Fraction of the solar disc covered by any body, from the overlap of two discs on the sky.
