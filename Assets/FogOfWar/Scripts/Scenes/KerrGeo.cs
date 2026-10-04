@@ -222,9 +222,14 @@ namespace FogOfWar
             double gtt = -(1 - 2 / r), gtp = -2 * a / r, gpp = r * r + a * a + 2 * a * a / r, grr = r * r / Delta(r, a);
             // gtt ut² + 2 gtp ut uph + gpp uph² + grr ur² = −1
             double A = gtt, B = 2 * gtp * uph, C = gpp * uph * uph + grr * ur * ur + 1;
-            double disc = Math.Max(B * B - 4 * A * C, 0);
-            double ut = (-B - Math.Sqrt(disc)) / (2 * A);
-            if (ut < 0) ut = (-B + Math.Sqrt(disc)) / (2 * A);
+            // Same branch as (−B − √D)/2A, falling back to (−B + √D)/2A, but in the cancellation-free form q/A, C/q
+            // with q = −(B + sgn B·√D)/2: A = g_tt is zero at r = 2 (the equatorial ergosphere edge), where the
+            // textbook formula divided 0 by 0 and returned NaN (#2); there the equation is linear and C/q is its root.
+            double s = Math.Sqrt(Math.Max(B * B - 4 * A * C, 0));
+            double q = -0.5 * (B + (B >= 0 ? s : -s));
+            double rq = q / A, rc = C / q;
+            double r1 = B >= 0 ? rq : rc, r2 = B >= 0 ? rc : rq;
+            double ut = r1 > 0 ? r1 : r2;
             var g = new Geo { r = r, phi = phi, alive = true };
             g.E = -(gtt * ut + gtp * uph);
             g.L = gtp * ut + gpp * uph;

@@ -394,9 +394,13 @@ namespace FogOfWar
                 if (Coasting())
                 {
                     double used = Coast(simDt);
-                    jd += used / 86400; simDt -= used;
-                    profSteps++;
-                    continue;
+                    if (used > 0)
+                    {
+                        jd += used / 86400; simDt -= used;
+                        profSteps++;
+                        continue;
+                    }
+                    // the conic would not converge: integrate this substep instead
                 }
                 double h = SubstepSize(simDt);
                 // jd (~2.46e6 days) resolves only ~40 µs, so step by exactly the time jd advances: otherwise each 1/60 s
@@ -436,7 +440,17 @@ namespace FogOfWar
             if (ship.PlanActive && ship.Phase == "cruising")
                 chunk = Math.Min(chunk, 0.01 * (sys.Pos(ship.Target, jd) - ship.Pos).Mag / Math.Max((ship.Vel - sys.Vel(ship.Target, jd)).Mag, 1e-3));
             chunk = Math.Max(chunk, Math.Min(maxDt, 1));
-            Rails.Propagate(r0, v0, dom.GM, chunk, out var r1, out var v1);
+            // #5: never adopt an unconverged conic; shorter arcs are easier, and failing that the integrator takes over
+            D3 r1, v1;
+            for (int tries = 0; !Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1); tries++)
+                if (tries == 20) return 0; else chunk *= 0.5;
+            // #6: stop at the first surface the arc passes through, even if it is outside again by the arc's end
+            double hit = FirstSurfaceHit(dom, r0, v0, chunk);
+            if (hit >= 0)
+            {
+                chunk = Math.Max(hit, 1e-3);
+                Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1);
+            }
             double jd1 = jd + chunk / 86400;
             ship.Pos = sys.Pos(dom, jd1) + r1;
             ship.Vel = sys.Vel(dom, jd1) + v1;
@@ -448,6 +462,53 @@ namespace FogOfWar
             if (ship.PlanActive) ship.Step(sys, jd1, 0.001, dom);
             return chunk;
         }
+
+        // The first time within `span` at which the coast arc (r0, v0 about `dom`) meets a surface, or −1. The arc is a
+        // conic about `dom`, so that body is found exactly (Rails.FirstCrossing); other nearby bodies move on their
+        // own orbits, so the arc is sampled and any chord that enters one is refined by bisection on the distance.
+        double FirstSurfaceHit(Body dom, D3 r0, D3 v0, double span)
+        {
+            double best = dom == sys.Sun ? -1 : Rails.FirstCrossing(r0, v0, dom.GM, InnerRadius(dom), span);
+            double limit = best >= 0 ? best : span;
+            var vShip = ship.Vel;
+            double gDom = dom.GM / r0.Sqr;
+            foreach (var b in ship.Near)
+            {
+                if (b == dom || b == sys.Sun) continue;
+                double Rb = InnerRadius(b);
+                var rel0 = ship.Pos - sys.Pos(b, jd);
+                // can't get there within the arc even with the dominant body's pull added to today's closing speed
+                double reach = ((vShip - sys.Vel(b, jd)).Mag + gDom * limit) * limit * 1.5;
+                if (rel0.Mag - Rb > reach) continue;
+                const int K = 24;
+                D3 Rel(double t)
+                {
+                    Rails.Propagate(r0, v0, dom.GM, t, out var p, out _);
+                    double j = jd + t / 86400;
+                    return sys.Pos(dom, j) + p - sys.Pos(b, j);
+                }
+                var a = Rel(0); double ta = 0;
+                for (int i = 1; i <= K; i++)
+                {
+                    double tb = limit * i / K; var c = Rel(tb);
+                    // closest point of the chord a→c to the body
+                    var d = c - a; double s = d.Sqr > 0 ? Math.Max(0, Math.Min(1, -D3.Dot(a, d) / d.Sqr)) : 0;
+                    double tc = ta + s * (tb - ta);
+                    if ((a + d * s).Mag < Rb && Rel(tc).Mag < Rb)
+                    {
+                        double lo = ta, hi = tc;
+                        for (int k = 0; k < 60 && hi - lo > 1e-3; k++) { double m = 0.5 * (lo + hi); if (Rel(m).Mag < Rb) hi = m; else lo = m; }
+                        limit = hi; best = hi;
+                        break;
+                    }
+                    a = c; ta = tb;
+                }
+            }
+            return best;
+        }
+
+        // Strictly inside every point of the touchdown surface, so CheckTouchdown always fires at a found crossing.
+        static double InnerRadius(Body b) => b.Radius * Math.Max(b.Shape.x, Math.Max(b.Shape.y, b.Shape.z)) * (1 - b.Flattening) * 0.998;
 
         double SubstepSize(double remaining)
         {
