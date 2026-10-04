@@ -296,7 +296,7 @@ namespace FogOfWar.OpenWorld
             // Brachistochrone: steer relative velocity onto v = sqrt(2·a·distance) toward the target, so the ship
             // accelerates, flips at the right moment and brakes. Near the target it parks in a circular orbit.
             double standoff = Standoff(T);
-            D3 vDes;
+            D3 vDes, ff = D3.Zero;
             bool orbiting = dist < standoff * 1.25 && vrel.Mag < Math.Sqrt(T.GM / Math.Max(dist, 1)) * 2 + 0.5;
             if (!orbiting)
             {
@@ -313,6 +313,11 @@ namespace FogOfWar.OpenWorld
                     if (cruising) { Phase = "cruising"; return null; }
                 }
                 else cruising = false;
+                // On or above the braking curve, feed its own deceleration forward. A P-controller alone (tau up to
+                // 120 s at 30 s steps) trails a curve falling at 0.85·a by about 0.85·a·tau, ~1 km/s at 1 g, and the
+                // ship reaches the standoff too fast to stop: harmless around a planet it can orbit, but it flew
+                // through Phobos (11 km) on the career suite's arrival from behind Mars.
+                if (!capped && vb > 0 && D3.Dot(vrel, vDes.Norm) >= vb) ff = -vDes.Norm * (aMax * 0.85);
             }
             else
             {
@@ -326,7 +331,7 @@ namespace FogOfWar.OpenWorld
             if (hover) vDes = (-r).Norm * (-(dist - standoff) * 0.002);
             var err = vDes - vrel;
             // in orbit, gravity is what keeps us there; otherwise cancel it first, then steer with what is left
-            var cmd = orbiting && !hover ? err / tau : Budget(err / tau, gRel);
+            var cmd = orbiting && !hover ? err / tau : Budget(err / tau + ff, gRel);
             if (orbiting && !hover)
             {
                 // Parked when the orbit has the right shape: speed near circular, little radial motion, radius near the
