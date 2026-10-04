@@ -16,7 +16,7 @@ namespace FogOfWar
               "Throw something in, or drop a probe, from the Sandbox section below."
             : "Every pixel is a light ray traced back along a real Schwarzschild geodesic, so the far side of the disk is lifted over the top. The <color=#FFB547>photon ring</color> is light that circled the hole at 1.5 rs before it reached you, and the black shadow has a radius of 2.6 rs: its edge is light that only just escaped.\n\n" +
               "One side of the disk is much brighter because that gas comes at you at half the speed of light. Throw something in, or drop a probe, from the Sandbox section below.";
-        public override string Note => "Thin disk, Novikov–Thorne; no thickness, limb darkening or returning light. Disk swirl and gas spreading are sped up; exposure is lowered as spin raises the disk's peak brightness. The camera hovers with zero angular momentum unless it rides a probe.";
+        public override string Note => "Thin disk, Novikov–Thorne; no thickness, limb darkening or returning light. Disk swirl and gas spreading are sped up; exposure is lowered as spin raises the disk's peak brightness. The camera hovers with zero angular momentum unless it rides a probe. The hovering camera's tide is the Newtonian estimate, and with spin its clock and hover thrust use equatorial values; sandbox probes are followed along their own geodesics.";
 
         static readonly string[] MassNames = { "Stellar (10 solar masses)", "Sagittarius A* (4.3 million)", "M87* (6.5 billion)", "TON 618 (≈66 billion)" };
         static readonly double[] Masses = { 10, 4.3e6, 6.5e9, 6.6e10 };
@@ -132,11 +132,14 @@ namespace FogOfWar
             double tidal = 2 * Phys.G * M * 2 / (rm * rm * rm) / Phys.g;
             list.Add(new Readout("Camera", "hovers (ZAMO)"));
             list.Add(new Readout("Your distance", r.ToString("0.00") + " rs"));
-            list.Add(new Readout("Your clock vs far away", dil.ToString("0.0000") + "×", dil < 0.8 ? Tone.Hot : Tone.Normal));
+            // with spin, the lapse and hover thrust are the equatorial values at the camera's distance (#14)
+            string eq = a > 0.001 ? " (equator approx.)" : "";
+            list.Add(new Readout("Your clock vs far away" + eq, dil.ToString("0.0000") + "×", dil < 0.8 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("1 hour for you is", Fmt.Num(1 / System.Math.Max(dil, 1e-9), 3) + " h outside"));
             double hover = HoverAccel(2 * r, a) * Phys.c * Phys.c / Lunit / Phys.g;
-            list.Add(new Readout("Thrust to hover", Fmt.Num(hover) + " g", hover > 10 ? Tone.Bad : hover > 3 ? Tone.Hot : Tone.Normal));
-            list.Add(new Readout("Tidal stretch on a 2 m body", Fmt.Num(tidal) + " g", tidal > 10 ? Tone.Bad : Tone.Normal));
+            list.Add(new Readout("Thrust to hover" + eq, Fmt.Num(hover) + " g", hover > 10 ? Tone.Bad : hover > 3 ? Tone.Hot : Tone.Normal));
+            // Newtonian 2GM·L/r³ (#14); the ridden probe's tide (Sandbox) uses the geodesic formula instead
+            list.Add(new Readout("Tidal stretch, 2 m body (Newtonian)", Fmt.Num(tidal) + " g", tidal > 10 ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Verdict", tidal > 1e3 ? "spaghetti" : tidal > 10 ? "very bad day" : "survivable (for now)", tidal > 10 ? Tone.Bad : Tone.Normal));
             SandboxReadouts(list);
         }
