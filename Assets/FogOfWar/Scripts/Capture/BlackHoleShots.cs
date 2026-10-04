@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
         };
@@ -105,6 +105,12 @@ namespace FogOfWar
                 S("bh-wide",             new Vector3(-14f, 4.5f, 50f), 55, Default, look: new Vector3(-4f, 0, 0)),
                 S("bh-smooth-luminet",   new Vector3(0, 4.2f, 24f), 42, With(s => Set(s, "clumpy", false))),
                 S("bh-kerr-0.9",         new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "spin", 0.9f))),
+                // step 2: thick disc against the thin one, and the orbiting hot spot
+                S("bh-thin-edge",        new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "thinDisk", true))),
+                S("bh-thick-edge",       new Vector3(0, 0.9f, 24f), 42, Default),
+                S("bh-thick-low",        new Vector3(0, 0.35f, 16f), 50, Default),
+                S("bh-thin-low",         new Vector3(0, 0.35f, 16f), 50, With(s => Set(s, "thinDisk", true))),
+                S("bh-hotspot",          new Vector3(0, 3.5f, 22f), 42, With(s => Set(s, "hotSpot", true))),
                 S("bh-kerr-0.998",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "spin", 0.998f))),
                 S("bh-kerr-0.998-nodisk", new Vector3(0, 0.0f, 24f), 30, With(s => { Set(s, "spin", 0.998f); Set(s, "disk", false); })),
                 S("bh-schw-nodisk",      new Vector3(0, 0.0f, 24f), 30, With(s => Set(s, "disk", false))),

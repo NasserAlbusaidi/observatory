@@ -23,6 +23,10 @@ namespace FogOfWar
         int massIdx = 1, shownMassIdx = 1;
         float logMass = Mathf.Log10(4.3e6f);
         bool disk = true, doppler = true, lens = true, clumpy = true;
+        bool thinDisk;                 // A/B: the zero-thickness disc of step 1
+        bool hotSpot; float spotRs = 4f; // orbiting hot spot (GRAVITY 2018), radius in rs (8 M)
+        readonly List<float> spotCurve = new List<float>();   // the spot's share of the frame's light, one sample per frame
+        int spotSeen;
         float outer = 13, temp = 4800, spin;
         public void SetSpin(float a) => spin = Mathf.Clamp(a, 0, 0.998f); // tour
         float peakSpin = -1; (double r, double f) peak;
@@ -112,6 +116,13 @@ namespace FogOfWar
             mat.SetFloat("_Lens", lens ? 1 : 0);
             mat.SetFloat("_Outer", outer);
             mat.SetFloat("_Temp", temp);
+            // thick disc: H_rad = (3/2)(ṁ/η) M, with the Eddington ratio ṁ from the temperature slider
+            // (ṁ = 0.1 at 4800 K, ∝ T⁴ as the disc's flux) and η = 1 − E_isco
+            mat.SetFloat("_Thick", thinDisk ? 0 : 1);
+            mat.SetFloat("_Hrad", (float)(1.5 * EddRatio / Efficiency));
+            mat.SetFloat("_SpotOn", hotSpot ? 1 : 0);
+            mat.SetFloat("_SpotR", Mathf.Max(spotRs * 2, (float)Kerr.Isco(spin) * 1.02f));
+            mat.SetFloat("_SpotSigma", 0.6f);
             mat.SetInt("_Steps", App.Quality == 2 ? 1200 : 1000);   // 1500 put 4K Sharp over 16 ms (audit #61)
             // a tidal disruption flare with the steady disk off: the returning debris feeds a new thin disk out to the
             // circularisation radius 2 r_p; its accretion rate follows the flare luminosity (in Eddington units)
@@ -139,10 +150,18 @@ namespace FogOfWar
             var t = Cam.transform;
             int pose = Hash(t.position.x, t.position.y, t.position.z, t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w, Cam.fieldOfView);
             int param = Hash(spin, App.Quality, disk ? 1 : 0, doppler ? 1 : 0, lens ? 1 : 0, clumpy ? 1 : 0, outer, temp, logMass, guides ? 1 : 0,
-                Cam.pixelWidth, Cam.pixelHeight, riding != null ? 1 : 0, nParts, bodies.Count, probes.Count);
+                Cam.pixelWidth, Cam.pixelHeight, riding != null ? 1 : 0, nParts, bodies.Count, probes.Count, thinDisk ? 1 : 0, hotSpot ? 1 : 0, spotRs);
             bool running = Time.timeScale > 0 && !paused;
             bool dynamic = running && (nParts > 0 || bodies.Exists(b => b.state == 0) || probes.Exists(p => p.g.alive));
-            bool swirl = running && clumpy && (disk || nParts > 0);
+            bool swirl = running && ((clumpy && (disk || nParts > 0)) || hotSpot);
+            post.MeasureSpot = hotSpot;
+            if (!hotSpot) spotCurve.Clear();
+            else if (post.SpotSamples != spotSeen)
+            {
+                spotSeen = post.SpotSamples;
+                spotCurve.Add(post.SpotFlux);
+                if (spotCurve.Count > 400) spotCurve.RemoveAt(0);
+            }
             var j = post.Step(param, pose, dynamic, swirl);
             mat.SetVector("_Jitter", new Vector4(j.x * 2f / Mathf.Max(Cam.pixelWidth, 1), j.y * 2f / Mathf.Max(Cam.pixelHeight, 1), 0, 0));
         }
@@ -203,6 +222,11 @@ namespace FogOfWar
             return System.Math.Exp(-0.5 * t * t);
         }
 
+        // Eddington ratio of the steady disc from the temperature slider (flux ∝ T⁴), and the efficiency 1 − E_isco.
+        double EddRatio => 0.1 * System.Math.Pow(temp / 4800.0, 4);
+        double Efficiency { get { var g = Geo.Circular(Kerr.Isco(spin) * 1.0001, spin); return 1 - g.E; } }
+        double DiscH(double r) => 1.5 * EddRatio / Efficiency * System.Math.Max(1 - System.Math.Sqrt(Kerr.Isco(spin) / r), 0) + 0.01 * r;
+
         public override void Readouts(List<Readout> list)
         {
             double M = MassKg;
@@ -219,6 +243,13 @@ namespace FogOfWar
             list.Add(new Readout(a > 0.001 ? "Innermost stable orbit (with / against)" : "Innermost stable orbit",
                 a > 0.001 ? Rs(Kerr.Isco(a)) + " / " + Rs(Kerr.Isco(a, false)) : Rs(6)));
             list.Add(new Readout("Hottest ring of the disk", Rs(FluxPeak().r)));
+            if (!thinDisk) list.Add(new Readout("Disk height at 10 M", (DiscH(10) / 10 * 100).ToString("0.0") + " % of r (ṁ " + EddRatio.ToString("0.00") + " Edd)"));
+            if (hotSpot)
+            {
+                double rsM = System.Math.Max(spotRs * 2, Kerr.Isco(spin) * 1.02);
+                double P = 2 * System.Math.PI * (System.Math.Pow(rsM, 1.5) + spin);
+                list.Add(new Readout("Hot spot orbit", Fmt.Duration(P * Tunit) + " (on screen " + Fmt.Num(P / 15, 1) + " s)"));
+            }
             list.Add(new Readout("Light-crossing time GM/c³", Fmt.Duration(Tunit)));
             if (riding != null) { ProbeReadouts(list); return; }
             double dil = CamLapse(r, a);
@@ -273,6 +304,9 @@ namespace FogOfWar
             // what the straight-ray comparison keeps (#32)
             if (!lens) GUILayout.Label("Lensing off: light runs in straight lines, seen from flat space. Still on: a black sphere the size of the horizon, and the disk's own gravitational redshift.", ui.note);
             clumpy = ui.Toggle("Clumpy gas texture", clumpy);
+            thinDisk = ui.Toggle("Thin disk (no thickness)", thinDisk);
+            hotSpot = ui.Toggle("Orbiting hot spot", hotSpot);
+            if (hotSpot) spotRs = ui.Slider("Hot spot orbit", spotRs, (float)Kerr.Isco(spin) * 0.51f, 10, v => v.ToString("0.0") + " rs", 0.1f);
             outer = ui.Slider("Disk outer radius", outer, 6, 20, v => v.ToString("0.0") + " rs", 0.5f);
             temp = ui.Slider(spin > 0.001f ? "Accretion rate (as spin-0 peak temp.)" : "Peak disk temperature", temp, 2500, 20000, v => Fmt.Num(v, 0) + " K", 100);
             // camera exposure, not physics: from "see the dim side" (+) to "see the beaming" (−); not saved

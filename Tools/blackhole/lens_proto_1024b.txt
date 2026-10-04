@@ -1,0 +1,70 @@
+  spread = np.where(np.isnan(xr).all(0), 0, (np.nanmax(xr, 0) - np.nanmin(xr, 0)) / np.nanmin(np.abs(xr), 0))
+  pspread = np.where(np.isnan(xp).all(0), 0, np.nanmax(xp, 0) - np.nanmin(xp, 0))
+default view (spin 0, 24 rs, 42 deg, 1920x1080)
+  name: default
+  build_s: 115.5
+  fallback: 0.01115
+  fate_wrong: 0
+  count_wrong: 0
+  sky_err_px_median: 0.003685
+  sky_err_px_p99: 0.03243
+  hit_rel_err_median: 7.222e-06
+  hit_err_px_median: 0.01126
+  hit_err_px_p99: 2.812
+  hit_err_px_frac_over_0.5: 0.06323
+  shade_err_mean_pct: 0.05748
+  shade_err_p99_pct: 1.121
+  shade_err_frac_over_1pct: 0.01115
+  pixels_with_disc_crossing: 0.6983
+  q>=3: total_fallback: 0.1003
+  q>=3: shade_err_p99_pct: 0.09428
+  q>=3: shade_err_frac_over_1pct: 0.0002473
+  q>=3: hit_err_px_frac_over_0.5: 0.01344
+  q>=3: hit_err_px_p99: 0.6226
+  q>=10: total_fallback: 0.1839
+  q>=10: shade_err_p99_pct: 0.08376
+  q>=10: shade_err_frac_over_1pct: 0.0002809
+  q>=10: hit_err_px_frac_over_0.5: 0.001123
+  q>=10: hit_err_px_p99: 0.2312
+  hit_rel_err_p99: 0.007113
+  hit_dphi_err_p99: 0.001771
+  big_cond_median: 104.2
+  all_cond_median: 6.952
+  big_rel_err_median: 0.002016
+  big_dist_edge_px_median: 531.7
+  sky_bad_frac: 0.0006818
+  sky_bad_rho_from_edge_px_median: 297.3
+bh-kerr-0.998
+  name: kerr998
+  build_s: 215.4
+  fallback: 0.0117
+  fate_wrong: 0
+  count_wrong: 0
+  sky_err_px_median: 0.004351
+  sky_err_px_p99: 0.03391
+  hit_rel_err_median: 7.556e-06
+  hit_err_px_median: 0.01472
+  hit_err_px_p99: 2.86
+  hit_err_px_frac_over_0.5: 0.06518
+  shade_err_mean_pct: 0.06117
+  shade_err_p99_pct: 1.093
+  shade_err_frac_over_1pct: 0.01072
+  pixels_with_disc_crossing: 0.7032
+  q>=3: total_fallback: 0.101
+  q>=3: shade_err_p99_pct: 0.1195
+  q>=3: shade_err_frac_over_1pct: 0.0003279
+  q>=3: hit_err_px_frac_over_0.5: 0.01492
+  q>=3: hit_err_px_p99: 0.7417
+  q>=10: total_fallback: 0.1847
+  q>=10: shade_err_p99_pct: 0.1086
+  q>=10: shade_err_frac_over_1pct: 0.0003729
+  q>=10: hit_err_px_frac_over_0.5: 0.002983
+  q>=10: hit_err_px_p99: 0.3375
+  hit_rel_err_p99: 0.007181
+  hit_dphi_err_p99: 0.001821
+  big_cond_median: 112
+  all_cond_median: 7.013
+  big_rel_err_median: 0.001965
+  big_dist_edge_px_median: 541.5
+  sky_bad_frac: 0
+  sky_bad_rho_from_edge_px_median: 0

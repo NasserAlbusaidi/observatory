@@ -1,0 +1,28 @@
+default view (spin 0, 24 rs, 42 deg, 1920x1080)
+  name: default
+  build_s: 20.5
+  fallback: 0.02307
+  fate_wrong: 0
+  count_wrong: 0
+  sky_err_px_median: 0.01432
+  sky_err_px_p99: 0.1155
+  hit_rel_err_median: 2.794e-05
+  hit_err_px_median: 0.04461
+  hit_err_px_p99: 11.86
+  hit_err_px_frac_over_0.5: 0.1388
+  sky_bad_frac: 0.0005195
+  sky_bad_rho_from_edge_px_median: 306.9
+bh-kerr-0.998
+  name: kerr998
+  build_s: 40
+  fallback: 0.02316
+  fate_wrong: 0
+  count_wrong: 0
+  sky_err_px_median: 0.0173
+  sky_err_px_p99: 0.1212
+  hit_rel_err_median: 3.004e-05
+  hit_err_px_median: 0.05898
+  hit_err_px_p99: 12.11
+  hit_err_px_frac_over_0.5: 0.1638
+  sky_bad_frac: 0.0002749
+  sky_bad_rho_from_edge_px_median: 308.2

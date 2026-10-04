@@ -28,7 +28,11 @@ Shader "FogOfWar/BlackHole"
             float _Spin, _RH, _Isco, _FluxMax, _StepK, _RMax, _Exposure, _DebugFate;
             float _HDROut;                 // 1: write linear radiance for BHPost (glare, accumulation, tonemap); 0: tonemap here
             float2 _Jitter;
-            float _SkyGain;                // 1 / BHPost's default exposure: the sky keeps its pixel values at the default                // sub-pixel offset in NDC for temporal accumulation (0 in debug views)
+            float _SkyGain;
+            // thick disc (step 2): radiation-pressure scale height H_rad (M); 0 = the thin disc
+            float _Thick, _Hrad;
+            // orbiting hot spot: on, radius (M), Gaussian radius (M); its azimuth follows Ω at the disc's swirl clock
+            float _SpotOn, _SpotR, _SpotSigma;                // 1 / BHPost's default exposure: the sky keeps its pixel values at the default                // sub-pixel offset in NDC for temporal accumulation (0 in debug views)
             int _Steps;
             // camera, computed on the CPU in double precision: Boyer–Lindquist position, orthonormal triad (world space),
             // and the ZAMO metric functions there
@@ -140,6 +144,73 @@ Shader "FogOfWar/BlackHole"
                     dbgLum = dot(blackbody(T * g) * F * pow(g, 4.0) * densOld * 0.75 * _Gain * outerFade, 1.0);
                 }
                 return planckRGB(T * g) * F * pow(g, 4.0) * limb * dens * 0.75 * _Gain * outerFade;
+            }
+
+            // Disc gas at radius r seen by a photon with b, q, without the swirl texture: emission and the local temperature
+            // T (for the hot spot). Same physics as diskColor (Page–Thorne flux, exact g, Planck colour, limb darkening).
+            float3 gasColor(float r, float b, float q, float EF, float tScale, float fScale, out float T)
+            {
+                float a = _Spin;
+                float F = pageThorne(r, a) / _FluxMax;
+                float sr = sqrt(r);
+                float om = 1.0 / (r * sr + a);
+                float ut = (r * sr + a) / (sqrt(sr * r) * sqrt(max(r * sr - 3.0 * sr + 2.0 * a, 1e-5)));
+                float Eorb = ut * (1.0 - om * b);
+                float D = r * r - 2.0 * r + a * a;
+                float S2 = (r * r + a * a) * (r * r + a * a) - a * a * D;
+                float Ezamo = (1.0 - 2.0 * a * r / S2 * b) / sqrt(max(r * r * D / S2, 1e-8));
+                float Eem = _Doppler > 0.5 ? Eorb : Ezamo;
+                float g = EF / max(Eem, 1e-4);
+                T = _Temp * pow(F, 0.25);
+                float mu = saturate(sqrt(max(q, 0.0)) / (r * max(Eem, 1e-4)));
+                float limb = (1.0 + 2.06 * mu) / (1.0 + 2.06 * 0.5);
+                float outerFade = smoothstep(_Outer, _Outer * 0.7, r * 0.5);
+                return planckRGB(T * tScale * g) * F * fScale * pow(g, 4.0) * limb * 0.75 * _Gain * outerFade;
+            }
+
+            // Half-thickness of the disc at r (M): Shakura–Sunyaev radiation-pressure height, zero at the ISCO (the
+            // stress-free edge), plus a 1 % gas-pressure floor.
+            float discH(float r) { return _Hrad * max(1.0 - sqrt(_Isco / r), 0.0) + 0.01 * r; }
+
+            // The near half of the slab around an equator crossing, sampled at 4 points along the chord from where the
+            // ray enters the disc to the midplane: Gaussian density in z/H, optical depth 4 from surface to midplane
+            // (vertically), source = local Page–Thorne blackbody. Returns the light added; trans is reduced.
+            // v: the backward ray's direction there in the local frame (radial, vertical, azimuthal).
+            float3 slabColor(float rHit, float b, float q, float EF, float3 v, inout float trans)
+            {
+                float H = discH(rHit);
+                float sinI = max(abs(v.y), 1e-3);
+                float L = min(2.0 * H / sinI, 0.2 * rHit);           // full chord, clamped for grazing rays
+                float sig = 0.5 * H, kap = 4.0 / (sig * 1.2533);     // ∫ kap exp(−z²/2σ²) dz over z ≥ 0 = 4
+                float3 c = 0;
+                [unroll] for (int k = 3; k >= 0; k--)               // from the camera side towards the midplane
+                {
+                    float sk = -(k + 0.5) / 4.0 * 0.5 * L;            // behind the crossing on the backward ray
+                    float z = sk * v.y;
+                    float rk = rHit + sk * v.x;
+                    if (rk <= _Isco) continue;
+                    float dtau = kap * exp(-0.5 * z * z / (sig * sig)) * (0.125 * L);
+                    float Tk;
+                    float3 S = gasColor(rk, b, q, EF, 1.0, 1.0, Tk);
+                    float a = 1.0 - exp(-dtau);
+                    c += trans * S * a;
+                    trans *= 1.0 - a;
+                }
+                return c;
+            }
+
+            // The hot spot (GRAVITY 2018 Sgr A* flares): a Gaussian blob in the plane at _SpotR, moving at the
+            // Keplerian Ω (same swirl clock as the disc), 3× the local temperature (so 81× the flux). Returns light and
+            // its weight (the blob's own opacity when the disc is off).
+            float3 spotColor(float rHit, float phHit, float b, float q, float EF, out float w)
+            {
+                float a = _Spin;
+                float phs = (_SimTime * _SwirlRate) / (_SpotR * sqrt(_SpotR) + a);
+                float d2 = rHit * rHit + _SpotR * _SpotR - 2.0 * rHit * _SpotR * cos(phHit - phs);
+                w = exp(-0.5 * d2 / (_SpotSigma * _SpotSigma));
+                if (w < 1e-3) { w = 0; return 0; }
+                float T;
+                return gasColor(max(rHit, _Isco * 1.001), b, q, EF, 3.0, 81.0, T) * w;
             }
 
             // Debris gas from the sandbox at (r, ph); pr is the photon's p_r there.
@@ -313,7 +384,7 @@ Shader "FogOfWar/BlackHole"
                 float3 pPrev = 0;
 
                 float3 col = 0;
-                float trans = 1.0, crossings = 0.0, firstHit = 0.0, firstG = 0.0; int stepsUsed = 0;
+                float trans = 1.0, crossings = 0.0, firstHit = 0.0, firstG = 0.0, spotLum = 0.0; int stepsUsed = 0;
                 bool escaped = false;
                 // A ray that can fall in has R > 0 all the way down to the horizon. If R(rCap) < 0 it has a turning
                 // point outside, and a step that lands inside rCap overshot it: retry that step smaller (QA-034).
@@ -388,6 +459,22 @@ Shader "FogOfWar/BlackHole"
                                 col += trans * c;
                                 trans *= 1.0 - al;
                             }
+                            // thick disc: the near half of the slab first (it can hide the far side's inner rim)
+                            if (_Disk > 0.5 && _Thick > 0.5 && rHit > _Isco && rHit * 0.5 < _Outer)
+                            {
+                                float thd = lerp(s.w, sn.w, t), rpd = lerp(s.y, sn.y, t), phd = (phn - ph) / max(h, 1e-9);
+                                float Dv = max(rHit * rHit - 2.0 * rHit + a * a, 1e-4);
+                                float3 v = normalize(float3(rHit * rpd / sqrt(Dv), rHit * thd, rHit * phd));
+                                col += slabColor(rHit, b, q, EF, v, trans);
+                            }
+                            if (_SpotOn > 0.5)
+                            {
+                                float w;
+                                float3 c = spotColor(rHit, phHit, b, q, EF, w);
+                                col += trans * c;
+                                spotLum += trans * dot(c, float3(0.2126, 0.7152, 0.0722));
+                                if (_Disk < 0.5) trans *= 1.0 - w;
+                            }
                             if (_Disk > 0.5 && rHit > _Isco && rHit * 0.5 < _Outer)
                             {
                                 float al;
@@ -439,7 +526,8 @@ Shader "FogOfWar/BlackHole"
                 if (_DebugFate > 1.5) return float4(firstHit / (_Isco * 4.0), saturate(firstG), 0, 1);
                 if (_DebugFate > 0.5)
                     return trans < 0.01 ? float4(1, 1, 1, 1) : float4(s.x < rCap ? 1 : 0, escaped ? 1 : 0, stepsUsed >= _Steps - 1 ? 1 : 0, 1);
-                if (_HDROut > 0.5) return float4(col * _Exposure, 1.0);
+                // alpha carries the hot spot's share of this pixel's luminance, for its light curve (BHPost reads it)
+                if (_HDROut > 0.5) return float4(col * _Exposure, spotLum * _Exposure);
                 return float4(tonemap(col * _Exposure), 1.0);
             }
             ENDCG

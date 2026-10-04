@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace FogOfWar
 {
@@ -28,6 +29,14 @@ namespace FogOfWar
         // Number of frames accumulated in the current history, and the format the camera hands over (shots driver).
         public int Accumulated => n;
         public RenderTextureFormat SourceFormat { get; private set; }
+
+        // Hot spot light curve: the ray tracer writes the spot's luminance into alpha; when MeasureSpot is set, the
+        // frame's mean alpha comes back asynchronously (a mip chain's 1×1 level) into SpotFlux, SpotSamples counts them.
+        public bool MeasureSpot;
+        public float SpotFlux { get; private set; }
+        public int SpotSamples { get; private set; }
+        RenderTexture spotRT;
+        bool spotPending;
 
         // Called once per frame before rendering. paramHash covers anything that changes the image (spin, quality,
         // toggles, sliders): a change restarts the accumulation. poseHash covers the camera: a change keeps the history
@@ -82,6 +91,25 @@ namespace FogOfWar
             }
             Decide();
 
+            if (MeasureSpot && !spotPending && SystemInfo.supportsAsyncGPUReadback)
+            {
+                if (spotRT == null)
+                {
+                    spotRT = new RenderTexture(256, 256, 0, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear)
+                    { useMipMap = true, autoGenerateMips = true, hideFlags = HideFlags.DontSave };
+                    spotRT.Create();
+                }
+                Graphics.Blit(src, spotRT);
+                spotPending = true;
+                AsyncGPUReadback.Request(spotRT, 8, TextureFormat.RGBAFloat, r =>
+                {
+                    spotPending = false;
+                    if (r.hasError) return;
+                    SpotFlux = r.GetData<Color>()[0].a;
+                    SpotSamples++;
+                });
+            }
+
             // accumulate into histB from (src, histA), then swap
             mat.SetTexture("_HistTex", histA);
             mat.SetFloat("_Alpha", alpha);
@@ -131,8 +159,8 @@ namespace FogOfWar
 
         void Release()
         {
-            foreach (var rt in new[] { histA, histB, coreRT }) if (rt != null) { rt.Release(); Destroy(rt); }
-            histA = histB = coreRT = null;
+            foreach (var rt in new[] { histA, histB, coreRT, spotRT }) if (rt != null) { rt.Release(); Destroy(rt); }
+            histA = histB = coreRT = spotRT = null;
         }
 
         void OnDisable() { fresh = true; pendingReset = true; }

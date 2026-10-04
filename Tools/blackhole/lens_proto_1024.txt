@@ -1,0 +1,41 @@
+  inside = rho < rc
+default view (spin 0, 24 rs, 42 deg, 1920x1080)
+  name: default
+  build_s: 146
+  fallback: 0.01115
+  fate_wrong: 0
+  count_wrong: 0
+  sky_err_px_median: 0.003685
+  sky_err_px_p99: 0.03243
+  hit_rel_err_median: 7.222e-06
+  hit_err_px_median: 0.01126
+  hit_err_px_p99: 2.812
+  hit_err_px_frac_over_0.5: 0.06323
+  hit_rel_err_p99: 0.007113
+  hit_dphi_err_p99: 0.001771
+  big_cond_median: 104.2
+  all_cond_median: 6.952
+  big_rel_err_median: 0.002016
+  big_dist_edge_px_median: 531.7
+  sky_bad_frac: 0.0006818
+  sky_bad_rho_from_edge_px_median: 297.3
+bh-kerr-0.998
+  name: kerr998
+  build_s: 230.9
+  fallback: 0.0117
+  fate_wrong: 0
+  count_wrong: 0
+  sky_err_px_median: 0.004351
+  sky_err_px_p99: 0.03391
+  hit_rel_err_median: 7.556e-06
+  hit_err_px_median: 0.01472
+  hit_err_px_p99: 2.86
+  hit_err_px_frac_over_0.5: 0.06518
+  hit_rel_err_p99: 0.007181
+  hit_dphi_err_p99: 0.001821
+  big_cond_median: 112
+  all_cond_median: 7.013
+  big_rel_err_median: 0.001965
+  big_dist_edge_px_median: 541.5
+  sky_bad_frac: 0
+  sky_bad_rho_from_edge_px_median: 0

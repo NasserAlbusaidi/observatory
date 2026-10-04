@@ -61,6 +61,41 @@ namespace FogOfWar
             clip2.Add(curvePlot);
             curveBox.Add(clip2);
             curveLabel = Ui.L(curveBox, "", "t-label", "f-mono");
+
+            spotBox = Ui.Panel(col, "Hot spot", "Light curve");
+            spotBox.pickingMode = PickingMode.Ignore;
+            spotBox.style.marginLeft = 10; spotBox.style.width = 300;
+            spotPlot = new VisualElement { pickingMode = PickingMode.Ignore };
+            spotPlot.style.height = 80;
+            spotPlot.generateVisualContent += DrawSpot;
+            var clip3 = new VisualElement { pickingMode = PickingMode.Ignore };
+            clip3.style.overflow = Overflow.Hidden;
+            clip3.Add(spotPlot);
+            spotBox.Add(clip3);
+            spotLabel = Ui.L(spotBox, "", "t-label", "f-mono");
+            spotLabel.style.whiteSpace = WhiteSpace.Normal;
+        }
+
+        VisualElement spotBox, spotPlot;
+        Label spotLabel;
+
+        // Total light from the spot per frame, normalised to its own peak: one beaming peak per orbit, weaker lensed bumps.
+        void DrawSpot(MeshGenerationContext mgc)
+        {
+            var rect = spotPlot.contentRect;
+            float w = rect.width, h = rect.height;
+            if (spotCurve.Count < 2 || w < 10) return;
+            float max = 1e-9f;
+            foreach (var v in spotCurve) max = Mathf.Max(max, v);
+            var pt = mgc.painter2D;
+            pt.strokeColor = CPhoton; pt.lineWidth = 1.5f;
+            pt.BeginPath();
+            for (int i = 0; i < spotCurve.Count; i++)
+            {
+                var q = new Vector2(i / (float)(spotCurve.Count - 1) * w, h - 2 - spotCurve[i] / max * (h - 4));
+                if (i == 0) pt.MoveTo(q); else pt.LineTo(q);
+            }
+            pt.Stroke();
         }
 
         static void Key(VisualElement parent, Color c, string text)
@@ -85,6 +120,14 @@ namespace FogOfWar
             mapR = want > mapR * 1.5 || want < mapR / 1.5 ? want : mapR + (want - mapR) * 0.08;
             Ui.Text(mapScale, $"edge {Fmt.Num(mapR / 2, 0)} rs · flat, not lensed");
             mapPlot.MarkDirtyRepaint();
+            Ui.Show(spotBox, hotSpot && spotCurve.Count > 1);
+            if (hotSpot && spotCurve.Count > 1)
+            {
+                float mx = 0, mn = float.MaxValue;
+                foreach (var v in spotCurve) { mx = Mathf.Max(mx, v); mn = Mathf.Min(mn, v); }
+                Ui.Text(spotLabel, $"peak / dip ×{(mn > 0 ? mx / mn : 0):0.0}  (beaming, once per orbit)");
+                spotPlot.MarkDirtyRepaint();
+            }
             bool curve = lightCurve.Count > 1 && lum > 1e-4;   // not an empty plot while the debris is still out (audit #57)
             Ui.Show(curveBox, curve);
             if (curve)
