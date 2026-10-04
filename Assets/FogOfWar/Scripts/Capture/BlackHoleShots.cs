@@ -519,7 +519,8 @@ namespace FogOfWar
                         for (int k = 0; k < N; k++) bt.RebuildLens();
                         ReadOne(trt, small);
                         log.WriteLine($"timing lens table rebuild ({BlackHoleScene.LensN}², quality {q}): {(Time.realtimeSinceStartup - t2) * 1000 / N:0.0} ms");
-                        // cost split of the table path, still camera: samples per pixel, and fallback pixels traced or black
+                        // cost split of the table path, still camera: adaptive (2, or 8 at edges) or 1 sample per pixel, and
+                        // fallback pixels traced or black
                         foreach (var (spp, noTrace) in new[] { (8f, false), (8f, true), (1f, true), (1f, false) })
                         {
                             Set(bt, "lensSpp", spp); Set(bt, "lensNoTrace", noTrace);
@@ -528,7 +529,7 @@ namespace FogOfWar
                             float t4 = Time.realtimeSinceStartup;
                             for (int k = 0; k < N; k++) cam.Render();
                             ReadOne(trt, small);
-                            log.WriteLine($"timing {res.x}x{res.y} quality {q}, lens table {spp:0} spp, fallback {(noTrace ? "black (not traced)" : "traced")}: {(Time.realtimeSinceStartup - t4) * 1000 / N:0.0} ms per frame");
+                            log.WriteLine($"timing {res.x}x{res.y} quality {q}, lens table {(spp > 1 ? "adaptive 2/8" : "1")} spp, fallback {(noTrace ? "black (not traced)" : "traced")}: {(Time.realtimeSinceStartup - t4) * 1000 / N:0.0} ms per frame");
                         }
                         Set(bt, "lensSpp", 8f); Set(bt, "lensNoTrace", false);
                         var p0 = new Vector3(0, 0.9f, 24f);
