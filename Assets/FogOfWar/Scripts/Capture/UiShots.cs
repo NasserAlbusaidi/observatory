@@ -100,6 +100,22 @@ namespace FogOfWar
                     lookPitch.SetValue(os, 22f);
                     yield return Wait(0.3f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06g-cockpit-look-down");
+                    // the nearest surfaces: couch wing, armrest and side console (issue #4)
+                    var lookYaw = typeof(OpenSystemScene).GetField("lookYaw", BindingFlags.Instance | BindingFlags.NonPublic);
+                    lookPitch.SetValue(os, 30f); lookYaw.SetValue(os, -55f);
+                    yield return Wait(0.3f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06i-cockpit-look-left");
+                    lookPitch.SetValue(os, 10f); lookYaw.SetValue(os, 0f);
+                    // the darker condition: red lighting under a 3 g burn
+                    var shipF = (OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(os);
+                    double g0 = shipF.MaxG;
+                    shipF.MaxG = 3;
+                    Controls.Tap(Controls.Action.ThrottleFull);
+                    yield return Wait(1.5f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06j-cockpit-burn-3g");
+                    Controls.Tap(Controls.Action.ThrottleCut);
+                    shipF.MaxG = g0;
+                    yield return Wait(1.0f);
                     // QA-050: photo mode from the cockpit starts outside the hull and the free camera moves
                     lookPitch.SetValue(os, 0f);
                     Capture.TogglePhoto();
