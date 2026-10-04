@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using FogOfWar.Cockpit;
 using FogOfWar.OpenWorld;
+using FogOfWar.UI;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -66,6 +67,8 @@ namespace FogOfWar
         {
             if (cockpit == null || !cockpit.Visible) return at;
             var c = new Vector2(hudShell.HudWidth / 2, hudShell.H / 2);
+            // looking at the cabin wall, not even the screen centre is on the display: no chevron at all
+            if (!CockpitShows(HudToScreen(c))) { Ui.Show(mkEdge, false); return at; }
             bool moved = false;
             for (int i = 0; i < 24 && !CockpitShows(HudToScreen(at)); i++) { at = c + (at - c) * 0.9f; moved = true; }
             // a little margin, so the chevron and its name stay clear of the bezel
