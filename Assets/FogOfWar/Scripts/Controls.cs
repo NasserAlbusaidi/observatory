@@ -15,7 +15,7 @@ namespace FogOfWar
             ThrottleUp, ThrottleDown, ThrottleFull, ThrottleCut,
             RcsForward, RcsBack, RcsUp, RcsDown, RcsLeft, RcsRight,
             FlightAssist, Flip, Engage, NextTarget, WarpUp, WarpDown, Map, CameraMode, Help, QuickSave,
-            Screenshot, PhotoMode, RecordClip, Floodlights,
+            Screenshot, PhotoMode, RecordClip, Floodlights, VelocityRef,
         }
 
         public static readonly Dictionary<Action, string> Label = new Dictionary<Action, string>
@@ -30,6 +30,7 @@ namespace FogOfWar
             [Action.Map] = "System map", [Action.CameraMode] = "Camera: chase / orbit / cockpit", [Action.Help] = "Show controls", [Action.QuickSave] = "Quick save",
             [Action.Screenshot] = "Screenshot", [Action.PhotoMode] = "Photo mode", [Action.RecordClip] = "Record a clip",
             [Action.Floodlights] = "Hull floodlights on/off",
+            [Action.VelocityRef] = "Velocity reference: orbit / target",
         };
 
         static readonly Dictionary<Action, (KeyCode, KeyCode)> Defaults = new Dictionary<Action, (KeyCode, KeyCode)>
@@ -49,6 +50,7 @@ namespace FogOfWar
             [Action.Help] = (KeyCode.F1, KeyCode.None), [Action.QuickSave] = (KeyCode.F5, KeyCode.None),
             [Action.Screenshot] = (KeyCode.F12, KeyCode.None), [Action.PhotoMode] = (KeyCode.F10, KeyCode.None), [Action.RecordClip] = (KeyCode.F9, KeyCode.None),
             [Action.Floodlights] = (KeyCode.G, KeyCode.None),
+            [Action.VelocityRef] = (KeyCode.B, KeyCode.None),
         };
 
         static readonly Dictionary<Action, KeyCode[]> bind = new Dictionary<Action, KeyCode[]>();

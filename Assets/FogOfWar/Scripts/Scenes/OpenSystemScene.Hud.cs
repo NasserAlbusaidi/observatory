@@ -41,6 +41,7 @@ namespace FogOfWar
         Label stDate, stWarp, stNear, stSun, stLimited;
         VisualElement tcIcon, mkIcon;
         Label tcName, tcSub, tcDist, tcRel, tcClose, tcBrach, tcNav, tcEngage, tcNoTarget;
+        Label tcDrift, tcStop, tcStopNote;
         Label spdVal, spdRef, drvVal, drvSub, dvVal, rotVal, mkTgtName, mkTgtDist, mkEdgeName, consoleToggle;
         VisualElement thrFill, thrCmd, pills;
         Label pAssist, pHold, pNav, pCam, pLimited, pEphem, pJet, pLanded;
@@ -338,6 +339,10 @@ namespace FogOfWar
             tcDist = Ui.KV(tcBody, "Distance").value;
             tcRel = Ui.KV(tcBody, "Relative speed").value;
             tcClose = Ui.KV(tcBody, "Closing").value;
+            // #27: the approach aid. Sideways drift is what a straight-in brake leaves over; Stop is a flip-and-burn
+            tcDrift = Ui.KV(tcBody, "Sideways drift").value;
+            tcStop = Ui.KV(tcBody, "Stop").value;
+            tcStopNote = Ui.L(tcBody, "", "t-note");
             Ui.E(tcBody, "rule");
             tcBrach = Ui.L(tcBody, "", "t-note", "f-mono");
             var nrow = Ui.E(tcBody, "row");
@@ -410,6 +415,7 @@ namespace FogOfWar
             Ui.B(row, "Flip 180°  " + UiShell.Keys(A.Flip), Flip);
             Ui.B(row, "Kill rotation", () => { ship.AngVel = Vector3.zero; ship.Hold = Hold.Off; });
             Ui.Section(c, "Attitude hold  (keys 1–9)");
+            Ui.B(c, "Velocity reference: orbit / target  " + UiShell.Keys(A.VelocityRef), ToggleVelRef, "small");
             var grid = Ui.E(c, "row", "wrap");
             for (int i = 0; i < 9; i++)
             {
@@ -588,6 +594,14 @@ namespace FogOfWar
                 Ui.Text(tcRel, Fmt.Num(vr.Mag, 3) + " km/s");
                 Ui.Text(tcClose, (closing >= 0 ? "+" : "") + Fmt.Num(closing, 3) + " km/s");
                 Ui.SetClass(tcClose, "cold", closing > 0);
+                double drift = (vr - r.Norm * closing).Mag;
+                Ui.Text(tcDrift, Spd(drift));
+                StopEstimate(vr, out var aStop, out var tStop, out var dStop, out var by);
+                double room = r.Mag - t.Radius;
+                bool late = closing > 0 && dStop > room;
+                Ui.Text(tcStop, aStop > 0 ? Dur(tStop) + "  ·  " + Km(dStop) + (late ? "  TOO FAST" : "") : "can't");
+                Ui.SetClass(tcStop, "warn", late);
+                Ui.Text(tcStopNote, $"Relative to {t.Name}. Stop: flip now, {by}, no gravity. Speed and holds measure against {VelRefBody.Name} ({UiShell.Keys(A.VelocityRef)} switches).");
                 double d = Math.Max(r.Mag - Ship.Standoff(t), 0);
                 Ui.Text(tcBrach, $"{Fmt.Num(ship.MaxG, 1)} g brachistochrone: {Dur(2 * Math.Sqrt(d / ship.AMax))}\nΔv {Fmt.Num(2 * Math.Sqrt(d * ship.AMax), 0)} km/s · peak {Fmt.Num(Math.Sqrt(d * ship.AMax), 0)} km/s");
                 Ui.Text(tcNav, ship.PlanActive ? "NAV  " + ship.Phase.ToUpperInvariant() : "NAV IDLE");
@@ -597,9 +611,9 @@ namespace FogOfWar
             }
 
             // flight cluster
-            var vRef = (ship.Vel - sys.Vel(reference, jd)).Mag;
+            var vRef = (ship.Vel - sys.Vel(VelRefBody, jd)).Mag;
             Ui.Text(spdVal, Fmt.Num(vRef, vRef < 10 ? 3 : 1));
-            Ui.Text(spdRef, "KM/S VS " + reference.Name.ToUpperInvariant());
+            Ui.Text(spdRef, "KM/S VS " + VelRefBody.Name.ToUpperInvariant());
             Ui.Text(drvVal, Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g");
             Ui.SetClass(drvVal, "accent", ship.Throttle > 0);
             Ui.SetClass(drvVal, "glow", ship.Throttle > 0);
@@ -613,7 +627,7 @@ namespace FogOfWar
             UpdateCareerStrip();
             UpdateLessonCard();
             SetPill(pAssist, "ASSIST " + (ship.FlightAssist ? "ON" : "OFF"), ship.FlightAssist ? "ok" : "bad");
-            SetPill(pHold, "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant(), ship.Hold != Hold.Off ? "cold" : null);
+            SetPill(pHold, "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant() + (ship.VelRef != null ? " VS " + ship.VelRef.Name.ToUpperInvariant() : ""), ship.Hold != Hold.Off ? "cold" : null);
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : "NAV IDLE", ship.PlanActive ? "hot" : null);
             SetPill(pCam, "CAM " + (pivot == Pivot.Ship ? camMode.ToString() : pivot == Pivot.Sun ? "MAP" : "TARGET").ToUpperInvariant(), null);
             SetPill(pLanded, ship.Landed != null ? "LANDED " + ship.Landed.Name.ToUpperInvariant() : null, "ok");

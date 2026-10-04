@@ -1,3 +1,4 @@
+using System;
 using FogOfWar.OpenWorld;
 using UnityEngine;
 using A = FogOfWar.Controls.Action;
@@ -9,7 +10,12 @@ namespace FogOfWar
     // first job (medical supplies to Luna) flown by the autopilot. Skippable; it ends when the first job is done.
     public partial class OpenSystemScene
     {
-        enum Lesson { Turn, Assist, Burn, Hold, Target, Engage, Warp, Arrive, Done }
+        // New lessons go after Done so saved step numbers keep their meaning; Flow gives the order they are taught in.
+        enum Lesson { Turn, Assist, Burn, Hold, Target, Engage, Warp, Arrive, Done, Beacon, RefSwitch, Brake, Creep }
+        static readonly Lesson[] Flow = { Lesson.Turn, Lesson.Assist, Lesson.Burn, Lesson.Hold, Lesson.Beacon, Lesson.RefSwitch, Lesson.Brake, Lesson.Creep,
+            Lesson.Target, Lesson.Engage, Lesson.Warp };
+        static string Step(Lesson l) => $"({Array.IndexOf(Flow, l) + 1}/{Flow.Length})";
+        static bool Practice(Lesson l) => l >= Lesson.Beacon;
         Lesson lesson = Lesson.Done;
         bool turned, burned;
 
@@ -21,14 +27,16 @@ namespace FogOfWar
         void ResumeTutorial()
         {
             int step = career.TutorialStep;
-            lesson = step > 0 && step <= (int)Lesson.Done && !career.Sandbox ? (Lesson)(step - 1) : Lesson.Done;
+            lesson = step > 0 && Enum.IsDefined(typeof(Lesson), step - 1) && !career.Sandbox ? (Lesson)(step - 1) : Lesson.Done;
             turned = burned = false;
+            // the beacon isn't saved: a practice picks up from its start with a new one ahead of the ship
+            if (Practice(lesson)) { lesson = Lesson.Beacon; SpawnBeacon(); }
             if (lesson == Lesson.Done) TutorialText = null;
         }
 
         void TickTutorial()
         {
-            if (lesson == Lesson.Done || career.Sandbox || career.Active.Find(x => x.Tutorial) == null) { lesson = Lesson.Done; TutorialText = null; career.TutorialStep = 0; return; }
+            if (lesson == Lesson.Done || career.Sandbox || career.Active.Find(x => x.Tutorial) == null) { EndPractice(); lesson = Lesson.Done; TutorialText = null; career.TutorialStep = 0; return; }
             switch (lesson)
             {
                 case Lesson.Turn:
@@ -43,7 +51,26 @@ namespace FogOfWar
                     if (burned && ship.ThrottleCmd == 0) lesson = Lesson.Hold;
                     break;
                 case Lesson.Hold:
-                    if (ship.Hold == Hold.Prograde) lesson = Lesson.Target;
+                    if (ship.Hold == Hold.Prograde) { lesson = Lesson.Beacon; SpawnBeacon(); }
+                    break;
+                // #27: a short manual approach to a beacon on the ship's own orbit, before the autopilot does it for real
+                case Lesson.Beacon:
+                    if (beacon == null) SpawnBeacon();
+                    if (ship.Target != beacon) ship.Target = beacon;
+                    if (BeaconClosing() >= 0.02 && ship.ThrottleCmd == 0 && ship.Throttle == 0) lesson = Lesson.RefSwitch;
+                    break;
+                case Lesson.RefSwitch:
+                    if (ship.VelRef == beacon) lesson = Lesson.Brake;
+                    break;
+                case Lesson.Brake:
+                    if (BeaconRel().Mag < 0.002 && ship.Throttle == 0) lesson = Lesson.Creep;
+                    break;
+                case Lesson.Creep:
+                    if ((sys.Pos(beacon, jd) - ship.Pos).Mag < 0.5 && BeaconRel().Mag < 0.002 && ship.RcsInput.sqrMagnitude == 0)
+                    {
+                        EndPractice();
+                        lesson = Lesson.Target;
+                    }
                     break;
                 case Lesson.Target:
                     if (ship.Target == sys.Moon) lesson = Lesson.Engage;
@@ -64,24 +91,65 @@ namespace FogOfWar
             switch (l)
             {
                 case Lesson.Turn:
-                    return $"First flight (1/7). Turn the ship: {Ctl.Keys(A.PitchUp)} / {Ctl.Keys(A.PitchDown)} pitch, {Ctl.Keys(A.YawLeft)} / {Ctl.Keys(A.YawRight)} yaw, {Ctl.Keys(A.RollLeft)} / {Ctl.Keys(A.RollRight)} roll. Drag the mouse to look around.";
+                    return $"First flight {Step(Lesson.Turn)}. Turn the ship: {Ctl.Keys(A.PitchUp)} / {Ctl.Keys(A.PitchDown)} pitch, {Ctl.Keys(A.YawLeft)} / {Ctl.Keys(A.YawRight)} yaw, {Ctl.Keys(A.RollLeft)} / {Ctl.Keys(A.RollRight)} roll. Drag the mouse to look around.";
                 case Lesson.Assist:
-                    return "(2/7) Let go. Flight assist uses the reaction wheels to stop the rotation; they run on power, so turning costs no reaction mass. With assist off, the ship keeps turning, as Newton says.";
+                    return $"{Step(Lesson.Assist)} Let go. Flight assist uses the reaction wheels to stop the rotation; they run on power, so turning costs no reaction mass. With assist off, the ship keeps turning, as Newton says.";
                 case Lesson.Burn:
-                    return $"(3/7) A short burn: {Ctl.Keys(A.ThrottleFull)} for full throttle, then {Ctl.Keys(A.ThrottleCut)} to cut it. At 1 g you gain 9.8 m/s every second, and every second costs reaction mass.";
+                    return $"{Step(Lesson.Burn)} A short burn: {Ctl.Keys(A.ThrottleFull)} for full throttle, then {Ctl.Keys(A.ThrottleCut)} to cut it. At 1 g you gain 9.8 m/s every second, and every second costs reaction mass.";
                 case Lesson.Hold:
-                    return "(4/7) Press 2 to hold prograde: the nose follows your velocity. Keys 1–9 pick the other holds; 1 turns the hold off.";
+                    return $"{Step(Lesson.Hold)} Press 2 to hold prograde: the nose follows your velocity. Keys 1–9 pick the other holds; 1 turns the hold off.";
                 case Lesson.Target:
-                    return $"(5/7) Your first job: medical supplies to Luna. Set the Moon as the target: press {Ctl.Keys(A.NextTarget)} until it shows, click its label, or use Set target in the panel.";
+                    return $"{Step(Lesson.Target)} Your first job: medical supplies to Luna. Set the Moon as the target: press {Ctl.Keys(A.NextTarget)} until it shows, click its label, or use Set target in the panel.";
                 case Lesson.Engage:
-                    return $"(6/7) Check the trip planner for time and reaction mass, then press {Ctl.Keys(A.Engage)}. The autopilot burns, flips at the midpoint and brakes.";
+                    return $"{Step(Lesson.Engage)} Check the trip planner for time and reaction mass, then press {Ctl.Keys(A.Engage)}. The autopilot burns, flips at the midpoint and brakes.";
                 case Lesson.Warp:
-                    return $"(7/7) Speed up time with {Ctl.Keys(A.WarpUp)} (try 1k×). Time compression saves your patience, not game days: deadlines run on the game clock.";
+                    return $"{Step(Lesson.Warp)} Speed up time with {Ctl.Keys(A.WarpUp)} (try 1k×). Time compression saves your patience, not game days: deadlines run on the game clock.";
+                case Lesson.Beacon:
+                    return $"{Step(l)} Practice first: a beacon sits 5 km ahead of you on your own orbit, and it is your target now. Press 8 to hold Target, and once the nose is on it give a short burn, until the target card's Closing reads 20 m/s or more. Then cut ({Ctl.Keys(A.ThrottleCut)}).";
+                case Lesson.RefSwitch:
+                    return $"{Step(l)} You are moving relative to two things now: Earth (your orbit, kilometres a second) and the beacon (a few metres a second). Press {Ctl.Keys(A.VelocityRef)} to measure against the beacon: the speed readout, prograde and retrograde then use it.";
+                case Lesson.Brake:
+                    return $"{Step(l)} Brake: press 3 to hold retrograde, against your motion relative to the beacon. When the nose has come round, burn. The card's Stop row says how long and how far a full burn takes; cut when you are under 2 m/s.";
+                case Lesson.Creep:
+                    return $"{Step(l)} Finish on RCS, which pushes without turning: {Ctl.Keys(A.RcsForward)}/{Ctl.Keys(A.RcsBack)} fore-aft, {Ctl.Keys(A.RcsLeft)}/{Ctl.Keys(A.RcsRight)} sideways, {Ctl.Keys(A.RcsUp)}/{Ctl.Keys(A.RcsDown)} up-down. Close to within 500 m and stop (under 2 m/s). Time compression ({Ctl.Keys(A.WarpUp)}) helps while you coast.";
                 case Lesson.Arrive:
                     return "The autopilot parks you in orbit. In orbit at a port you are docked, and the job pays.";
             }
             return null;
         }
+
+        // ---- the practice beacon: a massless marker coasting on the ship's own orbit, 5 km ahead (not saved)
+        Body beacon;
+        const string BeaconName = "Practice beacon";
+
+        void SpawnBeacon()
+        {
+            EndPractice();
+            var dom = Ship.Dominant(sys, ship.Pos, jd);
+            double jd0 = jd, mu = dom.GM;
+            var r = ship.Pos - sys.Pos(dom, jd); var v = ship.Vel - sys.Vel(dom, jd);
+            Rails.Propagate(r, v, mu, 5.0 / Math.Max(v.Mag, 1e-3), out var r0, out var v0);
+            beacon = new Body
+            {
+                Name = BeaconName, Parent = dom, GM = 0, Radius = 0.01, Look = Look.Rocky,
+                ColA = new Color(1f, 0.71f, 0.28f), ColB = new Color(1f, 0.85f, 0.5f),
+                Path = j => { Rails.Propagate(r0, v0, mu, (j - jd0) * 86400, out var p, out _); return sys.Pos(dom, j) + p; },
+            };
+            sys.Bodies.Add(beacon);
+            ship.Target = beacon;
+        }
+
+        void EndPractice()
+        {
+            if (beacon == null) return;
+            sys.Bodies.Remove(beacon);
+            if (ship.Target == beacon) ship.Target = null;
+            if (ship.VelRef == beacon) ship.VelRef = null;
+            beacon = null;
+        }
+
+        D3 BeaconRel() => beacon == null ? D3.Zero : ship.Vel - sys.Vel(beacon, jd);
+        double BeaconClosing() => beacon == null ? 0 : D3.Dot(BeaconRel(), (sys.Pos(beacon, jd) - ship.Pos).Norm);
 
         GUIStyle lessonStyle;
 

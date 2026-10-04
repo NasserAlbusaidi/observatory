@@ -33,6 +33,7 @@ namespace FogOfWar
             if (Ctl.Pressed(A.FlightAssist)) ship.FlightAssist = !ship.FlightAssist;
             if (Ctl.Pressed(A.Floodlights) && lighting != null) lighting.Floods = !lighting.Floods;
             if (Ctl.Pressed(A.Flip)) Flip();
+            if (Ctl.Pressed(A.VelocityRef)) ToggleVelRef();
             if (Ctl.Pressed(A.Engage)) TogglePlan();
             if (Ctl.Pressed(A.NextTarget)) NextTarget();
             if (Ctl.Pressed(A.WarpUp)) warpIdx = Math.Min(Warps.Length - 1, warpIdx + 1);
@@ -71,6 +72,25 @@ namespace FogOfWar
         void Flip() { ship.Plan = Plan.None; ship.CustomDir = -ship.Heading; ship.Hold = Hold.Custom; }
 
         void SetHold(Hold h) { ship.Hold = h; if (h != Hold.Off) ship.Plan = Plan.None; }
+
+        // #27: velocity holds, the speed readout and the approach aid measure against the orbit (the dominant body) or
+        // the target. Switching needs a target; losing the target falls back to the orbit.
+        void ToggleVelRef() => ship.VelRef = ship.VelRef == null && ship.Target != null ? ship.Target : null;
+        Body VelRefBody => ship.VelRef ?? reference;
+
+        // Stopping against the target at full drive (or RCS, if that is all there is) after a flip: no gravity, the mass
+        // now, the drive limit now. Distance and time scale with 1/a, so a lower g limit shows up at once.
+        void StopEstimate(D3 vr, out double a, out double t, out double d, out string by)
+        {
+            bool drive = !ship.Dry && ship.AMax > 0;
+            a = drive ? ship.AMax : ship.Dry ? 0 : Ship.RcsAccel;
+            by = drive ? Fmt.Num(ship.MaxG, 1) + " g drive" : ship.Dry ? "no reaction mass" : "RCS";
+            double v = vr.Mag;
+            t = a > 0 ? v / a : double.PositiveInfinity;
+            d = a > 0 ? v * v / (2 * a) : double.PositiveInfinity;
+        }
+
+        static string Spd(double kms) => Math.Abs(kms) < 1 ? Fmt.Num(kms * 1000, Math.Abs(kms) < 0.01 ? 1 : 0) + " m/s" : Fmt.Num(kms, 2) + " km/s";
 
         void TogglePlan()
         {
@@ -293,6 +313,11 @@ namespace FogOfWar
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
                 list.Add(new Readout("Relative speed", Fmt.Num(vr.Mag, 3) + " km/s"));
                 list.Add(new Readout("Closing speed", Fmt.Num(closing, 3) + " km/s", closing > 0 ? Tone.Cold : Tone.Normal));
+                list.Add(new Readout("Sideways drift", Spd((vr - r.Norm * closing).Mag)));
+                StopEstimate(vr, out var aStop, out var tStop, out var dStop, out var by);
+                bool late = closing > 0 && dStop > r.Mag - ship.Target.Radius;
+                list.Add(new Readout("Stop (flip now, " + by + ", no gravity)", aStop > 0 ? Dur(tStop) + ", " + Km(dStop) + (late ? ": too fast" : "") : "can't", late ? Tone.Bad : Tone.Normal));
+                list.Add(new Readout("Velocity reference (" + Ctl.Keys(A.VelocityRef) + ")", VelRefBody.Name));
             }
             double rAu = ship.Pos.Mag / Frame.AU;
             if (rAu > 1.7 && rAu < 5.6 && beltView.NearestIndex >= 0)

@@ -372,6 +372,7 @@ namespace FogOfWar
         void TickInner(float dt)
         {
             ReadInput(dt);
+            if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
             double simDt = dt * Warps[warpIdx];
             warpLimited = false;
             // only bodies the ship could reach this frame get per-substep collision checks
