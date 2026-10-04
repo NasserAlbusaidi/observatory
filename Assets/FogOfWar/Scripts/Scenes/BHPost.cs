@@ -11,7 +11,11 @@ namespace FogOfWar
     {
         public static readonly bool NoGlare = OpenWorld.Bloom.Disabled;
         public const int MaxFrames = 64, SwirlFrames = 8;
-        public float CoreGlare = 0.03f, WideGlare = 0.01f, Exposure = 0.92f;
+        // Default exposure: the inner disc on the approaching side sits at the top of the tonemap's shoulder, so its
+        // beaming over the receding side (≈ 20× in radiance at 10 M edge-on) still reads on screen. The player's
+        // exposure slider multiplies it (BlackHoleScene, EV −4 … +4, not saved).
+        public const float DefaultExposure = 0.33f;
+        public float CoreGlare = 0.03f, WideGlare = 0.07f, Exposure = DefaultExposure;
         const int GlareLevels = 6;   // the widest levels spread a bright disc into a veil over the whole view
 
         Material mat;

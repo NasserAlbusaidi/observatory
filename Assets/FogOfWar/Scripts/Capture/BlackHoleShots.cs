@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
         };
@@ -112,6 +112,8 @@ namespace FogOfWar
                 S("bh-kerr-0.998-default-zoom14", new Vector3(0, 1.3f, -14f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-kerr-0.998-default-zoom10", new Vector3(0, 0.9f, -10f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-kerr-0.998-default-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                // linear radiance before any tonemap (raw float32 RGB, <name>.f32 with a 2-int header), for measuring
+                S("hdr-edge-on", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "rawHdr", 1f))),
                 S("dbg-fate-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 1f))),
                 S("dbg-hit-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 2f))),
                 S("dbg-fate-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 1f); })),
@@ -193,6 +195,35 @@ namespace FogOfWar
             foreach (var s in Shots())
             {
                 if (only != null && Array.TrueForAll(only.Split(','), o => !s.name.Contains(o))) continue;   // comma list
+                if (s.name.StartsWith("hdr-"))
+                {
+                    Time.timeScale = 1;
+                    s.setup?.Invoke(app.Current);
+                    app.Orbit.enabled = false;
+                    cam.fieldOfView = s.fov;
+                    cam.transform.SetPositionAndRotation(s.pos, Quaternion.LookRotation(s.look - s.pos, Vector3.up));
+                    for (int f = 0; f < 3; f++) yield return null;
+                    Time.timeScale = 0;
+                    yield return null;
+                    var frt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+                    frt.Create();
+                    cam.targetTexture = frt;
+                    cam.Render();
+                    var ftex = new Texture2D(W, H, TextureFormat.RGBAFloat, false, true);
+                    var prevA = RenderTexture.active; RenderTexture.active = frt;
+                    ftex.ReadPixels(new Rect(0, 0, W, H), 0, 0, false); RenderTexture.active = prevA;
+                    var fpx = ftex.GetPixels();
+                    using (var bw = new BinaryWriter(File.Create(Path.Combine(dir, s.name + ".f32"))))
+                    {
+                        bw.Write(W); bw.Write(H);
+                        foreach (var c in fpx) { bw.Write(c.r); bw.Write(c.g); bw.Write(c.b); }
+                    }
+                    cam.targetTexture = rt;
+                    frt.Release(); Destroy(frt); Destroy(ftex);
+                    Set(app.Current, "rawHdr", 0f);
+                    log.WriteLine($"{s.name}: raw linear radiance written ({W}x{H}, rows bottom-up)");
+                    continue;
+                }
                 Time.timeScale = 1;
                 try { s.setup?.Invoke(app.Current); }
                 catch (Exception e) { log.WriteLine($"{s.name}: setup threw {e.InnerException?.Message ?? e.Message}"); errors++; }

@@ -27,7 +27,8 @@ Shader "FogOfWar/BlackHole"
             float _Disk, _Doppler, _Outer, _Temp, _Lens, _SimTime, _Clumpy, _Gain, _SwirlRate;
             float _Spin, _RH, _Isco, _FluxMax, _StepK, _RMax, _Exposure, _DebugFate;
             float _HDROut;                 // 1: write linear radiance for BHPost (glare, accumulation, tonemap); 0: tonemap here
-            float2 _Jitter;                // sub-pixel offset in NDC for temporal accumulation (0 in debug views)
+            float2 _Jitter;
+            float _SkyGain;                // 1 / BHPost's default exposure: the sky keeps its pixel values at the default                // sub-pixel offset in NDC for temporal accumulation (0 in debug views)
             int _Steps;
             // camera, computed on the CPU in double precision: Boyer–Lindquist position, orthonormal triad (world space),
             // and the ZAMO metric functions there
@@ -431,7 +432,7 @@ Shader "FogOfWar/BlackHole"
                     // of a 6500 K source seen at g × 6500 K
                     float gs = clamp(EF, 0.05, 20.0);
                     float3 tint = planckRGB(6500.0 * clamp(gs, 0.25, 4.0)) / planckRGB(6500.0);
-                    col += trans * skyAGrad(dir, ddxDir, ddyDir, px, _HDROut > 0.5) * tint * gs * gs * gs * gs;
+                    col += trans * skyAGrad(dir, ddxDir, ddyDir, px, _HDROut > 0.5) * (_HDROut > 0.5 ? _SkyGain : 1.0) * tint * gs * gs * gs * gs;
                 }
                 // debug views for the review harness: 1 = fate (red captured, green escaped, blue out of steps,
                 // white = opaque disc), 2 = first disc hit radius / ISCO and its brightness

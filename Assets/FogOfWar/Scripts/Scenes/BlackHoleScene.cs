@@ -31,6 +31,8 @@ namespace FogOfWar
         Material mat;
         float debugFate;   // review harness only: 1 ray fates, 2 first disc hit
         BHPost post;
+        float rawHdr;
+        float exposureEV;  // the player's exposure, EV relative to BHPost.DefaultExposure      // review harness only: linear radiance straight out of the ray tracer, no post pass
         bool prevHdr;
         // -fowbhnopost: the old single-pass look (tonemap in the ray tracer, no glare or accumulation), for A/B runs
         public static readonly bool NoPost = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fowbhnopost") >= 0;
@@ -62,7 +64,7 @@ namespace FogOfWar
             Art.SkyFacing(Quaternion.identity);
             TeardownSandbox();
             if (post != null) { Gfx.Destroy(post); post = null; }
-            Cam.allowHDR = prevHdr;
+            if (Cam != null) Cam.allowHDR = prevHdr;   // at app quit the camera can already be gone
         }
 
         public override void Tick(float dt)
@@ -128,9 +130,11 @@ namespace FogOfWar
         // Post pass on/off (debug views and -fowbhnopost bypass it), and this frame's jitter for temporal accumulation.
         void UpdatePost()
         {
-            bool on = post != null && !NoPost && debugFate == 0;
+            bool on = post != null && !NoPost && debugFate == 0 && rawHdr == 0;
             if (post != null) post.enabled = on;
-            mat.SetFloat("_HDROut", on ? 1 : 0);
+            mat.SetFloat("_HDROut", on || rawHdr > 0 ? 1 : 0);
+            mat.SetFloat("_SkyGain", 1f / BHPost.DefaultExposure);
+            if (post != null) post.Exposure = BHPost.DefaultExposure * Mathf.Pow(2, exposureEV);
             if (!on) { mat.SetVector("_Jitter", Vector4.zero); return; }
             var t = Cam.transform;
             int pose = Hash(t.position.x, t.position.y, t.position.z, t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w, Cam.fieldOfView);
@@ -271,6 +275,8 @@ namespace FogOfWar
             clumpy = ui.Toggle("Clumpy gas texture", clumpy);
             outer = ui.Slider("Disk outer radius", outer, 6, 20, v => v.ToString("0.0") + " rs", 0.5f);
             temp = ui.Slider(spin > 0.001f ? "Accretion rate (as spin-0 peak temp.)" : "Peak disk temperature", temp, 2500, 20000, v => Fmt.Num(v, 0) + " K", 100);
+            // camera exposure, not physics: from "see the dim side" (+) to "see the beaming" (−); not saved
+            exposureEV = ui.Slider("Exposure", exposureEV, -4, 4, v => (v > 0.04f ? "+" : "") + v.ToString("0.0") + " EV", 0.1f);
             SandboxControls(ui);
         }
     }

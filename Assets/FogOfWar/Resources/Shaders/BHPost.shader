@@ -80,13 +80,13 @@ Shader "Hidden/FogOfWar/BHPost"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            // the glare source is capped at a luminance of 16: the approaching side of the disc reaches hundreds, and
-            // even a percent of that spread wide fogs the whole view
+            // the glare source is capped at a luminance of 64 (before exposure): the approaching side of the disc
+            // reaches hundreds near the ISCO, and that much spread wide fogs the whole view
             float4 frag(v2f i) : SV_Target
             {
                 float3 c = down13(i.uv);
                 float L = dot(c, float3(0.2126, 0.7152, 0.0722));
-                return float4(c * min(1.0, 16.0 / max(L, 1e-6)), 1);
+                return float4(c * min(1.0, 64.0 / max(L, 1e-6)), 1);
             }
             ENDCG
         }
