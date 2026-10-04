@@ -147,6 +147,8 @@ namespace FogOfWar
                 S("sb-ride-fall-20rs",    Vector3.zero, 70, Ride(40), free: true),
                 S("sb-ride-fall-3rs",     Vector3.zero, 70, Ride(6), free: true),
                 S("sb-ride-fall-1.1rs",   Vector3.zero, 70, Ride(2.2), free: true),
+                // the ride camera's speed cap near the horizon of a fast spinner (#28)
+                S("sb-ride-kerr-0.998-horizon", Vector3.zero, 70, s => { Default(s); Set(s, "spin", 0.998f); Set(s, "ride", true); B(s).DropProbe(4); B(s).AdvanceUntilRide(1.015 * Kerr.Horizon(0.998)); Set(s, "logWarp", 0f); }, free: true),
             };
             l.AddRange(Extra);
             return l;
