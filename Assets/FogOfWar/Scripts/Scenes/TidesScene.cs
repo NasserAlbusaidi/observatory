@@ -12,7 +12,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Earth and Moon at <color=#FFB547>true scale</color>: the Moon really is that far and that small. Tidal stretching scales with 1/d³, so a small nudge does very little and a big one does a lot.\n\n" +
             "The blue shell is the ocean's tidal bulge, exaggerated about a million times so you can see it. Zoom out to find the Moon. Drag it inside the Roche limit and Earth's tides tear it into a ring of rubble.";
-        public override string Note => "1,000 km closer is roughly where the Moon was about 25 million years ago, at today's 3.8 cm/yr recession rate. Tides 0.8% stronger and a month 2.6 hours shorter. Nobody would notice without instruments. The view is drawn in the Moon's orbital plane, which is tilted 5.1° to Earth's orbit.";
+        public override string Note => "1,000 km closer is where the Moon would have been about 26 million years ago if it had always receded at today's 3.8 cm/yr. The real rate has varied a lot, so the date readout is a straight-line extrapolation, not a reconstruction. Tides 0.8% stronger and a month 2.6 hours shorter. Nobody would notice without instruments. The view is drawn in the Moon's orbital plane, which is tilted 5.1° to Earth's orbit. Simplified: the ocean tide is today's 0.54 m scaled by 1/d³, and the Moon breaks up exactly at the fluid Roche limit.";
 
         const float RE = 6371, D0 = 384400, ROCHE = 18470; // km
         const double ME = 5.972e24, MM = 7.342e22;
@@ -179,7 +179,7 @@ namespace FogOfWar
         {
             double ratio = System.Math.Pow(D0 / d, 3);
             double pd = Period(d) / 86400, p0 = Period(D0) / 86400;
-            double ageMyr = (D0 - d) * 1e5 / 3.8 / 1e6;
+            double ageMyr = System.Math.Abs(D0 - d) * 1e5 / 3.8 / 1e6; // constant present-day rate, either direction
             bool inside = d < ROCHE;
             double angSize = 2 * System.Math.Atan(1737 / d) * 180 / System.Math.PI;
             list.Add(new Readout("Distance", Fmt.Num(d, 0) + " km (" + (d / RE).ToString("0.0") + " Earth radii)"));
@@ -188,7 +188,9 @@ namespace FogOfWar
             list.Add(new Readout("Month length", pd.ToString("0.00") + " days"));
             list.Add(new Readout("Change vs today", ((pd - p0) * 24).ToString("0.0") + " h"));
             list.Add(new Readout("Moon's width in the sky", angSize.ToString("0.00") + "° (now 0.52°)"));
-            list.Add(new Readout("When was it this close?", d >= D0 ? "in the future" : ageMyr < 300 ? "~" + Fmt.Num(ageMyr, 1) + " Myr ago" : "billions of yr ago"));
+            string when = d == D0 ? "now" : "~" + Fmt.Num(ageMyr, ageMyr < 100 ? 1 : 0) + " Myr " + (d < D0 ? "ago" : "from now");
+            if (d < D0 && ageMyr > 4500) when += " (before the Moon formed)";
+            list.Add(new Readout("When, at today's 3.8 cm/yr", when));
             list.Add(new Readout("Moon status", inside ? "shredded into a ring" : "intact", inside ? Tone.Bad : Tone.Cold));
         }
 

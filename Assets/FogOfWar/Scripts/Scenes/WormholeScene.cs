@@ -3,7 +3,8 @@ using UnityEngine;
 
 namespace FogOfWar
 {
-    // Ray-traced Morris–Thorne (Ellis) wormhole with a fly-through and an Einstein–Rosen pinch-off.
+    // Ray-traced Morris–Thorne (Ellis) wormhole with a fly-through and an illustrated Einstein–Rosen pinch-off (the Ellis
+    // throat is shrunk on a set curve with a visual cutoff; no dynamical Einstein–Rosen solution is computed).
     public class WormholeScene : SimScene
     {
         public override string Title => "Wormhole";
@@ -11,8 +12,8 @@ namespace FogOfWar
         public override string Short => "Ray-traced tunnel to another sky";
         public override string Blurb =>
             "Every pixel is a light ray bent through the wormhole metric. The sphere in front of you is a lens: you're seeing <color=#FFB547>another universe's sky</color> through the throat, plus a squashed copy of your own sky wrapped round its edge.\n\n" +
-            "Hit Fly through to cross. Hit Einstein–Rosen pinch for the 1935 version, which slams shut faster than light can get across.";
-        public override string Note => "The catch: to stay open the throat needs negative energy density. The readout compares it with the best negative energy we can make in a lab (the Casimir effect). It compiles. It doesn't run.";
+            "Hit Fly through to cross. Hit Einstein–Rosen pinch for a sketch of the 1935 version, which slams shut faster than light can get across.";
+        public override string Note => "The catch: to stay open the throat needs negative energy density. The readout compares it with the best negative energy we can make in a lab (the Casimir effect). It compiles. It doesn't run. The pinch is an illustration: it squeezes this same tunnel shut on a set timetable rather than solving how an Einstein–Rosen bridge really evolves.";
 
         float throat = 1.2f, unitPow = 3f;
         Material mat;

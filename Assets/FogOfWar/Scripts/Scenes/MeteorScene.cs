@@ -16,7 +16,7 @@ namespace FogOfWar
         public override string Blurb =>
             "The plan from the RTL-SDR chat. Tune to an FM frequency that's dead in Muscat but used by a transmitter far beyond the horizon. When a meteor burns up between you, its <color=#FFB547>ionised trail</color> reflects that station's signal down to you for a fraction of a second.\n\n" +
             "Each ping lands on the waterfall below, the same thing your SDR software would show. Long ones are overdense trails from bigger meteors.";
-        public override string Note => "Geometry limit: both stations must see the trail above their horizon. At ~100 km altitude that caps the transmitter at about 2,250 km away. Push the slider past that and the pings stop. In summer, tropospheric ducting over the Gulf of Oman can carry FM 1,000 km directly: a steady signal is ducting, not meteors.";
+        public override string Note => "Geometry limit: both stations must see the trail above their horizon. At ~100 km altitude that caps the transmitter at about 2,250 km away. Push the slider past that and the pings stop. In summer, tropospheric ducting over the Gulf of Oman can carry FM 1,000 km directly: a steady signal is ducting, not meteors. The geometry is real; the meteor counts, trail lifetimes and signal strengths are illustrative picks, not a forecast. Your real ping rate depends on antenna, receiver, transmitter power and the night.";
 
         const float R = 63.71f;
         static readonly Vector3 Center = new Vector3(0, -R, 0);
@@ -282,7 +282,7 @@ namespace FogOfWar
             list.Add(new Readout("Pings received", Fmt.Num(detected, 0), Tone.Hot));
             list.Add(new Readout("Missed: wrong trail angle", Fmt.Num(specMiss, 0), Tone.Cold));
             if (shower != 0) list.Add(new Readout("Radiant altitude", radiantAlt.ToString("0") + "°" + (radiantAlt < 0 ? " (set: sporadics only)" : ""), radiantAlt < 0 ? Tone.Cold : Tone.Normal));
-            list.Add(new Readout("Ping rate", (hrs > 0.05f ? Fmt.Num(detected / hrs, 0) : "…") + " per hour"));
+            list.Add(new Readout("Ping rate (simulated)", (hrs > 0.05f ? Fmt.Num(detected / hrs, 0) : "…") + " per hour"));
             list.Add(new Readout("Transmitter distance", Fmt.Num(txKm, 0) + " km"));
             list.Add(new Readout("Direct reception?", "no, far below the horizon", Tone.Cold));
             list.Add(new Readout("Max forward-scatter reach", "≈ " + Fmt.Num(reach, 0) + " km", txKm > reach ? Tone.Bad : Tone.Normal));
