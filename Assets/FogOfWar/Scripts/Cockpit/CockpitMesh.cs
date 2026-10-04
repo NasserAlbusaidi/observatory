@@ -43,13 +43,13 @@ namespace FogOfWar.Cockpit
 
         // Vertex colour alpha picks the material in Cockpit.shader: 0 painted panel, 1/3 bare metal, 2/3 padding or
         // rubber, 1 self-lit indicator glass.
-        const float Paint = 0, Metal = 1 / 3f, Padding = 2 / 3f, Glass = 1;
-        static readonly Color Hull = new Color(0.30f, 0.31f, 0.33f, Paint), HullDark = new Color(0.16f, 0.17f, 0.18f, Paint),
-            Panel = new Color(0.40f, 0.41f, 0.42f, Paint), Bezel = new Color(0.05f, 0.05f, 0.055f, Paint), Pad = new Color(0.12f, 0.13f, 0.16f, Padding),
-            Frame = new Color(0.30f, 0.30f, 0.29f, Metal), Bolt = new Color(0.55f, 0.55f, 0.56f, Metal), Stripe = new Color(0.62f, 0.48f, 0.12f, Paint),
-            Grip = new Color(0.07f, 0.07f, 0.075f, Padding),
-            LedAmber = new Color(1.0f, 0.62f, 0.18f, Glass), LedGreen = new Color(0.25f, 1.0f, 0.45f, Glass), LedRed = new Color(1.0f, 0.15f, 0.1f, Glass),
-            LampGlass = new Color(0.95f, 0.92f, 0.85f, Glass);
+        const float MPaint = 0, MMetal = 1 / 3f, MPad = 2 / 3f, MGlass = 1;
+        static readonly Color Hull = new Color(0.30f, 0.31f, 0.33f, MPaint), HullDark = new Color(0.16f, 0.17f, 0.18f, MPaint),
+            Panel = new Color(0.40f, 0.41f, 0.42f, MPaint), Bezel = new Color(0.05f, 0.05f, 0.055f, MPaint), Pad = new Color(0.12f, 0.13f, 0.16f, MPad),
+            Frame = new Color(0.30f, 0.30f, 0.29f, MMetal), Bolt = new Color(0.55f, 0.55f, 0.56f, MMetal), Stripe = new Color(0.62f, 0.48f, 0.12f, MPaint),
+            Grip = new Color(0.07f, 0.07f, 0.075f, MPad),
+            LedAmber = new Color(1.0f, 0.62f, 0.18f, MGlass), LedGreen = new Color(0.25f, 1.0f, 0.45f, MGlass), LedRed = new Color(1.0f, 0.15f, 0.1f, MGlass),
+            LampGlass = new Color(0.95f, 0.92f, 0.85f, MGlass);
 
         class B
         {
