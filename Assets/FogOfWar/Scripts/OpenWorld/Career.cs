@@ -43,6 +43,7 @@ namespace FogOfWar.OpenWorld
         public double credits, fuel, earned;
         public int drive, tank, nextId, done, failed;
         public bool sandbox;
+        public int tutorial;             // first-flight lesson + 1; 0 = done or skipped (and for saves made before it existed)
         public List<Contract> active = new List<Contract>();
         public int sensors;
         public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
@@ -82,6 +83,7 @@ namespace FogOfWar.OpenWorld
         public double Credits = 25000, Earned;
         public int DriveLevel, TankLevel, Done, Failed;
         public bool Sandbox;
+        public int TutorialStep;         // the scene's first-flight lesson + 1, kept so Continue resumes it (or not) — QA-051
         public readonly List<Contract> Active = new List<Contract>();
         public readonly List<Contract> Board = new List<Contract>();
         public Port Docked { get; private set; }
@@ -116,6 +118,7 @@ namespace FogOfWar.OpenWorld
         // A fresh career: docked at Earth with one easy first job to the Moon.
         public void StartNew(double jd)
         {
+            TutorialStep = 1;
             Active.Add(new Contract
             {
                 Id = nextId++, Kind = JobKind.Cargo, Title = "Medical supplies for Shackleton base", From = "Earth orbit", To = "Luna",
@@ -467,7 +470,7 @@ namespace FogOfWar.OpenWorld
         public CareerSave ToSave(Ship ship) => new CareerSave
         {
             credits = Credits, earned = Earned, fuel = ship.Fuel, drive = DriveLevel, tank = TankLevel, nextId = nextId,
-            done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active),
+            done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
             sensors = Codex.SensorLevel, visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
             achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt),
         };
@@ -475,7 +478,7 @@ namespace FogOfWar.OpenWorld
         public void FromSave(CareerSave s, Ship ship)
         {
             Credits = s.credits; Earned = s.earned; DriveLevel = Mathf.Clamp(s.drive, 0, DriveG.Length - 1); TankLevel = Mathf.Clamp(s.tank, 0, MaxTankLevel);
-            nextId = s.nextId; Done = s.done; Failed = s.failed; Sandbox = s.sandbox;
+            nextId = s.nextId; Done = s.done; Failed = s.failed; Sandbox = s.sandbox; TutorialStep = s.tutorial;
             foreach (var c in Active) RemoveDerelict(c);
             Active.Clear(); if (s.active != null) Active.AddRange(s.active);
             foreach (var c in Active) SpawnDerelict(c);
