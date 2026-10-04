@@ -26,6 +26,8 @@ Shader "FogOfWar/BlackHole"
 
             float _Disk, _Doppler, _Outer, _Temp, _Lens, _SimTime, _Clumpy, _Gain, _SwirlRate;
             float _Spin, _RH, _Isco, _FluxMax, _StepK, _RMax, _Exposure, _DebugFate;
+            float _HDROut;                 // 1: write linear radiance for BHPost (glare, accumulation, tonemap); 0: tonemap here
+            float2 _Jitter;                // sub-pixel offset in NDC for temporal accumulation (0 in debug views)
             int _Steps;
             // camera, computed on the CPU in double precision: Boyer–Lindquist position, orthonormal triad (world space),
             // and the ZAMO metric functions there
@@ -76,20 +78,40 @@ Shader "FogOfWar/BlackHole"
 
             // Disc emission where the ray crosses the equator at radius r (M units), azimuth ph, for a photon with b = L/E.
             // EF is the photon energy the camera measures (E = 1 at infinity).
-            float3 diskColor(float r, float ph, float b, float EF, float order, out float alpha)
+            // Gas density pattern at (r, ph): two flow-map phases. Each phase follows the gas at exactly Ω(r) for one orbit
+            // since its own restart, with fresh noise after every restart; the two are half an orbit apart and
+            // cross-faded with triangle weights, so the shear never winds the pattern into rings ("vinyl").
+            float gasPattern(float r, float ph, float om, float a)
+            {
+                float rs = r * 0.5;
+                float P = UNITY_TWO_PI * (r * sqrt(r) + a);         // orbital period (M)
+                float cyc = _SimTime * _SwirlRate / P;
+                float d = 0.0;
+                [unroll] for (int k = 0; k < 2; k++)
+                {
+                    float c = cyc + 0.5 * k;
+                    float f = frac(c), seed = floor(c) * 7.31 + k * 3.17;
+                    float ang = ph - om * f * P;                     // where this gas was when the phase restarted
+                    float2 q = float2(cos(ang), sin(ang)) * rs;
+                    float turb = fbm(float3(q * 1.3, rs * 0.6 + seed));
+                    float streaks = fbm(float3(q * 0.35 * rs, 1.0 + seed));
+                    float clumps = fbm(float3(q.x * 2.1, rs * 1.7, q.y * 2.1) + seed * 1.9);
+                    float v = smoothstep(0.15, 0.85, turb * 0.7 + streaks * 0.35 + clumps * 0.3);
+                    d += v * (1.0 - abs(2.0 * f - 1.0));
+                }
+                return d;
+            }
+
+            float3 diskColor(float r, float ph, float b, float q, float EF, float order, out float alpha, out float dbgLum)
             {
                 float a = _Spin;
-                float rs = r * 0.5;                                  // rs units, for the texture and the edges
+                float rs = r * 0.5;                                  // rs units, for the edges
                 float F = pageThorne(r, a) / _FluxMax;
                 float sr = sqrt(r);
                 float om = 1.0 / (r * sr + a);                       // Keplerian Ω = dφ/dt
                 // the gas pattern co-rotates with Ω (sped up by _SwirlRate, in M per second of sim time)
-                float ang = ph - om * _SimTime * _SwirlRate;
-                float2 q = float2(cos(ang), sin(ang)) * rs;
-                float turb = fbm(float3(q * 1.3, rs * 0.6));
-                float streaks = fbm(float3(q * 0.35 * rs, 1.0));
                 // higher-order images are squeezed into thin arcs where the noise would alias into streaks: fade it there
-                float dens = lerp(1.0, 0.3 + 1.0 * smoothstep(0.15, 0.85, turb * 0.85 + streaks * 0.4), _Clumpy / (1.0 + 3.0 * order));
+                float dens = _Clumpy > 0.5 ? lerp(1.0, 0.3 + 1.0 * gasPattern(r, ph, om, a), 1.0 / (1.0 + 3.0 * order)) : 1.0;
                 // redshift g = E_obs / E_emit. Circular orbit: E_emit = u^t (1 − Ω b). Without Doppler: a ZAMO emitter.
                 float ut = (r * sr + a) / (sqrt(sr * r) * sqrt(max(r * sr - 3.0 * sr + 2.0 * a, 1e-5)));
                 float Eorb = ut * (1.0 - om * b);
@@ -100,10 +122,23 @@ Shader "FogOfWar/BlackHole"
                 float Eem = _Doppler > 0.5 ? Eorb : Ezamo;
                 float g = EF / max(Eem, 1e-4);
                 float T = _Temp * pow(F, 0.25);
+                // electron-scattering limb darkening (Chandrasekhar): I ∝ 1 + 2.06 μ, μ the cosine from the disc normal
+                // in the emitter's frame, |p^θ̂| / E_emit = √q / (r E_emit) at the equator; normalised at μ = 0.5
+                float mu = saturate(sqrt(max(q, 0.0)) / (r * max(Eem, 1e-4)));
+                float limb = (1.0 + 2.06 * mu) / (1.0 + 2.06 * 0.5);
                 // the outer edge is a soft fade (opacity too); the inner edge is the ISCO, where the flux itself goes to 0
                 float outerFade = smoothstep(_Outer, _Outer * 0.7, rs);
                 alpha = outerFade;
-                return blackbody(T * g) * F * pow(g, 4.0) * dens * 0.75 * _Gain * outerFade;
+                dbgLum = 0;
+                if (_DebugFate > 1.5)
+                {
+                    // debug view 2 keeps the brightness the old look had (old texture, old tint), so it stays comparable
+                    float ang = ph - om * _SimTime * _SwirlRate;
+                    float2 q2 = float2(cos(ang), sin(ang)) * rs;
+                    float densOld = lerp(1.0, 0.3 + 1.0 * smoothstep(0.15, 0.85, fbm(float3(q2 * 1.3, rs * 0.6)) * 0.85 + fbm(float3(q2 * 0.35 * rs, 1.0)) * 0.4), _Clumpy / (1.0 + 3.0 * order));
+                    dbgLum = dot(blackbody(T * g) * F * pow(g, 4.0) * densOld * 0.75 * _Gain * outerFade, 1.0);
+                }
+                return planckRGB(T * g) * F * pow(g, 4.0) * limb * dens * 0.75 * _Gain * outerFade;
             }
 
             // Debris gas from the sandbox at (r, ph); pr is the photon's p_r there.
@@ -132,7 +167,7 @@ Shader "FogOfWar/BlackHole"
                     g = EF * sqrt(r * r * Dz / S2z) / max(1.0 - 2.0 * a * r / S2z * b, 1e-4);
                 }
                 alpha = 1.0 - exp(-t.x * 3.0);
-                return blackbody(T * g) * pow(g, 4.0) * t.x * _DebrisRange.w;
+                return planckRGB(T * g) * pow(g, 4.0) * t.x * _DebrisRange.w;
             }
 
             // Thin guide rings in the equatorial plane (lensed like everything else).
@@ -186,7 +221,7 @@ Shader "FogOfWar/BlackHole"
                 float mu = saturate(-dot(nrm, segDir));
                 // stars: limb darkening (Eddington, 0.4 + 0.6 μ); planets: a dull glow lit by the disc
                 float shade = bc.z > 0.5 ? 0.25 + 0.75 * mu : 0.4 + 0.6 * mu;
-                return blackbody(bc.x * g) * pow(g, 4.0) * bc.y * shade;
+                return planckRGB(bc.x * g) * pow(g, 4.0) * bc.y * shade;
             }
 
             // ---- geodesic ----------------------------------------------------------------------------------------------
@@ -236,7 +271,7 @@ Shader "FogOfWar/BlackHole"
             float4 frag(v2fFS i) : SV_Target
             {
                 float px;
-                float3 rd = primaryRay(i.ndc, px);
+                float3 rd = primaryRay(i.ndc + (_DebugFate > 0.5 ? 0.0 : _Jitter), px);
                 float a = _Spin;
                 float M = _Lens > 0.5 ? 1.0 : 0.0;
 
@@ -355,8 +390,9 @@ Shader "FogOfWar/BlackHole"
                             if (_Disk > 0.5 && rHit > _Isco && rHit * 0.5 < _Outer)
                             {
                                 float al;
-                                float3 c = diskColor(rHit, phHit, b, EF, crossings, al);
-                                if (firstHit == 0.0) { firstHit = rHit; firstG = dot(c, 1.0); }
+                                float dl;
+                                float3 c = diskColor(rHit, phHit, b, q, EF, crossings, al, dl);
+                                if (firstHit == 0.0) { firstHit = rHit; firstG = dl; }
                                 col += trans * c;
                                 trans *= 1.0 - al;
                             }
@@ -380,20 +416,29 @@ Shader "FogOfWar/BlackHole"
                 // a ray still going after all its steps is circling near the photon orbit; it would almost always leave
                 // again, so take the sky in its current direction rather than black
                 if (!escaped && trans > 0.01 && (!canFall || (s.x >= rCap * 1.05 && s.y > 0.0))) escaped = true;
-                if (escaped && trans > 0.01)
+                // Ray differentials for the sky lookup, taken outside any branch so every pixel of the 2×2 quad has a
+                // value. Where a neighbour did not reach the sky (captured, or stopped by the disc) its direction means
+                // nothing: fall back to the plain pixel footprint.
+                float3 dir = skyDir(s, ph, b, q, a, M);
+                float skyOk = escaped && trans > 0.01 ? 1.0 : 0.0;
+                float3 ddxDir = ddx(dir), ddyDir = ddy(dir);
+                bool diffOk = abs(ddx(skyOk)) < 0.5 && abs(ddy(skyOk)) < 0.5;
+                float lx = length(ddxDir), ly = length(ddyDir);
+                if (!diffOk || !(lx < 0.5) || !(ly < 0.5)) { ddxDir = 0; ddyDir = 0; }
+                if (skyOk > 0.5)
                 {
-                    float3 dir = skyDir(s, ph, b, q, a, M);
-                    // the sky is blueshifted by g = EF for this observer: bolometric intensity × g⁴, and an approximate
-                    // colour shift (the ratio of blackbody tints for a 6500 K source seen at g × 6500 K)
+                    // the sky is blueshifted by g = EF for this observer: bolometric intensity × g⁴, and the colour shift
+                    // of a 6500 K source seen at g × 6500 K
                     float gs = clamp(EF, 0.05, 20.0);
-                    float3 tint = blackbody(6500.0 * clamp(gs, 0.25, 4.0)) / blackbody(6500.0);
-                    col += trans * skyA(dir, px) * tint * gs * gs * gs * gs;
+                    float3 tint = planckRGB(6500.0 * clamp(gs, 0.25, 4.0)) / planckRGB(6500.0);
+                    col += trans * skyAGrad(dir, ddxDir, ddyDir, px, _HDROut > 0.5) * tint * gs * gs * gs * gs;
                 }
                 // debug views for the review harness: 1 = fate (red captured, green escaped, blue out of steps,
                 // white = opaque disc), 2 = first disc hit radius / ISCO and its brightness
                 if (_DebugFate > 1.5) return float4(firstHit / (_Isco * 4.0), saturate(firstG), 0, 1);
                 if (_DebugFate > 0.5)
                     return trans < 0.01 ? float4(1, 1, 1, 1) : float4(s.x < rCap ? 1 : 0, escaped ? 1 : 0, stepsUsed >= _Steps - 1 ? 1 : 0, 1);
+                if (_HDROut > 0.5) return float4(col * _Exposure, 1.0);
                 return float4(tonemap(col * _Exposure), 1.0);
             }
             ENDCG

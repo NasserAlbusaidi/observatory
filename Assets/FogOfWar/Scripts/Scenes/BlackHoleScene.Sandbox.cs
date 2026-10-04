@@ -499,13 +499,18 @@ namespace FogOfWar
             // luminosity: the heat released by the gas model (E is energy per unit rest mass); Eddington for hydrogen
             double Lw = dissipated / Math.Max(h, 1e-9) * Phys.c * Phys.c / Tunit;
             double Ledd = 1.26e31 * MassKg / Phys.Msun;
-            // smoothed over sim time (not frames), on about the gas model's own time scale
-            double ema = 1 - Math.Exp(-h / LumTau);
+            // smoothed over sim time (not frames): at least the gas model's own time scale, and 5 % of the time since the
+            // latest break-up, so a flare that evolves over 10^5 M is not shot noise from the few particles heating up
+            // at any moment (QA-054: at spin 0.998 the gas drains fast near the small ISCO)
+            double tSince = 0;
+            foreach (var bb in bodies) if (bb.tDisrupt >= 0) tSince = Math.Max(tSince, simT - bb.tDisrupt);
+            double tau = Math.Max(LumTau, 0.05 * tSince);
+            double ema = 1 - Math.Exp(-h / tau);
             lum += (Lw / Ledd - lum) * ema;
             curveT += h;
             if (curveT > 0 && (lightCurve.Count == 0 || simT - lightCurve[lightCurve.Count - 1].x > Math.Max(h, 5)))
             {
-                fallbackRate += (fallbackAcc / Math.Max(curveT, 1e-9) - fallbackRate) * (1 - Math.Exp(-curveT / LumTau));
+                fallbackRate += (fallbackAcc / Math.Max(curveT, 1e-9) - fallbackRate) * (1 - Math.Exp(-curveT / tau));
                 fallbackAcc = 0; curveT = 0;
                 if (liveParts > 0 || lum > 1e-9) lightCurve.Add(new Vector2((float)simT, (float)lum));
                 if (lightCurve.Count > 600) lightCurve.RemoveAt(0);
@@ -684,6 +689,17 @@ namespace FogOfWar
             return d * 180 / Math.PI;
         }
 
+        // Median factor between consecutive light-curve samples over the last 60 (1 = smooth; QA-054 saw ~3).
+        double CurveJitter()
+        {
+            var r = new List<double>();
+            for (int i = Math.Max(1, lightCurve.Count - 60); i < lightCurve.Count; i++)
+                if (lightCurve[i].y > 1e-6 && lightCurve[i - 1].y > 1e-6) r.Add(Math.Exp(Math.Abs(Math.Log(lightCurve[i].y / lightCurve[i - 1].y))));
+            if (r.Count == 0) return 1;
+            r.Sort();
+            return r[r.Count / 2];
+        }
+
         public string DebugSummary()
         {
             int alive = 0, nan = 0, ph2 = 0; double rmin = 1e9, rmax = 0;
@@ -696,7 +712,7 @@ namespace FogOfWar
                 rmin = Math.Min(rmin, parts[i].r); rmax = Math.Max(rmax, parts[i].r);
             }
             string b = bodies.Count > 0 ? $" body r={bodies[bodies.Count - 1].g.r:0.0} rt={bodies[bodies.Count - 1].rt:0.0} state={bodies[bodies.Count - 1].state}" : "";
-            return $"cam d={Orbit.distance:0.0} tgt={Orbit.target} follow={followOn} warp={logWarp:0.00} t={simT:0} parts {nParts} alive {alive} nan {nan} circ {ph2} r {rmin:0.0}..{rmax:0.0} heat {heatScale:0.0e0} lum {lum:0.00e0}{b}";
+            return $"cam d={Orbit.distance:0.0} tgt={Orbit.target} follow={followOn} warp={logWarp:0.00} t={simT:0} parts {nParts} alive {alive} nan {nan} circ {ph2} r {rmin:0.0}..{rmax:0.0} heat {heatScale:0.0e0} lum {lum:0.00e0}{b} curve {lightCurve.Count} pts, step-to-step ×{CurveJitter():0.000} (median)";
         }
 
         // Run until the ridden probe is within r (M units).

@@ -48,6 +48,7 @@ namespace FogOfWar
             legend.style.flexWrap = Wrap.Wrap; legend.style.marginTop = 4;
             Key(legend, CIsco, "ISCO"); Key(legend, CPhoton, "photon orbit"); Key(legend, CTidal, "tidal radius"); Key(legend, CMb, "marginally bound");
             mapScale = Ui.L(map, "", "t-label", "f-mono");
+            mapScale.style.whiteSpace = WhiteSpace.Normal;   // QA-053: wrap inside the panel rather than run into the next one
 
             curveBox = Ui.Panel(col, "Flare", "Light curve");
             curveBox.pickingMode = PickingMode.Ignore;
@@ -82,7 +83,7 @@ namespace FogOfWar
             for (int i = 0; i < nParts; i += 8) if (parts[i].alive) hudRs.Add(parts[i].r);
             if (hudRs.Count > 0) { hudRs.Sort(); want = Math.Max(want, Math.Min(hudRs[hudRs.Count / 2] * 2, 8000)); }
             mapR = want > mapR * 1.5 || want < mapR / 1.5 ? want : mapR + (want - mapR) * 0.08;
-            Ui.Text(mapScale, $"edge {mapR / 2:0} rs, drawn flat (not lensed)");
+            Ui.Text(mapScale, $"edge {Fmt.Num(mapR / 2, 0)} rs · flat, not lensed");
             mapPlot.MarkDirtyRepaint();
             bool curve = lightCurve.Count > 1 && lum > 1e-4;   // not an empty plot while the debris is still out (audit #57)
             Ui.Show(curveBox, curve);

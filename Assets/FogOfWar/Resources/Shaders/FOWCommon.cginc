@@ -158,6 +158,56 @@ float3 skyTex(sampler2D s, float3 d, float px, float w)
 float3 skyA(float3 d, float px) { return _FOWHasSky > 0.5 ? skyTex(_SkyA, d, px, _SkyAW) : skyAProc(d, px); }
 float3 skyB(float3 d, float px) { return _FOWHasSky > 0.5 ? skyTex(_SkyB, d, px, _SkyBW) : skyBProc(d, px); }
 
+// Sky A through a lensed ray: dx, dy are the screen-space differentials of the arriving direction d. A magnified patch of
+// sky stays sharp and a squeezed one is filtered along the squeeze only (tex2Dgrad: anisotropic footprint). The u
+// differential takes whichever of u and u + 0.5 is continuous, so the RA 12h seam has no artefact. px is the floor.
+// Inverse of the luminance tonemap in BHPost.shader (ACES fit, Narkowicz 2015): the display luminance y → linear x.
+float acesInverse(float y)
+{
+    y = min(y, 0.995);
+    float A = 2.43 * y - 2.51, B = 0.59 * y - 0.03, C = 0.14 * y;
+    return max((-B - sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A), 0.0);
+}
+
+// acesInv: the caller tonemaps with BHPost's luminance curve, so undo that one instead of tonemap(): an unlensed patch
+// of sky then comes out with its original pixel value either way.
+float3 skyAGrad(float3 d, float3 dx, float3 dy, float px, bool acesInv)
+{
+    if (_FOWHasSky < 0.5) return skyAProc(d, max(max(length(dx), length(dy)), px));
+    float3x3 R = (float3x3)_SkyRot;
+    float2 uv = SkyUV(mul(R, d));
+    float2 ux = SkyUV(mul(R, normalize(d + dx))) - uv, uy = SkyUV(mul(R, normalize(d + dy))) - uv;
+    ux.x -= round(ux.x); uy.x -= round(uy.x);
+    // the floor: one screen pixel's worth of sky in each direction, as skyTex's isotropic choice
+    float m = px / 6.2831853;
+    if (length(ux) < m) ux = normalize(ux + 1e-9) * m;
+    if (length(uy) < m) uy = normalize(uy + 1e-9) * m;
+    float3 c = tex2Dgrad(_SkyA, uv, ux, uy).rgb;
+#ifdef UNITY_COLORSPACE_GAMMA
+    c = pow(max(c, 0), 2.2);
+#endif
+    if (acesInv)
+    {
+        float y = max(dot(c, float3(0.2126, 0.7152, 0.0722)), 1e-6);
+        return c * (acesInverse(y) / y);
+    }
+    c = min(c, 0.985);
+    return -log(1.0 - c) / 1.15;
+}
+
+// Colour of a blackbody at temperature T (kelvin) in linear sRGB with unit luminance: Planck's law weighted by the
+// CIE 1931 2° observer, XYZ → sRGB (D65), out-of-gamut colours desaturated towards white. A 256-texel LUT over
+// log10 T from 3 to 6, built on the CPU (BlackHoleScene.PlanckLut); below 1000 K it keeps the 1000 K colour.
+sampler2D _PlanckLUT;
+float3 planckRGB(float T)
+{
+    float u = saturate((log10(max(T, 1.0)) - 3.0) / 3.0);
+    return tex2Dlod(_PlanckLUT, float4((u * 255.0 + 0.5) / 256.0, 0.5, 0, 0)).rgb;
+}
+
+// Luminance of linear sRGB.
+float lumaRGB(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
+
 // Filmic-ish exposure curve; output is linear, Unity handles the sRGB write in linear projects.
 float3 tonemap(float3 c)
 {
