@@ -119,6 +119,10 @@ namespace FogOfWar
                 S("bh-kerr-0.998-default-smooth", new Vector3(0, 2.2f, -24f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "clumpy", false); })),
                 S("bh-kerr-0.998-guides", new Vector3(0, 0.9f, 24f), 42, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-no-doppler",       new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "doppler", false))),
+                // lensing off = straight rays from a flat-space camera (#32): compare with a straight-line reference
+                S("bh-nolens",           new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "lens", false))),
+                S("bh-nolens-4.4M",      new Vector3(0, 0.0f, 2.2f), 70, With(s => { Set(s, "lens", false); Set(s, "disk", false); })),
+                S("bh-nolens-kerr-0.9",  new Vector3(0, 0.9f, 24f), 42, With(s => { Set(s, "lens", false); Set(s, "spin", 0.9f); })),
                 // sandbox
                 S("sb-sun-sgra-approach", new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 1, 0, untilR: 30), ui: true),
                 S("sb-sun-sgra-shred",    new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 1, 12, untilR: 1), ui: true),

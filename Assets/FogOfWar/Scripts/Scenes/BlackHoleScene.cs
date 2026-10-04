@@ -174,6 +174,8 @@ namespace FogOfWar
             disk = ui.Toggle("Accretion disk", disk);
             doppler = ui.Toggle("Doppler beaming + redshift", doppler);
             lens = ui.Toggle("Gravitational lensing", lens);
+            // what the straight-ray comparison keeps (#32)
+            if (!lens) GUILayout.Label("Lensing off: light runs in straight lines, seen from flat space. Still on: a black sphere the size of the horizon, and the disk's own gravitational redshift.", ui.note);
             clumpy = ui.Toggle("Clumpy gas texture", clumpy);
             outer = ui.Slider("Disk outer radius", outer, 6, 20, v => v.ToString("0.0") + " rs", 0.5f);
             temp = ui.Slider(spin > 0.001f ? "Accretion rate (as spin-0 peak temp.)" : "Peak disk temperature", temp, 2500, 20000, v => Fmt.Num(v, 0) + " K", 100);
