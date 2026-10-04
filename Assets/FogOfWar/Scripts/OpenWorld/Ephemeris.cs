@@ -140,16 +140,26 @@ namespace FogOfWar.OpenWorld
                 (sw * si) * xp + (cw * si) * yp);
         }
 
+        // E − e·sin E = M for 0 ≤ e < 1. f(E) is increasing and odd, so the root shares M's sign and lies in
+        // [M, M + e] (M ≥ 0) or [M − e, M]. Newton runs inside that bracket and falls back to bisection when a
+        // step would leave it, so it converges for any phase and any e below 1 (a fixed +π starter with M < 0
+        // diverged near e = 0.9). The tolerance is on the residual, and the loop ends on the bracket width too.
         public static double SolveKepler(double M, double e)
         {
             M = Math.IEEERemainder(M, 2 * Math.PI);
-            double Ea = e < 0.8 ? M : Math.PI;
-            for (int k = 0; k < 30; k++)
+            if (e <= 0) return M;
+            double lo = M < 0 ? Math.Max(-Math.PI, M - e) : M, hi = M < 0 ? M : Math.Min(Math.PI, M + e);
+            double Ea = e < 0.8 ? M : (M < 0 ? -1 : 1) * Math.Min(Math.PI, Math.Abs(M) + e * 0.85);
+            Ea = Math.Max(lo, Math.Min(hi, Ea));
+            for (int k = 0; k < 100; k++)
             {
                 double f = Ea - e * Math.Sin(Ea) - M;
-                double dE = f / (1 - e * Math.Cos(Ea));
-                Ea -= dE;
-                if (Math.Abs(dE) < 1e-12) break;
+                if (Math.Abs(f) < 1e-14) break;
+                if (f > 0) hi = Ea; else lo = Ea;
+                double next = Ea - f / (1 - e * Math.Cos(Ea));
+                if (!(next > lo && next < hi)) next = 0.5 * (lo + hi);
+                if (next == Ea || hi - lo < 1e-15) break;
+                Ea = next;
             }
             return Ea;
         }

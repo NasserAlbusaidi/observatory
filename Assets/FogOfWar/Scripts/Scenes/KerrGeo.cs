@@ -15,6 +15,7 @@ namespace FogOfWar
         public double E, L;
         public bool photon, alive, inside; // inside: crossed the horizon (proper time keeps running for the probe)
         public double periPhi;             // φ at the latest pericentre (w = 0 going up), interpolated inside the step
+        public double periT, periR;        // coordinate time and radius there, likewise
         public int peris;
         public double apoR;                // r at the latest apocentre (0: none yet)
 
@@ -48,7 +49,7 @@ namespace FogOfWar
 
         public void Step(double a, double h)
         {
-            double w0 = w, ph0 = phi;
+            double w0 = w, ph0 = phi, r0 = r, t0 = t;
             D(r, w, a, out double r1, out double w1, out double p1, out double t1, out double s1);
             D(r + 0.5 * h * r1, w + 0.5 * h * w1, a, out double r2, out double w2, out double p2, out double t2, out double s2);
             D(r + 0.5 * h * r2, w + 0.5 * h * w2, a, out double r3, out double w3, out double p3, out double t3, out double s3);
@@ -68,6 +69,8 @@ namespace FogOfWar
                 // pericentre inside this step: w is close to linear in λ there, and so is φ
                 double f = -w0 / Math.Max(w - w0, 1e-300);
                 periPhi = ph0 + f * (phi - ph0);
+                periT = t0 + f * (t - t0);
+                periR = Math.Min(r0, r);
                 peris++;
             }
         }
@@ -222,9 +225,14 @@ namespace FogOfWar
             double gtt = -(1 - 2 / r), gtp = -2 * a / r, gpp = r * r + a * a + 2 * a * a / r, grr = r * r / Delta(r, a);
             // gtt ut² + 2 gtp ut uph + gpp uph² + grr ur² = −1
             double A = gtt, B = 2 * gtp * uph, C = gpp * uph * uph + grr * ur * ur + 1;
-            double disc = Math.Max(B * B - 4 * A * C, 0);
-            double ut = (-B - Math.Sqrt(disc)) / (2 * A);
-            if (ut < 0) ut = (-B + Math.Sqrt(disc)) / (2 * A);
+            // Same branch as (−B − √D)/2A, falling back to (−B + √D)/2A, but in the cancellation-free form q/A, C/q
+            // with q = −(B + sgn B·√D)/2: A = g_tt is zero at r = 2 (the equatorial ergosphere edge), where the
+            // textbook formula divided 0 by 0 and returned NaN (#2); there the equation is linear and C/q is its root.
+            double s = Math.Sqrt(Math.Max(B * B - 4 * A * C, 0));
+            double q = -0.5 * (B + (B >= 0 ? s : -s));
+            double rq = q / A, rc = C / q;
+            double r1 = B >= 0 ? rq : rc, r2 = B >= 0 ? rc : rq;
+            double ut = r1 > 0 ? r1 : r2;
             var g = new Geo { r = r, phi = phi, alive = true };
             g.E = -(gtt * ut + gtp * uph);
             g.L = gtp * ut + gpp * uph;
