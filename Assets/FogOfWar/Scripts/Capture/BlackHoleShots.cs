@@ -280,6 +280,45 @@ namespace FogOfWar
                     }
             }
 
+            // sandbox regressions (BH audit #29, #31, #33, #34, #36, #37): each line says what it should read
+            {
+                var bs = (BlackHoleScene)app.Current;
+                object Get(string f) => typeof(BlackHoleScene).GetField(f, F).GetValue(bs);
+                var probes = (System.Collections.IList)Get("probes");
+                Default(app.Current);
+                Set(bs, "ride", true); bs.DropProbe(0); bs.DropProbe(5); bs.DropProbe(6); bs.DropProbe(5);
+                log.WriteLine($"ridden probe evicted: riding {(Get("riding") == null ? "none" : "still")}, orbit camera {(app.Orbit.enabled ? "on" : "OFF")} (want none, on)");
+                bs.SetSpin(0.5f); bs.Tick(1f / 60);
+                log.WriteLine($"spin changed with probes out: {probes.Count} probes left (want 0, new experiment)");
+                Default(app.Current);
+                bs.DropProbe(1); for (int k = 0; k < 10; k++) bs.Tick(1f / 60);
+                Set(bs, "paused", true); double t0 = (double)Get("simT");
+                for (int k = 0; k < 30; k++) bs.Tick(1f / 60);
+                double tPaused = (double)Get("simT") - t0;
+                Set(bs, "stepPending", true); bs.Tick(1f / 60);
+                log.WriteLine($"paused 30 frames: sim time moved {tPaused} (want 0); one step: {(double)Get("simT") - t0 - tPaused:0.###} M (want 1/30 s of play)");
+                Set(bs, "paused", false);
+                Default(app.Current);
+                Set(bs, "periRs", 5f); bs.Throw(0); bs.AdvanceUntilBody(0);
+                for (int k = 0; k < 400; k++) bs.Tick(1f / 60);
+                log.WriteLine($"automatic warp 6.7 s after a break-up: 10^{(float)Get("logWarp"):0.00} M/s (want above 10^1.50: ramped after the 2 s hold)");
+                Default(app.Current);
+                Set(bs, "massIdx", -1); Set(bs, "shownMassIdx", -1); Set(bs, "logMass", 0.5f); Set(bs, "periRs", 60f);
+                bs.Throw(0); bs.AdvanceUntilBody(0);
+                log.WriteLine($"Sun at 60 rs from a 3-sun hole: {Get("rejectedParts")} pieces left out, {Get("liveParts")} kept (expect ~131 / ~3869)");
+                var parts = (Geo[])Get("parts"); int nAll = (int)Get("nParts");
+                for (int k = 0; k < nAll; k++) parts[k].alive = false;
+                bs.Tick(1f / 60);
+                log.WriteLine($"all debris retired: {Get("nParts")} slots, {Get("liveParts")} live (want 0, 0)");
+                Default(app.Current);
+                bs.DropProbe(5);
+                var list = new List<Readout>();
+                for (int k = 0; k < 60 * 60 && (string)probes[0].GetType().GetField("status").GetValue(probes[0]) != "escaped"; k++) bs.Tick(1f / 60);
+                Call(bs, "ProbeSummary", list, probes[0]);
+                log.WriteLine($"escaped light, probe status shown: {list.Find(x => x.label == "Probe status").value} (want escaped)");
+                Default(app.Current);
+            }
+
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.
             // One throw-away render per configuration first, so the first row does not carry the warm-up (audit #56).
             cam.targetTexture = rt; cam.Render();
