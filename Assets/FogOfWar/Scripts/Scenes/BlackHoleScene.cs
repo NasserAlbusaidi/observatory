@@ -35,8 +35,8 @@ namespace FogOfWar
         Material mat;
         float debugFate;   // review harness only: 1 ray fates, 2 first disc hit
         BHPost post;
-        float rawHdr;
-        float exposureEV;  // the player's exposure, EV relative to BHPost.DefaultExposure      // review harness only: linear radiance straight out of the ray tracer, no post pass
+        float rawHdr;      // review harness only: linear radiance straight out of the ray tracer, no post pass
+        float exposureEV;  // the player's exposure, EV relative to BHPost.DefaultExposure
         bool prevHdr;
         // -fowbhnopost: the old single-pass look (tonemap in the ray tracer, no glare or accumulation), for A/B runs
         public static readonly bool NoPost = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fowbhnopost") >= 0;
@@ -67,6 +67,7 @@ namespace FogOfWar
         {
             Art.SkyFacing(Quaternion.identity);
             TeardownSandbox();
+            TeardownLens();
             if (post != null) { Gfx.Destroy(post); post = null; }
             if (Cam != null) Cam.allowHDR = prevHdr;   // at app quit the camera can already be gone
         }
@@ -110,7 +111,7 @@ namespace FogOfWar
             // brighter, which would clip to white; part of that is taken out so the structure stays visible
             mat.SetFloat("_Gain", (float)System.Math.Pow(FluxPeak0 / FluxPeak().f, 0.6));
             mat.SetFloat("_SwirlRate", 15);   // disc pattern speed, sped up: ISCO period ≈ 6 s instead of 92 GM/c³
-            mat.SetFloat("_StepK", App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.15f);   // Sharp 0.12 cost 4K over 16 ms (audit #61)
+            mat.SetFloat("_StepK", StepK);
             mat.SetFloat("_Disk", disk ? 1 : 0);
             mat.SetFloat("_Doppler", doppler ? 1 : 0);
             mat.SetFloat("_Lens", lens ? 1 : 0);
@@ -123,7 +124,7 @@ namespace FogOfWar
             mat.SetFloat("_SpotOn", hotSpot ? 1 : 0);
             mat.SetFloat("_SpotR", Mathf.Max(spotRs * 2, (float)Kerr.Isco(spin) * 1.02f));
             mat.SetFloat("_SpotSigma", 0.6f);
-            mat.SetInt("_Steps", App.Quality == 2 ? 1200 : 1000);   // 1500 put 4K Sharp over 16 ms (audit #61)
+            mat.SetInt("_Steps", Steps);
             // a tidal disruption flare with the steady disk off: the returning debris feeds a new thin disk out to the
             // circularisation radius 2 r_p; its accretion rate follows the flare luminosity (in Eddington units)
             if (!disk && FlareDisk(out float fOuter, out float fTemp, out float fGain))
@@ -135,6 +136,7 @@ namespace FogOfWar
             }
             UploadSandbox(mat);
             mat.SetFloat("_DebugFate", debugFate);
+            UpdateLens(a);
             UpdatePost();
         }
 
@@ -150,7 +152,7 @@ namespace FogOfWar
             var t = Cam.transform;
             int pose = Hash(t.position.x, t.position.y, t.position.z, t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w, Cam.fieldOfView);
             int param = Hash(spin, App.Quality, disk ? 1 : 0, doppler ? 1 : 0, lens ? 1 : 0, clumpy ? 1 : 0, outer, temp, logMass, guides ? 1 : 0,
-                Cam.pixelWidth, Cam.pixelHeight, riding != null ? 1 : 0, nParts, bodies.Count, probes.Count, thinDisk ? 1 : 0, hotSpot ? 1 : 0, spotRs);
+                Cam.pixelWidth, Cam.pixelHeight, riding != null ? 1 : 0, nParts, bodies.Count, probes.Count, thinDisk ? 1 : 0, hotSpot ? 1 : 0, spotRs, lensTable ? 1 : 0);
             bool running = Time.timeScale > 0 && !paused;
             bool dynamic = running && (nParts > 0 || bodies.Exists(b => b.state == 0) || probes.Exists(p => p.g.alive));
             bool swirl = running && ((clumpy && (disk || nParts > 0)) || hotSpot);
@@ -165,6 +167,10 @@ namespace FogOfWar
             var j = post.Step(param, pose, dynamic, swirl);
             mat.SetVector("_Jitter", new Vector4(j.x * 2f / Mathf.Max(Cam.pixelWidth, 1), j.y * 2f / Mathf.Max(Cam.pixelHeight, 1), 0, 0));
         }
+
+        // ray step size and step budget per quality (Fast, Balanced, Sharp)
+        float StepK => App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.15f;   // Sharp 0.12 cost 4K over 16 ms (audit #61)
+        int Steps => App.Quality == 2 ? 1200 : 1000;                                // 1500 put 4K Sharp over 16 ms (audit #61)
 
         static int Hash(params float[] v)
         {

@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
         };
@@ -162,6 +162,17 @@ namespace FogOfWar
                 // the ride camera's speed cap near the horizon of a fast spinner (#28)
                 S("sb-ride-kerr-0.998-horizon", Vector3.zero, 70, s => { Default(s); Set(s, "spin", 0.998f); Set(s, "ride", true); B(s).DropProbe(4); B(s).AdvanceUntilRide(1.015 * Kerr.Horizon(0.998)); Set(s, "logWarp", 0f); }, free: true),
             };
+            // step 2 gate: each view with the lens table (its own name), with the full trace everywhere (-full), the map of
+            // pixels that fell back to the full trace (-fallback: red) and the ray fates for the critical curve (-fate)
+            foreach (var g in new[] { "bh-edge-on", "bh-inside-disc", "bh-photon-ring-thin", "bh-kerr-0.998-guides", "bh-thick-edge", "bh-hotspot" })
+            {
+                var b = l.Find(x => x.name == g);
+                var setup = b.setup;
+                Shot V(string suffix, Action<SimScene> extra) { var v = b; v.name = g + suffix; v.setup = s => { setup(s); extra(s); }; return v; }
+                l.Add(V("-full", s => Set(s, "lensTable", false)));
+                l.Add(V("-fallback", s => Set(s, "debugFate", 3f)));
+                l.Add(V("-fate", s => Set(s, "debugFate", 1f)));
+            }
             l.AddRange(Extra);
             return l;
         }
@@ -241,6 +252,7 @@ namespace FogOfWar
                 float until = Time.realtimeSinceStartup + 0.6f + s.run;
                 while (Time.realtimeSinceStartup < until) { if (!s.free) cam.transform.SetPositionAndRotation(s.pos, baseRot); yield return null; }
                 Time.timeScale = 0;   // freeze the disc while sub-frames accumulate
+                Set(app.Current, "diskClock", 3.0);   // at the same phase in every run, so A/B pairs compare
 
                 Array.Clear(acc, 0, acc.Length);
                 float pix = 2 * Mathf.Tan(s.fov * Mathf.Deg2Rad / 2) / H * Mathf.Rad2Deg;
@@ -279,7 +291,7 @@ namespace FogOfWar
                 }
                 tex.SetPixels32(outPx);
                 File.WriteAllBytes(Path.Combine(dir, s.name + ".png"), tex.EncodeToPNG());
-                log.WriteLine($"{s.name}  {((BlackHoleScene)app.Current).DebugSummary()}");
+                log.WriteLine($"{s.name}  {((BlackHoleScene)app.Current).DebugSummary()}  lens table {(bhs.LensActive ? "on" : "off")}, {bhs.LensBuilds} builds");
             }
 
             // -fowbhnotests: shots and GPU timing only (the sandbox checks below take several minutes)
@@ -383,6 +395,7 @@ namespace FogOfWar
             // One throw-away render per configuration first, so the first row does not carry the warm-up (audit #56).
             cam.targetTexture = rt; cam.Render();
             Time.timeScale = 1;
+            log.WriteLine($"lens table: {BlackHoleScene.LensN}² cells, {BlackHoleScene.LensBytes / 1048576.0:0.0} MiB of render targets");
             // second pass (audit #62): a busy sandbox: one shredded star's debris, two intact white dwarfs and a probe
             // (three bodies tested on every ray step), from the same camera
             foreach (bool busy in new[] { false, true })
@@ -407,15 +420,44 @@ namespace FogOfWar
                     cam.targetTexture = trt;
                     cam.fieldOfView = 42;
                     cam.transform.SetPositionAndRotation(new Vector3(0, 0.9f, 24f), Quaternion.LookRotation(-new Vector3(0, 0.9f, 24f)));
-                    yield return null;
                     var small = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-                    cam.Render(); ReadOne(trt, small);
-                    float t0 = Time.realtimeSinceStartup;
                     const int N = 12;
-                    for (int k = 0; k < N; k++) cam.Render();
-                    ReadOne(trt, small);
-                    float ms = (Time.realtimeSinceStartup - t0) * 1000 / N;
-                    log.WriteLine($"timing{(busy ? " (busy sandbox)" : "")} {res.x}x{res.y} quality {q}: {ms:0.0} ms per frame{(((BlackHoleScene)app.Current).Post?.enabled == true ? " (post pass on)" : " (no post pass)")}");
+                    var bt = (BlackHoleScene)app.Current;
+                    foreach (bool table in new[] { true, false })
+                    {
+                        Set(bt, "lensTable", table);
+                        yield return null;   // LateTick: builds the table for this camera
+                        cam.Render(); ReadOne(trt, small);
+                        float t0 = Time.realtimeSinceStartup;
+                        for (int k = 0; k < N; k++) cam.Render();
+                        ReadOne(trt, small);
+                        float ms = (Time.realtimeSinceStartup - t0) * 1000 / N;
+                        log.WriteLine($"timing{(busy ? " (busy sandbox)" : "")} {res.x}x{res.y} quality {q}, {(bt.LensActive ? "lens table" : "full trace")}: {ms:0.0} ms per frame{(bt.Post?.enabled == true ? " (post pass on)" : " (no post pass)")}");
+                    }
+                    Set(bt, "lensTable", true);
+                    if (!busy && res.x == 2560 && q == 1)
+                    {
+                        yield return null;
+                        // the table alone, rebuilt N times; then a camera falling in: every frame moves r, so every frame
+                        // rebuilds the table before it renders
+                        bt.RebuildLens(); ReadOne(trt, small);
+                        float t2 = Time.realtimeSinceStartup;
+                        for (int k = 0; k < N; k++) bt.RebuildLens();
+                        ReadOne(trt, small);
+                        log.WriteLine($"timing lens table rebuild ({BlackHoleScene.LensN}², quality {q}): {(Time.realtimeSinceStartup - t2) * 1000 / N:0.0} ms");
+                        var p0 = new Vector3(0, 0.9f, 24f);
+                        int b0 = bt.LensBuilds;
+                        float t3 = Time.realtimeSinceStartup;
+                        for (int k = 0; k < N; k++)
+                        {
+                            cam.transform.position = p0 * (1 - 0.01f * (k + 1));
+                            bt.LateTick(0);
+                            cam.Render();
+                        }
+                        ReadOne(trt, small);
+                        log.WriteLine($"timing {res.x}x{res.y} quality {q}, falling camera ({bt.LensBuilds - b0} rebuilds in {N} frames): {(Time.realtimeSinceStartup - t3) * 1000 / N:0.0} ms per frame");
+                        cam.transform.SetPositionAndRotation(p0, Quaternion.LookRotation(-p0));
+                    }
                     if (!busy && res.x == 2560 && q == 1 && ((BlackHoleScene)app.Current).Post?.enabled == true)
                     {
                         // the same without the post pass, for its cost
