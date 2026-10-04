@@ -98,8 +98,7 @@ namespace FogOfWar
             switch (KindOf(b))
             {
                 case TargetKind.Wreck: return "Derelict ship · drive dead · orbiting " + (b.Parent?.Name ?? "the Sun");
-                // QA-058: the tutorial's practice beacon also flies a Path, but it coasts on the ship's orbit
-                case TargetKind.Ship: return b.Name == BeaconName ? "Practice beacon · coasting" : "Ship under thrust";
+                case TargetKind.Ship: return "Ship under thrust";
                 default: return null;
             }
         }
