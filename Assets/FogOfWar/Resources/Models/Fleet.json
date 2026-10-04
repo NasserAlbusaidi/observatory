@@ -75,7 +75,7 @@
       "heightM": 18.18,
       "note": "x from -0.5 (nozzle exit) to +0.5 (nose); scale by lengthM / modelLength",
       "engineThroatX": -0.4125,
-      "triangles": 49092,
+      "triangles": 38899,
       "textures": "Models/TankerShip/TankerShip_{Albedo,Normal,Mask,Emission}.png"
     },
     "Hauler": {
@@ -89,7 +89,7 @@
       "heightM": 49.34,
       "note": "x from -0.5 (nozzle exit) to +0.5 (nose); scale by lengthM / modelLength",
       "engineThroatX": -0.4211,
-      "triangles": 46612,
+      "triangles": 39700,
       "textures": "Models/HaulerShip/HaulerShip_{Albedo,Normal,Mask,Emission}.png"
     }
   },
