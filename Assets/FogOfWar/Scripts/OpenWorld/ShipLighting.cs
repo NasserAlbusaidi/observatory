@@ -85,10 +85,11 @@ namespace FogOfWar.OpenWorld
             new Vector4(-1, 0, 0, 0), new Vector4(0, 0, -1, 0), new Vector4(0, 1, 0, 0), new Vector4(0, 0, 0, 1));
 
         // Puts the textured hull material on every part of the ship model except the drive glow. Returns the hull
-        // renderers, or null (model left as Models.Spawn made it) when the texture set isn't in the build.
-        public static Renderer[] ApplyHullMaterial(GameObject model)
+        // renderers, or null (model left as Models.Spawn made it) when the texture set isn't in the build. `set` names
+        // the atlas in Models/<set>/ (the NPC fleet uses the same encoding as the player ship).
+        public static Renderer[] ApplyHullMaterial(GameObject model, string set = "PlayerShip")
         {
-            const string dir = "Models/PlayerShip/PlayerShip_";
+            string dir = "Models/" + set + "/" + set + "_";
             var albedoTex = Resources.Load<Texture2D>(dir + "Albedo");
             var normalTex = Resources.Load<Texture2D>(dir + "Normal");
             var maskTex = Resources.Load<Texture2D>(dir + "Mask");

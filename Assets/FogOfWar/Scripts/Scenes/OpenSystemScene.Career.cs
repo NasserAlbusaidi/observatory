@@ -390,21 +390,55 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- the ship under thrust on an intercept job
 
-        Transform runnerT, runnerPlume;
-        float runnerLen = 1;
-        const float RunnerKm = 0.06f; // a 60 m torch ship
+        Transform runnerT, runnerPlume, runnerGlow;
+        string runnerFor;             // the job the spawned model belongs to: a new job may be a different class
+        float runnerLen = 1, runnerKm = TorchKm;
+        const float TorchKm = 0.06f;  // a 60 m torch ship, for a class with no model of its own
+
+        // Fleet.json (art handoff): one hull per runner class, picked by the first word of the runner's hull string.
+        [Serializable] class FleetShip { public string runner, model; public float lengthM; }
+        [Serializable] class FleetShips { public FleetShip Courier, Packet, Liner, Freighter, Tanker, Hauler; }
+        [Serializable] class FleetFile { public FleetShips ships; }
+        static FleetShip[] fleet;
+
+        static FleetShip FleetFor(string to)
+        {
+            if (fleet == null)
+            {
+                var ta = Resources.Load<TextAsset>("Models/Fleet");
+                var s = ta != null ? JsonUtility.FromJson<FleetFile>(ta.text)?.ships : null;
+                fleet = s == null ? new FleetShip[0] : new[] { s.Courier, s.Packet, s.Liner, s.Freighter, s.Tanker, s.Hauler };
+            }
+            // the runner body is "Runner <name> <id>", the hull string "<class> <name>" (Career.Intercept.Runners)
+            foreach (var f in fleet)
+            {
+                if (f == null || string.IsNullOrEmpty(f.runner)) continue;
+                string name = f.runner.Substring(f.runner.IndexOf(' ') + 1);
+                if (to.Contains(" " + name + " ")) return f;
+            }
+            return null;
+        }
 
         void LateRunner()
         {
             var job = career?.Active.Find(x => x.Kind == JobKind.Intercept);
             var b = job != null ? sys[job.To] : null;
             if (b == null) { if (runnerT != null) runnerT.gameObject.SetActive(false); return; }
+            if (runnerT != null && runnerFor != job.To) { UnityEngine.Object.Destroy(runnerT.gameObject); runnerT = null; }
             if (runnerT == null)
             {
                 runnerT = new GameObject("Runner").transform;
                 runnerT.SetParent(Root, false);
-                var model = Models.Spawn("TorchShip", runnerT, new Color(0.7f, 0.68f, 0.62f)).transform;
+                runnerFor = job.To;
+                var f = FleetFor(job.To);
+                bool own = f != null && Resources.Load<GameObject>("Models/" + f.model) != null;
+                runnerKm = own ? f.lengthM / 1000f : TorchKm;
+                var go = Models.Spawn(own ? f.model : "TorchShip", runnerT, new Color(0.7f, 0.68f, 0.62f));
+                if (own) ShipLighting.ApplyHullMaterial(go, f.model); // stays flat-coloured until its atlas is in the build
+                var model = go.transform;
                 Models.AlignMarker(model, "Nose", Vector3.forward);
+                // the fleet's Engine glows at all times: shown only under thrust
+                runnerGlow = own ? Models.FindDeep(model, "Engine") : null;
                 var rends = model.GetComponentsInChildren<Renderer>();
                 var bounds = rends[0].bounds;
                 foreach (var r in rends) { bounds.Encapsulate(r.bounds); foreach (var m in r.sharedMaterials) Own(m); }
@@ -415,12 +449,13 @@ namespace FogOfWar
             }
             runnerT.gameObject.SetActive(true);
             runnerT.localPosition = Map(sys.Pos(b, jd), out double k);
-            runnerT.localScale = Vector3.one * (float)(RunnerKm * k / runnerLen);
+            runnerT.localScale = Vector3.one * (float)(runnerKm * k / runnerLen);
             // nose along its thrust: it flies forward, then turns its drive against its motion to brake
             var acc = b.PathAccel(jd);
             if (acc.Sqr > 1e-18) runnerT.localRotation = Quaternion.LookRotation(Frame.U(acc.Norm));
             float g = (float)(acc.Mag / Ship.G0);
             runnerPlume.gameObject.SetActive(g > 0.005f);
+            if (runnerGlow != null) runnerGlow.gameObject.SetActive(g > 0.005f);
             float L = runnerLen * Mathf.Clamp(0.4f + 2f * g, 0.4f, 1.2f);
             runnerPlume.localScale = new Vector3(runnerLen * 0.06f, runnerLen * 0.06f, L);
             runnerPlume.localPosition = new Vector3(0, 0, -runnerLen * 0.5f - L * 0.9f);

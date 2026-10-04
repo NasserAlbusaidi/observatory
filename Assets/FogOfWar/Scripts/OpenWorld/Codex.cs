@@ -114,7 +114,7 @@ namespace FogOfWar.OpenWorld
             Earn("scan50", Scanned.Count >= 50);
             Earn("rich", c.Credits >= 100000);
             Earn("drive3", c.DriveLevel >= 1);
-            Earn("landed", ship.Landed != null);
+            Earn("landed", ship.Landed != null && ship.Crashed == null); // QA-055: a crash isn't a touchdown
             Earn("fumes", c.Docked != null && ship.Fuel < 5);
             Earn("icarus", au < 0.3);
             Earn("far", au > 30);

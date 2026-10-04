@@ -419,6 +419,8 @@ namespace FogOfWar
             }
             else { errors++; log.WriteLine($"    new career is not docked ({app.Current?.Title}), so no rescue can be posted"); }
 
+            yield return FleetShots();
+
             log.WriteLine("window sizes");
             foreach (var (w, h) in new[] { (1280, 720), (1024, 768), (2560, 1440) })
             {
@@ -466,6 +468,47 @@ namespace FogOfWar
                     if (ex > 1e-9 || ev > 1e-9) { errors++; msg += "  BAD"; }
                     log.WriteLine(msg);
                 }
+            }
+        }
+
+        // The intercept runner for each class in Fleet.json: post an intercept for that hull, hold beside it and look at it.
+        // Logs which model the scene spawned (a class without its own model falls back to the torch ship).
+        IEnumerator FleetShots()
+        {
+            log.WriteLine("fleet runners");
+            const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
+            foreach (var (cls, name) in new[] { ("Courier", "Halcyon"), ("Packet", "Wren"), ("Liner", "Meridian"), ("Freighter", "Okavango"), ("Tanker", "Ross 128"), ("Hauler", "Tisiphone") })
+            {
+                app.Restart(app.GameIndex);
+                yield return new WaitForSecondsRealtime(1f);
+                var os = app.Current as OpenSystemScene;
+                if (os?.Career == null) { errors++; log.WriteLine("    the game scene isn't the open world"); yield break; }
+                os.Career.Sandbox = false;
+                for (int k = 0; k < 50 && os.Career.Docked == null; k++) yield return new WaitForSecondsRealtime(0.1f);
+                var sys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", F).GetValue(os);
+                double jd = (double)typeof(OpenSystemScene).GetField("jd", F).GetValue(os);
+                OpenWorld.Contract job = null;
+                for (int seed = 1; seed < 400 && job == null && os.Career.Docked != null; seed++)
+                {
+                    var c = os.Career.Intercept(new System.Random(seed), sys, jd);
+                    if (c != null && c.To.Contains(" " + name + " ")) job = c;
+                }
+                if (job == null) { log.WriteLine($"    {cls}: no intercept posted (docked {os.Career.Docked?.Name ?? "-"})"); continue; }
+                os.Career.Accept(job, jd);
+                var runner = sys[job.To];
+                if (runner == null) { errors++; log.WriteLine($"    {cls}: accepted but no runner body"); continue; }
+                var ship = (OpenWorld.Ship)Ship(os);
+                ship.Plan = OpenWorld.Plan.None; ship.ThrottleCmd = 0; ship.Landed = null;
+                ship.Pos = sys.Pos(runner, jd) + new OpenWorld.D3(0, 0, 2); ship.Vel = sys.Vel(runner, jd);
+                typeof(OpenSystemScene).GetMethod("SetTarget", F).Invoke(os, new object[] { runner });
+                yield return new WaitForSecondsRealtime(0.5f);
+                float km = (float)typeof(OpenSystemScene).GetField("runnerKm", F).GetValue(os);
+                Invoke(os, "SetPivot", Enum.ToObject(typeof(OpenSystemScene).GetNestedType("Pivot", BindingFlags.NonPublic), 1), (double)km * 2.5);
+                yield return new WaitForSecondsRealtime(1.5f);
+                var rt = (Transform)typeof(OpenSystemScene).GetField("runnerT", F).GetValue(os);
+                string model = rt != null && rt.childCount > 0 ? rt.GetChild(0).name : "none";
+                log.WriteLine($"    {cls}: {job.To}, model {model}, {km * 1000:0} m");
+                yield return Shot($"9-fleet-{cls.ToLowerInvariant()}");
             }
         }
 
