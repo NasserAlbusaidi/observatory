@@ -28,9 +28,54 @@ namespace FogOfWar
             // the MFDs carry the bottom flight cluster's readouts, and in portrait the cluster would sit on top of them
             if ((flightCluster == null || flightCluster.panel == null) && hudShell != null) flightCluster = hudShell.HudLayer?.Q(className: "flight");
             if (flightCluster != null) flightCluster.style.visibility = inside ? Visibility.Hidden : Visibility.Visible;
+            KeepHudAboveConsole(inside);
             if (!inside) return;
             if ((mfdT += dt) >= 0.1f) { mfdT = 0; FillMfds(); }
             if ((plotT += dt) >= 0.25f) { plotT = 0; PlotOrbit(); }
+        }
+
+        // The status chips and the lesson card normally sit at fixed heights over the flight cluster. In the cockpit they
+        // ride just above the MFD row instead, wherever the aspect ratio and head turn put it.
+        void KeepHudAboveConsole(bool inside)
+        {
+            if (hudShell == null || pills == null) return;
+            float top = inside ? cockpit.ConsoleTop() : 0;
+            float colBottom = hudShell.Portrait ? 350 : 56; // BuildHud's own value
+            if (top <= 0)
+            {
+                pills.style.bottom = StyleKeyword.Null;
+                if (lessonCard != null) lessonCard.style.bottom = StyleKeyword.Null;
+                if (rightCol != null) rightCol.style.bottom = colBottom;
+                return;
+            }
+            float b = top / hudShell.Scale + 8;
+            pills.style.bottom = b;
+            if (lessonCard != null) lessonCard.style.bottom = b + 44;
+            // QA-049: the target card and ship console column ends above the MFDs (its body scrolls)
+            // in portrait the lesson card spans under the column too, so the column also ends above the card
+            float lesson = hudShell.Portrait && lessonCard != null && lessonCard.resolvedStyle.display == DisplayStyle.Flex &&!float.IsNaN(lessonCard.resolvedStyle.height)
+                ? 44 + lessonCard.resolvedStyle.height + 8 : 0;
+            if (rightCol != null) rightCol.style.bottom = Mathf.Max(colBottom, b + lesson);
+        }
+
+        // HUD world markers and labels: false for a screen point that lands on the cabin instead of the display.
+        bool CockpitShows(Vector3 screen) => cockpit == null || cockpit.OnDisplay(screen);
+
+        // Pull an edge marker (HUD coordinates) in toward the screen centre until it sits on the display.
+        Vector2 OntoDisplay(Vector2 at)
+        {
+            if (cockpit == null || !cockpit.Visible) return at;
+            var c = new Vector2(hudShell.HudWidth / 2, hudShell.H / 2);
+            bool moved = false;
+            for (int i = 0; i < 24 && !CockpitShows(HudToScreen(at)); i++) { at = c + (at - c) * 0.9f; moved = true; }
+            // a little margin, so the chevron and its name stay clear of the bezel
+            return moved ? c + (at - c) * 0.9f : at;
+        }
+
+        Vector3 HudToScreen(Vector2 at)
+        {
+            float left = float.IsNaN(hudShell.HudLayer.resolvedStyle.left) ? 0 : hudShell.HudLayer.resolvedStyle.left;
+            return new Vector3((at.x + left) * hudShell.Scale, Cam.pixelHeight - at.y * hudShell.Scale, 0);
         }
 
         void FillMfds()
