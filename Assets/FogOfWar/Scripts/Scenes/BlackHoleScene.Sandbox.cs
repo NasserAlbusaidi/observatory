@@ -104,14 +104,24 @@ namespace FogOfWar
         double lastDE;
         const double LumTau = 2000;   // M: smoothing of the luminosity and fallback readouts
         const double HeatTau = 0.25;  // orbits: smoothing of each gas particle's drawn heat, on its own clock
-        const double GasChunk = 0.125; // orbits: longest piece of returned gas's motion between two applications of the gas model
+        const double GasChunk = 0.125; // orbits: returned gas's motion between two applications of the gas model
+        // BH audit #30: the gas model is applied at fixed points of each particle's own time (pKick: from its return
+        // to pericentre, every GasChunk of a local orbit), and the heat it releases is binned by that time, not by
+        // frame. A bin is final once no returned gas is still behind it, so frame rate, warp and step budget change
+        // only how soon the light curve is drawn, not its shape.
+        double[] pKick, pKickDt;
+        const double LumBin = 50;      // M
+        readonly Dictionary<long, double> lumBins = new Dictionary<long, double>();
+        long lumNext;
+        double curveLastT;
+        void Deposit(double t, double e) { long k = Math.Max((long)Math.Floor(t / LumBin), lumNext); lumBins.TryGetValue(k, out var v); lumBins[k] = v + e; }
 
         double A => spin;
 
         void BuildSandbox()
         {
             parts = new Geo[MaxParts]; pTemp = new float[MaxParts]; pHeat = new float[MaxParts]; pBase = new float[MaxParts];
-            pPhase = new byte[MaxParts]; pMass = new double[MaxParts];
+            pPhase = new byte[MaxParts]; pMass = new double[MaxParts]; pKick = new double[MaxParts]; pKickDt = new double[MaxParts];
             texData = new float[NR * NP * 4];
             debrisTex = Own(new Texture2D(NR, NP, TextureFormat.RGBAFloat, false, true) { wrapModeU = TextureWrapMode.Clamp, wrapModeV = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear });
             ClearSandbox();
@@ -133,6 +143,7 @@ namespace FogOfWar
             if (followOn) { Orbit.target = Vector3.zero; Orbit.distance = 24; followOn = false; }
             camVel = new Vector4(0, 0, 0, 1);
             lightCurve.Clear(); lum = fallbackRate = fallbackAcc = accreted = 0; heatScale = 1e-9; curveT = 0; lastDE = 0; simT = 0;
+            lumBins.Clear(); lumNext = 0; curveLastT = double.NegativeInfinity;
             Orbit.enabled = true;
         }
 
@@ -302,6 +313,7 @@ namespace FogOfWar
             {
                 if (!parts[i].alive) continue;
                 parts[j] = parts[i]; pTemp[j] = pTemp[i]; pHeat[j] = pHeat[i]; pBase[j] = pBase[i]; pPhase[j] = pPhase[i]; pMass[j] = pMass[i];
+                pKick[j] = pKick[i]; pKickDt[j] = pKickDt[i];
                 j++;
             }
             nParts = liveParts = j;
@@ -445,10 +457,9 @@ namespace FogOfWar
             }
 
             // Gas: each particle integrates towards the shared clock with a step budget; one that runs out of steps keeps
-            // its own time and catches up on later frames (audit #51). Returned gas is damped over the time it actually
-            // integrated, in pieces of at most an eighth of a local orbit, so its history is the same at any frame rate,
-            // warp or step budget (BH audit #30).
-            double heatMax = 0, dissipated = 0, isco = Kerr.Isco(a);
+            // its own time and catches up on later frames (audit #51). Gas on its way back is stepped singly so its
+            // return to pericentre is caught where it happens; returned gas gets the gas model at its pKick times.
+            double heatMax = 0, isco = Kerr.Isco(a), tDone = simT;
             int live = 0;
             for (int i = 0; i < nParts; i++)
             {
@@ -456,33 +467,48 @@ namespace FogOfWar
                 if (!p.alive) continue;
                 double t0 = p.t, dE = 0;
                 int budget = p.r < 50 ? 200 : 40;   // more steps near the hole (audit #51)
-                if (pPhase[i] != 2) p.AdvanceT(a, simT - p.t, 0.12, budget);
-                else
-                    while (budget > 0 && simT - p.t > 1e-9 * Math.Max(simT, 1) && !p.inside)
+                if (pPhase[i] == 0) p.AdvanceT(a, simT - p.t, 0.12, budget);
+                else if (pPhase[i] == 1)
+                    for (; budget > 0 && p.t < simT && !p.inside && p.peris < 2; budget--) if (p.AdvanceT(a, simT - p.t, 0.12, 1) == 0) break;
+                if (pPhase[i] == 0 && p.apoR > 0 && p.E < 1) pPhase[i] = 1;   // apocentre: on its way back
+                if (pPhase[i] == 1 && p.peris >= 2)                            // back at pericentre
+                {
+                    pPhase[i] = 2; fallbackAcc += pMass[i];
+                    pKickDt[i] = GasChunk * 2 * Math.PI * Math.Pow(Math.Max(p.periR, 1), 1.5);
+                    pKick[i] = p.periT + pKickDt[i];
+                }
+                if (pPhase[i] == 2)
+                    while (budget > 0 && !p.inside && p.alive)
                     {
-                        double tc = p.t, P = 2 * Math.PI * Math.Pow(p.r, 1.5);
-                        int n = p.AdvanceT(a, Math.Min(simT - p.t, GasChunk * P), 0.12, budget);
-                        budget -= n;
-                        double dtc = p.t - tc;
-                        if (n == 0 || dtc <= 0) break;
+                        double to = Math.Min(simT, pKick[i]);
+                        if (to > p.t)
+                        {
+                            int n = p.AdvanceT(a, to - p.t, 0.12, budget);
+                            budget -= n;
+                            if (n == 0) break;
+                        }
+                        if (p.inside || p.t < pKick[i] - 1e-9 * Math.Max(p.t, 1)) break;   // not there yet: next frame
                         // inside the ISCO gas plunges in a free-fall time and radiates almost nothing: no braking there (audit #43)
-                        if (p.inside || p.r <= isco) continue;
-                        P = 2 * Math.PI * Math.Pow(p.r, 1.5);
-                        double E0 = p.E;
-                        p.w *= Math.Exp(-dtc / P);            // circularise: damp the radial motion over about an orbit
-                        p.SolveE(a);
-                        p.L *= Math.Exp(-dtc / (12 * P));    // spread inwards (sped up: a real viscous time is far longer)
-                        p.SolveE(a);
-                        dE += Math.Max(E0 - p.E, 0);
+                        double P = 2 * Math.PI * Math.Pow(p.r, 1.5);
+                        if (p.r > isco)
+                        {
+                            double E0 = p.E;
+                            p.w *= Math.Exp(-pKickDt[i] / P);            // circularise: damp the radial motion over about an orbit
+                            p.SolveE(a);
+                            p.L *= Math.Exp(-pKickDt[i] / (12 * P));    // spread inwards (sped up: a real viscous time is far longer)
+                            p.SolveE(a);
+                            double de = Math.Max(E0 - p.E, 0);
+                            dE += de;
+                            Deposit(pKick[i], de * pMass[i]);
+                        }
+                        pKickDt[i] = GasChunk * P;
+                        pKick[i] += pKickDt[i];
                     }
                 double dtp = p.t - t0;
-                dissipated += dE * pMass[i];   // energy released this frame; the luminosity divides by the frame's h
                 if (p.inside) { p.alive = false; accreted += pMass[i]; continue; }
                 if (p.E >= 1 && p.r > TexRMax * 2) { p.alive = false; continue; }
                 live++;
-                // turning points are counted inside the integrator, so several per frame are not missed at high warp
-                if (pPhase[i] == 0 && p.apoR > 0 && p.E < 1) pPhase[i] = 1;                           // apocentre: on its way back
-                if (pPhase[i] == 1 && p.peris >= 2) { pPhase[i] = 2; fallbackAcc += pMass[i]; }        // back at pericentre
+                if (pPhase[i] == 2) tDone = Math.Min(tDone, p.t);
                 // drawn heat follows the heating rate over a quarter of a local orbit of the particle's own time
                 if (dtp > 0) pHeat[i] += (float)((dE / dtp - pHeat[i]) * (1 - Math.Exp(-dtp / (HeatTau * 2 * Math.PI * Math.Pow(p.r, 1.5)))));
                 if (pHeat[i] > heatMax) heatMax = pHeat[i];
@@ -496,19 +522,25 @@ namespace FogOfWar
             foreach (var p in probes) StepProbe(p, h, dt);
             if (riding != null && (!riding.g.alive && riding.g.inside == false)) StopRide();
 
-            // luminosity: the heat released by the gas model (E is energy per unit rest mass); Eddington for hydrogen
-            double Lw = dissipated / Math.Max(h, 1e-9) * Phys.c * Phys.c / Tunit;
-            double Ledd = 1.26e31 * MassKg / Phys.Msun;
-            // smoothed over sim time (not frames), on about the gas model's own time scale
-            double ema = 1 - Math.Exp(-h / LumTau);
-            lum += (Lw / Ledd - lum) * ema;
-            curveT += h;
-            if (curveT > 0 && (lightCurve.Count == 0 || simT - lightCurve[lightCurve.Count - 1].x > Math.Max(h, 5)))
+            // luminosity, bin by finished bin: the heat released by the gas model (E is energy per unit rest mass) over
+            // the bin's time; Eddington for hydrogen. Smoothed over sim time, on about the gas model's own time scale.
+            double Ledd = 1.26e31 * MassKg / Phys.Msun, ema = 1 - Math.Exp(-LumBin / LumTau);
+            double spacing = Math.Max(LumBin, Math.Pow(10, logWarp) / 30);   // a point per 1/30 s of play at this warp
+            for (long done = (long)Math.Floor(tDone / LumBin); lumNext < done; lumNext++)
             {
-                fallbackRate += (fallbackAcc / Math.Max(curveT, 1e-9) - fallbackRate) * (1 - Math.Exp(-curveT / LumTau));
-                fallbackAcc = 0; curveT = 0;
-                if (liveParts > 0 || lum > 1e-9) lightCurve.Add(new Vector2((float)simT, (float)lum));
-                if (lightCurve.Count > 600) lightCurve.RemoveAt(0);
+                lumBins.TryGetValue(lumNext, out var e);
+                lumBins.Remove(lumNext);
+                double Lw = e / LumBin * Phys.c * Phys.c / Tunit;
+                lum += (Lw / Ledd - lum) * ema;
+                curveT += LumBin;
+                double tb = (lumNext + 1) * LumBin;
+                if (tb - curveLastT >= spacing)
+                {
+                    fallbackRate += (fallbackAcc / Math.Max(curveT, 1e-9) - fallbackRate) * (1 - Math.Exp(-curveT / LumTau));
+                    fallbackAcc = 0; curveT = 0; curveLastT = tb;
+                    if (liveParts > 0 || lum > 1e-9) lightCurve.Add(new Vector2((float)tb, (float)lum));
+                    if (lightCurve.Count > 600) lightCurve.RemoveAt(0);
+                }
             }
             Splat();
         }
