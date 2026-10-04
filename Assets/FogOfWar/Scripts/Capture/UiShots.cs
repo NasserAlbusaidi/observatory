@@ -149,6 +149,19 @@ namespace FogOfWar
                             yield return Wait(0.3f);
                             yield return Shot(app, shell, camRT, uiRT, tag, "06j-beacon-offscreen");
                             log.WriteLine("    beacon: " + os.TestLabelReport());
+                            // QA-062: the travel line within parking distance (the beacon starts 5 km off), then 5 km past it
+                            log.WriteLine("    travel line, parked: " + os.TestTravelLine());
+                            os.TestOffsetFromTarget(5);
+                            os.TestAimTargetAt(0.5f);
+                            yield return Wait(0.3f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06k-travel-5km");
+                            log.WriteLine("    travel line, 5 km out: " + os.TestTravelLine());
+                            // QA-060: toasts stay clear of the target card
+                            shell.Toast("Test toast: job posted");
+                            shell.Toast("Test toast with a note", "and a second line");
+                            shell.Toast("Test toast: something went wrong", null, 3.5f, "bad");
+                            yield return Wait(0.4f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06l-toasts");
                             ship.VelRef = null;
                             typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);
                         }
@@ -158,8 +171,16 @@ namespace FogOfWar
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
                 os?.ShowCodex(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
+                if (os != null) log.WriteLine("    codex tab: " + os.TestLessonReport());
                 os?.ShowCodex(0);
                 os?.ShowConsoleTab(0);
+                if (os != null)
+                {
+                    // QA-059: the lesson card above the console, which must clear it
+                    yield return Wait(0.3f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06m-lesson-console");
+                    log.WriteLine("    flight tab: " + os.TestLessonReport());
+                }
                 if (os != null)
                     foreach (var k in new[] { OpenWorld.JobKind.Intercept, OpenWorld.JobKind.Rescue })
                     {

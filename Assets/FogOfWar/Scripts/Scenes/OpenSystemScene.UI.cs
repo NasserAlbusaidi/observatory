@@ -96,12 +96,27 @@ namespace FogOfWar
         {
             if (ship.PlanActive) { ship.Plan = Plan.None; ship.Throttle = 0; ship.Phase = "plan aborted"; return; }
             if (ship.Target == null) return;
+            // QA-061: a brachistochrone the tank can't finish asks once; engaging again within a few seconds goes anyway
+            if (selectedPlan == Plan.Brachistochrone && !ship.UnlimitedFuel)
+            {
+                PlanTrip(out _, out double dv, out _);
+                if (DvShort(dv) && !(shortArmed == ship.Target && Time.unscaledTime < shortUntil))
+                {
+                    shortArmed = ship.Target; shortUntil = Time.unscaledTime + 8;
+                    ship.Phase = "Δv short: engage again to go anyway";
+                    hudShell?.Toast($"Not enough Δv to reach {ship.Target.Name}",
+                        $"Needs about {dv * DvMargin:N0} km/s with margin, {Career.DvLeft(ship):N0} left. Engage again to go anyway.", 6f, "bad");
+                    return;
+                }
+            }
+            shortArmed = null;
             ship.Plan = selectedPlan;
             ship.Landed = null; ship.ThrottleCmd = 0; ship.Hold = Hold.Off;
             if (selectedPlan == Plan.HoldStation) ship.StationOffset = ship.Pos - sys.Pos(ship.Target, jd);
         }
 
         Plan selectedPlan = Plan.Brachistochrone;
+        Body shortArmed; float shortUntil;
 
         // kept for QA scripts
         void TogglePlot() { selectedPlan = Plan.Brachistochrone; TogglePlan(); }
@@ -374,7 +389,8 @@ namespace FogOfWar
                 var tp = sys.Pos(ship.Target, jd);
                 double d = Math.Max((tp - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
                 GUILayout.Label($"Target: {ship.Target.Name}", ui.label);
-                GUILayout.Label($"Brachistochrone at {Fmt.Num(ship.MaxG, 1)} g: {Dur(2 * Math.Sqrt(d / ship.AMax))}, Δv ≈ {Fmt.Num(2 * Math.Sqrt(d * ship.AMax), 0)} km/s, peak {Fmt.Num(Math.Sqrt(d * ship.AMax), 0)} km/s", ui.note);
+                string brach = BrachLine(d, out bool dvShort).Replace("\n", ", ");
+                GUILayout.Label(brach, dvShort ? ui.label : ui.note);
                 if (ship.Target.Parent == sys.Sun && reference == sys.Sun || ship.Target.Parent == sys.Sun)
                 {
                     var (dv, t) = Ship.Hohmann(ship.Pos.Mag, tp.Mag, sys.Sun.GM);

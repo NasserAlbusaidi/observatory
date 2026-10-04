@@ -82,10 +82,17 @@ namespace FogOfWar
             Call("SetTarget", to);
             Put("cruiseIdx", cruise);
             double d = Math.Max((sys.Pos(to, jd) - ship.Pos).Mag - Ship.Standoff(to), 0);
-            Career.Trip(d, ship.AMax, new[] { 1, 0.5, 0.25 }[cruise], ship.Mass, out double estT, out double estDv, out double estFuel);
+            var (u, w) = ship.RelToTarget(sys, jd);
+            Career.Trip(d, ship.AMax, new[] { 1, 0.5, 0.25 }[cruise], ship.Mass, out double estT, out double estDv, out double estFuel, u, w);
             double jd0 = jd, fuel0 = ship.Fuel, dv0 = ship.DvUsed;
             Put("selectedPlan", Plan.Brachistochrone);
             Call("TogglePlan");
+            // QA-061: these trips are meant to fly; if the Δv guard asks first, say so and go anyway
+            if (!ship.PlanActive && ship.Phase.StartsWith("Δv short"))
+            {
+                log.WriteLine($"  {tag}: Δv guard asked first (est {estDv:F0} km/s × 1.1, {Career.DvLeft(ship):F0} left)");
+                Call("TogglePlan");
+            }
             yield return null;
             yield return Fly(done, warp, budget);
             log.WriteLine($"  {tag}: est {estT / 3600:F1} h, Δv {estDv:F0} km/s, {estFuel:F2} t  |  flew {(jd - jd0) * 24:F1} h, Δv {ship.DvUsed - dv0:F0} km/s, {fuel0 - ship.Fuel:F2} t  cap {ship.CruiseCap:F0} km/s");
@@ -393,6 +400,51 @@ namespace FogOfWar
                     Check(!career.Active.Contains(ic) && career.Credits > c4 && sys[ic.To] == null, $"cargo handed over in flight and paid ({career.Credits - c4:N0} cr)");
                     Check(ship.Target == null && !ship.PlanActive, "after the handover the autopilot lets the runner go");
                 }
+            }
+
+            // QA-061: Vesta 0.9 AU off while coasting away from it at 446 km/s, 300 km/s sideways. The card read the trip
+            // from rest (2·√(a·d)) and the tank ran dry short; the plan has to stop first. The estimate must cover what
+            // the autopilot flies, and a tank that can't finish it must not engage on the first press.
+            {
+                app.Restart(app.GameIndex);
+                yield return new WaitForSecondsRealtime(1f);
+                s = (OpenSystemScene)app.Current;
+                Put("warpIdx", 0);
+                var vesta = sys["Vesta"];
+                var dir = sys.Pos(vesta, jd).Norm;
+                var side = D3.Cross(dir, new D3(0, 0, 1)).Norm;
+                var pos0 = sys.Pos(vesta, jd) - dir * (0.9 * Frame.AU);
+                var vel0 = sys.Vel(vesta, jd) - dir * 446 + side * 300;
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Landed = null;
+                ship.Pos = pos0; ship.Vel = vel0; ship.Fuel = career.TankCapacity;
+                Call("SetTarget", vesta);
+                Put("cruiseIdx", 0);
+                Put("selectedPlan", Plan.Brachistochrone);
+                double d = Math.Max((sys.Pos(vesta, jd) - ship.Pos).Mag - Ship.Standoff(vesta), 0);
+                var (u, w) = ship.RelToTarget(sys, jd);
+                Career.Trip(d, ship.AMax, 1, ship.Mass, out double estT, out double estDv, out _, u, w);
+                double fromRest = 2 * Math.Sqrt(ship.AMax * d);
+                log.WriteLine($"  QA-061 setup: {d / Frame.AU:F3} AU, closing {u:F0} km/s, sideways {w:F0} km/s; from rest {fromRest:F0} km/s, from state {estDv:F0} km/s, Δv left {Career.DvLeft(ship):F0}");
+
+                // tank holding 90 % of the estimate: the first press warns, the second goes anyway
+                ship.Fuel = (ship.DryMass + ship.Cargo) * (Math.Exp(0.9 * estDv / Ship.Ve) - 1);
+                Call("TogglePlan");
+                Check(!ship.PlanActive && ship.Phase.StartsWith("Δv short"), $"short tank ({Career.DvLeft(ship):F0} km/s left): first engage warns ({ship.Phase})");
+                Call("TogglePlan");
+                Check(ship.PlanActive, "second engage goes anyway");
+                ship.Plan = Plan.None;
+
+                // full tank: fly it and compare
+                ship.Pos = pos0; ship.Vel = vel0; ship.Fuel = career.TankCapacity;
+                double dv0 = ship.DvUsed, jd0 = jd;
+                Call("TogglePlan");
+                Check(ship.PlanActive, $"full tank ({Career.DvLeft(ship):F0} km/s left) engages at once");
+                yield return Fly(() => ship.Phase == "in orbit" || ship.Dry, 5, 120);
+                Put("warpIdx", 0);
+                double flown = ship.DvUsed - dv0;
+                log.WriteLine($"  QA-061 flew {(jd - jd0) * 24:F1} h (est {estT / 3600:F1} h), Δv {flown:F0} km/s = {flown / estDv:F2} × estimate, phase {ship.Phase}");
+                Check(ship.Phase == "in orbit" && flown <= estDv * 1.1, $"arrives at Vesta within the 10 % margin ({flown:F0} of {estDv:F0} km/s)");
+                ship.Plan = Plan.None;
             }
 
             // #23: a radial fall toward Luna is not docked, a parking orbit is; #18: Continue on a save made mid-plan at

@@ -217,9 +217,8 @@ namespace FogOfWar
             {
                 Ui.Section(c, "Trip planner: " + ship.Target.Name);
                 c.Add(new Segmented(CruiseNames, cruiseIdx, i => { cruiseIdx = i; jobsSig = null; }));
-                double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
-                Career.Trip(d, ship.AMax, PlannerFrac(d), ship.Mass, out double t, out double dv, out double fuel);
-                bool short_ = fuel > ship.Fuel;
+                PlanTrip(out double t, out double dv, out double fuel);
+                bool short_ = DvShort(dv);
                 Ui.L(c, $"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", "t-note", "f-mono", short_ ? "warn" : "dim");
                 if (short_) Ui.L(c, "Not enough reaction mass. Coast, lower the g, or refuel.", "t-body", "warn");
                 foreach (var j in career.Active)
