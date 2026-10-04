@@ -152,6 +152,9 @@ namespace FogOfWar
             {
                 ("max", s => { Set(s, "v", 10f); Set(s, "R", 5f); Set(s, "sigma", 8f); Set(s, "amp", 3f); }, 3),
                 ("min", s => { Set(s, "v", 0.1f); Set(s, "R", 1.5f); Set(s, "sigma", 0.6f); Set(s, "amp", 0.2f); }, 3),
+                // energy-ratio references (#9): integrated shape gives 0.140 at v 2, R 1.5, σ 0.6 and 0.797 at σ 8
+                ("thick-wall-v2", s => { Set(s, "v", 2f); Set(s, "R", 1.5f); Set(s, "sigma", 0.6f); Set(s, "amp", 1.2f); }, 2),
+                ("thin-wall-v2", s => Set(s, "sigma", 8f), 2),
             },
             [typeof(JourneyScene)] = new (string, Action<SimScene>, float)[]
             {

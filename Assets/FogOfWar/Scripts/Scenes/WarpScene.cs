@@ -12,7 +12,7 @@ namespace FogOfWar
         public override string Blurb =>
             "The ship never moves through space. The bubble wall <color=#69D2FF>contracts space in front</color> and <color=#FFB547>expands it behind</color>, and the flat patch in the middle is carried along. The grid is spacetime; its height is the York time from Alcubierre's paper.\n\n" +
             "Push the speed past 1 c. Nothing in the maths stops you, which is the whole problem with \"mathematically possible\".";
-        public override string Note => "The bill: the wall needs negative energy density. The original estimates came out far beyond the mass-energy of the observable universe. Later reshaped bubbles cut that by many orders of magnitude, but it's still negative energy nobody can make. Above 1 c the crew also can't signal the front of their own bubble, so they can't switch it on or off.";
+        public override string Note => "The bill: the wall needs negative energy density. The original estimates came out far beyond the mass-energy of the observable universe. Later reshaped bubbles cut that by many orders of magnitude, but it's still negative energy nobody can make. Above 1 c the crew also can't signal the front of their own bubble, so they can't switch it on or off. The energy readout only compares this wall shape with the default bubble; it says nothing about how big the real bill is or whether one could be built.";
 
         float v = 2, R = 3, sigma = 2.5f, amp = 1.2f;
         Material surf, streakMat;
@@ -127,7 +127,10 @@ namespace FogOfWar
 
         public override void Readouts(List<Readout> list)
         {
-            float rel = v * v * R * R * sigma / (4 * 9 * 2.5f);
+            // Pfenning & Ford 1997 eq. 26: total energy ∝ −v² ∫ r² f'(r)² dr for the shader's tanh shape, integrated
+            // numerically so thick walls are right too (the old R²σ thin-wall scaling was 57% low at R 1.5, σ 0.6).
+            if (R != relR || sigma != relSigma) { relR = R; relSigma = sigma; relI = ShapeIntegral(R, sigma); }
+            double rel = v * v * relI / (2.0 * 2.0 * DefaultIntegral); // default bubble: v 2 c, R 3, σ 2.5
             list.Add(new Readout("Bubble speed", v.ToString("0.0") + " c", v > 1 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Crew's proper acceleration", "0 g (free fall)", Tone.Cold));
             list.Add(new Readout("Time dilation inside", "none (γ = 1)"));
@@ -136,8 +139,27 @@ namespace FogOfWar
             // Pfenning & Ford 1997: Δ = (1 + tanh²σR)² / (2σ tanh σR), ≈ 2/σ for a thin wall
             double th = System.Math.Tanh(sigma * R);
             list.Add(new Readout("Wall thickness ≈", (33 * System.Math.Pow(1 + th * th, 2) / (2 * sigma * th)).ToString("0.0") + " m"));
-            list.Add(new Readout("Negative energy, relative", Fmt.Num(rel, 2) + "× default", Tone.Cold));
+            list.Add(new Readout("Negative energy vs default bubble", Fmt.Num(rel, 2) + "× (ratio only)", Tone.Cold));
             list.Add(new Readout("Crew can steer the front?", v > 1 ? "no (beyond their horizon)" : "yes", v > 1 ? Tone.Bad : Tone.Normal));
+        }
+
+        float relR = -1, relSigma = -1;
+        double relI;
+        static double defaultIntegral;
+        static double DefaultIntegral => defaultIntegral > 0 ? defaultIntegral : (defaultIntegral = ShapeIntegral(3, 2.5));
+
+        // ∫₀^(R+30/σ) r² f'(r)² dr for f(r) = [tanh σ(r+R) − tanh σ(r−R)] / (2 tanh σR), by Simpson's rule.
+        public static double ShapeIntegral(double R, double sigma)
+        {
+            const int n = 4000;
+            double b = R + 30 / sigma, h = b / n, k = sigma / (2 * System.Math.Tanh(sigma * R)), sum = 0;
+            for (int i = 0; i <= n; i++)
+            {
+                double r = i * h, c1 = System.Math.Cosh(sigma * (r + R)), c2 = System.Math.Cosh(sigma * (r - R));
+                double fp = k * (1 / (c1 * c1) - 1 / (c2 * c2));
+                sum += (i == 0 || i == n ? 1 : i % 2 == 1 ? 4 : 2) * r * r * fp * fp;
+            }
+            return sum * h / 3;
         }
 
         public override void Controls(PanelUI ui)
