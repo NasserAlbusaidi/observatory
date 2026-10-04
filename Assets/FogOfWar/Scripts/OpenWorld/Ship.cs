@@ -101,7 +101,7 @@ namespace FogOfWar.OpenWorld
             }
             else
             {
-                want = HoldDir(sys, jd, reference);
+                want = HoldDirMid(sys, jd, h, reference, g);
                 Phase = ThrottleCmd > 0 ? "burning" : RcsInput.sqrMagnitude > 0 ? "RCS" : "coasting";
             }
             if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of reaction mass"; }
@@ -134,8 +134,9 @@ namespace FogOfWar.OpenWorld
             // (Ship harness, issue #13): a 2 h 1 g burn 0.2 AU from Earth, 1 mm at h = 30 s (was 1,000 km); 30 min of
             // burns and coasts from low Earth orbit with a fixed heading, 45 m at h = 5 s, 0.2 km at 10 s, 1.6 km at 30 s
             // (was 37, 74, 222 km). The scene's substeps there are ~9 s (1 % of the orbit's radian time) and ≤ 30 s under
-            // power anywhere. A heading that tracks something (prograde hold, autopilot) is re-aimed once per step, a
-            // first-order hold: ~45 km on the same LEO sequence at h = 10 s, about 0.3 % of the distance flown.
+            // power anywhere. Holds that track the ship's motion are aimed at mid-step (HoldDirMid): a prograde hold on
+            // the same LEO sequence is 0.38 km off at h = 10 s and 3.3 km at 30 s (was 45 and 136 km). The autopilot
+            // still re-aims once per step; it is a feedback loop, so that shows as guidance error, not drift.
             var thrust = Heading * (Throttle * AMax) + rcs;
             double dv = (Throttle * AMax + rcs.Mag) * h;
             // reaction mass that runs out partway through the step drives the ship for only the fraction f of h it lasts
@@ -161,6 +162,19 @@ namespace FogOfWar.OpenWorld
         {
             if (ManualInput && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
             UpdateAttitude(PlanActive ? (D3?)null : HoldDir(sys, jd, reference), h);
+        }
+
+        // #13: under power, a hold that follows the ship's own motion (prograde, normal, radial, target) is aimed at
+        // the state predicted for the middle of the step, so the thrust it steers is second order in h. Aimed at the
+        // start, it lagged half a step: 45 km after 30 min of prograde burns from LEO at h = 10 s.
+        D3? HoldDirMid(SolarSystem sys, double jd, double h, Body reference, D3 g)
+        {
+            if (Hold == Hold.Off || Hold == Hold.Custom || ThrottleCmd <= 0 || !(h > 0)) return HoldDir(sys, jd, reference);
+            D3 p = Pos, v = Vel, a = g + Heading * (ThrottleCmd * AMax);
+            Pos = p + v * (0.5 * h) + a * (0.125 * h * h); Vel = v + a * (0.5 * h);
+            var d = HoldDir(sys, jd + 0.5 * h / 86400, reference);
+            Pos = p; Vel = v;
+            return d;
         }
 
         D3? HoldDir(SolarSystem sys, double jd, Body reference)
