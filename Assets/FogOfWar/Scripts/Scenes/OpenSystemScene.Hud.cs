@@ -391,7 +391,7 @@ namespace FogOfWar
             var head = Ui.E(c, "row");
             Ui.L(head, "THROTTLE", "t-label", "f-condm").style.flexGrow = 1;
             thrLabel = Ui.L(head, "", "t-val", "f-mono");
-            thrSlider = new FowSlider(0, 1, (float)ship.ThrottleCmd, v => { ship.ThrottleCmd = v; if (ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "pilot override"; } });
+            thrSlider = new FowSlider(0, 1, (float)ship.ThrottleCmd, v => ManualThrottle(v));
             c.Add(thrSlider);
             Ui.L(c, $"{UiShell.Keys(A.ThrottleUp)} / {UiShell.Keys(A.ThrottleDown)} throttle · {UiShell.Keys(A.ThrottleFull)} full · {UiShell.Keys(A.ThrottleCut)} cut", "t-note");
             Ui.Section(c, "Drive limit");
@@ -407,7 +407,7 @@ namespace FogOfWar
             Ui.L(r, $"Flight assist ({UiShell.Keys(A.FlightAssist)}): stop rotating when the stick is released", "t-body");
             var row = Ui.E(c, "row", "wrap");
             row.style.marginTop = 6;
-            Ui.B(row, "Flip  " + UiShell.Keys(A.Flip), Flip);
+            Ui.B(row, "Flip 180°  " + UiShell.Keys(A.Flip), Flip);
             Ui.B(row, "Kill rotation", () => { ship.AngVel = Vector3.zero; ship.Hold = Hold.Off; });
             Ui.Section(c, "Attitude hold  (keys 1–9)");
             var grid = Ui.E(c, "row", "wrap");

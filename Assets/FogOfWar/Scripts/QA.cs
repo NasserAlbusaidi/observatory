@@ -121,6 +121,18 @@ namespace FogOfWar
             if (ship.Landed != null || alt < 0) Debug.LogError(msg); else Debug.LogWarning(msg);
             Set(s, "warpIdx", 0);
         }
+        static double helpJd;
+        static double Jd(SimScene s) => (double)s.GetType().GetField("jd", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
+        static FogOfWarApp App(SimScene s) => (FogOfWarApp)typeof(SimScene).GetField("App", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
+        static void Check(bool ok, string msg) { if (ok) Debug.LogWarning(msg + ": ok"); else Debug.LogError(msg); }
+
+        static void CutCheck(SimScene s)
+        {
+            var sh = (OpenWorld.Ship)Ship(s);
+            int warp = (int)s.GetType().GetField("warpIdx", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
+            Check(!sh.PlanActive && sh.Throttle == 0 && sh.ThrottleCmd == 0 && warp == 0, $"QA cut during autopilot: plan {sh.Plan}, throttle {sh.Throttle}, warp index {warp}");
+        }
+
         static object Ship(SimScene s) => s.GetType().GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
         static object PivotShip(SimScene s) => Enum.ToObject(s.GetType().GetNestedType("Pivot", BindingFlags.NonPublic), 0);
         static void Invoke(object o, string method, params object[] args)
@@ -212,6 +224,12 @@ namespace FogOfWar
                 ("fps-chase", s => FpsMark(), 8f),
                 ("fps-chase-done", s => FpsReport("chase"), 0.1f),
                 ("match-velocity-moon", s => { View(s, "Moon", 4); Set(s, "selectedPlan", OpenWorld.Plan.MatchVelocity); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 2); Invoke(s, "SetPivot", PivotShip(s), 0.16); }, 10f),
+                // #15: X during an autopilot burn stops the drive and the plan and drops to 1×; then re-engage for the next step
+                ("cut-autopilot", s => { Set(Ship(s), "Throttle", 1.0); Controls.Tap(Controls.Action.ThrottleCut); }, 0.5f),
+                ("cut-autopilot-check", s => { CutCheck(s); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 2); }, 2f),
+                // #17: the help sheet pauses flight
+                ("help-pauses", s => { helpJd = Jd(s); App(s).HelpOpen = true; }, 1f),
+                ("help-pauses-check", s => { Check(Jd(s) == helpJd, $"QA help: game clock {(Jd(s) - helpJd) * 86400:F1} s on while help was open"); App(s).HelpOpen = false; }, 0.5f),
                 ("hold-station", s => { Invoke(s, "TogglePlan"); Set(s, "selectedPlan", OpenWorld.Plan.HoldStation); Invoke(s, "TogglePlan"); }, 6f),
                 ("plot-moon-100k", s => { Invoke(s, "TogglePlan"); View(s, "Moon", 4); Set(s, "selectedPlan", OpenWorld.Plan.Brachistochrone); Invoke(s, "TogglePlan"); Set(s, "warpIdx", 5); Invoke(s, "SetPivot", PivotShip(s), 0.16); }, 12f),
                 ("moon-parked", s => Set(s, "warpIdx", 0), 2f),
