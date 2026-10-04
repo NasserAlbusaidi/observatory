@@ -92,6 +92,7 @@ namespace FogOfWar
 
             // ---- flight cluster, bottom centre
             var fl = Ui.E(layer, "flight");
+            flightBox = fl;
             var sp = Ui.E(fl, "gauge", "speed");
             Ui.L(sp, "VELOCITY", "t-micro", "f-condm");
             spdVal = Ui.L(sp, "", "t-big", "f-mono", "glow-ink");
@@ -277,9 +278,10 @@ namespace FogOfWar
                 if (sp.z < 0) d = -d;
                 if (d.sqrMagnitude < 1e-6f) d = Vector2.down;
                 d.Normalize();
-                float hw = hudShell.HudWidth / 2 - 60, hh = hudShell.H / 2 - 90;
+                var free = FreeView(); // QA-057: clear of the console and the flight cluster
+                float hw = free.width / 2, hh = free.height / 2;
                 float k = Mathf.Min(hw / Mathf.Max(Mathf.Abs(d.x), 1e-4f), hh / Mathf.Max(Mathf.Abs(d.y), 1e-4f));
-                var at = OntoDisplay(new Vector2(hudShell.HudWidth / 2 + d.x * k, hudShell.H / 2 - d.y * k));
+                var at = OntoDisplay(new Vector2(free.center.x + d.x * k, free.center.y - d.y * k));
                 mkEdge.style.translate = new Translate(at.x, at.y);
                 float deg = Mathf.Atan2(-d.y, d.x) * Mathf.Rad2Deg; // screen y grows downward
                 mkEdge.Q("chev").style.rotate = new Rotate(deg + 45);
@@ -293,6 +295,35 @@ namespace FogOfWar
 
         // QA-046: the label sits right of the bracket unless that would run under the right-hand panels (or off
         // screen); then it goes left of the bracket, and below it if neither side has room.
+        VisualElement flightBox;
+
+        // QA-056: under 1 km/s a speed reads in m/s, as the lessons and the drift row do
+        static string SpeedNum(double kms, out string unit)
+        {
+            double a = Math.Abs(kms);
+            if (a >= 1) { unit = "km/s"; return Fmt.Num(kms, a < 10 ? 3 : 1); }
+            unit = "m/s";
+            double ms = kms * 1000;
+            if (Math.Abs(ms) < 0.005) ms = 0; // no "×10^-5 m/s" at rest
+            return Fmt.Num(ms, Math.Abs(ms) < 10 ? 2 : Math.Abs(ms) < 100 ? 1 : 0);
+        }
+
+        static string SpeedText(double kms) => SpeedNum(kms, out string u) + " " + u;
+
+        // QA-057: the part of the HUD that has no panels on it (right column and bottom flight cluster excluded)
+        Rect FreeView()
+        {
+            float xMax = hudShell.HudWidth - 60, yMax = hudShell.H - 90;
+            if (rightCol != null && rightCol.resolvedStyle.display == DisplayStyle.Flex && !float.IsNaN(rightCol.layout.x))
+                xMax = Mathf.Min(xMax, rightCol.layout.x - 24);
+            if (flightBox != null && flightBox.resolvedStyle.display == DisplayStyle.Flex && !float.IsNaN(flightBox.layout.y))
+                yMax = Mathf.Min(yMax, flightBox.layout.y - 24);
+            float xMin = 60, yMin = 70;
+            if (xMax < xMin + 200) xMax = xMin + 200;
+            if (yMax < yMin + 200) yMax = yMin + 200;
+            return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+        }
+
         void PlaceTargetLabel(VisualElement lab, Vector2 at, float r)
         {
             float w = float.IsNaN(lab.resolvedStyle.width) ? 200 : lab.resolvedStyle.width;
@@ -310,6 +341,13 @@ namespace FogOfWar
             else { left = -w / 2; top = r + 6; lab.style.alignItems = Align.Center; }
             // a bracket that is itself under the panels still gets its label in the open: pull it left of them
             left = Mathf.Max(Mathf.Min(left, rightLimit - w - at.x), 8 - at.x);
+            // QA-057: and never down over the flight cluster: lift it above the bracket instead
+            if (flightBox != null && flightBox.resolvedStyle.display == DisplayStyle.Flex && !float.IsNaN(flightBox.layout.y))
+            {
+                var fb = flightBox.layout;
+                bool overlapX = at.x + left < fb.xMax && at.x + left + w > fb.x;
+                if (overlapX && at.y + top + h > fb.y - 6) top = Mathf.Min(-r - h - 4, fb.y - 6 - h - at.y);
+            }
             lab.style.left = left; lab.style.top = top;
         }
 
@@ -591,8 +629,8 @@ namespace FogOfWar
                 SetKindIcon(mkIcon, kind);
                 Ui.Text(tcSub, Kind(t).ToUpperInvariant() + (kind != TargetKind.Body ? "" : t.SizeEstimated ? "  ·  SIZE UNKNOWN" : "  ·  R " + Km(t.Radius)));
                 Ui.Text(tcDist, Km(r.Mag - t.Radius));
-                Ui.Text(tcRel, Fmt.Num(vr.Mag, 3) + " km/s");
-                Ui.Text(tcClose, (closing >= 0 ? "+" : "") + Fmt.Num(closing, 3) + " km/s");
+                Ui.Text(tcRel, SpeedText(vr.Mag));
+                Ui.Text(tcClose, (closing >= 0 ? "+" : "") + SpeedText(closing));
                 Ui.SetClass(tcClose, "cold", closing > 0);
                 double drift = (vr - r.Norm * closing).Mag;
                 Ui.Text(tcDrift, Spd(drift));
@@ -612,8 +650,8 @@ namespace FogOfWar
 
             // flight cluster
             var vRef = (ship.Vel - sys.Vel(VelRefBody, jd)).Mag;
-            Ui.Text(spdVal, Fmt.Num(vRef, vRef < 10 ? 3 : 1));
-            Ui.Text(spdRef, "KM/S VS " + VelRefBody.Name.ToUpperInvariant());
+            Ui.Text(spdVal, SpeedNum(vRef, out string spdUnit));
+            Ui.Text(spdRef, spdUnit.ToUpperInvariant() + " VS " + VelRefBody.Name.ToUpperInvariant());
             Ui.Text(drvVal, Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g");
             Ui.SetClass(drvVal, "accent", ship.Throttle > 0);
             Ui.SetClass(drvVal, "glow", ship.Throttle > 0);

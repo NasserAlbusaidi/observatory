@@ -9,10 +9,12 @@ namespace FogOfWar
     // kind line and a small icon in the target card and the target bracket, instead of reading as planets or moons.
     public partial class OpenSystemScene
     {
-        enum TargetKind { Body, Ship, Wreck }
+        enum TargetKind { Body, Ship, Wreck, Beacon }
 
         static TargetKind KindOf(Body b) =>
-            b == null ? TargetKind.Body : Career.IsDerelict(b) ? TargetKind.Wreck : b.Path != null ? TargetKind.Ship : TargetKind.Body;
+            b == null ? TargetKind.Body : Career.IsDerelict(b) ? TargetKind.Wreck
+            : b.Path != null && b.PathAccel != null && b.Name.StartsWith("Runner ") ? TargetKind.Ship
+            : b.Path != null && b.GM == 0 ? TargetKind.Beacon : TargetKind.Body;
 
         static readonly Color ShipCol = new Color(0.41f, 0.82f, 1f), WreckCol = new Color(1f, 0.42f, 0.37f);
 
@@ -48,7 +50,7 @@ namespace FogOfWar
 
         static void SetKindIcon(VisualElement box, TargetKind k)
         {
-            Ui.Show(box, k != TargetKind.Body);
+            Ui.Show(box, k == TargetKind.Ship || k == TargetKind.Wreck);
             Ui.Show(box.Q(className: "ship"), k == TargetKind.Ship);
             Ui.Show(box.Q(className: "wreck"), k == TargetKind.Wreck);
         }
@@ -99,6 +101,7 @@ namespace FogOfWar
             {
                 case TargetKind.Wreck: return "Derelict ship · drive dead · orbiting " + (b.Parent?.Name ?? "the Sun");
                 case TargetKind.Ship: return "Ship under thrust";
+                case TargetKind.Beacon: return "Beacon · coasting near " + (b.Parent?.Name ?? "the Sun");
                 default: return null;
             }
         }
