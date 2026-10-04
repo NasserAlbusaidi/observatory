@@ -27,17 +27,20 @@ namespace FogOfWar
         public static double MarginallyBound(double a, bool prograde = true) => prograde ? 2 - a + 2 * Math.Sqrt(1 - a) : 2 + a + 2 * Math.Sqrt(1 + a);
 
         // Page–Thorne flux (shape only, as in BlackHole.shader).
+        // x1, x2, x3 are the roots of x³ − 3x + 2a, so a = xᵢ(3 − xᵢ²)/2 and the coefficient (xᵢ − a)²/xᵢ equals
+        // xᵢ(xᵢ² − 1)²/4: no division by x2, which is 0 at a = 0. Spin 0 then gives the exact Schwarzschild flux
+        // [x − x0 − (√3/2) ln((x − √3)(x0 + √3) / ((x + √3)(x0 − √3)))] / (x⁴(x³ − 3x)) with no spin substitute (#35).
         public static double PageThorne(double r, double a)
         {
             double x = Math.Sqrt(r), x0 = Math.Sqrt(Isco(a));
             if (x <= x0) return 0;
-            if (a < 1e-3) a = 1e-3;   // the x2 root sits at 0 when a = 0; the limit is smooth
             double ac = Math.Acos(a);
             double x1 = 2 * Math.Cos((ac - Math.PI) / 3), x2 = 2 * Math.Cos((ac + Math.PI) / 3), x3 = -2 * Math.Cos(ac / 3);
+            double C(double xi) => xi * (xi * xi - 1) * (xi * xi - 1) / 4;
             double br = x - x0 - 1.5 * a * Math.Log(x / x0)
-                - 3 * (x1 - a) * (x1 - a) / (x1 * (x1 - x2) * (x1 - x3)) * Math.Log((x - x1) / (x0 - x1))
-                - 3 * (x2 - a) * (x2 - a) / (x2 * (x2 - x1) * (x2 - x3)) * Math.Log((x - x2) / (x0 - x2))
-                - 3 * (x3 - a) * (x3 - a) / (x3 * (x3 - x1) * (x3 - x2)) * Math.Log((x - x3) / (x0 - x3));
+                - 3 * C(x1) / ((x1 - x2) * (x1 - x3)) * Math.Log((x - x1) / (x0 - x1))
+                - 3 * C(x2) / ((x2 - x1) * (x2 - x3)) * Math.Log((x - x2) / (x0 - x2))
+                - 3 * C(x3) / ((x3 - x1) * (x3 - x2)) * Math.Log((x - x3) / (x0 - x3));
             return Math.Max(br / (x * x * x * x * (x * x * x - 3 * x + 2 * a)), 0);
         }
 

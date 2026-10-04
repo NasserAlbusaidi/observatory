@@ -54,15 +54,19 @@ Shader "FogOfWar/BlackHole"
             {
                 float x = sqrt(r), x0 = sqrt(_Isco);
                 if (x <= x0) return 0.0;
-                a = max(a, 1e-3);   // the x2 root sits at 0 when a = 0; the limit is smooth
                 float ac = acos(a);
                 float x1 = 2.0 * cos((ac - UNITY_PI) / 3.0);
                 float x2 = 2.0 * cos((ac + UNITY_PI) / 3.0);
                 float x3 = -2.0 * cos(ac / 3.0);
+                // (xᵢ − a)²/xᵢ written as xᵢ(xᵢ² − 1)²/4 (the xᵢ are roots of x³ − 3x + 2a): no division by x2, which
+                // is 0 at a = 0, so spin 0 is the exact Schwarzschild flux (as Kerr.PageThorne)
+                float c1 = x1 * (x1 * x1 - 1.0) * (x1 * x1 - 1.0) * 0.25;
+                float c2 = x2 * (x2 * x2 - 1.0) * (x2 * x2 - 1.0) * 0.25;
+                float c3 = x3 * (x3 * x3 - 1.0) * (x3 * x3 - 1.0) * 0.25;
                 float br = x - x0 - 1.5 * a * log(x / x0)
-                    - 3.0 * (x1 - a) * (x1 - a) / (x1 * (x1 - x2) * (x1 - x3)) * log((x - x1) / (x0 - x1))
-                    - 3.0 * (x2 - a) * (x2 - a) / (x2 * (x2 - x1) * (x2 - x3)) * log((x - x2) / (x0 - x2))
-                    - 3.0 * (x3 - a) * (x3 - a) / (x3 * (x3 - x1) * (x3 - x2)) * log((x - x3) / (x0 - x3));
+                    - 3.0 * c1 / ((x1 - x2) * (x1 - x3)) * log((x - x1) / (x0 - x1))
+                    - 3.0 * c2 / ((x2 - x1) * (x2 - x3)) * log((x - x2) / (x0 - x2))
+                    - 3.0 * c3 / ((x3 - x1) * (x3 - x2)) * log((x - x3) / (x0 - x3));
                 return max(br / (x * x * x * x * (x * x * x - 3.0 * x + 2.0 * a)), 0.0);
             }
 
