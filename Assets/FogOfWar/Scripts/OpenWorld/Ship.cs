@@ -74,11 +74,14 @@ namespace FogOfWar.OpenWorld
             return best;
         }
 
+        // Gravity at the end of the last step, reused as the start of the next when nothing has moved the ship since.
+        D3 gEnd, gEndPos; double gEndJd = double.NaN; SolarSystem gEndSys;
+
         // Advance by h seconds at Julian date jd (the start of the step).
         public void Step(SolarSystem sys, double jd, double h, Body reference)
         {
             dominant = reference;
-            var g = sys.Gravity(Pos, jd);
+            var g = sys == gEndSys && jd == gEndJd && (Pos - gEndPos).Sqr == 0 ? gEnd : sys.Gravity(Pos, jd);
             if (RotInput.sqrMagnitude > 0 && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
 
             D3? want = null;
@@ -123,13 +126,31 @@ namespace FogOfWar.OpenWorld
                 Landed = null;
             }
 
-            var a = g + Heading * (Throttle * AMax) + rcs;
-            Vel += a * h;
-            Pos += Vel * h;
+            // Velocity Verlet, with gravity sampled at both ends of the step and the drive's thrust (constant across the
+            // step) integrated exactly, so a burn in free space is exact at any step size; the old semi-implicit Euler was
+            // first order (a 300 s 1 g burn ended h/300 long: 10 % at h = 30 s). Error budget against a 0.05 s reference
+            // (Ship harness, issue #13): a 2 h 1 g burn 0.2 AU from Earth, 1 mm at h = 30 s (was 1,000 km); 30 min of
+            // burns and coasts from low Earth orbit with a fixed heading, 45 m at h = 5 s, 0.2 km at 10 s, 1.6 km at 30 s
+            // (was 37, 74, 222 km). The scene's substeps there are ~9 s (1 % of the orbit's radian time) and ≤ 30 s under
+            // power anywhere. A heading that tracks something (prograde hold, autopilot) is re-aimed once per step, a
+            // first-order hold: ~45 km on the same LEO sequence at h = 10 s, about 0.3 % of the distance flown.
+            var thrust = Heading * (Throttle * AMax) + rcs;
             double dv = (Throttle * AMax + rcs.Mag) * h;
-            DvUsed += dv;
-            if (!UnlimitedFuel) Fuel = Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
-            CheckTouchdown(sys, jd);
+            // reaction mass that runs out partway through the step drives the ship for only the fraction f of h it lasts
+            double f = 1, dryMass = Mass - Fuel;
+            if (!UnlimitedFuel && dv > 0 && dryMass > 0)
+            {
+                double dvLeft = Ve * Math.Log(Mass / dryMass);
+                if (dvLeft < dv) f = dvLeft / dv;
+            }
+            // thrust on for f·h then off moves the ship a·h²·f(1 − f/2) and changes its velocity by a·f·h
+            Pos += Vel * h + g * (0.5 * h * h) + thrust * (h * h * f * (1 - 0.5 * f));
+            double jd1 = jd + h / 86400;
+            gEnd = sys.Gravity(Pos, jd1); gEndPos = Pos; gEndJd = jd1; gEndSys = sys;
+            Vel += (g + gEnd) * (0.5 * h) + thrust * (f * h);
+            DvUsed += dv * f;
+            if (!UnlimitedFuel) Fuel = f < 1 ? 0 : Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
+            CheckTouchdown(sys, jd1);
         }
 
         // Attitude only (coasting on rails): holds and manual rotation still move the nose.
