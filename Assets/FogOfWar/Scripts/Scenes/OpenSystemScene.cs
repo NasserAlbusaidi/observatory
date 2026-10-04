@@ -486,7 +486,8 @@ namespace FogOfWar
         // own orbits, so the arc is sampled and any chord that enters one is refined by bisection on the distance.
         double FirstSurfaceHit(Body dom, D3 r0, D3 v0, double span)
         {
-            double best = dom == sys.Sun ? -1 : Rails.FirstCrossing(r0, v0, dom.GM, InnerRadius(dom), span);
+            // only bodies CheckTouchdown will test (ship.Near), or a found crossing would stop the arc without landing
+            double best = dom == sys.Sun || !ship.Near.Contains(dom) ? -1 : Rails.FirstCrossing(r0, v0, dom.GM, InnerRadius(dom), span);
             double limit = best >= 0 ? best : span;
             var vShip = ship.Vel;
             double gDom = dom.GM / r0.Sqr;
