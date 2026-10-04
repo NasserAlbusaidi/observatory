@@ -169,8 +169,9 @@ namespace FogOfWar
         }
 
         // ray step size and step budget per quality (Fast, Balanced, Sharp)
-        float StepK => App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.15f;   // Sharp 0.12 cost 4K over 16 ms (audit #61)
-        int Steps => App.Quality == 2 ? 1200 : 1000;                                // 1500 put 4K Sharp over 16 ms (audit #61)
+        float StepK => stepKOverride > 0 ? stepKOverride : App.Quality == 0 ? 0.3f : App.Quality == 1 ? 0.2f : 0.15f;   // Sharp 0.12 cost 4K over 16 ms (audit #61)
+        int Steps => stepsOverride > 0 ? stepsOverride : App.Quality == 2 ? 1200 : 1000;                                // 1500 put 4K Sharp over 16 ms (audit #61)
+        float stepKOverride; int stepsOverride;   // review harness only: a converged reference trace
 
         static int Hash(params float[] v)
         {

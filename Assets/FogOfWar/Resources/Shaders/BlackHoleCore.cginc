@@ -591,7 +591,7 @@ float _LensSpp;                // samples per pixel (8; 1 for the review harness
 float _LensNoTrace;            // review harness: pass 1 draws fallback pixels black instead of tracing them
 #define LENS_EPS 2e-4
 #define LENS_GRAZE 0.05
-#define LENS_POLE_B 0.6       // M: rays this close over a pole take the full trace (step 2 gate: the stripe reached |b| = 0.56)
+float _LensPoleB;              // M: rays this close over a pole take the full trace (0.6; step 2 gate: the stripe reached |b| = 0.56)
 
 float lensEdge(float psi)
 {
@@ -719,7 +719,7 @@ bool lensSample(float3 d, float b, float q, float EF, float3 Cr, float3 Cph, flo
                 inout float spotLum, out float3 dir, out float skyOk)
 {
     trans = 1.0; dir = float3(0, 0, 1); skyOk = 0;
-    if (abs(q) < 1e-3 || abs(b) < LENS_POLE_B) return false;
+    if (abs(q) < 1e-3 || abs(b) < _LensPoleB) return false;
     int i0, i1, j0; float fx, fy;
     lensCells(d, i0, i1, j0, fx, fy);
     float4 codes = lensCodes(i0, i1, j0);

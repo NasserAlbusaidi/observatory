@@ -60,7 +60,8 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true); Set(s, "lensSpp", 8f); Set(s, "lensNoTrace", false);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true); Set(s, "lensSpp", 8f); Set(s, "lensNoTrace", false); Set(s, "lensPoleB", 0.6f);
+            Set(s, "stepKOverride", 0f); Set(s, "stepsOverride", 0);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
         };
@@ -120,6 +121,12 @@ namespace FogOfWar
                 S("bh-kerr-0.998-default-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 // linear radiance before any tonemap (raw float32 RGB, <name>.f32 with a 2-int header), for measuring
                 S("hdr-edge-on", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "rawHdr", 1f))),
+                // is the full trace converged near the poles (|b| small, the centre column)? the full trace at a quarter of
+                // Sharp's step, and the table without its pole fallback, against bh-edge-on-full
+                S("bh-edge-on-pole-k003", new Vector3(0, 0.9f, 24f), 42, With(s => { Set(s, "lensTable", false); Set(s, "stepKOverride", 0.0375f); Set(s, "stepsOverride", 6000); })),
+                S("bh-edge-on-pole-table", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "lensPoleB", 0f))),
+                // the hot spot's light curve, with the disc clock running: its period against the orbit readout
+                S("chk-spot-curve", new Vector3(0, 3.5f, 22f), 42, With(s => Set(s, "hotSpot", true))),
                 S("dbg-fate-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 1f))),
                 S("dbg-hit-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 2f))),
                 S("dbg-fate-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 1f); })),
@@ -214,6 +221,53 @@ namespace FogOfWar
             foreach (var s in Shots())
             {
                 if (only != null && Array.TrueForAll(only.Split(','), o => !s.name.Contains(o))) continue;   // comma list
+                if (s.name.StartsWith("chk-spot"))
+                {
+                    Time.timeScale = 1;
+                    s.setup?.Invoke(app.Current);
+                    app.Orbit.enabled = false;
+                    cam.fieldOfView = s.fov;
+                    cam.transform.SetPositionAndRotation(s.pos, Quaternion.LookRotation(s.look - s.pos, Vector3.up));
+                    var bh = (BlackHoleScene)app.Current;
+                    object G(string f) => typeof(BlackHoleScene).GetField(f, F).GetValue(bh);
+                    double a = (float)G("spin");
+                    double R = Math.Max((float)G("spotRs") * 2, Kerr.Isco(a) * 1.02);
+                    double P = 2 * Math.PI * (Math.Pow(R, 1.5) + a) / 15;   // seconds of disc clock (swirl rate 15)
+                    var ts = new List<double>(); var fs = new List<double>();
+                    int seen = bh.Post.SpotSamples;
+                    double c0 = (double)G("diskClock");
+                    float giveUp = Time.realtimeSinceStartup + (float)(3 * P) + 10;
+                    while ((double)G("diskClock") - c0 < 2.2 * P && Time.realtimeSinceStartup < giveUp)
+                    {
+                        yield return null;
+                        if (bh.Post.SpotSamples != seen) { seen = bh.Post.SpotSamples; ts.Add((double)G("diskClock") - c0); fs.Add(bh.Post.SpotFlux); }
+                    }
+                    Time.timeScale = 0;
+                    if (fs.Count < 32) { log.WriteLine($"{s.name}: only {fs.Count} light-curve samples"); errors++; continue; }
+                    // resample on an even clock grid, then the autocorrelation peak between 0.5 and 1.5 expected periods
+                    int M = 512; var u = new double[M];
+                    double span = ts[ts.Count - 1] - ts[0], mean = 0;
+                    for (int k = 0, j = 0; k < M; k++)
+                    {
+                        double t = ts[0] + span * k / (M - 1);
+                        while (j < ts.Count - 2 && ts[j + 1] < t) j++;
+                        double f = (t - ts[j]) / Math.Max(ts[j + 1] - ts[j], 1e-9);
+                        u[k] = fs[j] + (fs[j + 1] - fs[j]) * Math.Max(0, Math.Min(1, f)); mean += u[k];
+                    }
+                    mean /= M;
+                    double best = -1e30, lagBest = 0;
+                    for (int lag = (int)(0.5 * P / span * (M - 1)); lag <= Math.Min(M - 2, (int)(1.5 * P / span * (M - 1))); lag++)
+                    {
+                        double c = 0;
+                        for (int k = 0; k + lag < M; k++) c += (u[k] - mean) * (u[k + lag] - mean);
+                        c /= M - lag;
+                        if (c > best) { best = c; lagBest = lag; }
+                    }
+                    double mx = 0, mn = double.MaxValue;
+                    foreach (var f in fs) { mx = Math.Max(mx, f); mn = Math.Min(mn, f); }
+                    log.WriteLine($"{s.name}: {fs.Count} samples over {span:0.0} s of disc clock; orbit at {R:0.00} M, expected period {P:0.00} s (readout P/15), measured {lagBest / (M - 1) * span:0.00} s; peak / dip {(mn > 0 ? mx / mn : 0):0.0}");
+                    continue;
+                }
                 if (s.name.StartsWith("hdr-"))
                 {
                     Time.timeScale = 1;
