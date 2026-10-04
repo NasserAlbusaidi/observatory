@@ -560,18 +560,30 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
 // The sky seen along an escaping direction, weight w (0 = none). dir's screen-space differentials pick the
 // filter footprint, so every pixel of the 2×2 quad must call this (outside any branch). Where a neighbour did
 // not reach the sky its direction means nothing: fall back to the plain pixel footprint.
-float3 skyTerm(float3 dir, float w, float EF, float px)
+void skyGrad(float3 dir, float w, out float3 ddxDir, out float3 ddyDir)
 {
     float ok = w > 0.0 ? 1.0 : 0.0;
-    float3 ddxDir = ddx(dir), ddyDir = ddy(dir);
+    ddxDir = ddx(dir); ddyDir = ddy(dir);
     bool diffOk = abs(ddx(ok)) < 0.5 && abs(ddy(ok)) < 0.5;
     if (!diffOk || !(length(ddxDir) < 0.5) || !(length(ddyDir) < 0.5)) { ddxDir = 0; ddyDir = 0; }
-    if (ok < 0.5) return 0;
+}
+
+// The same with the differentials given (callable inside a branch).
+float3 skyTermGrad(float3 dir, float w, float EF, float px, float3 ddxDir, float3 ddyDir)
+{
+    if (!(w > 0.0)) return 0;
     // the sky is blueshifted by g = EF for this observer: bolometric intensity × g⁴, and the colour shift of a
     // 6500 K source seen at g × 6500 K
     float gs = clamp(EF, 0.05, 20.0);
     float3 tint = planckRGB(6500.0 * clamp(gs, 0.25, 4.0)) / planckRGB(6500.0);
     return w * skyAGrad(dir, ddxDir, ddyDir, px, _HDROut > 0.5) * (_HDROut > 0.5 ? _SkyGain : 1.0) * tint * gs * gs * gs * gs;
+}
+
+float3 skyTerm(float3 dir, float w, float EF, float px)
+{
+    float3 dx, dy;
+    skyGrad(dir, w, dx, dy);
+    return skyTermGrad(dir, w, EF, px, dx, dy);
 }
 
 // ---- lens table (visuals step 2) ---------------------------------------------------------------------------
@@ -660,6 +672,29 @@ void lensCells(float3 d, out int i0, out int i1, out int j0, out float fx, out f
     j0 = (int)fj;
 }
 
+// The escape direction at view direction d from the table (world, camera φ applied); false unless all four cells
+// escape. The image pass takes the sky's filter footprint from these at neighbouring pixels.
+bool lensSkyDir(float3 d, out float3 dir)
+{
+    int i0, i1, j0; float fx, fy;
+    lensCells(d, i0, i1, j0, fx, fy);
+    float4 a00 = _LensT0.Load(int3(i0, j0, 0)), a10 = _LensT0.Load(int3(i1, j0, 0));
+    float4 a01 = _LensT0.Load(int3(i0, j0 + 1, 0)), a11 = _LensT0.Load(int3(i1, j0 + 1, 0));
+    float4 w = float4((1.0 - fx) * (1.0 - fy), fx * (1.0 - fy), (1.0 - fx) * fy, fx * fy);
+    float3 e = w.x * a00.yzw + w.y * a10.yzw + w.z * a01.yzw + w.w * a11.yzw;
+    float sp, cp; sincos(_CamBL.z, sp, cp);
+    dir = normalize(float3(e.x * cp - e.z * sp, e.y, e.x * sp + e.z * cp));
+    return all(floor(float4(a00.x, a10.x, a01.x, a11.x) / 8.0) == 1.0);
+}
+
+// The fate × 8 + count code of the cell at view direction d (adaptive sampling's edge test).
+float lensCode(float3 d)
+{
+    int i0, i1, j0; float fx, fy;
+    lensCells(d, i0, i1, j0, fx, fy);
+    return _LensT0.Load(int3(fx < 0.5 ? i0 : i1, fy < 0.5 ? j0 : j0 + 1, 0)).x;
+}
+
 // The four cells' fate × 8 + count codes.
 float4 lensCodes(int i0, int i1, int j0)
 {
@@ -716,9 +751,9 @@ void lensCentre(float3 d, out float3 Cr, out float3 Cph, out float3 Cd)
 // (|q| tiny) or passes close over a pole (|b| small: there its escape direction swings faster than the table
 // follows), or more than three crossings are needed before the ray is stopped. Cr, Cph, Cd: lensCentre's.
 bool lensSample(float3 d, float b, float q, float EF, float3 Cr, float3 Cph, float3 Cd, inout float3 col, out float trans,
-                inout float spotLum, out float3 dir, out float skyOk)
+                inout float spotLum, out float3 dir, out float skyOk, out float code)
 {
-    trans = 1.0; dir = float3(0, 0, 1); skyOk = 0;
+    trans = 1.0; dir = float3(0, 0, 1); skyOk = 0; code = -1;
     if (abs(q) < 1e-3 || abs(b) < _LensPoleB) return false;
     int i0, i1, j0; float fx, fy;
     lensCells(d, i0, i1, j0, fx, fy);
@@ -727,6 +762,7 @@ bool lensSample(float3 d, float b, float q, float EF, float3 Cr, float3 Cph, flo
     bool plane = _Disk > 0.5 || _DebrisRange.z > 0.5 || _GuideOn > 0.5 || _SpotOn > 0.5;
     if (plane ? any(codes != codes.x) : any(fates != fates.x)) return false;
     float fate = fates.x, cnt = codes.x - fate * 8.0;
+    code = codes.x;
     if (_NB > 0)
     {
         float4 r00 = _LensT4.Load(int3(i0, j0, 0)), r10 = _LensT4.Load(int3(i1, j0, 0));

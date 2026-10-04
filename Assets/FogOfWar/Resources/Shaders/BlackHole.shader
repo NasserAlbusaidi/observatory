@@ -21,40 +21,87 @@ Shader "FogOfWar/BlackHole"
         CGINCLUDE
             #include "BlackHoleCore.cginc"
 
-            // Pass 0, the image from the lens table: _LensSpp table samples per pixel, 8 on a 4 × 2 grid (the frame's
-            // jitter moves each one within its own cell), 1 at the jittered centre. A pixel where any sample can't use the table is discarded and left to
-            // pass 1; the stencil marks the pixels this pass served. Debug views 1 and 2 leave every pixel to pass 1.
+            // One table sample at offset o (pixels) from the pixel centre: its light without the sky, and what the sky term
+            // needs. False: the pixel takes the full trace.
+            bool lensPixelSample(v2fFS i, float2 o, float2 pixNdc, float3 Cr, float3 Cph, float3 Cd, out float3 c, out float sl,
+                                 out float3 dr, out float w, out float EF, out float code, out float px)
+            {
+                float3 n; float boost;
+                zamoPhoton(primaryRay(i.ndc + o * pixNdc, px), n, boost);
+                float b, q; float4 s0;
+                photon(n, boost, 1.0, b, q, EF, s0);
+                c = 0; sl = 0;
+                float tr, ok;
+                bool good = lensSample(-n, b, q, EF, Cr, Cph, Cd, c, tr, sl, dr, ok, code);
+                w = tr * ok;
+                return good;
+            }
+
+            // Pass 0, the image from the lens table, sampled adaptively. Two samples first, one in each half of the pixel
+            // (the frame's jitter moves each within its half). Where the pixel is smooth, they are the pixel: both
+            // samples and the table cells at the pixel's four corners have the same fate and crossing count, and the two
+            // brightnesses agree within 10 %. Elsewhere (the critical curve, disc rims, the photon ring, thin lensed
+            // images) 8 samples on a 4 × 2 grid replace them. A pixel where any sample can't use the table is discarded
+            // and left to pass 1; the stencil marks the pixels this pass served. Debug views 1 and 2 leave every pixel
+            // to pass 1; view 3 shows the fallback pixels red and the 8-sample pixels yellow. _LensSpp 1: one sample.
             float4 fragLens(v2fFS i) : SV_Target
             {
                 if (_LensOn < 0.5 || (_DebugFate > 0.5 && _DebugFate < 2.5)) discard;
                 float px = 2.0 * _TanFov / _ScreenH;
                 float2 jit = _DebugFate > 0.5 ? 0.0 : _Jitter;
                 float2 pixNdc = 2.0 / _ScreenParams.xy;
-                float3 col = 0;
-                float spotLum = 0;
-                bool fallback = false;
+                float2 jpx = jit / pixNdc;                     // the frame's jitter in pixels
                 float3 Cr, Cph, Cd, nc; float bc;
                 zamoPhoton(primaryRay(i.ndc + jit, px), nc, bc);
                 lensCentre(-nc, Cr, Cph, Cd);
-                int spp = _LensSpp > 1.5 ? 8 : 1;
-                [loop] for (int k = 0; k < spp; k++)
+                // the sky's filter footprint: the table's escape directions one pixel right and up of the pixel centre
+                // (no hardware derivatives here: the samples run in loops of varying length)
+                float3 skyDx = 0, skyDy = 0;
                 {
-                    float2 o = spp == 1 ? jit / pixNdc : (float2(k & 3, k >> 2) + 0.5) / float2(4.0, 2.0) - 0.5 + jit / pixNdc / float2(4.0, 2.0);
-                    float3 n; float boost;
-                    zamoPhoton(primaryRay(i.ndc + o * pixNdc, px), n, boost);
-                    float b, q, EF; float4 s0;
-                    photon(n, boost, 1.0, b, q, EF, s0);
-                    float3 c = 0, dr = float3(0, 0, 1); float tr = 0, sl = 0, ok = 0;
-                    if (!fallback) fallback = !lensSample(-n, b, q, EF, Cr, Cph, Cd, c, tr, sl, dr, ok);
-                    // the sky outside the branch: its differentials need every pixel of the quad (same sample, one pixel over)
-                    col += c + skyTerm(dr, tr * ok, EF, px);
+                    float3 n0, n1, n2; float bb;
+                    zamoPhoton(primaryRay(i.ndc + jit, px), n0, bb);
+                    zamoPhoton(primaryRay(i.ndc + jit + float2(pixNdc.x, 0), px), n1, bb);
+                    zamoPhoton(primaryRay(i.ndc + jit + float2(0, pixNdc.y), px), n2, bb);
+                    float3 s0, s1, s2;
+                    if (lensSkyDir(-n0, s0) && lensSkyDir(-n1, s1) && lensSkyDir(-n2, s2)) { skyDx = s1 - s0; skyDy = s2 - s0; }
+                    if (!(length(skyDx) < 0.5) || !(length(skyDy) < 0.5)) { skyDx = 0; skyDy = 0; }
+                }
+                int first = _LensSpp > 1.5 ? 2 : 1;
+                float3 col = 0;
+                float spotLum = 0, lum0 = 0, code0 = -2;
+                bool fallback = false, refine = false;
+                int n = first;
+                // samples 0 and 1: one per half pixel; 2…9: the 4 × 2 grid, only where the pixel needs it
+                [loop] for (int k = 0; k < n && !fallback; k++)
+                {
+                    float2 o = k >= 2 ? (float2((k - 2) & 3, (k - 2) >> 2) + 0.5) / float2(4.0, 2.0) - 0.5 + jpx / float2(4.0, 2.0)
+                             : first == 1 ? jpx : float2((k + 0.5) / 2.0 - 0.5 + jpx.x / 2.0, jpx.y);
+                    float3 c, dr; float sl, w, EF, code;
+                    fallback = !lensPixelSample(i, o, pixNdc, Cr, Cph, Cd, c, sl, dr, w, EF, code, px);
+                    float3 e = c + skyTermGrad(dr, w, EF, px, skyDx, skyDy);
+                    if (k == 2) { col = 0; spotLum = 0; }
+                    col += e;
                     spotLum += sl;
+                    if (k == 0) { lum0 = lumaRGB(e); code0 = code; }
+                    if (k == 1 && !fallback)
+                    {
+                        // smooth: both samples and the cells at the pixel's four corners share fate and crossing count,
+                        // and the two brightnesses agree within 10 %
+                        refine = code != code0 || abs(lumaRGB(e) - lum0) > 0.1 * max(lumaRGB(e), lum0) + 1e-4;
+                        [loop] for (int m = 0; m < 4 && !refine; m++)
+                        {
+                            float3 nm; float bm;
+                            zamoPhoton(primaryRay(i.ndc + (float2(m & 1, m >> 1) - 0.5) * pixNdc, px), nm, bm);
+                            refine = lensCode(-nm) != code0;
+                        }
+                        if (refine) n = 10;
+                    }
                 }
                 if (fallback) discard;
-                col /= spp;
-                spotLum /= spp;
-                // debug view 3: green where the table served the pixel (pass 1 draws red where it did not)
-                if (_DebugFate > 2.5) return float4(0, 1, 0, 1);
+                col /= refine ? 8.0 : first;
+                spotLum /= refine ? 8.0 : first;
+                // debug view 3: green where the table served the pixel, yellow with 8 samples (pass 1 draws red)
+                if (_DebugFate > 2.5) return refine ? float4(1, 1, 0, 1) : float4(0, 1, 0, 1);
                 // alpha carries the hot spot's share of this pixel's luminance, for its light curve (BHPost reads it)
                 if (_HDROut > 0.5) return float4(col * _Exposure, spotLum * _Exposure);
                 return float4(tonemap(col * _Exposure), 1.0);
