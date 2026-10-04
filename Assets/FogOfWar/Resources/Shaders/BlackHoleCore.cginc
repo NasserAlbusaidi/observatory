@@ -88,7 +88,18 @@ float gasPattern(float r, float ph, float om, float a)
     return d;
 }
 
-float3 diskColor(float r, float ph, float b, float q, float EF, float order, out float alpha, out float dbgLum)
+// The gas density at (r, ph) for a crossing of the given order: the swirl pattern, faded on higher-order images,
+// which are squeezed into thin arcs where the noise would alias into streaks. 1 without the clumpy texture.
+float gasDens(float r, float ph, float order)
+{
+    if (_Clumpy < 0.5) return 1.0;
+    float a = _Spin;
+    float om = 1.0 / (r * sqrt(r) + a);
+    return lerp(1.0, 0.3 + 1.0 * gasPattern(r, ph, om, a), 1.0 / (1.0 + 3.0 * order));
+}
+
+// densIn: the gas density if the caller already has it (the lens table pass shares one per pixel), else < 0.
+float3 diskColor(float r, float ph, float b, float q, float EF, float order, float densIn, out float alpha, out float dbgLum)
 {
     float a = _Spin;
     float rs = r * 0.5;                                  // rs units, for the edges
@@ -96,8 +107,8 @@ float3 diskColor(float r, float ph, float b, float q, float EF, float order, out
     float sr = sqrt(r);
     float om = 1.0 / (r * sr + a);                       // Keplerian Ω = dφ/dt
     // the gas pattern co-rotates with Ω (sped up by _SwirlRate, in M per second of sim time)
-    // higher-order images are squeezed into thin arcs where the noise would alias into streaks: fade it there
-    float dens = _Clumpy > 0.5 ? lerp(1.0, 0.3 + 1.0 * gasPattern(r, ph, om, a), 1.0 / (1.0 + 3.0 * order)) : 1.0;
+    float dens = densIn;
+    [branch] if (densIn < 0.0) dens = gasDens(r, ph, order);   // HLSL's ?: would evaluate both sides
     // redshift g = E_obs / E_emit. Circular orbit: E_emit = u^t (1 − Ω b). Without Doppler: a ZAMO emitter.
     float ut = (r * sr + a) / (sqrt(sr * r) * sqrt(max(r * sr - 3.0 * sr + 2.0 * a, 1e-5)));
     float Eorb = ut * (1.0 - om * b);
@@ -326,7 +337,7 @@ float3 skyDir(float4 s, float ph, float b, float q, float a, float M)
 // Everything in the equatorial plane where a ray crosses it, nearest first: guide rings, debris, the near half
 // of the thick slab, the hot spot, the disc. The full trace and the lens-table lookup both shade a crossing
 // here. pr: the photon's p_r there; thd: the backward ray's dθ/dλ; order: the crossings before this one.
-void shadeCrossing(float rHit, float phHit, float prHit, float thd, float b, float q, float EF, float M, float order,
+void shadeCrossing(float rHit, float phHit, float prHit, float thd, float b, float q, float EF, float M, float order, float densIn,
                    inout float3 col, inout float trans, inout float spotLum, inout float firstHit, inout float firstG)
 {
     float a = _Spin;
@@ -359,7 +370,7 @@ void shadeCrossing(float rHit, float phHit, float prHit, float thd, float b, flo
     {
         float al;
         float dl;
-        float3 c = diskColor(rHit, phHit, b, q, EF, order, al, dl);
+        float3 c = diskColor(rHit, phHit, b, q, EF, order, densIn, al, dl);
         if (firstHit == 0.0) { firstHit = rHit; firstG = dl; }
         col += trans * c;
         trans *= 1.0 - al;
@@ -504,7 +515,7 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
                 }
                 else
                 {
-                    shadeCrossing(rHit, phHit, prHit, thd, b, q, EF, M, crossings, R.col, R.trans, R.spotLum, R.firstHit, R.firstG);
+                    shadeCrossing(rHit, phHit, prHit, thd, b, q, EF, M, crossings, -1.0, R.col, R.trans, R.spotLum, R.firstHit, R.firstG);
                     if (R.trans < 0.01) break;
                 }
             }
@@ -563,6 +574,7 @@ float _LensOn, _LensN;
 #define LENS_EPS 2e-4
 #define LENS_SPP 8
 #define LENS_GRAZE 0.05
+#define LENS_POLE_B 0.6       // M: rays this close over a pole take the full trace (step 2 gate: the stripe reached |b| = 0.56)
 
 float lensEdge(float psi)
 {
@@ -613,38 +625,95 @@ float crossingMu(float r, float b, float q)
     return sqrt(max(q, 0.0)) / (r * max(E, 1e-4));
 }
 
-// One pixel sample from the table, for the view direction d (ZAMO frame) of a photon with b, q, EF: the light
-// of its crossings into col (spotLum: the hot spot's share), the transmission left, and the sky direction with
-// skyOk. Returns false where the table can't stand in for the full trace: the four cells around d disagree on
-// fate or crossing count, a body may lie on the path, a drawn crossing is grazing (μ < 0.05), the photon is
-// near-equatorial (|q| tiny), or more than three crossings are needed before the ray is stopped.
-bool lensSample(float3 d, float b, float q, float EF, inout float3 col, out float trans, inout float spotLum,
-                out float3 dir, out float skyOk)
+// The table cells around the view direction d (ZAMO frame): columns i0, i1 (wrapping in ψ), rows j0 and j0 + 1, and
+// the bilinear fractions.
+void lensCells(float3 d, out int i0, out int i1, out int j0, out float fx, out float fy)
 {
-    trans = 1.0; dir = float3(0, 0, 1); skyOk = 0;
-    if (abs(q) < 1e-3) return false;
     float psi = atan2(d.z, d.y);
     if (psi < 0.0) psi += UNITY_TWO_PI;
     float rho = atan2(length(d.yz), -d.x);
     float x = psi / UNITY_TWO_PI * _LensN - 0.5, y = lensV(rho, lensEdge(psi)) * _LensN - 0.5;
-    float fi = floor(x), fx = x - fi;
-    float fj = clamp(floor(y), 0.0, _LensN - 2.0), fy = saturate(y - fj);
+    float fi = floor(x);
+    float fj = clamp(floor(y), 0.0, _LensN - 2.0);
+    fx = x - fi; fy = saturate(y - fj);
     int N = (int)_LensN;
-    int i0 = (int)fi;
-    i0 = i0 < 0 ? i0 + N : i0 >= N ? i0 - N : i0;
-    int i1 = i0 + 1 >= N ? 0 : i0 + 1, j0 = (int)fj;
-    // few values stay live across the shading below (it needs many registers): the cells are rebuilt from i0, i1, j0
-    #define LENS_CELLS int3 c00 = int3(i0, j0, 0), c10 = int3(i1, j0, 0), c01 = int3(i0, j0 + 1, 0), c11 = int3(i1, j0 + 1, 0)
-    #define LENS_W float4((1.0 - fx) * (1.0 - fy), fx * (1.0 - fy), (1.0 - fx) * fy, fx * fy)
-    LENS_CELLS;
-    float4 codes = float4(_LensT0.Load(c00).x, _LensT0.Load(c10).x, _LensT0.Load(c01).x, _LensT0.Load(c11).x);
+    i0 = (int)fi;
+    i0 = i0 < 0 ? i0 + N : i0 >= N ? i0 - N : i0;    // ψ ∈ [0, 2π): at most one turn out
+    i1 = i0 + 1 >= N ? 0 : i0 + 1;
+    j0 = (int)fj;
+}
+
+// The four cells' fate × 8 + count codes.
+float4 lensCodes(int i0, int i1, int j0)
+{
+    return float4(_LensT0.Load(int3(i0, j0, 0)).x, _LensT0.Load(int3(i1, j0, 0)).x,
+                  _LensT0.Load(int3(i0, j0 + 1, 0)).x, _LensT0.Load(int3(i1, j0 + 1, 0)).x);
+}
+
+// Crossing k of those cells, interpolated (r, φ − φ_camera, p_r, dθ/dλ). Azimuths are unwrapped against the first
+// cell (two rays either side of a pole differ by ~2π); false if the cells still disagree by more than a radian.
+bool lensCrossing(int k, int i0, int i1, int j0, float fx, float fy, out float4 X)
+{
+    int3 c00 = int3(i0, j0, 0), c10 = int3(i1, j0, 0), c01 = int3(i0, j0 + 1, 0), c11 = int3(i1, j0 + 1, 0);
+    float4 w = float4((1.0 - fx) * (1.0 - fy), fx * (1.0 - fy), (1.0 - fx) * fy, fx * fy);
+    float4 x00, x10, x01, x11;
+    if (k == 0) { x00 = _LensT1.Load(c00); x10 = _LensT1.Load(c10); x01 = _LensT1.Load(c01); x11 = _LensT1.Load(c11); }
+    else if (k == 1) { x00 = _LensT2.Load(c00); x10 = _LensT2.Load(c10); x01 = _LensT2.Load(c01); x11 = _LensT2.Load(c11); }
+    else { x00 = _LensT3.Load(c00); x10 = _LensT3.Load(c10); x01 = _LensT3.Load(c01); x11 = _LensT3.Load(c11); }
+    float3 dp = float3(x10.y, x01.y, x11.y) - x00.y;
+    dp -= UNITY_TWO_PI * round(dp / UNITY_TWO_PI);
+    X = w.x * x00 + w.y * x10 + w.z * x01 + w.w * x11;
+    X.y = x00.y + dot(w.yzw, dp);
+    return all(abs(dp) <= 1.0);
+}
+
+// The swirl texture is the costly part of shading a crossing and barely changes across one pixel, so the table pass
+// evaluates it once per pixel, at the pixel's (jittered) centre, for each of its first three crossings; the pixel's
+// samples share it where their crossing lies close to the centre's, while the flux, redshift, edges and sky stay per
+// sample. Per crossing: r, φ − φ_camera and the density (< 0: nothing to share).
+void lensCentre(float3 d, out float3 Cr, out float3 Cph, out float3 Cd)
+{
+    Cr = 0; Cph = 0; Cd = -1;
+    if (_Disk < 0.5 || _Clumpy < 0.5) return;
+    int i0, i1, j0; float fx, fy;
+    lensCells(d, i0, i1, j0, fx, fy);
+    float4 codes = lensCodes(i0, i1, j0);
+    if (any(codes != codes.x)) return;
+    float cnt = codes.x - floor(codes.x / 8.0) * 8.0;
+    [loop] for (int k = 0; k < 3; k++)
+    {
+        if (k >= cnt) break;
+        float4 X;
+        if (!lensCrossing(k, i0, i1, j0, fx, fy, X) || X.x <= _Isco) continue;
+        float g = gasDens(X.x, X.y + _CamBL.z, k);
+        if (k == 0) { Cr.x = X.x; Cph.x = X.y; Cd.x = g; }
+        else if (k == 1) { Cr.y = X.x; Cph.y = X.y; Cd.y = g; }
+        else { Cr.z = X.x; Cph.z = X.y; Cd.z = g; }
+    }
+}
+
+// One pixel sample from the table, for the view direction d (ZAMO frame) of a photon with b, q, EF: the light of its
+// crossings into col (spotLum: the hot spot's share), the transmission left, and the sky direction with skyOk.
+// Returns false where the table can't stand in for the full trace: the four cells around d disagree on fate or
+// crossing count, a body may lie on the path, a drawn crossing is grazing (μ < 0.05), the photon is near-equatorial
+// (|q| tiny) or passes close over a pole (|b| small: there its escape direction swings faster than the table
+// follows), or more than three crossings are needed before the ray is stopped. Cr, Cph, Cd: lensCentre's.
+bool lensSample(float3 d, float b, float q, float EF, float3 Cr, float3 Cph, float3 Cd, inout float3 col, out float trans,
+                inout float spotLum, out float3 dir, out float skyOk)
+{
+    trans = 1.0; dir = float3(0, 0, 1); skyOk = 0;
+    if (abs(q) < 1e-3 || abs(b) < LENS_POLE_B) return false;
+    int i0, i1, j0; float fx, fy;
+    lensCells(d, i0, i1, j0, fx, fy);
+    float4 codes = lensCodes(i0, i1, j0);
     float4 fates = floor(codes / 8.0);
     bool plane = _Disk > 0.5 || _DebrisRange.z > 0.5 || _GuideOn > 0.5 || _SpotOn > 0.5;
     if (plane ? any(codes != codes.x) : any(fates != fates.x)) return false;
     float fate = fates.x, cnt = codes.x - fate * 8.0;
     if (_NB > 0)
     {
-        float4 r00 = _LensT4.Load(c00), r10 = _LensT4.Load(c10), r01 = _LensT4.Load(c01), r11 = _LensT4.Load(c11);
+        float4 r00 = _LensT4.Load(int3(i0, j0, 0)), r10 = _LensT4.Load(int3(i1, j0, 0));
+        float4 r01 = _LensT4.Load(int3(i0, j0 + 1, 0)), r11 = _LensT4.Load(int3(i1, j0 + 1, 0));
         float rlo = min(min(r00.x, r10.x), min(r01.x, r11.x)), rhi = max(max(r00.y, r10.y), max(r01.y, r11.y));
         [loop] for (int bj = 0; bj < _NB; bj++)
             if (_BRad[bj].x + _BRad[bj].y >= rlo && _BRad[bj].x - _BRad[bj].y <= rhi) return false;
@@ -655,35 +724,29 @@ bool lensSample(float3 d, float b, float q, float EF, inout float3 col, out floa
         [loop] for (int k = 0; k < 3; k++)
         {
             if (k >= cnt || trans < 0.01) break;
-            LENS_CELLS;
-            float4 w = LENS_W;
-            float4 x00, x10, x01, x11;
-            if (k == 0) { x00 = _LensT1.Load(c00); x10 = _LensT1.Load(c10); x01 = _LensT1.Load(c01); x11 = _LensT1.Load(c11); }
-            else if (k == 1) { x00 = _LensT2.Load(c00); x10 = _LensT2.Load(c10); x01 = _LensT2.Load(c01); x11 = _LensT2.Load(c11); }
-            else { x00 = _LensT3.Load(c00); x10 = _LensT3.Load(c10); x01 = _LensT3.Load(c01); x11 = _LensT3.Load(c11); }
-            // azimuths are unwrapped against the first cell: two rays passing either side of a pole differ by ~2π
-            float3 dp = float3(x10.y, x01.y, x11.y) - x00.y;
-            dp -= UNITY_TWO_PI * round(dp / UNITY_TWO_PI);
-            if (any(abs(dp) > 1.0)) return false;
-            float4 X = w.x * x00 + w.y * x10 + w.z * x01 + w.w * x11;
-            X.y = x00.y + dot(w.yzw, dp);
+            float4 X;
+            if (!lensCrossing(k, i0, i1, j0, fx, fy, X)) return false;
             if (planeDrawn(X.x) && crossingMu(X.x, b, q) < LENS_GRAZE) return false;
-            shadeCrossing(X.x, X.y + _CamBL.z, X.z, X.w, b, q, EF, 1.0, k, col, trans, spotLum, fh, fg);
+            float cr = k == 0 ? Cr.x : k == 1 ? Cr.y : Cr.z;
+            float cph = k == 0 ? Cph.x : k == 1 ? Cph.y : Cph.z;
+            float cd = k == 0 ? Cd.x : k == 1 ? Cd.y : Cd.z;
+            float dph = X.y - cph;
+            dph -= UNITY_TWO_PI * round(dph / UNITY_TWO_PI);
+            float dens = cd >= 0.0 && abs(X.x - cr) < 0.02 * X.x && abs(dph) < 0.05 ? cd : -1.0;
+            shadeCrossing(X.x, X.y + _CamBL.z, X.z, X.w, b, q, EF, 1.0, k, dens, col, trans, spotLum, fh, fg);
         }
         if (cnt > 3.5 && trans >= 0.01) return false;
     }
     if (fate == 1.0 && trans > 0.01)
     {
-        LENS_CELLS;
-        float4 w = LENS_W;
-        float3 e = w.x * _LensT0.Load(c00).yzw + w.y * _LensT0.Load(c10).yzw + w.z * _LensT0.Load(c01).yzw + w.w * _LensT0.Load(c11).yzw;
+        float4 w = float4((1.0 - fx) * (1.0 - fy), fx * (1.0 - fy), (1.0 - fx) * fy, fx * fy);
+        float3 e = w.x * _LensT0.Load(int3(i0, j0, 0)).yzw + w.y * _LensT0.Load(int3(i1, j0, 0)).yzw
+                 + w.z * _LensT0.Load(int3(i0, j0 + 1, 0)).yzw + w.w * _LensT0.Load(int3(i1, j0 + 1, 0)).yzw;
         float sp, cp; sincos(_CamBL.z, sp, cp);
         dir = normalize(float3(e.x * cp - e.z * sp, e.y, e.x * sp + e.z * cp));
         skyOk = 1;
     }
     return true;
-    #undef LENS_CELLS
-    #undef LENS_W
 }
 
 #endif

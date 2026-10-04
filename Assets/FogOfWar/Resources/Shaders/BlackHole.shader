@@ -33,6 +33,9 @@ Shader "FogOfWar/BlackHole"
                 float3 col = 0;
                 float spotLum = 0;
                 bool fallback = false;
+                float3 Cr, Cph, Cd, nc; float bc;
+                zamoPhoton(primaryRay(i.ndc + jit, px), nc, bc);
+                lensCentre(-nc, Cr, Cph, Cd);
                 [loop] for (int k = 0; k < LENS_SPP; k++)
                 {
                     float2 o = (float2(k & 3, k >> 2) + 0.5) / float2(4.0, 2.0) - 0.5 + jit / pixNdc / float2(4.0, 2.0);
@@ -41,7 +44,7 @@ Shader "FogOfWar/BlackHole"
                     float b, q, EF; float4 s0;
                     photon(n, boost, 1.0, b, q, EF, s0);
                     float3 c = 0, dr = float3(0, 0, 1); float tr = 0, sl = 0, ok = 0;
-                    if (!fallback) fallback = !lensSample(-n, b, q, EF, c, tr, sl, dr, ok);
+                    if (!fallback) fallback = !lensSample(-n, b, q, EF, Cr, Cph, Cd, c, tr, sl, dr, ok);
                     // the sky outside the branch: its differentials need every pixel of the quad (same sample, one pixel over)
                     col += c + skyTerm(dr, tr * ok, EF, px);
                     spotLum += sl;

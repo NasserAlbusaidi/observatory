@@ -439,7 +439,8 @@ namespace FogOfWar
                     foreach (bool table in new[] { true, false })
                     {
                         Set(bt, "lensTable", table);
-                        yield return null;   // LateTick: builds the table for this camera
+                        yield return null;
+                        bt.LateTick(0);      // coroutines resume before LateUpdate: update the scene (and table) for this row
                         cam.Render(); ReadOne(trt, small);
                         float t0 = Time.realtimeSinceStartup;
                         for (int k = 0; k < N; k++) cam.Render();
