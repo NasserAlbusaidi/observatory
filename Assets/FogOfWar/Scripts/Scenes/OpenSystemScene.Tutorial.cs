@@ -37,6 +37,9 @@ namespace FogOfWar
         void TickTutorial()
         {
             if (lesson == Lesson.Done || career.Sandbox || career.Active.Find(x => x.Tutorial) == null) { EndPractice(); lesson = Lesson.Done; TutorialText = null; career.TutorialStep = 0; return; }
+            // the practice is optional: picking another target (the Moon job) or engaging a plan ends it, and the
+            // lessons carry on from there
+            if (Practice(lesson) && (beacon == null || ship.Target != beacon || ship.PlanActive)) { EndPractice(); lesson = Lesson.Target; }
             switch (lesson)
             {
                 case Lesson.Turn:
@@ -55,8 +58,6 @@ namespace FogOfWar
                     break;
                 // #27: a short manual approach to a beacon on the ship's own orbit, before the autopilot does it for real
                 case Lesson.Beacon:
-                    if (beacon == null) SpawnBeacon();
-                    if (ship.Target != beacon) ship.Target = beacon;
                     if (BeaconClosing() >= 0.02 && ship.ThrottleCmd == 0 && ship.Throttle == 0) lesson = Lesson.RefSwitch;
                     break;
                 case Lesson.RefSwitch:
@@ -105,7 +106,7 @@ namespace FogOfWar
                 case Lesson.Warp:
                     return $"{Step(Lesson.Warp)} Speed up time with {Ctl.Keys(A.WarpUp)} (try 1k×). Time compression saves your patience, not game days: deadlines run on the game clock.";
                 case Lesson.Beacon:
-                    return $"{Step(l)} Practice first: a beacon sits 5 km ahead of you on your own orbit, and it is your target now. Press 8 to hold Target, and once the nose is on it give a short burn, until the target card's Closing reads 20 m/s or more. Then cut ({Ctl.Keys(A.ThrottleCut)}).";
+                    return $"{Step(l)} Practice first: a beacon sits 5 km ahead of you on your own orbit, and it is your target now (pick another target to skip the practice). Press 8 to hold Target, and once the nose is on it give a short burn, until the target card's Closing reads 20 m/s or more. Then cut ({Ctl.Keys(A.ThrottleCut)}).";
                 case Lesson.RefSwitch:
                     return $"{Step(l)} You are moving relative to two things now: Earth (your orbit, kilometres a second) and the beacon (a few metres a second). Press {Ctl.Keys(A.VelocityRef)} to measure against the beacon: the speed readout, prograde and retrograde then use it.";
                 case Lesson.Brake:
@@ -119,12 +120,13 @@ namespace FogOfWar
         }
 
         // ---- the practice beacon: a massless marker coasting on the ship's own orbit, 5 km ahead (not saved)
-        Body beacon;
+        Body beacon, beforeBeacon; // the target the player had before the practice, given back after it
         const string BeaconName = "Practice beacon";
 
         void SpawnBeacon()
         {
             EndPractice();
+            beforeBeacon = ship.Target;
             var dom = Ship.Dominant(sys, ship.Pos, jd);
             double jd0 = jd, mu = dom.GM;
             var r = ship.Pos - sys.Pos(dom, jd); var v = ship.Vel - sys.Vel(dom, jd);
@@ -143,7 +145,7 @@ namespace FogOfWar
         {
             if (beacon == null) return;
             sys.Bodies.Remove(beacon);
-            if (ship.Target == beacon) ship.Target = null;
+            if (ship.Target == beacon) ship.Target = beforeBeacon != null && sys.Bodies.Contains(beforeBeacon) ? beforeBeacon : null;
             if (ship.VelRef == beacon) ship.VelRef = null;
             beacon = null;
         }
