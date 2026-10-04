@@ -98,17 +98,14 @@ float gasDens(float r, float ph, float order)
     return lerp(1.0, 0.3 + 1.0 * gasPattern(r, ph, om, a), 1.0 / (1.0 + 3.0 * order));
 }
 
-// densIn: the gas density if the caller already has it (the lens table pass shares one per pixel), else < 0.
-float3 diskColor(float r, float ph, float b, float q, float EF, float order, float densIn, out float alpha, out float dbgLum)
+// dens: the gas density there (gasDens; shadeCrossing works it out once for the slab and the midplane).
+float3 diskColor(float r, float ph, float b, float q, float EF, float order, float dens, out float alpha, out float dbgLum)
 {
     float a = _Spin;
     float rs = r * 0.5;                                  // rs units, for the edges
     float F = pageThorne(r, a) / _FluxMax;
     float sr = sqrt(r);
     float om = 1.0 / (r * sr + a);                       // Keplerian Ω = dφ/dt
-    // the gas pattern co-rotates with Ω (sped up by _SwirlRate, in M per second of sim time)
-    float dens = densIn;
-    [branch] if (densIn < 0.0) dens = gasDens(r, ph, order);   // HLSL's ?: would evaluate both sides
     // redshift g = E_obs / E_emit. Circular orbit: E_emit = u^t (1 − Ω b). Without Doppler: a ZAMO emitter.
     float ut = (r * sr + a) / (sqrt(sr * r) * sqrt(max(r * sr - 3.0 * sr + 2.0 * a, 1e-5)));
     float Eorb = ut * (1.0 - om * b);
@@ -164,11 +161,22 @@ float3 gasColor(float r, float b, float q, float EF, float tScale, float fScale,
 // stress-free edge), plus a 1 % gas-pressure floor.
 float discH(float r) { return _Hrad * max(1.0 - sqrt(_Isco / r), 0.0) + 0.01 * r; }
 
-// The near half of the slab around an equator crossing, sampled at 4 points along the chord from where the
-// ray enters the disc to the midplane: Gaussian density in z/H, optical depth 4 from surface to midplane
-// (vertically), source = local Page–Thorne blackbody. Returns the light added; trans is reduced.
+// The hot spot's weight at (r, ph): a Gaussian of radius _SpotSigma round _SpotR, moving at the Keplerian Ω on
+// the disc's swirl clock.
+float spotWeight(float r, float ph)
+{
+    float phs = (_SimTime * _SwirlRate) / (_SpotR * sqrt(_SpotR) + _Spin);
+    float d2 = r * r + _SpotR * _SpotR - 2.0 * r * _SpotR * cos(ph - phs);
+    return exp(-0.5 * d2 / (_SpotSigma * _SpotSigma));
+}
+
+// The near half of the slab around an equator crossing, sampled at 4 points along the chord from where the ray
+// enters the disc to the midplane: Gaussian density in z/H, optical depth 4 from surface to midplane (vertically),
+// source = the local Page–Thorne blackbody times the crossing's gas density (the swirl texture, dens). Inside the
+// hot spot the gas is up to 3× hotter, so the spot shows at the slab's photosphere; spotLum gets its share. The
+// opacity fades with the disc's outer edge like the emission. Returns the light added; trans is reduced.
 // v: the backward ray's direction there in the local frame (radial, vertical, azimuthal).
-float3 slabColor(float rHit, float b, float q, float EF, float3 v, inout float trans)
+float3 slabColor(float rHit, float phHit, float b, float q, float EF, float3 v, float dens, inout float trans, inout float spotLum)
 {
     float H = discH(rHit);
     float sinI = max(abs(v.y), 1e-3);
@@ -181,12 +189,16 @@ float3 slabColor(float rHit, float b, float q, float EF, float3 v, inout float t
         float z = sk * v.y;
         float rk = rHit + sk * v.x;
         if (rk <= _Isco) continue;
-        float dtau = kap * exp(-0.5 * z * z / (sig * sig)) * (0.125 * L);
+        float fade = smoothstep(_Outer, _Outer * 0.7, rk * 0.5);
+        float dtau = kap * exp(-0.5 * z * z / (sig * sig)) * (0.125 * L) * fade;
+        float ts = _SpotOn > 0.5 ? 1.0 + 2.0 * spotWeight(rk, phHit + sk * v.z / rHit) : 1.0;
+        float ts4 = ts * ts * ts * ts;
         float Tk;
-        float3 S = gasColor(rk, b, q, EF, 1.0, 1.0, Tk);
-        float a = 1.0 - exp(-dtau);
-        c += trans * S * a;
-        trans *= 1.0 - a;
+        float3 S = gasColor(rk, b, q, EF, ts, ts4, Tk) * dens;
+        float3 e = trans * S * (1.0 - exp(-dtau));
+        c += e;
+        spotLum += dot(e, float3(0.2126, 0.7152, 0.0722)) * (1.0 - 1.0 / ts4);
+        trans *= exp(-dtau);
     }
     return c;
 }
@@ -196,10 +208,7 @@ float3 slabColor(float rHit, float b, float q, float EF, float3 v, inout float t
 // its weight (the blob's own opacity when the disc is off).
 float3 spotColor(float rHit, float phHit, float b, float q, float EF, out float w)
 {
-    float a = _Spin;
-    float phs = (_SimTime * _SwirlRate) / (_SpotR * sqrt(_SpotR) + a);
-    float d2 = rHit * rHit + _SpotR * _SpotR - 2.0 * rHit * _SpotR * cos(phHit - phs);
-    w = exp(-0.5 * d2 / (_SpotSigma * _SpotSigma));
+    w = spotWeight(rHit, phHit);
     if (w < 1e-3) { w = 0; return 0; }
     float T;
     return gasColor(max(rHit, _Isco * 1.001), b, q, EF, 3.0, 81.0, T) * w;
@@ -349,16 +358,23 @@ void shadeCrossing(float rHit, float phHit, float prHit, float thd, float b, flo
         col += trans * c;
         trans *= 1.0 - al;
     }
+    bool disc = _Disk > 0.5 && rHit > _Isco && rHit * 0.5 < _Outer;
+    // the gas pattern co-rotates with Ω (sped up by _SwirlRate, in M per second of sim time); densIn: the lens table
+    // pass's shared value (lensCentre), else < 0. An if, not ?:, which in HLSL would evaluate both sides.
+    float dens = densIn;
+    [branch] if (disc && dens < 0.0) dens = gasDens(rHit, phHit, order);
     // thick disc: the near half of the slab first (it can hide the far side's inner rim)
-    if (_Disk > 0.5 && _Thick > 0.5 && rHit > _Isco && rHit * 0.5 < _Outer)
+    bool slab = disc && _Thick > 0.5;
+    if (slab)
     {
         float Dv = max(rHit * rHit - 2.0 * M * rHit + a * a, 1e-4);
         float rpd = -prHit * Dv;                                        // the backward ray's dr/dλ
         float phd = -(a * (rHit * rHit + a * a - a * b) / Dv - a + b);  // and dφ/dλ, at θ = π/2
         float3 v = normalize(float3(rHit * rpd / sqrt(Dv), rHit * thd, rHit * phd));
-        col += slabColor(rHit, b, q, EF, v, trans);
+        col += slabColor(rHit, phHit, b, q, EF, v, dens, trans, spotLum);
     }
-    if (_SpotOn > 0.5)
+    // the hot spot in the midplane (in a thick disc it is in the slab instead)
+    if (_SpotOn > 0.5 && !slab)
     {
         float w;
         float3 c = spotColor(rHit, phHit, b, q, EF, w);
@@ -366,11 +382,11 @@ void shadeCrossing(float rHit, float phHit, float prHit, float thd, float b, flo
         spotLum += trans * dot(c, float3(0.2126, 0.7152, 0.0722));
         if (_Disk < 0.5) trans *= 1.0 - w;
     }
-    if (_Disk > 0.5 && rHit > _Isco && rHit * 0.5 < _Outer)
+    if (disc)
     {
         float al;
         float dl;
-        float3 c = diskColor(rHit, phHit, b, q, EF, order, densIn, al, dl);
+        float3 c = diskColor(rHit, phHit, b, q, EF, order, dens, al, dl);
         if (firstHit == 0.0) { firstHit = rHit; firstG = dl; }
         col += trans * c;
         trans *= 1.0 - al;
