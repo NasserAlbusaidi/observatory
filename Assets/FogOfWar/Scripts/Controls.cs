@@ -25,7 +25,7 @@ namespace FogOfWar
             [Action.ThrottleUp] = "Throttle up", [Action.ThrottleDown] = "Throttle down", [Action.ThrottleFull] = "Throttle full", [Action.ThrottleCut] = "Throttle cut",
             [Action.RcsForward] = "RCS forward", [Action.RcsBack] = "RCS back", [Action.RcsUp] = "RCS up", [Action.RcsDown] = "RCS down",
             [Action.RcsLeft] = "RCS left", [Action.RcsRight] = "RCS right",
-            [Action.FlightAssist] = "Flight assist on/off", [Action.Flip] = "Flip (point retrograde)", [Action.Engage] = "Engage / abort nav plan",
+            [Action.FlightAssist] = "Flight assist on/off", [Action.Flip] = "Flip (turn 180°)", [Action.Engage] = "Engage / abort nav plan",
             [Action.NextTarget] = "Next target", [Action.WarpUp] = "Time compression up", [Action.WarpDown] = "Time compression down",
             [Action.Map] = "System map", [Action.CameraMode] = "Camera: chase / orbit / cockpit", [Action.Help] = "Show controls", [Action.QuickSave] = "Quick save",
             [Action.Screenshot] = "Screenshot", [Action.PhotoMode] = "Photo mode", [Action.RecordClip] = "Record a clip",
@@ -60,10 +60,26 @@ namespace FogOfWar
         public static IEnumerable<Action> All => (Action[])Enum.GetValues(typeof(Action));
         public static KeyCode Get(Action a, int slot) => bind[a][slot];
 
+        // Keys with a fixed job that the rebindable actions can't take (#21): 1–9 attitude holds in flight (1–8 pick a
+        // scene in the Observatory), Esc menu, F2 hide panels, F11 fullscreen.
+        public static string FixedUse(KeyCode k)
+        {
+            if (k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9) return "attitude holds";
+            switch (k)
+            {
+                case KeyCode.Escape: return "the menu";
+                case KeyCode.F2: return "hiding the panels";
+                case KeyCode.F11: return "fullscreen";
+            }
+            return null;
+        }
+
         // Assign a key. A key drives one action only: if another action had it, that action gets this slot's old key
-        // (a swap). Returns a note for the player, or null.
+        // (a swap). A fixed key is refused and nothing changes. Returns a note for the player, or null.
         public static string Set(Action a, int slot, KeyCode k)
         {
+            var use = FixedUse(k);
+            if (use != null) return $"{KeyLabel(k)} is fixed for {use} and can't be assigned. \"{Label[a]}\" is unchanged.";
             string note = null;
             var old = bind[a][slot];
             if (k != KeyCode.None)
@@ -83,15 +99,30 @@ namespace FogOfWar
 
         static void Load()
         {
+            var repaired = new List<(Action, int)>();
             foreach (var kv in Defaults)
             {
                 var keys = new[] { kv.Value.Item1, kv.Value.Item2 };
                 for (int i = 0; i < 2; i++)
                 {
                     string s = PlayerPrefs.GetString($"fow-key-{kv.Key}-{i}", null);
-                    if (!string.IsNullOrEmpty(s) && Enum.TryParse(s, out KeyCode k)) keys[i] = k;
+                    if (!string.IsNullOrEmpty(s) && Enum.TryParse(s, out KeyCode k))
+                    {
+                        // a save from before fixed keys were refused: that slot goes back to its default (#21)
+                        if (FixedUse(k) != null) repaired.Add((kv.Key, i));
+                        else keys[i] = k;
+                    }
                 }
                 bind[kv.Key] = keys;
+            }
+            // a restored default still drives one action only: if something else now has that key, leave the slot empty
+            foreach (var (a, i) in repaired)
+            {
+                var k = bind[a][i];
+                if (k == KeyCode.None) continue;
+                foreach (var kv in bind)
+                    for (int j = 0; j < 2; j++)
+                        if (kv.Value[j] == k && !(kv.Key == a && j == i)) bind[a][i] = KeyCode.None;
             }
         }
 
@@ -127,14 +158,17 @@ namespace FogOfWar
         public static string Keys(Action a)
         {
             var k = bind[a];
-            string Name(KeyCode c) => c switch
-            {
-                KeyCode.None => "", KeyCode.LeftShift => "L-Shift", KeyCode.LeftControl => "L-Ctrl", KeyCode.Period => ".", KeyCode.Comma => ",",
-                KeyCode.LeftBracket => "[", KeyCode.RightBracket => "]", KeyCode.KeypadPlus => "Num +", KeyCode.KeypadMinus => "Num -",
-                _ => c.ToString(),
-            };
-            string a0 = Name(k[0]), a1 = Name(k[1]);
+            string a0 = KeyLabel(k[0]), a1 = KeyLabel(k[1]);
             return a1 == "" ? a0 : a0 == "" ? a1 : a0 + " / " + a1;
         }
+
+        static string KeyLabel(KeyCode c) => c switch
+        {
+            KeyCode.None => "", KeyCode.LeftShift => "L-Shift", KeyCode.LeftControl => "L-Ctrl", KeyCode.Period => ".", KeyCode.Comma => ",",
+            KeyCode.LeftBracket => "[", KeyCode.RightBracket => "]", KeyCode.KeypadPlus => "Num +", KeyCode.KeypadMinus => "Num -",
+            KeyCode.Alpha1 => "1", KeyCode.Alpha2 => "2", KeyCode.Alpha3 => "3", KeyCode.Alpha4 => "4", KeyCode.Alpha5 => "5",
+            KeyCode.Alpha6 => "6", KeyCode.Alpha7 => "7", KeyCode.Alpha8 => "8", KeyCode.Alpha9 => "9", KeyCode.Escape => "Esc",
+            _ => c.ToString(),
+        };
     }
 }

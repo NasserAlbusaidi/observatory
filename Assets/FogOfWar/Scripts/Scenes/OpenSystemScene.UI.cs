@@ -10,7 +10,7 @@ namespace FogOfWar
     // Open System: pilot input, the ship and nav-computer panel, the flight HUD, labels, readouts and save games.
     public partial class OpenSystemScene
     {
-        static readonly string[] HoldNames = { "Off", "Prograde", "Retrograde", "Normal", "Anti-normal", "Radial out", "Radial in", "Target", "Anti-target", "Flip" };
+        static readonly string[] HoldNames = { "Off", "Prograde", "Retrograde", "Normal", "Anti-normal", "Radial out", "Radial in", "Target", "Anti-target", "Flip 180°" };
         static readonly string[] PlanShort = { "", "Brachistochrone", "Match velocity", "Hold station" };
         static readonly string[] PlanNames = { "", "Brachistochrone (fast)", "Match velocity", "Hold station" };
 
@@ -27,9 +27,8 @@ namespace FogOfWar
             if (Ctl.Held(A.ThrottleUp)) th += dt * 0.5;
             if (Ctl.Held(A.ThrottleDown)) th -= dt * 0.5;
             if (Ctl.Pressed(A.ThrottleFull)) th = 1;
-            if (Ctl.Pressed(A.ThrottleCut)) th = 0;
-            th = Math.Max(0, Math.Min(1, th));
-            if (th != ship.ThrottleCmd) { ship.ThrottleCmd = th; if (ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "pilot override"; } }
+            if (Ctl.Pressed(A.ThrottleCut)) CutDrive();
+            else ManualThrottle(th);
 
             if (Ctl.Pressed(A.FlightAssist)) ship.FlightAssist = !ship.FlightAssist;
             if (Ctl.Pressed(A.Floodlights) && lighting != null) lighting.Floods = !lighting.Floods;
@@ -44,8 +43,29 @@ namespace FogOfWar
             if (!Ctl.Locked)
                 for (int i = 0; i < 9; i++)
                     if (Input.GetKeyDown(KeyCode.Alpha1 + i)) SetHold((Hold)i);
-            // warping with the stick held makes no sense: drop to 1× while flying by hand
-            if (ship.ManualInput && warpIdx > 1) warpIdx = 1;
+            // warping with the stick or RCS held makes no sense: drop to 1× while flying by hand
+            if (ship.ManualInput && warpIdx > 0) warpIdx = 0;
+        }
+
+        // The pilot sets the drive (keys or slider): a change takes over from the nav computer and drops time
+        // compression to 1×, so a manual burn never starts at high warp (#15).
+        void ManualThrottle(double th)
+        {
+            th = Math.Max(0, Math.Min(1, th));
+            if (th == ship.ThrottleCmd) return;
+            ship.ThrottleCmd = th;
+            if (ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "pilot override"; }
+            warpIdx = 0;
+        }
+
+        // Cut: the drive stops now, whoever was flying. Cancels the nav plan too (its burns don't go through ThrottleCmd)
+        // and zeroes the applied throttle, so no powered step runs on the old value.
+        void CutDrive()
+        {
+            bool takeover = ship.PlanActive || ship.ThrottleCmd > 0 || ship.Throttle > 0;
+            ship.ThrottleCmd = 0; ship.Throttle = 0;
+            if (ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "drive cut"; }
+            if (takeover) warpIdx = 0;
         }
 
         void Flip() { ship.Plan = Plan.None; ship.CustomDir = -ship.Heading; ship.Hold = Hold.Custom; }
@@ -304,7 +324,7 @@ namespace FogOfWar
             // --- ship
             GUILayout.Label("Throttle (" + Ctl.Keys(A.ThrottleUp) + " / " + Ctl.Keys(A.ThrottleDown) + ", " + Ctl.Keys(A.ThrottleFull) + " full, " + Ctl.Keys(A.ThrottleCut) + " cut)", ui.label);
             float th = GUILayout.HorizontalSlider((float)ship.ThrottleCmd, 0, 1);
-            if (Mathf.Abs(th - (float)ship.ThrottleCmd) > 1e-4f) { ship.ThrottleCmd = th; if (ship.PlanActive) ship.Plan = Plan.None; }
+            if (Mathf.Abs(th - (float)ship.ThrottleCmd) > 1e-4f) ManualThrottle(th);
             GUILayout.Space(6);
             GUILayout.Label("Drive limit", ui.label);
             var gl = new string[Gs.Length];
@@ -312,7 +332,7 @@ namespace FogOfWar
             int gi = ui.Buttons(gl);
             if (gi >= 0) ship.MaxG = Gs[gi];
             ship.FlightAssist = ui.Toggle("Flight assist (" + Ctl.Keys(A.FlightAssist) + "): stop rotating when the stick is released", ship.FlightAssist);
-            int fb = ui.Buttons("Flip (" + Ctl.Keys(A.Flip) + ")", "Kill rotation");
+            int fb = ui.Buttons("Flip 180° (" + Ctl.Keys(A.Flip) + ")", "Kill rotation");
             if (fb == 0) Flip();
             if (fb == 1) { ship.AngVel = Vector3.zero; ship.Hold = Hold.Off; }
 

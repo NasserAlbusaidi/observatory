@@ -66,7 +66,7 @@ namespace FogOfWar
                 case Lesson.Turn:
                     return $"First flight (1/7). Turn the ship: {Ctl.Keys(A.PitchUp)} / {Ctl.Keys(A.PitchDown)} pitch, {Ctl.Keys(A.YawLeft)} / {Ctl.Keys(A.YawRight)} yaw, {Ctl.Keys(A.RollLeft)} / {Ctl.Keys(A.RollRight)} roll. Drag the mouse to look around.";
                 case Lesson.Assist:
-                    return "(2/7) Let go. Flight assist fires the RCS to stop the rotation. With it off, the ship keeps turning, as Newton says.";
+                    return "(2/7) Let go. Flight assist uses the reaction wheels to stop the rotation; they run on power, so turning costs no reaction mass. With assist off, the ship keeps turning, as Newton says.";
                 case Lesson.Burn:
                     return $"(3/7) A short burn: {Ctl.Keys(A.ThrottleFull)} for full throttle, then {Ctl.Keys(A.ThrottleCut)} to cut it. At 1 g you gain 9.8 m/s every second, and every second costs reaction mass.";
                 case Lesson.Hold:

@@ -214,7 +214,7 @@ namespace FogOfWar.UI
                 }
             }
             Ui.Section(c, "Fixed keys");
-            Ui.L(c, "1–9 attitude holds (off, prograde, retrograde, normal, anti-normal, radial out, radial in, target, anti-target) · Esc menu · F2 hide the HUD · F11 fullscreen.", "t-note");
+            Ui.L(c, "1–9 attitude holds (off, prograde, retrograde, normal, anti-normal, radial out, radial in, target, anti-target) · Esc menu · F2 hide the HUD · F11 fullscreen. These keys can't be assigned to other actions.", "t-note");
             var row2 = Ui.E(c, "row");
             row2.style.marginTop = 10;
             Ui.B(row2, "Reset to defaults", () => { Controls.ResetDefaults(); app.CancelRebind(); }, "danger");
@@ -423,6 +423,7 @@ namespace FogOfWar.UI
             var p = Ui.Panel(wrap, "Controls", null, true);
             p.style.width = Mathf.Min(W - 40, Portrait ? 900 : 1080);
             p.style.maxHeight = H - 60;
+            if (app.InGame) Ui.L(p, "Flight is paused while this sheet is open.", "t-note");
             var sv = Ui.NewScroll();
             p.Add(sv);
             var cols = Ui.E(sv.contentContainer, "row");
@@ -451,7 +452,10 @@ namespace FogOfWar.UI
                 Ui.L(r, what, "t-body");
                 Ui.L(r, k, "t-val", "f-mono", "accent");
             }
-            Ui.L(sv.contentContainer, "1–9: attitude hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. Mouse: drag to look, scroll to zoom, click a label to target it. Change keys in Esc → Settings → Controls.", "t-note").style.marginTop = 12;
+            Ui.L(sv.contentContainer, "1–9: attitude hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. " +
+                $"Flip ({Keys(A.Flip)}) turns the nose 180° from where it points now; 3 points it against your velocity. Turning alone doesn't slow you: burn to brake. " +
+                "Turning uses reaction wheels, which run on power and spend no reaction mass. " +
+                "Mouse: drag to look, scroll to zoom, click a label to target it. Change keys in Esc → Settings → Controls.", "t-note").style.marginTop = 12;
             var row = Ui.E(p, "row");
             row.style.marginTop = 10;
             Ui.B(row, "Close  (" + Keys(A.Help) + ")", () => app.HelpOpen = false);
