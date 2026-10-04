@@ -120,7 +120,7 @@ namespace FogOfWar.OpenWorld
                 if (!liftoff)
                 {
                     // sitting on the surface: ride along with the body
-                    Pos = sys.Pos(Landed, jd + h / 86400) + up * Landed.Radius * (1 - Landed.Flattening * 0.5) * 1.0001;
+                    Pos = sys.Pos(Landed, jd + h / 86400) + up * SurfaceRadius(Landed, up) * 1.0001;
                     Vel = sys.Vel(Landed, jd);
                     Phase = "landed on " + Landed.Name;
                     return;
@@ -273,11 +273,14 @@ namespace FogOfWar.OpenWorld
                 if (b == sys.Sun) continue;
                 var bp = sys.Pos(b, jd);
                 var r = Pos - bp;
-                double R = SurfaceRadius(b, r) * 0.999;
+                double R = SurfaceRadius(b, r);
                 if (r.Mag < R)
                 {
-                    ImpactSpeed = (Vel - sys.Vel(b, jd)).Mag;
-                    Pos = bp + r.Norm * SurfaceRadius(b, r) * 1.0001;
+                    // a step or coast arc can end below the surface; take the speed back up to it, since the fall from
+                    // the surface to here (μ(1/r − 1/R)) would otherwise turn a gentle touchdown into a crash
+                    double v = (Vel - sys.Vel(b, jd)).Mag;
+                    ImpactSpeed = Math.Sqrt(Math.Max(0, v * v - 2 * b.GM * (1 / r.Mag - 1 / R)));
+                    Pos = bp + r.Norm * R * 1.0001;
                     Vel = sys.Vel(b, jd);
                     Landed = b; Plan = Plan.None; ThrottleCmd = 0; Throttle = 0; AngVel = Vector3.zero;
                     bool giant = b.Look == Look.Gas || b.Look == Look.Ice;
