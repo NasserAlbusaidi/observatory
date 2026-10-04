@@ -12,7 +12,7 @@ namespace FogOfWar
         public override string Short => "Free acceleration forever";
         public override string Blurb =>
             "Amber balls have positive mass, cyan ones negative. Push a negative mass and it accelerates <color=#FFB547>toward</color> you. Put one next to a positive mass and the positive one flees while the negative one chases it.\n\n" +
-            "The pair speeds up forever with no fuel, while total momentum and total energy both stay at zero. That free lunch is why most physicists think persistent negative mass can't exist.";
+            "The pair speeds up forever with no fuel. Total momentum stays at zero, and so does the pair's kinetic energy: the negative mass's −½mv² cancels the positive one's. Their gap never changes, so the potential energy doesn't either, and total energy is conserved without anything paying for the speed. That free lunch is why most physicists think persistent negative mass can't exist.";
         public override string Note => "Not antimatter. Antihydrogen falls down; CERN's ALPHA-g measured it in 2023. Negative energy density is real in tiny Casimir-sized doses, and it's the same ingredient the wormhole and warp scenes are begging for.";
 
         static readonly string[] Presets = { "Bondi runaway pair (+m, −m)", "Mixed swarm", "Only negative masses", "Normal orbit (both positive)" };
@@ -30,7 +30,7 @@ namespace FogOfWar
         Material posMat, negMat, posHalo, negHalo, gridMat;
         Mesh sphere, trailMesh, gridMesh;
         Transform gridT;
-        float simT;
+        float simT, E0;
         Vector3 com;
         readonly List<Vector3> pts = new List<Vector3>();
         readonly List<Color> cols = new List<Color>();
@@ -93,6 +93,7 @@ namespace FogOfWar
                 }
             }
             Accel();
+            E0 = Energy(out _, out _);
             Orbit.target = Vector3.zero;
         }
 
@@ -107,6 +108,20 @@ namespace FogOfWar
                     float r2 = d.sqrMagnitude + 0.25f; // softening
                     bodies[i].a += d * (bodies[j].m / (r2 * Mathf.Sqrt(r2)));
                 }
+        }
+
+        // Signed kinetic energy Σ ½mv² and the potential matching the softened force, U = −Σ m_i m_j / √(r² + 0.25),
+        // counted once per pair (zero at infinity). K + U is conserved by the equations; the integrator drifts a little.
+        float Energy(out float K, out float U)
+        {
+            K = 0; U = 0;
+            for (int i = 0; i < bodies.Count; i++)
+            {
+                K += 0.5f * bodies[i].m * bodies[i].v.sqrMagnitude;
+                for (int j = i + 1; j < bodies.Count; j++)
+                    U -= bodies[i].m * bodies[j].m / Mathf.Sqrt((bodies[j].x - bodies[i].x).sqrMagnitude + 0.25f);
+            }
+            return K + U;
         }
 
         public override void Tick(float dt)
@@ -145,12 +160,16 @@ namespace FogOfWar
 
         public override void Readouts(List<Readout> list)
         {
-            Vector3 P = Vector3.zero; float KE = 0, vmax = 0; int np = 0, nn = 0;
-            foreach (var b in bodies) { P += b.v * b.m; KE += 0.5f * b.m * b.v.sqrMagnitude; vmax = Mathf.Max(vmax, b.v.magnitude); if (b.m > 0) np++; else nn++; }
+            Vector3 P = Vector3.zero; float vmax = 0; int np = 0, nn = 0;
+            foreach (var b in bodies) { P += b.v * b.m; vmax = Mathf.Max(vmax, b.v.magnitude); if (b.m > 0) np++; else nn++; }
+            float E = Energy(out float KE, out float U);
             list.Add(new Readout("Bodies", np + " positive, " + nn + " negative"));
             list.Add(new Readout("Elapsed", simT.ToString("0.0") + " s (sim)"));
             list.Add(new Readout("Total momentum |Σ m·v|", Fmt.Num(P.magnitude, 4), Tone.Cold));
-            list.Add(new Readout("Total kinetic energy", Fmt.Num(KE, 4), Tone.Cold));
+            list.Add(new Readout("Kinetic energy Σ ½mv² (signed)", Fmt.Num(KE, 4), Tone.Cold));
+            list.Add(new Readout("Potential energy", Fmt.Num(U, 4)));
+            list.Add(new Readout("Total energy (kinetic + potential)", Fmt.Num(E, 4), Tone.Cold));
+            list.Add(new Readout("Total energy drift since reset", Fmt.Num(E - E0, 2)));
             list.Add(new Readout("Fastest body", vmax.ToString("0.000") + " u/s", vmax > 1 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Centre has drifted", com.magnitude.ToString("0.0") + " u"));
             list.Add(new Readout("Fuel burned", "0", Tone.Bad));
