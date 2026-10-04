@@ -339,6 +339,18 @@ namespace FogOfWar
         }
 
         // The ride-along camera: at the probe, just above the plane, looking at the hole, moving with the probe.
+        // It is not quite the probe: it sits 0.12 rs above the plane at the probe's r and φ (held at 1.03 r₊ or more,
+        // also once the probe has crossed), and its observer is the ZAMO there, boosted by the probe's own velocity
+        // past its local ZAMO (r̂ and φ̂), capped at CamVMax. The cap scales the whole vector, and γ is computed from
+        // the capped vector, so the shader's boost always has γ²(1 − v²) = 1 (#28).
+        const double CamVMax = 0.99;
+        static Vector4 CamBoost(double vr, double vph)
+        {
+            double v2 = vr * vr + vph * vph;
+            if (v2 > CamVMax * CamVMax) { double k = CamVMax / Math.Sqrt(v2); vr *= k; vph *= k; v2 = CamVMax * CamVMax; }
+            return new Vector4((float)vr, 0, (float)vph, (float)(1 / Math.Sqrt(1 - v2)));
+        }
+
         void RideCamera()
         {
             if (riding == null) { camVel = new Vector4(0, 0, 0, 1); return; }
@@ -350,8 +362,7 @@ namespace FogOfWar
             if (!g.inside)
             {
                 g.ZamoVelocity(a, out double vr, out double vph);
-                double v2 = Math.Min(vr * vr + vph * vph, 0.98);   // camera stops at 1.03 r₊, speed capped at 0.99 c (γ ≤ 7)
-                camVel = new Vector4((float)vr, 0, (float)vph, (float)(1 / Math.Sqrt(1 - v2)));
+                camVel = CamBoost(vr, vph);   // camera stops at 1.03 r₊, speed capped at 0.99 c (γ ≤ 7.09)
             }
         }
 

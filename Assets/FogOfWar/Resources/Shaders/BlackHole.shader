@@ -54,15 +54,19 @@ Shader "FogOfWar/BlackHole"
             {
                 float x = sqrt(r), x0 = sqrt(_Isco);
                 if (x <= x0) return 0.0;
-                a = max(a, 1e-3);   // the x2 root sits at 0 when a = 0; the limit is smooth
                 float ac = acos(a);
                 float x1 = 2.0 * cos((ac - UNITY_PI) / 3.0);
                 float x2 = 2.0 * cos((ac + UNITY_PI) / 3.0);
                 float x3 = -2.0 * cos(ac / 3.0);
+                // (xᵢ − a)²/xᵢ written as xᵢ(xᵢ² − 1)²/4 (the xᵢ are roots of x³ − 3x + 2a): no division by x2, which
+                // is 0 at a = 0, so spin 0 is the exact Schwarzschild flux (as Kerr.PageThorne)
+                float c1 = x1 * (x1 * x1 - 1.0) * (x1 * x1 - 1.0) * 0.25;
+                float c2 = x2 * (x2 * x2 - 1.0) * (x2 * x2 - 1.0) * 0.25;
+                float c3 = x3 * (x3 * x3 - 1.0) * (x3 * x3 - 1.0) * 0.25;
                 float br = x - x0 - 1.5 * a * log(x / x0)
-                    - 3.0 * (x1 - a) * (x1 - a) / (x1 * (x1 - x2) * (x1 - x3)) * log((x - x1) / (x0 - x1))
-                    - 3.0 * (x2 - a) * (x2 - a) / (x2 * (x2 - x1) * (x2 - x3)) * log((x - x2) / (x0 - x2))
-                    - 3.0 * (x3 - a) * (x3 - a) / (x3 * (x3 - x1) * (x3 - x2)) * log((x - x3) / (x0 - x3));
+                    - 3.0 * c1 / ((x1 - x2) * (x1 - x3)) * log((x - x1) / (x0 - x1))
+                    - 3.0 * c2 / ((x2 - x1) * (x2 - x3)) * log((x - x2) / (x0 - x2))
+                    - 3.0 * c3 / ((x3 - x1) * (x3 - x2)) * log((x - x3) / (x0 - x3));
                 return max(br / (x * x * x * x * (x * x * x - 3.0 * x + 2.0 * a)), 0.0);
             }
 
@@ -252,17 +256,20 @@ Shader "FogOfWar/BlackHole"
                 }
                 // → the photon's conserved b and q (Bardeen 1973; James et al. 2015)
                 float rc = _CamBL.x, muc = _CamBL.y, stc = _CamBL.w;
-                float lapse = _CamMet.x, omg = _CamMet.y, varpi = _CamMet.z, rho = _CamMet.w;
+                float lapse = _CamMet.x, omg = _CamMet.y, varpi = _CamMet.z, rho = _CamMet.w, Dc = _CamDelta;
+                // lensing off: the same coordinates with M = 0 are flat space, so the camera frame is flat too (no lapse,
+                // no frame dragging, flat Δ) and each pixel's ray is the straight line in its own direction
+                if (M < 0.5) { lapse = 1.0; omg = 0.0; varpi = sqrt(rc * rc + a * a) * stc; Dc = rc * rc + a * a; }
                 float EZ = 1.0 / (lapse + omg * varpi * n.z);
                 float EF = EZ * boost;                               // energy the camera measures, E = 1 at infinity
-                float pr0 = EZ * rho * n.x / sqrt(_CamDelta);
+                float pr0 = EZ * rho * n.x / sqrt(Dc);
                 float pth = EZ * rho * n.y;
                 float b = EZ * varpi * n.z;
                 // b = 0 exactly would run through the pole itself; a nudge of 1e-4 M moves the ray far less than a pixel
                 b = (b < 0.0 ? -1.0 : 1.0) * max(abs(b), 1e-4);
                 float q = pth * pth + muc * muc * (b * b / max(stc * stc, 1e-6) - a * a);
 
-                float4 s = float4(rc, -_CamDelta * pr0, _CamTheta, -pth);   // backward: (r, dr/dλ, θ, dθ/dλ)
+                float4 s = float4(rc, -Dc * pr0, _CamTheta, -pth);   // backward: (r, dr/dλ, θ, dθ/dλ)
                 float ph = _CamBL.z;
                 float rCap = _RH + 1e-3;
                 float projR = 1e-3, projT = 1e-3 * (q + b * b + 1.0);
@@ -335,7 +342,7 @@ Shader "FogOfWar/BlackHole"
                             float rHit = (2 * t3 - 3 * t2 + 1) * s.x + (t3 - 2 * t2 + t) * s.y * h + (-2 * t3 + 3 * t2) * sn.x + (t3 - t2) * sn.y * h;
                             rHit = clamp(rHit, min(s.x, sn.x), max(s.x, sn.x));   // the cubic can overshoot on a long step
                             float phHit = lerp(ph, phn, t);
-                            float Dh = max(rHit * rHit - 2.0 * rHit + a * a, 1e-4);
+                            float Dh = max(rHit * rHit - 2.0 * M * rHit + a * a, 1e-4);
                             float prHit = -lerp(s.y, sn.y, t) / Dh;   // the physical photon's p_r
                             col += trans * guideColor(rHit);
                             if (_DebrisRange.z > 0.5)
@@ -360,7 +367,7 @@ Shader "FogOfWar/BlackHole"
                     if (hitI >= 0)
                     {
                         float rB = lerp(s.x, sn.x, tBody);
-                        float Db = max(rB * rB - 2.0 * rB + a * a, 1e-4);
+                        float Db = max(rB * rB - 2.0 * M * rB + a * a, 1e-4);
                         float prB = -lerp(s.y, sn.y, tBody) / Db;
                         col += trans * bodyColor(hitI, nrm, normalize(pNext - pPrev), b, prB, EF);
                         trans = 0;
