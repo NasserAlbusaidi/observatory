@@ -172,6 +172,8 @@ namespace FogOfWar
                 l.Add(V("-full", s => Set(s, "lensTable", false)));
                 l.Add(V("-fallback", s => Set(s, "debugFate", 3f)));
                 l.Add(V("-fate", s => Set(s, "debugFate", 1f)));
+                // the step 1b renderer (full trace, thin disc) at the same disc phase, for before/after sheets
+                l.Add(V("-1b", s => { Set(s, "lensTable", false); Set(s, "thinDisk", true); Set(s, "hotSpot", false); }));
             }
             l.AddRange(Extra);
             return l;
@@ -389,6 +391,17 @@ namespace FogOfWar
                 log.WriteLine($"escaped light, probe status shown: {list.Find(x => x.label == "Probe status").value} (want escaped)");
                 Default(app.Current);
             }
+            }
+
+            // -fowbhnotiming: shots only (a second orientation needs no second set of timings)
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowbhnotiming") >= 0)
+            {
+                cam.targetTexture = null;
+                if (shell != null) shell.Surface = null;
+                log.WriteLine($"done, {errors} errors");
+                log.Close(); log = null;
+                Application.Quit();
+                yield break;
             }
 
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.
