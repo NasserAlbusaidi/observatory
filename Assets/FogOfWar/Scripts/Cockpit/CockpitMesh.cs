@@ -41,11 +41,15 @@ namespace FogOfWar.Cockpit
         // the console face leans back toward the pilot by this much (degrees from vertical)
         public const float ConsoleTilt = 28f;
 
-        static readonly Color Hull = new Color(0.30f, 0.31f, 0.33f, 0), HullDark = new Color(0.16f, 0.17f, 0.18f, 0),
-            Panel = new Color(0.40f, 0.41f, 0.42f, 0), Bezel = new Color(0.05f, 0.05f, 0.055f, 0), Pad = new Color(0.12f, 0.13f, 0.16f, 0),
-            Frame = new Color(0.22f, 0.22f, 0.21f, 0), Stripe = new Color(0.62f, 0.48f, 0.12f, 0), Grip = new Color(0.07f, 0.07f, 0.075f, 0),
-            LedAmber = new Color(1.0f, 0.62f, 0.18f, 1), LedGreen = new Color(0.25f, 1.0f, 0.45f, 1), LedRed = new Color(1.0f, 0.15f, 0.1f, 1),
-            LampGlass = new Color(0.95f, 0.92f, 0.85f, 1);
+        // Vertex colour alpha picks the material in Cockpit.shader: 0 painted panel, 1/3 bare metal, 2/3 padding or
+        // rubber, 1 self-lit indicator glass.
+        const float MPaint = 0, MMetal = 1 / 3f, MPad = 2 / 3f, MGlass = 1;
+        static readonly Color Hull = new Color(0.30f, 0.31f, 0.33f, MPaint), HullDark = new Color(0.16f, 0.17f, 0.18f, MPaint),
+            Panel = new Color(0.40f, 0.41f, 0.42f, MPaint), Bezel = new Color(0.05f, 0.05f, 0.055f, MPaint), Pad = new Color(0.19f, 0.20f, 0.24f, MPad),
+            Frame = new Color(0.30f, 0.30f, 0.29f, MMetal), Bolt = new Color(0.55f, 0.55f, 0.56f, MMetal), Stripe = new Color(0.62f, 0.48f, 0.12f, MPaint),
+            Grip = new Color(0.17f, 0.17f, 0.18f, MPad),
+            LedAmber = new Color(1.0f, 0.62f, 0.18f, MGlass), LedGreen = new Color(0.25f, 1.0f, 0.45f, MGlass), LedRed = new Color(1.0f, 0.15f, 0.1f, MGlass),
+            LampGlass = new Color(0.95f, 0.92f, 0.85f, MGlass);
 
         class B
         {
@@ -83,6 +87,47 @@ namespace FogOfWar.Cockpit
 
             public void Box(Vector3 ctr, Vector3 half, Color col) => Box(ctr, half, Quaternion.identity, col);
 
+            // A box with every edge chamfered by ch metres: 6 faces, 12 edge strips and 8 corner triangles. The strips
+            // catch the lamps at a different angle from the faces, which is what reads as a solid edge up close.
+            public void Bevel(Vector3 ctr, Vector3 half, Quaternion rot, Color col, float ch)
+            {
+                ch = Mathf.Min(ch, 0.45f * Mathf.Min(half.x, Mathf.Min(half.y, half.z)));
+                // on the face normal to `axis`, its corner nearest (sx, sy, sz)
+                Vector3 V(int sx, int sy, int sz, int axis) => ctr + rot * new Vector3(
+                    sx * (half.x - (axis == 0 ? 0 : ch)), sy * (half.y - (axis == 1 ? 0 : ch)), sz * (half.z - (axis == 2 ? 0 : ch)));
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    Out(V(s, -1, -1, 0), V(s, 1, -1, 0), V(s, 1, 1, 0), V(s, -1, 1, 0), ctr, col);
+                    Out(V(-1, s, -1, 1), V(1, s, -1, 1), V(1, s, 1, 1), V(-1, s, 1, 1), ctr, col);
+                    Out(V(-1, -1, s, 2), V(1, -1, s, 2), V(1, 1, s, 2), V(-1, 1, s, 2), ctr, col);
+                }
+                for (int p = -1; p <= 1; p += 2)
+                    for (int q = -1; q <= 1; q += 2)
+                    {
+                        Out(V(p, q, -1, 0), V(p, q, 1, 0), V(p, q, 1, 1), V(p, q, -1, 1), ctr, col);   // along z
+                        Out(V(p, -1, q, 0), V(p, 1, q, 0), V(p, 1, q, 2), V(p, -1, q, 2), ctr, col);   // along y
+                        Out(V(-1, p, q, 1), V(1, p, q, 1), V(1, p, q, 2), V(-1, p, q, 2), ctr, col);   // along x
+                    }
+                for (int sx = -1; sx <= 1; sx += 2)
+                    for (int sy = -1; sy <= 1; sy += 2)
+                        for (int sz = -1; sz <= 1; sz += 2)
+                            Tri(V(sx, sy, sz, 0), V(sx, sy, sz, 1), V(sx, sy, sz, 2), ctr, col);
+            }
+
+            public void Bevel(Vector3 ctr, Vector3 half, Color col, float c) => Bevel(ctr, half, Quaternion.identity, col, c);
+
+            // one flat triangle, wound to face away from ctr
+            void Tri(Vector3 a, Vector3 b2, Vector3 cc, Vector3 ctr, Color col)
+            {
+                var nn = Vector3.Cross(cc - a, b2 - a);
+                if (Vector3.Dot(nn, (a + b2 + cc) / 3 - ctr) < 0) { (b2, cc) = (cc, b2); nn = -nn; }
+                nn.Normalize();
+                int i = v.Count;
+                v.Add(a); v.Add(b2); v.Add(cc);
+                for (int k = 0; k < 3; k++) { n.Add(nn); c.Add(col); }
+                t.Add(i); t.Add(i + 2); t.Add(i + 1);
+            }
+
             // an inward-facing wall rectangle on plane axis = value, spanning the other two axes
             public void Wall(Vector3 a, Vector3 b, Vector3 cc, Vector3 d, Color col) => Quad(a, b, cc, d, col);
         }
@@ -111,10 +156,14 @@ namespace FogOfWar.Cockpit
             // ---- display bezel: a 4 cm lip around the aperture, standing 3 cm proud of the wall
             const float lip = 0.04f, proud = 0.03f;
             float zb = Zf - proud / 2;
-            b.Box(new Vector3(0, Top + lip / 2, zb), new Vector3(HalfW + lip, lip / 2, proud / 2), Bezel);
-            b.Box(new Vector3(0, Bottom - lip / 2, zb), new Vector3(HalfW + lip, lip / 2, proud / 2), Bezel);
-            b.Box(new Vector3(-HalfW - lip / 2, (Top + Bottom) / 2, zb), new Vector3(lip / 2, (Top - Bottom) / 2, proud / 2), Bezel);
-            b.Box(new Vector3(HalfW + lip / 2, (Top + Bottom) / 2, zb), new Vector3(lip / 2, (Top - Bottom) / 2, proud / 2), Bezel);
+            b.Bevel(new Vector3(0, Top + lip / 2, zb), new Vector3(HalfW + lip, lip / 2, proud / 2), Bezel, 0.008f);
+            b.Bevel(new Vector3(0, Bottom - lip / 2, zb), new Vector3(HalfW + lip, lip / 2, proud / 2), Bezel, 0.008f);
+            b.Bevel(new Vector3(-HalfW - lip / 2, (Top + Bottom) / 2, zb), new Vector3(lip / 2, (Top - Bottom) / 2, proud / 2), Bezel, 0.008f);
+            b.Bevel(new Vector3(HalfW + lip / 2, (Top + Bottom) / 2, zb), new Vector3(lip / 2, (Top - Bottom) / 2, proud / 2), Bezel, 0.008f);
+            // a bolt at each corner of the display frame
+            for (int sx = -1; sx <= 1; sx += 2)
+                for (int sy = 0; sy <= 1; sy++)
+                    b.Bevel(new Vector3(sx * (HalfW + lip / 2), sy == 0 ? Bottom - lip / 2 : Top + lip / 2, Zf - proud - 0.003f), new Vector3(0.006f, 0.006f, 0.003f), Bolt, 0.002f);
             // status LEDs on the lower bezel
             for (int i = 0; i < 5; i++)
                 b.Box(new Vector3(-HalfW + 0.05f + i * 0.03f, Bottom - lip / 2, Zf - proud - 0.001f), new Vector3(0.006f, 0.004f, 0.001f), i == 0 ? LedGreen : LedAmber);
@@ -122,14 +171,21 @@ namespace FogOfWar.Cockpit
             // ---- console under the display: a slab leaning back toward the pilot, holding the MFD row
             var tilt = Quaternion.Euler(ConsoleTilt, 0, 0);
             var consoleCtr = new Vector3(0, -0.47f, 1.20f);
-            b.Box(consoleCtr, new Vector3(0.62f, 0.20f, 0.06f), tilt, Panel);
+            b.Bevel(consoleCtr, new Vector3(0.62f, 0.20f, 0.06f), tilt, Panel, 0.014f);
+            // hex bolts at the console face's corners
+            for (int sx = -1; sx <= 1; sx += 2)
+                for (int sy = -1; sy <= 1; sy += 2)
+                    b.Bevel(consoleCtr + tilt * new Vector3(sx * 0.585f, sy * 0.165f, -0.062f), new Vector3(0.007f, 0.007f, 0.003f), tilt, Bolt, 0.0025f);
             // (the MFD bezels depend on the screen's aspect: Bezels)
             // lower console, knee panel and a row of guarded switches
-            b.Box(new Vector3(0, -0.86f, 1.05f), new Vector3(0.62f, 0.22f, 0.20f), HullDark);
+            b.Bevel(new Vector3(0, -0.86f, 1.05f), new Vector3(0.62f, 0.22f, 0.20f), Quaternion.identity, HullDark, 0.02f);
             for (int i = 0; i < 8; i++)
             {
                 float x = -0.42f + i * 0.12f;
-                b.Box(new Vector3(x, -0.70f, 0.838f), new Vector3(0.022f, 0.012f, 0.012f), Grip);
+                b.Bevel(new Vector3(x, -0.70f, 0.838f), new Vector3(0.022f, 0.012f, 0.012f), Grip, 0.004f);
+                // the switch guard: two metal cheeks either side of the toggle
+                b.Box(new Vector3(x - 0.026f, -0.70f, 0.836f), new Vector3(0.0025f, 0.016f, 0.014f), Frame);
+                b.Box(new Vector3(x + 0.026f, -0.70f, 0.836f), new Vector3(0.0025f, 0.016f, 0.014f), Frame);
                 b.Box(new Vector3(x, -0.67f, 0.846f), new Vector3(0.004f, 0.004f, 0.002f), i == 3 ? LedRed : i % 2 == 0 ? LedGreen : LedAmber);
             }
             // yellow-black hazard stripe along the console's lower edge (the drive interlock panel)
@@ -138,26 +194,32 @@ namespace FogOfWar.Cockpit
 
             // ---- crash couch: the pilot lies back in it; the eye sits just off the headrest
             var couchTilt = Quaternion.Euler(-14, 0, 0);
-            b.Box(new Vector3(0, -0.05f, -0.22f), new Vector3(0.27f, 0.62f, 0.07f), couchTilt, Pad);          // backrest
-            b.Box(new Vector3(0, 0.04f, -0.14f), new Vector3(0.15f, 0.10f, 0.05f), couchTilt, Pad);           // headrest
-            b.Box(new Vector3(-0.19f, 0.05f, -0.10f), new Vector3(0.035f, 0.13f, 0.10f), couchTilt, Pad);     // head wings
-            b.Box(new Vector3(0.19f, 0.05f, -0.10f), new Vector3(0.035f, 0.13f, 0.10f), couchTilt, Pad);
-            b.Box(new Vector3(0, -0.72f, 0.18f), new Vector3(0.27f, 0.07f, 0.34f), Quaternion.Euler(12, 0, 0), Pad); // seat pan
-            b.Box(new Vector3(0, -0.95f, 0.58f), new Vector3(0.24f, 0.06f, 0.20f), Quaternion.Euler(40, 0, 0), Pad); // leg rest
-            b.Box(new Vector3(0, -1.08f, -0.05f), new Vector3(0.10f, 0.17f, 0.10f), Frame);                    // gimbal post
-            b.Box(new Vector3(0, -0.84f, -0.05f), new Vector3(0.32f, 0.03f, 0.40f), Frame);                    // couch frame
+            // padded parts get rounded-off edges: the head wings are right beside the eye
+            b.Bevel(new Vector3(0, -0.05f, -0.22f), new Vector3(0.27f, 0.62f, 0.07f), couchTilt, Pad, 0.03f);          // backrest
+            b.Bevel(new Vector3(0, 0.04f, -0.14f), new Vector3(0.15f, 0.10f, 0.05f), couchTilt, Pad, 0.025f);          // headrest
+            b.Bevel(new Vector3(-0.19f, 0.05f, -0.10f), new Vector3(0.035f, 0.13f, 0.10f), couchTilt, Pad, 0.014f);    // head wings
+            b.Bevel(new Vector3(0.19f, 0.05f, -0.10f), new Vector3(0.035f, 0.13f, 0.10f), couchTilt, Pad, 0.014f);
+            b.Bevel(new Vector3(0, -0.72f, 0.18f), new Vector3(0.27f, 0.07f, 0.34f), Quaternion.Euler(12, 0, 0), Pad, 0.03f); // seat pan
+            b.Bevel(new Vector3(0, -0.95f, 0.58f), new Vector3(0.24f, 0.06f, 0.20f), Quaternion.Euler(40, 0, 0), Pad, 0.025f); // leg rest
+            b.Bevel(new Vector3(0, -1.08f, -0.05f), new Vector3(0.10f, 0.17f, 0.10f), Quaternion.identity, Frame, 0.012f);   // gimbal post
+            b.Bevel(new Vector3(0, -0.84f, -0.05f), new Vector3(0.32f, 0.03f, 0.40f), Quaternion.identity, Frame, 0.008f);   // couch frame
             // armrests with the two flight sticks (left: translation, right: rotation)
             for (int s = -1; s <= 1; s += 2)
             {
-                b.Box(new Vector3(s * 0.34f, -0.50f, 0.12f), new Vector3(0.05f, 0.035f, 0.28f), Pad);
-                b.Box(new Vector3(s * 0.34f, -0.57f, 0.12f), new Vector3(0.03f, 0.04f, 0.24f), Frame);
-                b.Box(new Vector3(s * 0.34f, -0.44f, 0.34f), new Vector3(0.018f, 0.045f, 0.018f), Grip);      // stick
-                b.Box(new Vector3(s * 0.34f, -0.395f, 0.345f), new Vector3(0.022f, 0.012f, 0.026f), Grip);    // stick head
+                b.Bevel(new Vector3(s * 0.34f, -0.50f, 0.12f), new Vector3(0.05f, 0.035f, 0.28f), Quaternion.identity, Pad, 0.016f);
+                b.Bevel(new Vector3(s * 0.34f, -0.57f, 0.12f), new Vector3(0.03f, 0.04f, 0.24f), Quaternion.identity, Frame, 0.006f);
+                b.Bevel(new Vector3(s * 0.34f, -0.44f, 0.34f), new Vector3(0.018f, 0.045f, 0.018f), Quaternion.identity, Grip, 0.006f);   // stick
+                b.Bevel(new Vector3(s * 0.34f, -0.395f, 0.345f), new Vector3(0.022f, 0.012f, 0.026f), Quaternion.identity, Grip, 0.006f); // stick head
                 b.Box(new Vector3(s * 0.34f, -0.383f, 0.36f), new Vector3(0.005f, 0.002f, 0.005f), s < 0 ? LedAmber : LedRed);
+                // grip ridges and a metal collar where the stick leaves its boot
+                for (int r = 0; r < 3; r++)
+                    b.Box(new Vector3(s * 0.34f, -0.445f + r * 0.016f, 0.34f - 0.019f), new Vector3(0.016f, 0.003f, 0.0015f), Frame);
+                b.Bevel(new Vector3(s * 0.34f, -0.459f, 0.34f), new Vector3(0.024f, 0.006f, 0.024f), Quaternion.identity, Frame, 0.003f);
             }
-            // five-point harness straps across the backrest
-            b.Box(new Vector3(-0.12f, -0.25f, -0.135f), new Vector3(0.025f, 0.30f, 0.004f), Quaternion.Euler(-14, 0, 8), Stripe);
-            b.Box(new Vector3(0.12f, -0.25f, -0.135f), new Vector3(0.025f, 0.30f, 0.004f), Quaternion.Euler(-14, 0, -8), Stripe);
+            // five-point harness straps across the backrest, meeting at a metal buckle
+            b.Box(new Vector3(-0.12f, -0.25f, -0.094f), new Vector3(0.025f, 0.30f, 0.004f), Quaternion.Euler(-14, 0, 8), Stripe);
+            b.Box(new Vector3(0.12f, -0.25f, -0.094f), new Vector3(0.025f, 0.30f, 0.004f), Quaternion.Euler(-14, 0, -8), Stripe);
+            b.Bevel(new Vector3(0, -0.47f, -0.036f), new Vector3(0.04f, 0.04f, 0.008f), couchTilt, Bolt, 0.008f);
 
             // ---- side walls: conduit runs, handholds, equipment lockers
             for (int s = -1; s <= 1; s += 2)
@@ -165,14 +227,14 @@ namespace FogOfWar.Cockpit
                 float wx = s * X;
                 b.Box(new Vector3(wx - s * 0.03f, 0.55f, -0.1f), new Vector3(0.03f, 0.03f, 1.30f), Frame);              // conduit
                 b.Box(new Vector3(wx - s * 0.025f, 0.45f, -0.1f), new Vector3(0.02f, 0.02f, 1.30f), HullDark);
-                b.Box(new Vector3(wx - s * 0.12f, -0.15f, 0.55f), new Vector3(0.12f, 0.35f, 0.40f), Panel);             // side console
+                b.Bevel(new Vector3(wx - s * 0.12f, -0.15f, 0.55f), new Vector3(0.12f, 0.35f, 0.40f), Quaternion.identity, Panel, 0.015f); // side console
                 for (int k = 0; k < 6; k++)
                 {
                     var at = new Vector3(wx - s * 0.241f, -0.05f - (k / 2) * 0.12f, 0.40f + (k % 2) * 0.22f);
                     b.Box(at, new Vector3(0.002f, 0.035f, 0.07f), Bezel);                                                   // small status panel
                     b.Box(at + new Vector3(-s * 0.002f, 0.025f, -0.055f), new Vector3(0.001f, 0.004f, 0.004f), k == 1 ? LedRed : LedAmber); // its LED
                 }
-                b.Box(new Vector3(wx - s * 0.09f, 0.15f, -0.85f), new Vector3(0.09f, 0.55f, 0.32f), HullDark);          // locker
+                b.Bevel(new Vector3(wx - s * 0.09f, 0.15f, -0.85f), new Vector3(0.09f, 0.55f, 0.32f), Quaternion.identity, HullDark, 0.012f); // locker
                 b.Box(new Vector3(wx - s * 0.181f, 0.15f, -0.85f), new Vector3(0.002f, 0.50f, 0.005f), Bezel);           // locker seam
                 // grab bar on stand-offs
                 b.Box(new Vector3(wx - s * 0.09f, 0.85f, 0.2f), new Vector3(0.012f, 0.012f, 0.45f), Stripe);
@@ -216,7 +278,17 @@ namespace FogOfWar.Cockpit
             foreach (var m in row.Centres)
             {
                 var back = rot * Vector3.forward * 0.012f;
-                b.Box(m + back, new Vector3(w / 2 + 0.025f, h / 2 + 0.03f, 0.01f), rot, Bezel, true);
+                b.Bevel(m + back, new Vector3(w / 2 + 0.025f, h / 2 + 0.03f, 0.01f), rot, Bezel, 0.006f);
+                // a raised rim around the glass, 6 mm wide and 7 mm proud, so the screen sits in a recess
+                const float rim = 0.006f, up = 0.0035f;
+                b.Bevel(m + rot * new Vector3(0, h / 2 + rim / 2, -up), new Vector3(w / 2 + rim, rim / 2, up), rot, Bezel, 0.002f);
+                b.Bevel(m + rot * new Vector3(0, -h / 2 - rim / 2, -up), new Vector3(w / 2 + rim, rim / 2, up), rot, Bezel, 0.002f);
+                b.Bevel(m + rot * new Vector3(-w / 2 - rim / 2, 0, -up), new Vector3(rim / 2, h / 2, up), rot, Bezel, 0.002f);
+                b.Bevel(m + rot * new Vector3(w / 2 + rim / 2, 0, -up), new Vector3(rim / 2, h / 2, up), rot, Bezel, 0.002f);
+                // mounting screws at the bezel's corners
+                for (int sx = -1; sx <= 1; sx += 2)
+                    for (int sy = -1; sy <= 1; sy += 2)
+                        b.Bevel(m + rot * new Vector3(sx * (w / 2 + 0.017f), sy * (h / 2 + 0.021f), -0.003f), new Vector3(0.004f, 0.004f, 0.002f), rot, Bolt, 0.0015f);
                 for (int k = 0; k < 4; k++)
                 {
                     float y = -h / 2 + 0.03f * h / MfdH + k * (h - 0.06f * h / MfdH) / 3;
