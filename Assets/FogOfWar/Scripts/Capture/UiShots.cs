@@ -129,6 +129,31 @@ namespace FogOfWar
                     setCam.Invoke(os, new object[] { 0 });
                     yield return null;
                 }
+                if (os != null)
+                {
+                    // QA-056/058: the tutorial's practice beacon as the target, speeds measured against it (m/s);
+                    // QA-057: the same target off screen, so its edge marker shows
+                    const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
+                    var spawn = typeof(OpenSystemScene).GetMethod("SpawnBeacon", F);
+                    if (spawn != null)
+                    {
+                        spawn.Invoke(os, null);
+                        var beacon = (OpenWorld.Body)typeof(OpenSystemScene).GetField("beacon", F).GetValue(os);
+                        var ship = (OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", F).GetValue(os);
+                        if (beacon != null && ship != null)
+                        {
+                            ship.VelRef = beacon;
+                            yield return Wait(0.5f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06i-beacon");
+                            os.TestAimTargetAt(1.6f);
+                            yield return Wait(0.3f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06j-beacon-offscreen");
+                            log.WriteLine("    beacon: " + os.TestLabelReport());
+                            ship.VelRef = null;
+                            typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);
+                        }
+                    }
+                }
                 os?.ShowConsoleTab(5);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
                 os?.ShowCodex(1);
