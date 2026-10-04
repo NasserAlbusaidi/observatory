@@ -17,7 +17,7 @@ namespace FogOfWar.OpenWorld
     {
         public const double G0 = 9.80665e-3;    // km/s^2
         public const double RcsAccel = 0.1 * G0; // RCS translation, all axes
-        public const float AngAccel = 1.5f;      // rad/s^2 (RCS torque)
+        public const float AngAccel = 1.5f;      // rad/s^2 (reaction-wheel torque: electric, no reaction mass)
         public const float MaxRate = 0.6f;       // rad/s
 
         public D3 Pos, Vel;
@@ -79,7 +79,8 @@ namespace FogOfWar.OpenWorld
         {
             dominant = reference;
             var g = sys.Gravity(Pos, jd);
-            if (RotInput.sqrMagnitude > 0 && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
+            // the pilot's stick or RCS takes over from the nav computer (RCS is not a trim on top of the plan)
+            if (ManualInput && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
 
             D3? want = null;
             double throttle = ThrottleCmd;
@@ -135,7 +136,7 @@ namespace FogOfWar.OpenWorld
         // Attitude only (coasting on rails): holds and manual rotation still move the nose.
         public void Turn(SolarSystem sys, double jd, double h, Body reference)
         {
-            if (RotInput.sqrMagnitude > 0 && PlanActive) Plan = Plan.None;
+            if (ManualInput && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
             UpdateAttitude(PlanActive ? (D3?)null : HoldDir(sys, jd, reference), h);
         }
 
@@ -165,24 +166,42 @@ namespace FogOfWar.OpenWorld
         }
 
         // Rigid-body attitude. Pilot input accelerates the rotation; with flight assist on, the ship stops rotating when
-        // the stick is released. A hold or plan slews the nose with the same acceleration and rate limits. Long time
-        // steps (time compression) use the rate limit alone.
+        // the stick is released. A hold or plan slews the nose with the same acceleration and rate limits. Torque comes
+        // from reaction wheels (electric), so turning spends no reaction mass and works with a dry tank. Long steps are
+        // split into short ones so the result doesn't depend on frame rate or time compression (#16); only a hold or
+        // plan over a long step (time compression) slews at the rate limit alone, and a free spin turns exactly.
+        const float AttStep = 0.05f;  // s, longest rigid-body substep
+        const int MaxAttSteps = 64;
+
         void UpdateAttitude(D3? want, double h)
         {
             float dt = (float)h;
             bool manual = RotInput.sqrMagnitude > 0;
-            if (dt > 0.25f)
+            if (!manual && want.HasValue && dt > 0.25f)
             {
-                if (manual) Att = Att * Quaternion.Euler(RotInput * (MaxRate * dt * Mathf.Rad2Deg));
-                else if (want.HasValue)
-                {
-                    var to = Quaternion.LookRotation(Frame.U(want.Value), Att * Vector3.up);
-                    Att = Quaternion.RotateTowards(Att, to, MaxRate * dt * Mathf.Rad2Deg);
-                }
-                else if (!FlightAssist && AngVel.sqrMagnitude > 0) Att = Att * Quaternion.AngleAxis(Mathf.Min(AngVel.magnitude * dt, 3.14f) * Mathf.Rad2Deg, AngVel);
-                if (FlightAssist || want.HasValue) AngVel = Vector3.zero;
+                var to = Quaternion.LookRotation(Frame.U(want.Value), Att * Vector3.up);
+                Att = Quaternion.RotateTowards(Att, to, MaxRate * dt * Mathf.Rad2Deg);
+                AngVel = Vector3.zero;
                 return;
             }
+            if (!manual && !want.HasValue)
+            {
+                if (AngVel.sqrMagnitude == 0) return;
+                if (!FlightAssist)
+                {
+                    // nothing acts on the ship: it keeps spinning about the same body axis
+                    double turn = AngVel.magnitude * h % (2 * Math.PI);
+                    Att = Quaternion.Normalize(Att * Quaternion.AngleAxis((float)turn * Mathf.Rad2Deg, AngVel));
+                    return;
+                }
+            }
+            int n = Mathf.Clamp(Mathf.CeilToInt(dt / AttStep), 1, MaxAttSteps);
+            for (int i = 0; i < n; i++) AttitudeStep(want, dt / n, manual);
+            Att = Quaternion.Normalize(Att);
+        }
+
+        void AttitudeStep(D3? want, float dt, bool manual)
+        {
             if (manual) AngVel += RotInput * (AngAccel * dt);
             else if (want.HasValue)
             {
@@ -199,7 +218,6 @@ namespace FogOfWar.OpenWorld
             else if (FlightAssist) AngVel = Vector3.MoveTowards(AngVel, Vector3.zero, AngAccel * dt);
             AngVel = Vector3.ClampMagnitude(AngVel, MaxRate);
             if (AngVel.sqrMagnitude > 0) Att = Att * Quaternion.AngleAxis(AngVel.magnitude * dt * Mathf.Rad2Deg, AngVel);
-            Att = Quaternion.Normalize(Att);
         }
 
         // Anything that hits a surface stops on it (no crash model yet). Bodies come from the scene's Near list, at

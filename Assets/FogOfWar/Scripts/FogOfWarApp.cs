@@ -143,8 +143,9 @@ namespace FogOfWar
             simTime += dt;
             Shader.SetGlobalFloat("_SimTime", simTime);
             if (Controls.Pressed(Controls.Action.Help) && !KeysQuiet) HelpOpen = !HelpOpen;
-            // the game pauses under its menu; Observatory scenes keep animating behind theirs
-            if (!(MenuOpen && InGame)) current?.Tick(dt);
+            // the game pauses under its menu and its help sheet (#17: flight never runs on while the controls are
+            // covered); Observatory scenes keep animating behind theirs, and photo mode keeps its own time control
+            if (!(InGame && (MenuOpen || (HelpOpen && Rig == null)))) current?.Tick(dt);
         }
 
         void LateUpdate()
@@ -308,7 +309,7 @@ namespace FogOfWar
 
         void ControlsMenu()
         {
-            GUILayout.Label("Click a key slot, then press the new key. Esc cancels; Delete clears the slot. A key already in use swaps places.", ui.body);
+            GUILayout.Label("Click a key slot, then press the new key. Esc cancels; Delete clears the slot. A key already in use swaps places. The fixed keys below can't be assigned.", ui.body);
             GUILayout.Label(string.IsNullOrEmpty(rebindNote) ? " " : rebindNote, ui.note);
             foreach (var a in Controls.All)
             {
@@ -340,6 +341,7 @@ namespace FogOfWar
             helpScroll = GUILayout.BeginScrollView(helpScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
             GUILayout.BeginVertical(GUILayout.Width(ui.AvailWidth));
             GUILayout.Label("CONTROLS", ui.title);
+            if (InGame) GUILayout.Label("Flight is paused while this sheet is open.", ui.note);
             foreach (var a in Controls.All)
             {
                 GUILayout.BeginHorizontal();
@@ -347,7 +349,10 @@ namespace FogOfWar
                 GUILayout.Label(Controls.Keys(a), ui.value);
                 GUILayout.EndHorizontal();
             }
-            GUILayout.Label("1–9: hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. Mouse: drag to look around, scroll to zoom. Change keys under Esc → Controls.", ui.note);
+            GUILayout.Label("1–9: hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. " +
+                $"Flip ({Controls.Keys(Controls.Action.Flip)}) turns the nose 180° from where it points now; 3 points it against your velocity. Turning alone doesn't slow you: burn to brake. " +
+                "Turning uses reaction wheels, which run on power and spend no reaction mass. " +
+                "Mouse: drag to look around, scroll to zoom. Change keys under Esc → Controls.", ui.note);
             GUILayout.Space(6);
             if (GUILayout.Button("Close (F1)", ui.button)) HelpOpen = false;
             GUILayout.EndVertical();
