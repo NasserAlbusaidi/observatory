@@ -140,10 +140,13 @@ namespace FogOfWar.OpenWorld
         public void Tick(SolarSystem sys, Ship ship, double jd, double simDt)
         {
             this.ship = ship; this.jd = jd;
+            StartSpan(ship, jd, simDt);
             Apply(ship);
             Notes.RemoveAll(n => UnityEngine.Time.realtimeSinceStartup - n.Time > 8);
             Discover(sys, ship, jd, simDt);
             if (Sandbox) { Docked = null; return; }
+            // a job past its final cutoff fails before anything this update could pay it (#24)
+            Expire(jd);
             var was = Docked;
             Docked = FindDock(sys, ship, jd, was);
             if (Docked != was) OnEvent?.Invoke(Docked != null ? Happening.Docked : Happening.Undocked, (Docked ?? was).Name);
@@ -167,7 +170,6 @@ namespace FogOfWar.OpenWorld
             TransferInProgress = false;
             Rescues(sys, ship, jd, simDt);
             Intercepts(sys, ship, jd, simDt);
-            Expire(jd);
             foreach (var t in Codex.CheckFeats(this, ship)) Say(Happening.Achievement, "Achievement: " + t);
         }
 
@@ -185,8 +187,9 @@ namespace FogOfWar.OpenWorld
             var t = ship.Target;
             if (t == null || t.Parent == null || IsCraft(t) || Codex.Scanned.Contains(t.Name)) { Codex.ScanTarget = null; return; }
             if (Codex.ScanTarget != t.Name) { Codex.ScanTarget = t.Name; Codex.ScanProgress = 0; }
-            if (ship.Throttle > 0 || (ship.Pos - sys.Pos(t, jd)).Mag > Codex.ScanRange(t)) return;
-            Codex.ScanProgress += simDt;
+            double q = ScanSeconds(sys, t, Codex.ScanRange(t), jd, simDt);
+            if (q <= 0) return;
+            Codex.ScanProgress += q;
             if (Codex.ScanProgress < Codex.ScanSeconds) return;
             Codex.Scanned.Add(t.Name); Codex.Visited.Add(t.Name);
             if (Sandbox) { Say(Happening.Scanned, "Codex: " + t.Name + " scanned"); return; }
@@ -203,8 +206,10 @@ namespace FogOfWar.OpenWorld
             return true;
         }
 
-        // Docked: in a bound orbit close to the port body with the drive off (or sitting on its surface).
+        // Docked: in a bound orbit close to the port body with the drive off (or sitting on its surface). The orbit's
+        // periapsis must clear the surface by DockClearance, so a fall toward the ground never counts (#23).
         public static double DockRange(Body b) => Ship.Standoff(b) * 2;
+        public static double DockClearance(Body b) => b.Radius * 0.05 + 10;
 
         // Once docked, trim burns while the autopilot circularises don't undock you; leaving range or orbit does.
         Port FindDock(SolarSystem sys, Ship ship, double jd, Port was)
@@ -218,10 +223,21 @@ namespace FogOfWar.OpenWorld
                 var r = ship.Pos - sys.Pos(b, jd);
                 double d = r.Mag;
                 if (d > DockRange(b)) continue;
-                double v = (ship.Vel - sys.Vel(b, jd)).Mag;
-                if (v * v < 2 * b.GM / d) return p;
+                var vr = ship.Vel - sys.Vel(b, jd);
+                double v = vr.Mag;
+                if (v * v >= 2 * b.GM / d) continue;
+                if (Periapsis(r, vr, b.GM) > b.Radius + DockClearance(b)) return p;
             }
             return null;
+        }
+
+        // Closest approach of the conic through (r, v) about a body of the given GM: p / (1 + e). A radial fall has none.
+        public static double Periapsis(D3 r, D3 v, double gm)
+        {
+            if (gm <= 0) return r.Mag;
+            var h = D3.Cross(r, v);
+            var e = D3.Cross(v, h) / gm - r.Norm;
+            return h.Sqr / gm / (1 + e.Mag);
         }
 
         void Deliver(double jd)
@@ -236,6 +252,7 @@ namespace FogOfWar.OpenWorld
 
         void Complete(Contract c, double jd, string what)
         {
+            if (FinallyExpired(c, jd)) return; // Expire fails it; nothing pays after the final cutoff (#24)
             bool late = jd > c.DeadlineJd;
             double pay = late ? c.Pay * 0.5 : c.Pay;
             Credits += pay; Earned += pay; Done++;
@@ -247,6 +264,53 @@ namespace FogOfWar.OpenWorld
 
         public static double ScanRange(Body b) => Math.Max(Ship.Standoff(b) * 2, b.Radius + 1000);
 
+        // ------------------------------------------------------------ scan time (#19)
+
+        // The ship's state at the start of this update (the end of the last one), so a long update credits only the time
+        // actually spent in scan conditions, whatever the time compression.
+        D3 lastPos, lastVel, spanPos, spanVel;
+        double lastJd = double.NaN, lastBurn, spanJd, spanBurn;
+        bool spanOk;
+
+        void StartSpan(Ship ship, double jd, double simDt)
+        {
+            // a load or a jump in the date leaves nothing to interpolate: that update credits no scan time
+            spanOk = !double.IsNaN(lastJd) && simDt > 0 && Math.Abs((jd - lastJd) * 86400 - simDt) < 0.01 + 1e-6 * simDt;
+            spanPos = lastPos; spanVel = lastVel; spanJd = lastJd; spanBurn = lastBurn;
+            lastPos = ship.Pos; lastVel = ship.Vel; lastJd = jd; lastBurn = ship.BurnSeconds;
+        }
+
+        // Seconds of this update spent within range of b with the drive off. In between the update's end states the
+        // position relative to b is taken as a cubic (Hermite) curve, sampled for range crossings; if both ends are in
+        // range the whole update counts. Drive time is taken off as if it all fell in range, so this never overcounts.
+        double ScanSeconds(SolarSystem sys, Body b, double range, double jd, double simDt)
+        {
+            if (!spanOk) return 0;
+            var r1 = ship.Pos - sys.Pos(b, jd);
+            var r0 = spanPos - sys.PosAt(b, spanJd);
+            double d0 = r0.Mag - range, d1 = r1.Mag - range, inside;
+            if (d0 <= 0 && d1 <= 0) inside = simDt;
+            else
+            {
+                var m0 = (spanVel - sys.Vel(b, spanJd)) * simDt;
+                var m1 = (ship.Vel - sys.Vel(b, jd)) * simDt;
+                int n = (int)Math.Min(64, Math.Ceiling(simDt / 10));
+                inside = 0;
+                double prev = d0;
+                for (int i = 1; i <= n; i++)
+                {
+                    double s = (double)i / n, s2 = s * s, s3 = s2 * s;
+                    var p = r0 * (2 * s3 - 3 * s2 + 1) + m0 * (s3 - 2 * s2 + s) + r1 * (-2 * s3 + 3 * s2) + m1 * (s3 - s2);
+                    double d = i == n ? d1 : p.Mag - range;
+                    // the part of this piece inside the range, with the distance taken as linear across it
+                    if (prev <= 0 && d <= 0) inside += simDt / n;
+                    else if (prev <= 0 || d <= 0) inside += simDt / n * -Math.Min(prev, d) / Math.Abs(prev - d);
+                    prev = d;
+                }
+            }
+            return Math.Max(0, inside - (ship.BurnSeconds - spanBurn));
+        }
+
         void Scan(SolarSystem sys, Ship ship, double jd, double simDt)
         {
             for (int i = Active.Count - 1; i >= 0; i--)
@@ -254,21 +318,25 @@ namespace FogOfWar.OpenWorld
                 var c = Active[i];
                 if (c.Kind != JobKind.Survey) continue;
                 var b = sys[c.To];
-                if (b == null || ship.Throttle > 0) continue;
-                if ((ship.Pos - sys.Pos(b, jd)).Mag > Codex.ScanRange(b)) continue;
-                c.Dwell += simDt * (Codex.SensorLevel > 0 ? 2 : 1);
+                if (b == null) continue;
+                double q = ScanSeconds(sys, b, Codex.ScanRange(b), jd, simDt);
+                if (q <= 0) continue;
+                c.Dwell += q * (Codex.SensorLevel > 0 ? 2 : 1);
                 if (c.Dwell < c.DwellNeeded) continue;
                 Codex.Scanned.Add(c.To); Codex.Visited.Add(c.To);
                 Complete(c, jd, "Survey of " + c.To + " sent by tight beam");
             }
         }
 
+        // Late delivery pays half until twice the time allowed has passed; after that the job has failed.
+        static bool FinallyExpired(Contract c, double jd) => jd - c.IssuedJd > 2 * (c.DeadlineJd - c.IssuedJd);
+
         void Expire(double jd)
         {
             for (int i = Active.Count - 1; i >= 0; i--)
             {
                 var c = Active[i];
-                if (jd - c.IssuedJd <= 2 * (c.DeadlineJd - c.IssuedJd)) continue;
+                if (!FinallyExpired(c, jd)) continue;
                 Active.RemoveAt(i); Failed++;
                 RemoveDerelict(c);
                 Say(Happening.JobFailed, "Contract failed, far past its deadline: " + c.Title, false);
@@ -461,6 +529,12 @@ namespace FogOfWar.OpenWorld
             seconds = Math.Sqrt(d / a) * (f + 1 / f) * 1.1 + ParkSeconds;
             tonnes = mass * (1 - Math.Exp(-dv / Ship.Ve));
         }
+
+        // A brachistochrone's cruise speed for a coast at fraction f (0 = no cap, full burn) over distance d still to go.
+        // Chosen during the flight, a coast never sets it below the closing speed the ship already has: it stops
+        // accelerating rather than burning to slow down.
+        public static double CruiseCap(double f, double a, double d, double closing = 0) =>
+            f < 1 ? Math.Max(f * Math.Sqrt(a * d), closing) : 0;
 
         // Δv left in the tank at the current mass.
         public static double DvLeft(Ship ship) => Ship.Ve * Math.Log(ship.Mass / (ship.Mass - ship.Fuel));

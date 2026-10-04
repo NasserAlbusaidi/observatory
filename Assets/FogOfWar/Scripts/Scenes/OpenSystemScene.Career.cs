@@ -19,6 +19,7 @@ namespace FogOfWar
         int cruiseIdx;
         bool planWasActive;
         Body planTarget;
+        int planCruiseIdx;
 
         void InitCareer()
         {
@@ -134,18 +135,29 @@ namespace FogOfWar
             return (float)(belt * Math.Clamp(v / 20, 0.3, 3) / 240);
         }
 
+        // The coast the trip estimate is for: while a plan flies, the cruise speed it actually holds (#20), else the selection.
+        bool FlyingPlan => ship.PlanActive && ship.Plan == Plan.Brachistochrone;
+        double PlannerFrac(double d) => !FlyingPlan ? CruiseFracs[cruiseIdx]
+            : ship.CruiseCap > 0 ? Math.Min(1, ship.CruiseCap / Math.Sqrt(ship.AMax * Math.Max(d, 1e-6))) : 1;
+        string PlannerLead() => FlyingPlan ? "Active plan, from here at" : "At";
+
         void TickCareer(double simDt)
         {
-            // a plan starts (or restarts on a new target in the same frame): fix its cruise speed from the distance to go
-            if (ship.PlanActive && (!planWasActive || ship.Target != planTarget) && ship.Plan == Plan.Brachistochrone)
+            // a plan starts (or restarts on a new target in the same frame): fix its cruise speed from the distance to go.
+            // A new coast choice during the flight applies at once (#20), from the distance still to go; a coast never
+            // brakes the ship below the speed it already has (it stops accelerating instead), full burn lifts the cap.
+            bool fresh = !planWasActive || ship.Target != planTarget;
+            if (ship.PlanActive && (fresh || cruiseIdx != planCruiseIdx) && ship.Plan == Plan.Brachistochrone)
             {
-                double f = CruiseFracs[cruiseIdx];
-                double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
-                ship.CruiseCap = f < 1 ? f * Math.Sqrt(ship.AMax * d) : 0;
+                var to = sys.Pos(ship.Target, jd) - ship.Pos;
+                double d = Math.Max(to.Mag - Ship.Standoff(ship.Target), 0);
+                double closing = fresh ? 0 : D3.Dot(ship.Vel - sys.Vel(ship.Target, jd), to.Norm);
+                ship.CruiseCap = Career.CruiseCap(CruiseFracs[cruiseIdx], ship.AMax, d, closing);
             }
             if (!ship.PlanActive) ship.CruiseCap = 0;
             planWasActive = ship.PlanActive;
             planTarget = ship.Target;
+            planCruiseIdx = cruiseIdx;
             career.Tick(sys, ship, jd, simDt);
             // QA-041: a job ending out there, or a dry tank, drops time compression; a crossing caps it at 100×
             if (career.DropWarp) { warpIdx = 0; career.DropWarp = false; }
@@ -306,8 +318,8 @@ namespace FogOfWar
             int ci = ui.Buttons(Array.ConvertAll(new[] { 0, 1, 2 }, i => (cruiseIdx == i ? "● " : "") + CruiseNames[i]));
             if (ci >= 0) cruiseIdx = ci;
             double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
-            Career.Trip(d, ship.AMax, CruiseFracs[cruiseIdx], ship.Mass, out double t, out double dv, out double fuel);
-            GUILayout.Label($"At {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", fuel > ship.Fuel ? ui.label : ui.note);
+            Career.Trip(d, ship.AMax, PlannerFrac(d), ship.Mass, out double t, out double dv, out double fuel);
+            GUILayout.Label($"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", fuel > ship.Fuel ? ui.label : ui.note);
             if (fuel > ship.Fuel) GUILayout.Label("Not enough reaction mass. Coast, lower the g, or refuel.", ui.label);
             foreach (var c in career.Active)
             {

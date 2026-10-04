@@ -457,12 +457,26 @@ namespace FogOfWar
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the save: " + e.Message); return; }
             jd = s.jd;
             ship.FromSave(s, sys);
-            warpIdx = Mathf.Clamp(s.warp, 0, Warps.Length - 1);
-            if (ship.Target != null) targetIdx = targets.IndexOf(ship.Target);
+            // #18: the save keeps no plan to fly on, so Continue starts at 1× with the drive off and says what it dropped
+            warpIdx = 0;
             reference = Ship.Dominant(sys, ship.Pos, jd);
             SetPivot(Pivot.Ship, 0.16);
             camMode = CamMode.Chase;
             LoadCareer();
+            // rescue and intercept ships exist again only now: resolve the saved target after the career (a finished
+            // job's ship is gone, so its target stays empty)
+            ship.Target = string.IsNullOrEmpty(s.target) ? null : sys[s.target];
+            if (ship.Target != null) targetIdx = targets.IndexOf(ship.Target);
+            var dropped = new List<string>();
+            if (s.plan != (int)Plan.None) dropped.Add("autopilot plan");
+            if (s.hold != (int)Hold.Off) dropped.Add("attitude hold");
+            if (s.throttle > 0) dropped.Add("burn");
+            if (dropped.Count > 0 || s.warp > 0)
+                career.Notes.Add(new Career.Note
+                {
+                    Text = "Loaded at 1× with the drive off" + (dropped.Count > 0 ? ". Not resumed: " + string.Join(", ", dropped) : ""),
+                    Good = dropped.Count == 0, Time = Time.realtimeSinceStartup,
+                });
             ship.Phase = "game loaded";
         }
     }

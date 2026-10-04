@@ -34,6 +34,7 @@ namespace FogOfWar.OpenWorld
         public Body Target;
         public D3 StationOffset;
         public double DvUsed;
+        public double BurnSeconds;               // sim seconds with the drive firing (career scan time leaves these out)
         // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
         // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
         public const double Ve = 10000;          // km/s
@@ -129,6 +130,7 @@ namespace FogOfWar.OpenWorld
             Pos += Vel * h;
             double dv = (Throttle * AMax + rcs.Mag) * h;
             DvUsed += dv;
+            if (Throttle > 0) BurnSeconds += h;
             if (!UnlimitedFuel) Fuel = Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
             CheckTouchdown(sys, jd);
         }
@@ -433,20 +435,32 @@ namespace FogOfWar.OpenWorld
             public string target;
             public int warp;
             public bool assist;
+            // what Continue does not fly on, kept so the load can say so; the spin and the landing it does keep (#18).
+            // Older saves lack these and read as none.
+            public int plan, hold;
+            public double throttle;
+            public float wx, wy, wz;
+            public string landed;
         }
 
         public SaveData ToSave(double jd, int warp) => new SaveData
         {
             jd = jd, px = Pos.x, py = Pos.y, pz = Pos.z, vx = Vel.x, vy = Vel.y, vz = Vel.z, maxG = MaxG, dv = DvUsed,
             qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Target?.Name, warp = warp, assist = FlightAssist,
+            plan = (int)(PlanActive ? Plan : Plan.None), hold = (int)Hold, throttle = ThrottleCmd,
+            wx = AngVel.x, wy = AngVel.y, wz = AngVel.z, landed = Landed?.Name,
         };
 
         public void FromSave(SaveData s, SolarSystem sys)
         {
             Pos = new D3(s.px, s.py, s.pz); Vel = new D3(s.vx, s.vy, s.vz); MaxG = s.maxG; DvUsed = s.dv;
-            Att = Quaternion.Normalize(new Quaternion(s.qx, s.qy, s.qz, s.qw)); AngVel = Vector3.zero;
+            Att = Quaternion.Normalize(new Quaternion(s.qx, s.qy, s.qz, s.qw));
+            // with flight assist off nothing damps a spin: keep it (assist on would have stopped it anyway)
+            AngVel = s.assist ? Vector3.zero : Vector3.ClampMagnitude(new Vector3(s.wx, s.wy, s.wz), MaxRate);
+            // a job's ship is rebuilt with the career: the scene resolves the target again after that
             Target = string.IsNullOrEmpty(s.target) ? null : sys[s.target];
-            FlightAssist = s.assist; Plan = Plan.None; Hold = Hold.Off; ThrottleCmd = 0; Landed = null;
+            FlightAssist = s.assist; Plan = Plan.None; Hold = Hold.Off; ThrottleCmd = 0; Throttle = 0;
+            Landed = string.IsNullOrEmpty(s.landed) ? null : sys[s.landed];
         }
     }
 }
