@@ -136,7 +136,7 @@ namespace FogOfWar.Cockpit
             for (int i = 0; i <= N; i++)
             {
                 double t = bound ? T * i / N : span * (2.0 * i / N - 1);
-                OpenWorld.Rails.Propagate(r, v, mu, t, out var p, out _);
+                if (!OpenWorld.Rails.Propagate(r, v, mu, t, out var p, out _)) continue;
                 if (!bound && p.Mag > 6 * r.Mag) continue;
                 pts.Add(p);
                 extent = Math.Max(extent, p.Mag * 1.05);

@@ -68,7 +68,7 @@ namespace FogOfWar.OpenWorld
             Body best = sys.Sun; double bestSoi = double.MaxValue;
             foreach (var b in sys.Bodies)
             {
-                if (b.Parent == null) continue;
+                if (b.Parent == null || Career.IsCraft(b)) continue; // a ship (derelict, beacon) pulls nothing: never the frame
                 double soi = Math.Max(b.A * Math.Pow(b.GM / b.Parent.GM, 0.4), b.Radius * 1.5);
                 if (soi < bestSoi && (sys.Pos(b, jd) - p).Mag < soi) { best = b; bestSoi = soi; }
             }
@@ -101,7 +101,7 @@ namespace FogOfWar.OpenWorld
             }
             else
             {
-                want = HoldDir(sys, jd, reference);
+                want = HoldDirMid(sys, jd, h, reference, g);
                 Phase = ThrottleCmd > 0 ? "burning" : RcsInput.sqrMagnitude > 0 ? "RCS" : "coasting";
             }
             if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of reaction mass"; }
@@ -120,7 +120,7 @@ namespace FogOfWar.OpenWorld
                 if (!liftoff)
                 {
                     // sitting on the surface: ride along with the body
-                    Pos = sys.Pos(Landed, jd + h / 86400) + up * Landed.Radius * (1 - Landed.Flattening * 0.5) * 1.0001;
+                    Pos = sys.Pos(Landed, jd + h / 86400) + up * SurfaceRadius(Landed, up) * 1.0001;
                     Vel = sys.Vel(Landed, jd);
                     Phase = "landed on " + Landed.Name;
                     return;
@@ -134,8 +134,9 @@ namespace FogOfWar.OpenWorld
             // (Ship harness, issue #13): a 2 h 1 g burn 0.2 AU from Earth, 1 mm at h = 30 s (was 1,000 km); 30 min of
             // burns and coasts from low Earth orbit with a fixed heading, 45 m at h = 5 s, 0.2 km at 10 s, 1.6 km at 30 s
             // (was 37, 74, 222 km). The scene's substeps there are ~9 s (1 % of the orbit's radian time) and ≤ 30 s under
-            // power anywhere. A heading that tracks something (prograde hold, autopilot) is re-aimed once per step, a
-            // first-order hold: ~45 km on the same LEO sequence at h = 10 s, about 0.3 % of the distance flown.
+            // power anywhere. Holds that track the ship's motion are aimed at mid-step (HoldDirMid): a prograde hold on
+            // the same LEO sequence is 0.38 km off at h = 10 s and 3.3 km at 30 s (was 45 and 136 km). The autopilot
+            // still re-aims once per step; it is a feedback loop, so that shows as guidance error, not drift.
             var thrust = Heading * (Throttle * AMax) + rcs;
             double dv = (Throttle * AMax + rcs.Mag) * h;
             // reaction mass that runs out partway through the step drives the ship for only the fraction f of h it lasts
@@ -163,6 +164,23 @@ namespace FogOfWar.OpenWorld
             UpdateAttitude(PlanActive ? (D3?)null : HoldDir(sys, jd, reference), h);
         }
 
+        // #27: the body velocity holds and the speed readout are measured against; null means the dominant body (the
+        // orbit). The pilot can switch it to the target to brake against that instead (not saved).
+        public Body VelRef;
+
+        // #13: under power, a hold that follows the ship's own motion (prograde, normal, radial, target) is aimed at
+        // the state predicted for the middle of the step, so the thrust it steers is second order in h. Aimed at the
+        // start, it lagged half a step: 45 km after 30 min of prograde burns from LEO at h = 10 s.
+        D3? HoldDirMid(SolarSystem sys, double jd, double h, Body reference, D3 g)
+        {
+            if (Hold == Hold.Off || Hold == Hold.Custom || ThrottleCmd <= 0 || !(h > 0)) return HoldDir(sys, jd, reference);
+            D3 p = Pos, v = Vel, a = g + Heading * (ThrottleCmd * AMax);
+            Pos = p + v * (0.5 * h) + a * (0.125 * h * h); Vel = v + a * (0.5 * h);
+            var d = HoldDir(sys, jd + 0.5 * h / 86400, reference);
+            Pos = p; Vel = v;
+            return d;
+        }
+
         D3? HoldDir(SolarSystem sys, double jd, Body reference)
         {
             if (Hold == Hold.Off) return null;
@@ -172,8 +190,9 @@ namespace FogOfWar.OpenWorld
                 var d = (sys.Pos(Target, jd) - Pos).Norm;
                 return Hold == Hold.Target ? d : -d;
             }
-            var v = Vel - sys.Vel(reference, jd);
-            var r = Pos - sys.Pos(reference, jd);
+            var vr = VelRef ?? reference;
+            var v = Vel - sys.Vel(vr, jd);
+            var r = Pos - sys.Pos(vr, jd);
             if (v.Sqr < 1e-12) return null;
             var n = D3.Cross(r, v).Norm;
             switch (Hold)
@@ -245,6 +264,13 @@ namespace FogOfWar.OpenWorld
 
         // Anything that hits a surface stops on it (no crash model yet). Bodies come from the scene's Near list, at
         // the given date; using the step's start date keeps the ephemeris cache warm.
+        // #25: contact faster than this (km/s, relative to the body's centre, as the landed ship rides it) destroys the
+        // ship; the scene then reloads the last save. Forgiving (the -fowqa sandbox) lands it anyway and says so.
+        public const double SafeTouchdown = 0.02;
+        public bool Forgiving;
+        public Body Crashed;
+        public double ImpactSpeed;
+
         public void CheckTouchdown(SolarSystem sys, double jd)
         {
             foreach (var b in Near)
@@ -252,14 +278,23 @@ namespace FogOfWar.OpenWorld
                 if (b == sys.Sun) continue;
                 var bp = sys.Pos(b, jd);
                 var r = Pos - bp;
-                double R = SurfaceRadius(b, r) * 0.999;
+                double R = SurfaceRadius(b, r);
                 if (r.Mag < R)
                 {
-                    Pos = bp + r.Norm * SurfaceRadius(b, r) * 1.0001;
+                    // a step or coast arc can end below the surface; take the speed back up to it, since the fall from
+                    // the surface to here (μ(1/r − 1/R)) would otherwise turn a gentle touchdown into a crash
+                    double v = (Vel - sys.Vel(b, jd)).Mag;
+                    ImpactSpeed = Math.Sqrt(Math.Max(0, v * v - 2 * b.GM * (1 / r.Mag - 1 / R)));
+                    Pos = bp + r.Norm * R * 1.0001;
                     Vel = sys.Vel(b, jd);
                     Landed = b; Plan = Plan.None; ThrottleCmd = 0; Throttle = 0; AngVel = Vector3.zero;
                     bool giant = b.Look == Look.Gas || b.Look == Look.Ice;
                     Phase = giant ? "in " + b.Name + "'s cloud tops (no surface): climb out" : "landed on " + b.Name;
+                    if (ImpactSpeed > SafeTouchdown)
+                    {
+                        if (Forgiving) Phase += $" (impact {ImpactSpeed * 1000:F0} m/s: sandbox, no damage)";
+                        else { Crashed = b; Phase = $"destroyed: hit {b.Name} at {ImpactSpeed * 1000:F0} m/s"; }
+                    }
                     break;
                 }
             }

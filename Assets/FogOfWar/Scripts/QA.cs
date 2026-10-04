@@ -208,7 +208,7 @@ namespace FogOfWar
                 ("rcs-forward", s => Controls.Hold(Controls.Action.RcsForward, true), 2f),
                 ("rcs-release", s => { Controls.Hold(Controls.Action.RcsForward, false); Invoke(s, "SetHold", OpenWorld.Hold.Off); }, 1f),
                 ("flip", s => { flipFrom = ((OpenWorld.Ship)Ship(s)).Heading; Controls.Tap(Controls.Action.Flip); }, 8f),
-                ("flip-check", s => { var h = ((OpenWorld.Ship)Ship(s)).Heading; Debug.LogWarning($"QA flip: nose turned {Math.Acos(Math.Max(-1, Math.Min(1, OpenWorld.D3.Dot(h, flipFrom)))) * 180 / Math.PI:F1} deg"); }, 0.5f),
+                ("flip-check", s => { var h = ((OpenWorld.Ship)Ship(s)).Heading; Debug.LogWarning($"QA flip: nose turned {Math.Acos(Math.Max(-1, Math.Min(1, OpenWorld.D3.Dot(h, flipFrom)))) * 180 / Math.PI:F1} deg (hold {((OpenWorld.Ship)Ship(s)).Hold}, plan {((OpenWorld.Ship)Ship(s)).Plan}, warp {s.GetType().GetField("warpIdx", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(s)}, angvel {((OpenWorld.Ship)Ship(s)).AngVel.magnitude:F2})"); }, 0.5f),
                 ("cam-orbit", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
                 ("cam-cockpit", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
                 // the cabin: red high-g lighting under a 3 g burn, then a look round the interior

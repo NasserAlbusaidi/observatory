@@ -12,7 +12,7 @@ namespace FogOfWar
         VisualElement lessonCard, lessonPips;
         Label lessonStep, lessonText;
         string lessonShown;
-        static readonly Regex StepRx = new Regex(@"^(?:First flight )?\((\d)/(\d)\)\.?\s*");
+        static readonly Regex StepRx = new Regex(@"^(?:First flight )?\((\d+)/(\d+)\)\.?\s*");
 
         void BuildLessonCard(VisualElement layer)
         {
