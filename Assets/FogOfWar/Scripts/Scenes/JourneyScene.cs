@@ -15,7 +15,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Accelerate at a constant 1 g, flip at the halfway point, brake at 1 g. The view is the forward window, rendered with real <color=#FFB547>aberration</color> (the sky crowds ahead) and <color=#FFB547>Doppler shift</color> (ahead turns blue, behind goes dark).\n\n" +
             "Past γ ≈ 1,000 the cosmic microwave background is blue-shifted into visible light and the space ahead starts to glow. Drag to look behind you, or switch to the chase camera to watch the ship flip and brake tail-first.\n\nThe stars are the real sky, all 9,000 naked-eye stars from the Yale Bright Star Catalogue, turned so your destination sits dead ahead.";
-        public override string Note => "Why mass is a bitch: the speed never reaches 1. Every extra 9 costs more rapidity, and the perfect-rocket fuel ratio grows exponentially with rapidity.";
+        public override string Note => "Why mass is a bitch: the speed never reaches 1. Every extra 9 costs more rapidity, and even an ideal photon rocket (pure light out the back, nothing wasted) needs propellant that grows exponentially with rapidity. The readout is propellant per tonne that arrives, ship and payload together; no known engine comes close.";
 
         const double G_LY = 1.0323; // 1 g in ly/yr²
         static readonly string[] DestNames = { "Proxima Centauri (4.24 ly)", "Galactic centre (26,670 ly)", "The video's 220,000 ly crossing", "Andromeda (2.54 million ly)" };
@@ -196,7 +196,8 @@ namespace FogOfWar
             list.Add(new Readout("Time dilation γ", Fmt.Num(s.gamma, 2)));
             list.Add(new Readout("Whole trip, ship time", Fmt.Years(s.T)));
             list.Add(new Readout("Whole trip, Earth time", Fmt.Years(s.tTotal)));
-            list.Add(new Readout("Perfect photon rocket fuel", Fmt.Num(Math.Exp(2 * s.wMax), 2) + "× payload", Tone.Bad));
+            // ideal photon rocket, speed up and brake: initial / final mass = e^(2·wMax), so propellant / final mass is one less
+            list.Add(new Readout("Ideal photon rocket propellant", Fmt.Num(Math.Exp(2 * s.wMax) - 1, 2) + "× arriving mass", Tone.Bad));
         }
 
         public override void Controls(PanelUI ui)
