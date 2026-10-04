@@ -392,6 +392,44 @@ namespace FogOfWar
                 }
             }
 
+            // #23: a radial fall toward Luna is not docked, a parking orbit is; #18: Continue on a save made mid-plan at
+            // 100k× with a rescue targeted loads at 1×, says the plan was not resumed and targets the rebuilt derelict
+            {
+                app.Restart(app.GameIndex);
+                yield return new WaitForSecondsRealtime(1f);
+                s = (OpenSystemScene)app.Current;
+                Put("warpIdx", 0);
+                var moon = sys.Moon;
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Landed = null;
+                ship.Pos = sys.Pos(moon, jd) + new D3(2000, 0, 0); ship.Vel = sys.Vel(moon, jd) + new D3(-1, 0, 0);
+                yield return null; yield return null;
+                Check(career.Docked == null, $"radial fall 263 km above Luna is not docked ({career.Docked?.Name ?? "none"})");
+                ship.Pos = sys.Pos(moon, jd) + new D3(5000, 0, 0); ship.Vel = sys.Vel(moon, jd) + new D3(0, Math.Sqrt(moon.GM / 5000), 0);
+                yield return null; yield return null;
+                Check(career.Docked?.Name == "Luna", $"circular orbit at Luna docks ({career.Docked?.Name ?? "none"})");
+                var rj = career.Docked != null ? career.Rescue(new System.Random(5), sys, jd) : null;
+                if (rj != null) career.Accept(rj, jd);
+                if (rj != null && career.Active.Contains(rj))
+                {
+                    Call("SetTarget", sys[rj.To]);
+                    Put("selectedPlan", Plan.Brachistochrone);
+                    Call("TogglePlan");
+                    Put("warpIdx", 5);
+                    yield return null;
+                    s.SaveGame();
+                    app.Restart(app.GameIndex);
+                    yield return new WaitForSecondsRealtime(1f);
+                    s = (OpenSystemScene)app.Current;
+                    s.LoadGame();
+                    yield return null;
+                    var wreck = sys[rj.To];
+                    Check(wreck != null && ship.Target == wreck, $"Continue targets the rebuilt derelict ({ship.Target?.Name ?? "none"})");
+                    Check(Get<int>("warpIdx") == 0 && !ship.PlanActive && career.Notes.Exists(n => n.Text.Contains("Not resumed")),
+                        $"Continue starts at 1× with the plan dropped and says so (warp {Get<int>("warpIdx")})");
+                }
+                else log.WriteLine("  (rescue not accepted: Continue check skipped)");
+            }
+
             // New game while a rescue is active: the rebuilt scene must not touch the old wreck's materials
             {
                 int before = exceptions;
