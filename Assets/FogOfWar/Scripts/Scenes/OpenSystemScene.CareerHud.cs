@@ -86,7 +86,7 @@ namespace FogOfWar
             var sb = new StringBuilder();
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
               .Append(career.Docked?.Name).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
-              .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append('|').Append(Math.Round(jd, 2));
+              .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell));
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
             return sb.ToString();
@@ -218,9 +218,9 @@ namespace FogOfWar
                 Ui.Section(c, "Trip planner: " + ship.Target.Name);
                 c.Add(new Segmented(CruiseNames, cruiseIdx, i => { cruiseIdx = i; jobsSig = null; }));
                 double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
-                Career.Trip(d, ship.AMax, CruiseFracs[cruiseIdx], ship.Mass, out double t, out double dv, out double fuel);
+                Career.Trip(d, ship.AMax, PlannerFrac(d), ship.Mass, out double t, out double dv, out double fuel);
                 bool short_ = fuel > ship.Fuel;
-                Ui.L(c, $"At {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", "t-note", "f-mono", short_ ? "warn" : "dim");
+                Ui.L(c, $"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", "t-note", "f-mono", short_ ? "warn" : "dim");
                 if (short_) Ui.L(c, "Not enough reaction mass. Coast, lower the g, or refuel.", "t-body", "warn");
                 foreach (var j in career.Active)
                 {
