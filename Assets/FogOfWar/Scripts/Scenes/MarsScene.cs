@@ -16,7 +16,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Your Universe Sandbox Mars. Crank the greenhouse and watch <color=#FFB547>energy in</color> against <color=#69D2FF>energy out</color>. While they differ the planet is still heating or cooling, whatever the thermometer says right now.\n\n" +
             "The relief is real Mars (MOLA laser altimetry): Olympus Mons, Tharsis, Hellas, Valles Marineris. Lapse rate times elevation is why the peaks freeze while the basins cook, and why the global average describes almost nowhere.";
-        public override string Note => "Equilibrium dial: watch the in/out gap, not the thermometer. A big greenhouse takes decades to finish warming. (No water-vapour feedback is modelled, so there is no true runaway. Map: simple model, not a GCM. Thicker air carries more heat to the poles, so the pole–equator contrast shrinks as pressure rises; the lapse rate fades as the greenhouse thins. Both are heuristics. Water is liquid only where the local pressure is above 6.1 mbar, and it boils lower on high ground.)";
+        public override string Note => "Equilibrium dial: watch the in/out gap, not the thermometer. The warming clock is illustrative: the average just closes on its target with a fixed e-folding time of about 17 displayed years, not from a heat-capacity calculation. (No water-vapour feedback is modelled, so there is no true runaway. Map: simple model, not a GCM. Thicker air carries more heat to the poles, so the pole–equator contrast shrinks as pressure rises; the lapse rate fades as the greenhouse thins. Both are heuristics. Water can be liquid only where the local pressure is above 6.1 mbar, and it boils lower on high ground. The liquid-water percentage counts ground where conditions would allow it; how much water Mars actually has isn't modelled, and the terrain map paints seas only in lowlands more than 1 km below datum.)";
 
         const double S = 586, R = 3.3895e6;
         float tau = 2.8f, albedo = 0.22f, lapse = 6.5f, relief = 8, cwarp = 2, pressure = 1000; // pressure: mbar at datum
@@ -106,7 +106,7 @@ namespace FogOfWar
             planet.Rotate(0, -dt * 3f, 0, Space.World);
             double step = dt * cwarp;
             Tk += (Target() - Tk) * (1 - System.Math.Exp(-step * 0.35));
-            years += step * 6;
+            years += step * 6; // illustrative clock: e-folding time 6 / 0.35 ≈ 17 displayed years
             mat.SetFloat("_Tmean", (float)(Tk - 273.15));
             mat.SetFloat("_Lapse", (float)LapseEff);
             mat.SetFloat("_LatDT", (float)LatDT);
@@ -144,9 +144,9 @@ namespace FogOfWar
             list.Add(new Readout("Surface pressure (datum)", Fmt.Num(pressure, pressure < 100 ? 1 : 0) + " mbar" + (pressure < Triple ? " (below water's triple point)" : "")));
             list.Add(new Readout("Water boils at (datum)", pressure < Triple ? "no liquid phase" : Boil(pressure).ToString("0") + " °C"));
             list.Add(new Readout("Pole–equator contrast", LatDT.ToString("0") + " K"));
-            list.Add(new Readout("Surface where water is liquid", (100.0 * liquid / samples.Count).ToString("0") + "%"));
+            list.Add(new Readout("Ground where liquid water is possible", (100.0 * liquid / samples.Count).ToString("0") + "%"));
             list.Add(new Readout("Equilibrium target", (Target() - 273.15).ToString("0.0") + " °C"));
-            list.Add(new Readout("Years since change", Fmt.Num(years, 0)));
+            list.Add(new Readout("Years since change (illustrative)", Fmt.Num(years, 0)));
         }
 
         public override void Controls(PanelUI ui)
