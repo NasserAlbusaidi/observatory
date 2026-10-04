@@ -43,9 +43,10 @@ namespace FogOfWar.EditorTools
                 ti.SetPlatformTextureSettings(ps);
                 return;
             }
-            if (assetPath.Contains("/Models/PlayerShip/"))
+            if (System.Text.RegularExpressions.Regex.IsMatch(assetPath, @"/Models/\w+Ship/"))
             {
-                // ship atlas (Blender/ship_pbr.py): the normal map is object space, so it needs all three channels
+                // ship atlases (Blender/ship_pbr.py; the NPC fleet uses the same encoding, Fleet.json "textures"): the
+                // normal map is object space, so it needs all three channels
                 // (BC7, not BC5); normal and mask are data, albedo and emission are colour
                 ti.sRGBTexture = !(Is("Normal") || Is("Mask"));
                 ti.wrapModeU = TextureWrapMode.Clamp;
