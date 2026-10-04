@@ -373,13 +373,15 @@ namespace FogOfWar
         {
             if (ship.Crashed != null) { Crashed(); return; }
             ReadInput(dt);
+            if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
             double simDt = dt * Warps[warpIdx];
             warpLimited = false;
-            // only bodies the ship could reach this frame get per-substep collision checks
+            // only bodies the ship could reach this frame get per-substep collision checks; craft (a derelict, the practice
+            // beacon) have no surface to land on or crash into
             ship.Near.Clear();
             double reach0 = simDt * (ship.Vel.Mag + 60) + 100;
             foreach (var b in sys.Bodies)
-                if (b.Parent != null && (sys.Pos(b, jd) - ship.Pos).Mag < reach0 + b.Radius * 2) ship.Near.Add(b);
+                if (b.Parent != null && !Career.IsCraft(b) && (sys.Pos(b, jd) - ship.Pos).Mag < reach0 + b.Radius * 2) ship.Near.Add(b);
             int steps = 0;
             // QA-003: a frame budget, so heavy integration lowers the warp instead of the frame rate
             var budget = System.Diagnostics.Stopwatch.StartNew();

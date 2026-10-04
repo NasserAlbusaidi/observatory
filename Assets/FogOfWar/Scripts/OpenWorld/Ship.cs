@@ -68,7 +68,7 @@ namespace FogOfWar.OpenWorld
             Body best = sys.Sun; double bestSoi = double.MaxValue;
             foreach (var b in sys.Bodies)
             {
-                if (b.Parent == null) continue;
+                if (b.Parent == null || Career.IsCraft(b)) continue; // a ship (derelict, beacon) pulls nothing: never the frame
                 double soi = Math.Max(b.A * Math.Pow(b.GM / b.Parent.GM, 0.4), b.Radius * 1.5);
                 if (soi < bestSoi && (sys.Pos(b, jd) - p).Mag < soi) { best = b; bestSoi = soi; }
             }
@@ -164,6 +164,10 @@ namespace FogOfWar.OpenWorld
             UpdateAttitude(PlanActive ? (D3?)null : HoldDir(sys, jd, reference), h);
         }
 
+        // #27: the body velocity holds and the speed readout are measured against; null means the dominant body (the
+        // orbit). The pilot can switch it to the target to brake against that instead (not saved).
+        public Body VelRef;
+
         // #13: under power, a hold that follows the ship's own motion (prograde, normal, radial, target) is aimed at
         // the state predicted for the middle of the step, so the thrust it steers is second order in h. Aimed at the
         // start, it lagged half a step: 45 km after 30 min of prograde burns from LEO at h = 10 s.
@@ -186,8 +190,9 @@ namespace FogOfWar.OpenWorld
                 var d = (sys.Pos(Target, jd) - Pos).Norm;
                 return Hold == Hold.Target ? d : -d;
             }
-            var v = Vel - sys.Vel(reference, jd);
-            var r = Pos - sys.Pos(reference, jd);
+            var vr = VelRef ?? reference;
+            var v = Vel - sys.Vel(vr, jd);
+            var r = Pos - sys.Pos(vr, jd);
             if (v.Sqr < 1e-12) return null;
             var n = D3.Cross(r, v).Norm;
             switch (Hold)

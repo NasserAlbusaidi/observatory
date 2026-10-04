@@ -147,13 +147,15 @@ namespace FogOfWar
             Check(s.TutorialText != null && s.TutorialText.StartsWith("First flight"), "tutorial starts on a new career");
             Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
             Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
-            Check(s.TutorialText != null && s.TutorialText.StartsWith("(3/7)"), "turn and let go: flight assist lesson passes");
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("(3/11)"), "turn and let go: flight assist lesson passes");
             yield return Shot("c00-tutorial");
             Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
             Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
             Call("SetHold", Hold.Prograde); yield return new WaitForSecondsRealtime(0.4f);
-            Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/7)"), "burn and prograde hold lessons pass");
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/11)") && ship.Target?.Name == "Practice beacon",
+                "burn and prograde hold lessons pass; the practice beacon is the target");
             Call("SetHold", Hold.Off);
+            // #27: the beacon practice is optional, so the Trip below (which targets the Moon) skips it
 
             // 1. the first job, full burn to the Moon
             double c0 = career.Credits;
@@ -161,6 +163,7 @@ namespace FogOfWar
             yield return Trip(sys.Moon, 0, "Earth → Moon full burn", () => career.Docked?.Name == "Luna" && ship.Phase == "in orbit", moonWarp, 60);
             State("at Luna");
             Check(career.Docked?.Name == "Luna", "docked at Luna after the autopilot parks");
+            Check(sys["Practice beacon"] == null, "retargeting ended the practice and removed the beacon");
             Check(career.Credits - c0 >= 3000, $"first job paid ({career.Credits - c0:N0} cr)");
             Check(s.TutorialText == null, "tutorial ends with the first job");
             yield return Shot("c02-luna-docked");
@@ -476,7 +479,7 @@ namespace FogOfWar
                 yield return new WaitForSecondsRealtime(1f);
                 s = (OpenSystemScene)app.Current;
                 yield return null;
-                string running = JsonUtility.ToJson(career.ToSave(ship));        // lesson 1 of 7 in progress
+                string running = JsonUtility.ToJson(career.ToSave(ship));        // lesson 1 of 11 in progress
                 Call("SkipTutorial");
                 yield return null;
                 string skipped = JsonUtility.ToJson(career.ToSave(ship));
