@@ -27,6 +27,8 @@ namespace FogOfWar
             career.StartNew(jd);
             ship.Fuel = career.TankCapacity;
             career.Apply(ship);
+            ship.Forgiving = career.Sandbox;
+            if (crashNote != null) { career.Notes.Add(new Career.Note { Text = crashNote, Good = false, Time = Time.realtimeSinceStartup }); crashNote = null; }
             if (Cam.GetComponent<AudioListener>() == null) Cam.gameObject.AddComponent<AudioListener>();
             sound = new ShipAudio(Root, o => Own(o)) { Muted = muted };
             if (!career.Sandbox) StartTutorial();

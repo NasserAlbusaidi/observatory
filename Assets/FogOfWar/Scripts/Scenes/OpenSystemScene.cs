@@ -371,6 +371,7 @@ namespace FogOfWar
 
         void TickInner(float dt)
         {
+            if (ship.Crashed != null) { Crashed(); return; }
             ReadInput(dt);
             double simDt = dt * Warps[warpIdx];
             warpLimited = false;
@@ -422,6 +423,23 @@ namespace FogOfWar
             reference = Ship.Dominant(sys, ship.Pos, jd);
             TickCareer(achieved);
         }
+
+        // #25: an impact above Ship.SafeTouchdown ends the flight. The last save comes back (under the active
+        // -fowsavekey); with none, a new game starts. The note says what happened either way.
+        static string crashNote;
+        void Crashed()
+        {
+            string what = $"Destroyed: hit {ship.Crashed.Name} at {Speed(ship.ImpactSpeed)}. ";
+            ship.Crashed = null;
+            if (HasSave)
+            {
+                LoadGame();
+                career.Notes.Add(new Career.Note { Text = what + "Reloaded your last save", Good = false, Time = Time.realtimeSinceStartup });
+            }
+            else { crashNote = what + "No save to reload, so a new game started"; App.NewGame(); }
+        }
+
+        static string Speed(double kms) => kms < 1 ? $"{kms * 1000:F0} m/s" : $"{kms:F2} km/s";
 
         // Drive off (or the autopilot parked in orbit): ride a two-body conic around the dominant body. Exact at any
         // warp; other bodies' pulls are ignored until the next burn (patched conics).

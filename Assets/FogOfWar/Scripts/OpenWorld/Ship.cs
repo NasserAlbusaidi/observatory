@@ -245,6 +245,13 @@ namespace FogOfWar.OpenWorld
 
         // Anything that hits a surface stops on it (no crash model yet). Bodies come from the scene's Near list, at
         // the given date; using the step's start date keeps the ephemeris cache warm.
+        // #25: contact faster than this (km/s, relative to the body's centre, as the landed ship rides it) destroys the
+        // ship; the scene then reloads the last save. Forgiving (the -fowqa sandbox) lands it anyway and says so.
+        public const double SafeTouchdown = 0.02;
+        public bool Forgiving;
+        public Body Crashed;
+        public double ImpactSpeed;
+
         public void CheckTouchdown(SolarSystem sys, double jd)
         {
             foreach (var b in Near)
@@ -255,11 +262,17 @@ namespace FogOfWar.OpenWorld
                 double R = SurfaceRadius(b, r) * 0.999;
                 if (r.Mag < R)
                 {
+                    ImpactSpeed = (Vel - sys.Vel(b, jd)).Mag;
                     Pos = bp + r.Norm * SurfaceRadius(b, r) * 1.0001;
                     Vel = sys.Vel(b, jd);
                     Landed = b; Plan = Plan.None; ThrottleCmd = 0; Throttle = 0; AngVel = Vector3.zero;
                     bool giant = b.Look == Look.Gas || b.Look == Look.Ice;
                     Phase = giant ? "in " + b.Name + "'s cloud tops (no surface): climb out" : "landed on " + b.Name;
+                    if (ImpactSpeed > SafeTouchdown)
+                    {
+                        if (Forgiving) Phase += $" (impact {ImpactSpeed * 1000:F0} m/s: sandbox, no damage)";
+                        else { Crashed = b; Phase = $"destroyed: hit {b.Name} at {ImpactSpeed * 1000:F0} m/s"; }
+                    }
                     break;
                 }
             }
