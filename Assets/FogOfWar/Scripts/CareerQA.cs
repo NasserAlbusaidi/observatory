@@ -433,6 +433,30 @@ namespace FogOfWar
                 else log.WriteLine("  (rescue not accepted: Continue check skipped)");
             }
 
+            // #25: a slow touchdown lands; a fast one destroys the ship, and the last save (a Luna parking orbit) comes back
+            {
+                app.Restart(app.GameIndex);
+                yield return new WaitForSecondsRealtime(1f);
+                s = (OpenSystemScene)app.Current;
+                Put("warpIdx", 0);
+                var moon = sys.Moon;
+                var up = new D3(1, 0, 0);
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Landed = null;
+                ship.Pos = sys.Pos(moon, jd) + up * 5000; ship.Vel = sys.Vel(moon, jd) + new D3(0, Math.Sqrt(moon.GM / 5000), 0);
+                s.SaveGame();
+                ship.Pos = sys.Pos(moon, jd) + up * (Ship.SurfaceRadius(moon, up) + 0.02); ship.Vel = sys.Vel(moon, jd) - up * 0.005;
+                yield return Fly(() => ship.Landed != null, 0, 20);
+                Check(ship.Landed == moon && ship.Phase.StartsWith("landed") && ship.ImpactSpeed < Ship.SafeTouchdown,
+                    $"a {ship.ImpactSpeed * 1000:F0} m/s touchdown lands ({ship.Phase})");
+                ship.Landed = null;
+                ship.Pos = sys.Pos(moon, jd) + up * (Ship.SurfaceRadius(moon, up) + 50); ship.Vel = sys.Vel(moon, jd) - up * 2;
+                yield return Fly(() => career.Notes.Exists(n => n.Text.StartsWith("Destroyed")), 1, 30);
+                Put("warpIdx", 0);
+                double alt = (ship.Pos - sys.Pos(moon, jd)).Mag;
+                Check(career.Notes.Exists(n => n.Text.StartsWith("Destroyed: hit Moon")) && ship.Landed == null && Math.Abs(alt - 5000) < 50,
+                    $"a 2 km/s impact destroys the ship and reloads the parking-orbit save ({alt:F0} km from Luna, {ship.Phase})");
+            }
+
             // New game while a rescue is active: the rebuilt scene must not touch the old wreck's materials
             {
                 int before = exceptions;
