@@ -16,7 +16,7 @@ namespace FogOfWar
               "Throw something in, or drop a probe, from the Sandbox section below."
             : "Every pixel is a light ray traced back along a real Schwarzschild geodesic, so the far side of the disk is lifted over the top. The <color=#FFB547>photon ring</color> is light that circled the hole at 1.5 rs before it reached you, and the black shadow has a radius of 2.6 rs: its edge is light that only just escaped.\n\n" +
               "One side of the disk is much brighter because that gas comes at you at half the speed of light. Throw something in, or drop a probe, from the Sandbox section below.";
-        public override string Note => "Thin disk, Novikov–Thorne; no thickness, limb darkening or returning light. Disk swirl and gas spreading are sped up; exposure is lowered as spin raises the disk's peak brightness. The camera hovers with zero angular momentum unless it rides a probe. The hovering camera's tide is the Newtonian estimate, and with spin its clock and hover thrust use equatorial values; sandbox probes are followed along their own geodesics.";
+        public override string Note => "Thin disk, Novikov–Thorne, with electron-scattering limb darkening; no thickness or returning light. Colours are Planck spectra seen by the human eye (CIE 1931). Disk swirl and gas spreading are sped up; exposure is lowered as spin raises the disk's peak brightness. The camera hovers with zero angular momentum unless it rides a probe. The hovering camera's tide is the Newtonian estimate, and with spin its clock and hover thrust use equatorial values; sandbox probes are followed along their own geodesics.";
 
         static readonly string[] MassNames = { "Stellar (10 solar masses)", "Sagittarius A* (4.3 million)", "M87* (6.5 billion)", "TON 618 (≈66 billion)" };
         static readonly double[] Masses = { 10, 4.3e6, 6.5e9, 6.6e10 };
@@ -30,6 +30,11 @@ namespace FogOfWar
         (double r, double f) FluxPeak() { if (peakSpin != spin) { peakSpin = spin; peak = Kerr.FluxPeak(spin); } return peak; }
         Material mat;
         float debugFate;   // review harness only: 1 ray fates, 2 first disc hit
+        BHPost post;
+        bool prevHdr;
+        // -fowbhnopost: the old single-pass look (tonemap in the ray tracer, no glare or accumulation), for A/B runs
+        public static readonly bool NoPost = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fowbhnopost") >= 0;
+        public BHPost Post => post;
 
         // mass of the hole in kg, and the time and length units GM/c³ (s) and GM/c² (m)
         double MassKg => System.Math.Pow(10, logMass) * Phys.Msun;
@@ -42,6 +47,13 @@ namespace FogOfWar
             Gfx.Fullscreen("BlackHole", Root, Cam, mat);
             Orbit.Set(new Vector3(0, 2.2f, -24f), Vector3.zero, 2.2f, 60f);
             Art.SkyFacing(Art.GalacticCentreAhead);   // the real Sagittarius star clouds behind the hole, Milky Way level with the disk
+            Shader.SetGlobalTexture("_PlanckLUT", PlanckLut);
+            // lensing squeezes the sky in one direction: let the sky lookup filter anisotropically (BlackHole.shader)
+            if (Shader.GetGlobalTexture("_SkyA") is Texture sky && sky.anisoLevel < 8) sky.anisoLevel = 8;
+            prevHdr = Cam.allowHDR;
+            Cam.allowHDR = true;   // the ray tracer writes linear radiance for BHPost
+            post = Cam.GetComponent<BHPost>() ?? Cam.gameObject.AddComponent<BHPost>();
+            post.Reset();
             BuildSandbox();
         }
 
@@ -49,6 +61,8 @@ namespace FogOfWar
         {
             Art.SkyFacing(Quaternion.identity);
             TeardownSandbox();
+            if (post != null) { Gfx.Destroy(post); post = null; }
+            Cam.allowHDR = prevHdr;
         }
 
         public override void Tick(float dt)
@@ -108,6 +122,81 @@ namespace FogOfWar
             }
             UploadSandbox(mat);
             mat.SetFloat("_DebugFate", debugFate);
+            UpdatePost();
+        }
+
+        // Post pass on/off (debug views and -fowbhnopost bypass it), and this frame's jitter for temporal accumulation.
+        void UpdatePost()
+        {
+            bool on = post != null && !NoPost && debugFate == 0;
+            if (post != null) post.enabled = on;
+            mat.SetFloat("_HDROut", on ? 1 : 0);
+            if (!on) { mat.SetVector("_Jitter", Vector4.zero); return; }
+            var t = Cam.transform;
+            int pose = Hash(t.position.x, t.position.y, t.position.z, t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w, Cam.fieldOfView);
+            int param = Hash(spin, App.Quality, disk ? 1 : 0, doppler ? 1 : 0, lens ? 1 : 0, clumpy ? 1 : 0, outer, temp, logMass, guides ? 1 : 0,
+                Cam.pixelWidth, Cam.pixelHeight, riding != null ? 1 : 0, nParts, bodies.Count, probes.Count);
+            bool running = Time.timeScale > 0 && !paused;
+            bool dynamic = running && (nParts > 0 || bodies.Exists(b => b.state == 0) || probes.Exists(p => p.g.alive));
+            bool swirl = running && clumpy && (disk || nParts > 0);
+            var j = post.Step(param, pose, dynamic, swirl);
+            mat.SetVector("_Jitter", new Vector4(j.x * 2f / Mathf.Max(Cam.pixelWidth, 1), j.y * 2f / Mathf.Max(Cam.pixelHeight, 1), 0, 0));
+        }
+
+        static int Hash(params float[] v)
+        {
+            unchecked
+            {
+                int h = 17;
+                foreach (float x in v) h = h * 31 + Mathf.RoundToInt(x * 1e4f);
+                return h;
+            }
+        }
+
+        // ---- Planck colour LUT (FOWCommon planckRGB): 256 texels over log10 T = 3 … 6, unit luminance, linear sRGB
+        static Texture2D planckLut;
+        static Texture2D PlanckLut
+        {
+            get
+            {
+                if (planckLut != null) return planckLut;
+                planckLut = new Texture2D(256, 1, TextureFormat.RGBAHalf, false, true)
+                { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "PlanckLUT", hideFlags = HideFlags.DontSave };
+                var px = new Color[256];
+                for (int i = 0; i < 256; i++) px[i] = PlanckColor(System.Math.Pow(10, 3 + 3.0 * i / 255));
+                planckLut.SetPixels(px);
+                planckLut.Apply(false, true);
+                return planckLut;
+            }
+        }
+
+        // Planck's law × CIE 1931 2° colour-matching functions (the multi-lobe Gaussian fit of Wyman, Sloan and Shirley
+        // 2013), 360–830 nm, → XYZ → linear sRGB (D65), scaled to luminance 1; out-of-gamut colours are mixed with white
+        // of the same luminance until no channel is negative.
+        public static Color PlanckColor(double T)
+        {
+            double X = 0, Y = 0, Z = 0;
+            for (double l = 360; l <= 830; l += 1)
+            {
+                double lm = l * 1e-9;
+                double B = 1 / (lm * lm * lm * lm * lm * (System.Math.Exp(1.438776877e-2 / (lm * T)) - 1));
+                X += B * (1.056 * G(l, 599.8, 37.9, 31.0) + 0.362 * G(l, 442.0, 16.0, 26.7) - 0.065 * G(l, 501.1, 20.4, 26.2));
+                Y += B * (0.821 * G(l, 568.8, 46.9, 40.5) + 0.286 * G(l, 530.9, 16.3, 31.1));
+                Z += B * (1.217 * G(l, 437.0, 11.8, 36.0) + 0.681 * G(l, 459.0, 26.0, 13.8));
+            }
+            X /= Y; Z /= Y; Y = 1;
+            double r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z;
+            double g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
+            double b = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+            double m = System.Math.Min(r, System.Math.Min(g, b));
+            if (m < 0) { double t = -m / (1 - m); r += (1 - r) * t; g += (1 - g) * t; b += (1 - b) * t; }
+            return new Color((float)r, (float)g, (float)b, 1);
+        }
+
+        static double G(double x, double mu, double s1, double s2)
+        {
+            double t = (x - mu) / (x < mu ? s1 : s2);
+            return System.Math.Exp(-0.5 * t * t);
         }
 
         public override void Readouts(List<Readout> list)

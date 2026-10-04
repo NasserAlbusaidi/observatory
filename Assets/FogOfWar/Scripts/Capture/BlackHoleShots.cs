@@ -112,6 +112,8 @@ namespace FogOfWar
                 S("bh-kerr-0.998-default-zoom14", new Vector3(0, 1.3f, -14f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-kerr-0.998-default-zoom10", new Vector3(0, 0.9f, -10f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
                 S("bh-kerr-0.998-default-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); })),
+                S("dbg-fate-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 1f))),
+                S("dbg-hit-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 2f))),
                 S("dbg-fate-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 1f); })),
                 S("dbg-hit-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 2f); })),
                 // QA-034 recheck: the scene's own default camera (Orbit.Set in Build), spin 0.998, clumpy gas on and off
@@ -127,6 +129,8 @@ namespace FogOfWar
                 S("sb-sun-sgra-approach", new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 1, 0, untilR: 30), ui: true),
                 S("sb-sun-sgra-shred",    new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 1, 12, untilR: 1), ui: true),
                 S("sb-sun-sgra-stream",   new Vector3(0, 9f, 34f), 55, Tde(0, 5f, 1, 120, untilR: 1), ui: true),
+                // QA-053 (map footer) and QA-054 (flare curve at spin 0.998): 25 s of play after a throw
+                S("sb-spin998-flare",     new Vector3(0, 9f, 34f), 55, With(s => { Set(s, "spin", 0.998f); Set(s, "periRs", 5f); B(s).Throw(0); for (int i = 0; i < 45 * 60; i++) B(s).Tick(1f / 60); Set(s, "logWarp", 0f); Set(s, "warpTarget", -1f); }), ui: true),
                 S("sb-sun-sgra-return",   new Vector3(0, 14f, 40f), 55, Tde(0, 5f, 1, 4.2e5, 3.6f), ui: true),
                 S("sb-sun-sgra-disc",     new Vector3(0, 3f, 26f), 50, Tde(0, 5f, 1, 6e5, 3.7f), ui: true),
                 S("sb-sun-m87-whole",     new Vector3(0, 5f, 30f), 50, Tde(0, 5f, 2, 0, untilR: 12), ui: true),
@@ -188,7 +192,7 @@ namespace FogOfWar
 
             foreach (var s in Shots())
             {
-                if (only != null && !s.name.Contains(only)) continue;
+                if (only != null && Array.TrueForAll(only.Split(','), o => !s.name.Contains(o))) continue;   // comma list
                 Time.timeScale = 1;
                 try { s.setup?.Invoke(app.Current); }
                 catch (Exception e) { log.WriteLine($"{s.name}: setup threw {e.InnerException?.Message ?? e.Message}"); errors++; }
@@ -204,22 +208,30 @@ namespace FogOfWar
                 Array.Clear(acc, 0, acc.Length);
                 float pix = 2 * Mathf.Tan(s.fov * Mathf.Deg2Rad / 2) / H * Mathf.Rad2Deg;
                 Color32[] uiPx = null;
-                for (int k = 0; k < SS; k++)
+                // with the post pass on, the scene jitters and accumulates by itself (BHPost): render 64 still frames
+                // and read the last one; otherwise jitter the camera and average SS frames here
+                var bhs = (BlackHoleScene)app.Current;
+                bool accum = bhs.Post != null && bhs.Post.enabled;
+                int frames = accum ? BHPost.MaxFrames : SS, reads = accum ? 1 : SS;
+                if (accum) bhs.Post.Reset();   // a new shot: nothing of the previous view in the history
+                for (int k = 0; k < frames; k++)
                 {
-                    float jx = SS == 1 ? 0 : Halton(k + 1, 2) - 0.5f, jy = SS == 1 ? 0 : Halton(k + 1, 3) - 0.5f;
+                    float jx = SS == 1 || accum ? 0 : Halton(k + 1, 2) - 0.5f, jy = SS == 1 || accum ? 0 : Halton(k + 1, 3) - 0.5f;
                     if (!s.free) cam.transform.SetPositionAndRotation(s.pos, baseRot * Quaternion.Euler(-jy * pix, jx * pix, 0));
                     yield return null;
                     yield return new WaitForEndOfFrame();
                     cam.Render();
+                    if (accum && k < frames - 1) continue;
                     ReadInto(rt, tex);
                     var px = tex.GetPixels32();
                     for (int p = 0, q = 0; p < px.Length; p++, q += 3) { acc[q] += px[p].r; acc[q + 1] += px[p].g; acc[q + 2] += px[p].b; }
-                    if (k == 0 && uiRT != null && (s.ui || withUi)) { ReadInto(uiRT, tex); uiPx = tex.GetPixels32(); }
+                    if (uiPx == null && uiRT != null && (s.ui || withUi)) { ReadInto(uiRT, tex); uiPx = tex.GetPixels32(); }
                 }
+                if (accum) log.WriteLine($"  {s.name}: accumulated {bhs.Post.Accumulated} frames from {bhs.Post.SourceFormat}");
                 var outPx = new Color32[W * H];
                 for (int p = 0, q = 0; p < outPx.Length; p++, q += 3)
                 {
-                    float r = acc[q] / SS, g = acc[q + 1] / SS, b = acc[q + 2] / SS;
+                    float r = acc[q] / reads, g = acc[q + 1] / reads, b = acc[q + 2] / reads;
                     if (uiPx != null)
                     {
                         // UI Toolkit writes premultiplied colour
@@ -233,6 +245,10 @@ namespace FogOfWar
                 log.WriteLine($"{s.name}  {((BlackHoleScene)app.Current).DebugSummary()}");
             }
 
+            // -fowbhnotests: shots and GPU timing only (the sandbox checks below take several minutes)
+            bool tests = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowbhnotests") < 0;
+            if (tests)
+            {
             // CPU cost of the sandbox: a full star's debris near pericentre, at the default warp
             {
                 Default(app.Current);
@@ -324,6 +340,7 @@ namespace FogOfWar
                 log.WriteLine($"escaped light, probe status shown: {list.Find(x => x.label == "Probe status").value} (want escaped)");
                 Default(app.Current);
             }
+            }
 
             // GPU cost of the ray tracer at the default view: N renders, one readback to wait for the GPU.
             // One throw-away render per configuration first, so the first row does not carry the warm-up (audit #56).
@@ -342,10 +359,11 @@ namespace FogOfWar
                 bs.Throw(1); bs.Throw(1); bs.DropProbe(1);
             }
             app.Orbit.enabled = false;
-            foreach (var res in new[] { new Vector2Int(1920, 1080), new Vector2Int(2560, 1440), new Vector2Int(3840, 2160) })
+            foreach (var res in new[] { new Vector2Int(1920, 1080), new Vector2Int(2560, 1440), new Vector2Int(3840, 2160), new Vector2Int(5120, 1440) })
                 foreach (int q in new[] { 0, 1, 2 })
                 {
                     if (busy && !((res.x == 1920 && q == 1) || (res.x == 3840 && q == 2))) continue;
+                    if (res.x == 5120 && q != 2) continue;
                     app.Quality = q;
                     var trt = new RenderTexture(res.x, res.y, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                     trt.Create();
@@ -360,7 +378,21 @@ namespace FogOfWar
                     for (int k = 0; k < N; k++) cam.Render();
                     ReadOne(trt, small);
                     float ms = (Time.realtimeSinceStartup - t0) * 1000 / N;
-                    log.WriteLine($"timing{(busy ? " (busy sandbox)" : "")} {res.x}x{res.y} quality {q}: {ms:0.0} ms per frame");
+                    log.WriteLine($"timing{(busy ? " (busy sandbox)" : "")} {res.x}x{res.y} quality {q}: {ms:0.0} ms per frame{(((BlackHoleScene)app.Current).Post?.enabled == true ? " (post pass on)" : " (no post pass)")}");
+                    if (!busy && res.x == 2560 && q == 1 && ((BlackHoleScene)app.Current).Post?.enabled == true)
+                    {
+                        // the same without the post pass, for its cost
+                        var bp = ((BlackHoleScene)app.Current).Post;
+                        bp.enabled = false; Set(app.Current, "debugFate", 0f);
+                        var mm = (Material)typeof(BlackHoleScene).GetField("mat", F).GetValue(app.Current);
+                        mm.SetFloat("_HDROut", 0);
+                        cam.Render(); ReadOne(trt, small);
+                        float t1 = Time.realtimeSinceStartup;
+                        for (int k = 0; k < N; k++) cam.Render();
+                        ReadOne(trt, small);
+                        log.WriteLine($"timing {res.x}x{res.y} quality {q}: {(Time.realtimeSinceStartup - t1) * 1000 / N:0.0} ms per frame (post pass off)");
+                        bp.enabled = true;
+                    }
                     cam.targetTexture = null;
                     trt.Release(); Destroy(trt); Destroy(small);
                 }
