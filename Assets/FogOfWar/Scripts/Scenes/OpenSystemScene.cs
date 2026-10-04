@@ -399,10 +399,15 @@ namespace FogOfWar
                     continue;
                 }
                 double h = SubstepSize(simDt);
+                // jd (~2.46e6 days) resolves only ~40 µs, so step by exactly the time jd advances: otherwise each 1/60 s
+                // step rounds the planets' clock against the ship's (0.06 % slow, an 18 m/s drift against Earth)
+                h = (jd + h / 86400 - jd) * 86400;
+                if (h <= 0) break;
                 ship.Step(sys, jd, h, reference);
                 profSteps++;
                 jd += h / 86400;
                 simDt -= h;
+                if (simDt < 1e-4) simDt = 0; // finer than jd can resolve
             }
             // the player's warp stays selected; when the frame budget runs out, report the rate actually achieved
             double achieved = dt * Warps[warpIdx] - Math.Max(simDt, 0);

@@ -75,11 +75,14 @@ namespace FogOfWar.OpenWorld
             return best;
         }
 
+        // Gravity at the end of the last step, reused as the start of the next when nothing has moved the ship since.
+        D3 gEnd, gEndPos; double gEndJd = double.NaN; SolarSystem gEndSys;
+
         // Advance by h seconds at Julian date jd (the start of the step).
         public void Step(SolarSystem sys, double jd, double h, Body reference)
         {
             dominant = reference;
-            var g = sys.Gravity(Pos, jd);
+            var g = sys == gEndSys && jd == gEndJd && (Pos - gEndPos).Sqr == 0 ? gEnd : sys.Gravity(Pos, jd);
             // the pilot's stick or RCS takes over from the nav computer (RCS is not a trim on top of the plan)
             if (ManualInput && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
 
@@ -125,14 +128,32 @@ namespace FogOfWar.OpenWorld
                 Landed = null;
             }
 
-            var a = g + Heading * (Throttle * AMax) + rcs;
-            Vel += a * h;
-            Pos += Vel * h;
+            // Velocity Verlet, with gravity sampled at both ends of the step and the drive's thrust (constant across the
+            // step) integrated exactly, so a burn in free space is exact at any step size; the old semi-implicit Euler was
+            // first order (a 300 s 1 g burn ended h/300 long: 10 % at h = 30 s). Error budget against a 0.05 s reference
+            // (Ship harness, issue #13): a 2 h 1 g burn 0.2 AU from Earth, 1 mm at h = 30 s (was 1,000 km); 30 min of
+            // burns and coasts from low Earth orbit with a fixed heading, 45 m at h = 5 s, 0.2 km at 10 s, 1.6 km at 30 s
+            // (was 37, 74, 222 km). The scene's substeps there are ~9 s (1 % of the orbit's radian time) and ≤ 30 s under
+            // power anywhere. A heading that tracks something (prograde hold, autopilot) is re-aimed once per step, a
+            // first-order hold: ~45 km on the same LEO sequence at h = 10 s, about 0.3 % of the distance flown.
+            var thrust = Heading * (Throttle * AMax) + rcs;
             double dv = (Throttle * AMax + rcs.Mag) * h;
-            DvUsed += dv;
-            if (Throttle > 0) BurnSeconds += h;
-            if (!UnlimitedFuel) Fuel = Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
-            CheckTouchdown(sys, jd);
+            // reaction mass that runs out partway through the step drives the ship for only the fraction f of h it lasts
+            double f = 1, dryMass = Mass - Fuel;
+            if (!UnlimitedFuel && dv > 0 && dryMass > 0)
+            {
+                double dvLeft = Ve * Math.Log(Mass / dryMass);
+                if (dvLeft < dv) f = dvLeft / dv;
+            }
+            // thrust on for f·h then off moves the ship a·h²·f(1 − f/2) and changes its velocity by a·f·h
+            Pos += Vel * h + g * (0.5 * h * h) + thrust * (h * h * f * (1 - 0.5 * f));
+            double jd1 = jd + h / 86400;
+            gEnd = sys.Gravity(Pos, jd1); gEndPos = Pos; gEndJd = jd1; gEndSys = sys;
+            Vel += (g + gEnd) * (0.5 * h) + thrust * (f * h);
+            DvUsed += dv * f;
+            if (Throttle > 0) BurnSeconds += h * f;
+            if (!UnlimitedFuel) Fuel = f < 1 ? 0 : Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
+            CheckTouchdown(sys, jd1);
         }
 
         // Attitude only (coasting on rails): holds and manual rotation still move the nose.
@@ -275,7 +296,7 @@ namespace FogOfWar.OpenWorld
             // Brachistochrone: steer relative velocity onto v = sqrt(2·a·distance) toward the target, so the ship
             // accelerates, flips at the right moment and brakes. Near the target it parks in a circular orbit.
             double standoff = Standoff(T);
-            D3 vDes;
+            D3 vDes, ff = D3.Zero;
             bool orbiting = dist < standoff * 1.25 && vrel.Mag < Math.Sqrt(T.GM / Math.Max(dist, 1)) * 2 + 0.5;
             if (!orbiting)
             {
@@ -292,6 +313,11 @@ namespace FogOfWar.OpenWorld
                     if (cruising) { Phase = "cruising"; return null; }
                 }
                 else cruising = false;
+                // On or above the braking curve, feed its own deceleration forward. A P-controller alone (tau up to
+                // 120 s at 30 s steps) trails a curve falling at 0.85·a by about 0.85·a·tau, ~1 km/s at 1 g, and the
+                // ship reaches the standoff too fast to stop: harmless around a planet it can orbit, but it flew
+                // through Phobos (11 km) on the career suite's arrival from behind Mars.
+                if (!capped && vb > 0 && D3.Dot(vrel, vDes.Norm) >= vb) ff = -vDes.Norm * (aMax * 0.85);
             }
             else
             {
@@ -305,7 +331,7 @@ namespace FogOfWar.OpenWorld
             if (hover) vDes = (-r).Norm * (-(dist - standoff) * 0.002);
             var err = vDes - vrel;
             // in orbit, gravity is what keeps us there; otherwise cancel it first, then steer with what is left
-            var cmd = orbiting && !hover ? err / tau : Budget(err / tau, gRel);
+            var cmd = orbiting && !hover ? err / tau : Budget(err / tau + ff, gRel);
             if (orbiting && !hover)
             {
                 // Parked when the orbit has the right shape: speed near circular, little radial motion, radius near the

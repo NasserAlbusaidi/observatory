@@ -345,6 +345,7 @@ namespace FogOfWar
             app.InputLocked = true;
             Controls.Locked = true;
             int startQuality = app.Quality;
+            PhysicsChecks();
 
             for (int i = 0; i < app.SceneCount; i++)
             {
@@ -430,6 +431,42 @@ namespace FogOfWar
             log.Close();
             log = null;
             Application.Quit();
+        }
+
+        // Issues #8 and #13: bodies' positions and velocities stay continuous across the ends of the JPL fits, and a
+        // powered step is exact under constant thrust, reaction mass running out mid-step included, at any step size.
+        void PhysicsChecks()
+        {
+            log.WriteLine("physics regressions");
+            var sys = OpenWorld.SolarSystem.Build();
+            foreach (var b in sys.Bodies)
+            {
+                if (b.Cheb == null) continue;
+                foreach (double e in new[] { b.Cheb.JdStart, b.Cheb.JdEnd })
+                {
+                    double typ = Math.Max(sys.Vel(b, e - 1).Mag, sys.Vel(b, e + 1).Mag), worst = 0;
+                    for (double t = e - 0.01; t <= e + 0.01; t += 0.0005) worst = Math.Max(worst, sys.Vel(b, t).Mag);
+                    double step = (sys.PosAt(b, e + 1e-7) - sys.PosAt(b, e - 1e-7)).Mag;
+                    if (worst > 1.1 * typ || step > 5) { errors++; log.WriteLine($"    BAD {b.Name} at JD {e}: speed up to {worst:F1} km/s (typical {typ:F1}), position step {step:F1} km"); }
+                }
+            }
+            var empty = new OpenWorld.SolarSystem();
+            const double g0 = OpenWorld.Ship.G0;
+            foreach (double h in new[] { 1.0, 30, 60 })
+            {
+                // 300 s at 1 g: unlimited, then with reaction mass for exactly 100 s (coasting the rest)
+                foreach (bool limited in new[] { false, true })
+                {
+                    var ship = new OpenWorld.Ship { ThrottleCmd = 1, UnlimitedFuel = !limited };
+                    if (limited) ship.Fuel = (ship.DryMass + ship.Cargo) * (Math.Exp(g0 * 100 / OpenWorld.Ship.Ve) - 1);
+                    double tb = limited ? 100 : 300, x = 0.5 * g0 * tb * tb + g0 * tb * (300 - tb), jd = 2461317.5;
+                    for (int k = 0; k < Math.Round(300 / h); k++) { ship.Step(empty, jd, h, null); jd += h / 86400; }
+                    double ex = Math.Abs(ship.Pos.Mag / x - 1), ev = Math.Abs(ship.Vel.Mag / (g0 * tb) - 1);
+                    string msg = $"    1 g burn{(limited ? ", fuel for 100 s" : "")}, h {h} s: position error {ex:E1}, velocity error {ev:E1}";
+                    if (ex > 1e-9 || ev > 1e-9) { errors++; msg += "  BAD"; }
+                    log.WriteLine(msg);
+                }
+            }
         }
 
         IEnumerator Shot(string name)

@@ -10,6 +10,12 @@ namespace FogOfWar.OpenWorld
     // Chebyshev fit to JPL Horizons vectors (Tools/horizons/fit.mjs): ecliptic J2000 km, TDB, relative to the parent.
     public class Cheb
     {
+        // The Horizons samples span 2000-01-01 to 2100-01-01 TDB (fit.mjs JD0..JD1). fit.mjs rounds the segment count,
+        // so with 8- and 16-day segments the last segment runs 3 days past the data: it is extrapolated there (Mercury's
+        // runs off by 10⁸ km) and, fitted to part of its span, it misses its neighbour by up to 24 km. The usable fit
+        // ends with the last segment the data covers in full.
+        public const double DataEnd = 2488069.5;
+
         double jd0, seg; int nSeg, n; double[] c;
 
         public static Cheb Load(string name)
@@ -24,16 +30,20 @@ namespace FogOfWar.OpenWorld
             return ch;
         }
 
-        public double JdEnd => jd0 + seg * nSeg;
+        public double JdEnd => jd0 + seg * Math.Min(nSeg, Math.Floor((DataEnd - jd0) / seg + 1e-9));
         public double JdStart => jd0;
 
-        public bool Eval(double jd, out D3 p)
+        public bool Eval(double jd, out D3 p) => Eval(jd, out p, out _, false);
+
+        // Position (km) and, when asked, its exact time derivative (km/s) from the same polynomial.
+        public bool Eval(double jd, out D3 p, out D3 v, bool vel = true)
         {
             double u = (jd - jd0) / seg;
             int k = (int)Math.Floor(u);
-            if (k < 0 || k >= nSeg) { p = D3.Zero; return false; }
+            if (k < 0 || k >= nSeg || jd >= JdEnd) { p = v = D3.Zero; return false; }
             double t = 2 * (u - k) - 1;
             p = new D3(Clenshaw(k * 3 * n, t), Clenshaw((k * 3 + 1) * n, t), Clenshaw((k * 3 + 2) * n, t));
+            v = vel ? new D3(Derivative(k * 3 * n, t), Derivative((k * 3 + 1) * n, t), Derivative((k * 3 + 2) * n, t)) * (2 / (seg * 86400)) : D3.Zero;
             return true;
         }
 
@@ -42,6 +52,14 @@ namespace FogOfWar.OpenWorld
             double b0 = 0, b1 = 0, b2 = 0;
             for (int i = n - 1; i >= 1; i--) { b2 = b1; b1 = b0; b0 = 2 * t * b1 - b2 + c[o + i]; }
             return t * b0 - b1 + c[o];
+        }
+
+        // d/dt Σ cᵢ Tᵢ(t) = Σ i cᵢ Uᵢ₋₁(t), summed by Clenshaw's recurrence for the U polynomials.
+        double Derivative(int o, double t)
+        {
+            double b0 = 0, b1 = 0, b2 = 0;
+            for (int i = n - 1; i >= 1; i--) { b2 = b1; b1 = b0; b0 = 2 * t * b1 - b2 + i * c[o + i]; }
+            return b0;
         }
     }
 
@@ -196,7 +214,7 @@ namespace FogOfWar.OpenWorld
 
         public Body this[string name] => Bodies.Find(b => b.Name == name);
 
-        // True outside the span of the JPL fits, where positions fall back to approximate mean elements.
+        // True outside the span of the JPL fits (or in the blend at their ends), where positions use approximate mean elements.
         public bool Approximate(double jd) => jd < EphemStart || jd >= EphemEnd;
 
         // Heliocentric position, km.
@@ -212,26 +230,70 @@ namespace FogOfWar.OpenWorld
         // Uncached, for sampling other dates (orbit lines) without evicting the current date.
         public D3 PosAt(Body b, double jd) => PosNoCache(b, jd);
 
+        // Supported epochs. Inside [EphemStart, EphemEnd), 2000-06-29 to 2099-06-22 TDB, every fitted body is on its JPL
+        // fit (the shortest fit ends 2099-12-19; less the blend). Over the BlendDays at each end of its own fit a body's
+        // position cross-fades smoothly to its mean elements, and beyond the fit it is on the mean elements alone;
+        // Approximate() is true over both. Position and velocity are continuous everywhere: velocity is the analytic rate
+        // of the model in use (Chebyshev derivative; the blend's own rate inside the window), never a difference taken
+        // across a model change. The blend spreads the gap between the two models over the window, adding at most
+        // 1.5 × gap / BlendDays to the body's speed and 6 × gap / BlendDays² to its acceleration: at the 2099 end the gap
+        // is under 40,000 km for the inner planets, the Moon and the asteroids (< 4 m/s), 0.55, 1.9, 1.9 and 6.2 million km for
+        // Jupiter to Neptune (0.05, 0.19, 0.18, 0.6 km/s). At the 2000 end the asteroids' fallback (osculating elements
+        // for 2100) is 10⁷–10⁹ km out and their blend is correspondingly fast; a game starts at the current date, so that
+        // end is reached only with a wrong system clock. (Ship harness, issue #8: a ship flown through the 2099 blend in a
+        // 3-radius orbit stays within 2.5 % of its radius at Saturn, 0.5 % at Jupiter.)
+        public const double BlendDays = 180;
+
         D3 PosNoCache(Body b, double jd)
         {
             if (b.Parent == null) return D3.Zero;
             if (b.Path != null) return b.Path(jd);
             var parent = b.Parent == Sun ? D3.Zero : jd == cacheJd ? Pos(b.Parent, jd) : PosNoCache(b.Parent, jd);
-            var p = parent + (b.Cheb != null && b.Cheb.Eval(jd, out var local) ? local : b.Kepler(jd));
-            if (b.Barycentric && b.MassiveMoons.Count > 0)
-            {
-                // planet centre = barycentre − Σ GMᵢ rᵢ / (GM + Σ GMᵢ), rᵢ = moon relative to the planet
-                var s = D3.Zero; double m = b.GM;
-                foreach (var moon in b.MassiveMoons) { s += moon.Kepler(jd) * moon.GM; m += moon.GM; }
-                p -= s / m;
-            }
-            return p;
+            return parent + Local(b, jd, false, out _);
         }
 
         public D3 Vel(Body b, double jd)
         {
+            if (b.Parent == null) return D3.Zero;
             const double h = 30.0 / 86400; // 30 s
-            return (PosNoCache(b, jd + h) - PosNoCache(b, jd - h)) / 60.0;
+            if (b.Path != null) return (b.Path(jd + h) - b.Path(jd - h)) / 60.0;
+            Local(b, jd, true, out var v);
+            return b.Parent == Sun ? v : v + Vel(b.Parent, jd);
+        }
+
+        // Position relative to the parent (km) and, if asked, its rate (km/s): the fit, the mean elements, or the blend.
+        static D3 Local(Body b, double jd, bool wantVel, out D3 v)
+        {
+            const double h = 30.0 / 86400; // the mean elements are one smooth model, so a central difference is safe
+            D3 Kep(double t, out D3 kv) { kv = wantVel ? (b.Kepler(t + h) - b.Kepler(t - h)) / 60.0 : D3.Zero; return b.Kepler(t); }
+            D3 p;
+            if (b.Cheb != null && b.Cheb.Eval(jd, out var cp, out var cv, wantVel))
+            {
+                // fallback weight w: 1 at either end of the fit, 0 from BlendDays inside it (smoothstep, so dw/dt is 0 at both ends)
+                double edge = Math.Min(jd - b.Cheb.JdStart, b.Cheb.JdEnd - jd);
+                if (edge >= BlendDays) { p = cp; v = cv; }
+                else
+                {
+                    double u = edge / BlendDays, w = 1 - u * u * (3 - 2 * u);
+                    double dw = -6 * u * (1 - u) / (BlendDays * 86400) * (jd - b.Cheb.JdStart < b.Cheb.JdEnd - jd ? 1 : -1); // per s
+                    var kp = Kep(jd, out var kv);
+                    p = cp + (kp - cp) * w;
+                    v = cv + (kv - cv) * w + (kp - cp) * dw;
+                }
+            }
+            else p = Kep(jd, out v);
+            if (b.Barycentric && b.MassiveMoons.Count > 0)
+            {
+                // planet centre = barycentre − Σ GMᵢ rᵢ / (GM + Σ GMᵢ), rᵢ = moon relative to the planet
+                var s = D3.Zero; var sv = D3.Zero; double m = b.GM;
+                foreach (var moon in b.MassiveMoons)
+                {
+                    s += moon.Kepler(jd) * moon.GM; m += moon.GM;
+                    if (wantVel) sv += (moon.Kepler(jd + h) - moon.Kepler(jd - h)) / 60.0 * moon.GM;
+                }
+                p -= s / m; v -= sv / m;
+            }
+            return p;
         }
 
         // Acceleration of a test particle at p, km/s^2, in the heliocentric frame: direct pull of every massive body,
@@ -404,7 +466,7 @@ namespace FogOfWar.OpenWorld
             {
                 if (b.Parent != null && b.Parent != sun && b != s.Moon) continue; // moons use mean elements
                 b.Cheb = Cheb.Load(b.Name);
-                if (b.Cheb != null) { s.EphemStart = Math.Max(s.EphemStart, b.Cheb.JdStart); s.EphemEnd = Math.Min(s.EphemEnd, b.Cheb.JdEnd); }
+                if (b.Cheb != null) { s.EphemStart = Math.Max(s.EphemStart, b.Cheb.JdStart + BlendDays); s.EphemEnd = Math.Min(s.EphemEnd, b.Cheb.JdEnd - BlendDays); }
             }
             return s;
         }
