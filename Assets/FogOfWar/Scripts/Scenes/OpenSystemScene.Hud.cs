@@ -308,6 +308,8 @@ namespace FogOfWar
             return Fmt.Num(ms, Math.Abs(ms) < 10 ? 2 : Math.Abs(ms) < 100 ? 1 : 0);
         }
 
+        static string BrachSpeed(double kms) => kms < 1 ? SpeedText(kms) : Fmt.Num(kms, kms < 10 ? 1 : 0) + " km/s";
+
         static string SpeedText(double kms) => SpeedNum(kms, out string u) + " " + u;
 
         // QA-057: the part of the HUD that has no panels on it (right column and bottom flight cluster excluded)
@@ -641,7 +643,9 @@ namespace FogOfWar
                 Ui.SetClass(tcStop, "warn", late);
                 Ui.Text(tcStopNote, $"Relative to {t.Name}. Stop: flip now, {by}, no gravity. Speed and holds measure against {VelRefBody.Name} ({UiShell.Keys(A.VelocityRef)} switches).");
                 double d = Math.Max(r.Mag - Ship.Standoff(t), 0);
-                Ui.Text(tcBrach, $"{Fmt.Num(ship.MaxG, 1)} g brachistochrone: {Dur(2 * Math.Sqrt(d / ship.AMax))}\nΔv {Fmt.Num(2 * Math.Sqrt(d * ship.AMax), 0)} km/s · peak {Fmt.Num(Math.Sqrt(d * ship.AMax), 0)} km/s");
+                // QA-062: inside the parking distance there is no trip to plan; short trips read in m/s
+                Ui.Text(tcBrach, d < 1 ? "Within parking distance: no brachistochrone needed."
+                    : $"{Fmt.Num(ship.MaxG, 1)} g brachistochrone: {Dur(2 * Math.Sqrt(d / ship.AMax))}\nΔv {BrachSpeed(2 * Math.Sqrt(d * ship.AMax))} · peak {BrachSpeed(Math.Sqrt(d * ship.AMax))}");
                 Ui.Text(tcNav, ship.PlanActive ? "NAV  " + ship.Phase.ToUpperInvariant() : "NAV IDLE");
                 Ui.SetClass(tcNav, "accent", ship.PlanActive);
                 Ui.Text(tcEngage, ship.PlanActive ? "ABORT" : "ENGAGE");
