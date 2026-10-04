@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true); Set(s, "lensSpp", 8f); Set(s, "lensNoTrace", false);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
         };
@@ -459,6 +459,18 @@ namespace FogOfWar
                         for (int k = 0; k < N; k++) bt.RebuildLens();
                         ReadOne(trt, small);
                         log.WriteLine($"timing lens table rebuild ({BlackHoleScene.LensN}², quality {q}): {(Time.realtimeSinceStartup - t2) * 1000 / N:0.0} ms");
+                        // cost split of the table path, still camera: samples per pixel, and fallback pixels traced or black
+                        foreach (var (spp, noTrace) in new[] { (8f, false), (8f, true), (1f, true), (1f, false) })
+                        {
+                            Set(bt, "lensSpp", spp); Set(bt, "lensNoTrace", noTrace);
+                            bt.LateTick(0);
+                            cam.Render(); ReadOne(trt, small);
+                            float t4 = Time.realtimeSinceStartup;
+                            for (int k = 0; k < N; k++) cam.Render();
+                            ReadOne(trt, small);
+                            log.WriteLine($"timing {res.x}x{res.y} quality {q}, lens table {spp:0} spp, fallback {(noTrace ? "black (not traced)" : "traced")}: {(Time.realtimeSinceStartup - t4) * 1000 / N:0.0} ms per frame");
+                        }
+                        Set(bt, "lensSpp", 8f); Set(bt, "lensNoTrace", false);
                         var p0 = new Vector3(0, 0.9f, 24f);
                         int b0 = bt.LensBuilds;
                         float t3 = Time.realtimeSinceStartup;
@@ -469,7 +481,7 @@ namespace FogOfWar
                             cam.Render();
                         }
                         ReadOne(trt, small);
-                        log.WriteLine($"timing {res.x}x{res.y} quality {q}, falling camera ({bt.LensBuilds - b0} rebuilds in {N} frames): {(Time.realtimeSinceStartup - t3) * 1000 / N:0.0} ms per frame");
+                        log.WriteLine($"timing {res.x}x{res.y} quality {q}, falling camera ({bt.LensBuilds - b0} rebuilds in {N} frames, table {(bt.LensActive ? "on" : "off")} at the end): {(Time.realtimeSinceStartup - t3) * 1000 / N:0.0} ms per frame");
                         cam.transform.SetPositionAndRotation(p0, Quaternion.LookRotation(-p0));
                     }
                     if (!busy && res.x == 2560 && q == 1 && ((BlackHoleScene)app.Current).Post?.enabled == true)

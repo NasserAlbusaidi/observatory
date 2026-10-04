@@ -15,6 +15,10 @@ namespace FogOfWar
         public const int LensN = 1024;
         const int EdgeSamples = 4096;      // photon orbits sampled for the shadow edge (each with both signs of p_θ)
         bool lensTable = true;             // review harness: false = the full trace everywhere (A/B)
+        float lensSpp = 8;                 // review harness: 1 for the cost split
+        bool lensNoTrace;                  // review harness: fallback pixels black instead of traced (cost split)
+        double lastR, lastMu;
+        int movingFrames;                  // frames in a row the camera's r or θ changed
         Material lensMat;
         Mesh lensQuad;
         CommandBuffer lensCmd;
@@ -33,7 +37,14 @@ namespace FogOfWar
         void UpdateLens(double a)
         {
             Kerr.ToBL(Cam.transform.position * 2f, a, out double r, out double mu, out _);
-            bool want = lensTable && lens && debugFate != 1 && debugFate != 2 && r >= 4 && LensSupported;
+            // a camera that moves in or out frame after frame (falling, riding a probe) would rebuild every frame,
+            // which costs more than the full trace: from the second such frame the full trace draws until it settles.
+            // Fast quality always takes the full trace (cheaper than the table's samples there).
+            bool moved = Math.Abs(r - lastR) > 1e-5 * r || Math.Abs(mu - lastMu) > 1e-5;
+            movingFrames = moved ? movingFrames + 1 : 0;
+            lastR = r; lastMu = mu;
+            bool want = lensTable && lens && debugFate != 1 && debugFate != 2 && r >= 4 && LensSupported
+                && App.Quality > 0 && movingFrames < 2;
             if (want && (!lensValid || keyA != a || keyQ != App.Quality || Math.Abs(r - keyR) > 1e-5 * r || Math.Abs(mu - keyMu) > 1e-5))
             {
                 lensValid = BuildLens(r, mu, a);
@@ -41,6 +52,8 @@ namespace FogOfWar
             }
             LensActive = want && lensValid;
             mat.SetFloat("_LensOn", LensActive ? 1 : 0);
+            mat.SetFloat("_LensSpp", lensSpp);
+            mat.SetFloat("_LensNoTrace", lensNoTrace ? 1 : 0);
         }
 
         static bool LensSupported => SystemInfo.supportedRenderTargetCount >= 5

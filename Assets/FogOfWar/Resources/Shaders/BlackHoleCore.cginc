@@ -587,8 +587,9 @@ float3 skyTerm(float3 dir, float w, float EF, float px)
 Texture2D<float4> _LensT0, _LensT1, _LensT2, _LensT3, _LensT4;
 Texture2D<float> _LensEdge;    // ρc at the centres of _LensN bins over ψ
 float _LensOn, _LensN;
+float _LensSpp;                // samples per pixel (8; 1 for the review harness's cost split)
+float _LensNoTrace;            // review harness: pass 1 draws fallback pixels black instead of tracing them
 #define LENS_EPS 2e-4
-#define LENS_SPP 8
 #define LENS_GRAZE 0.05
 #define LENS_POLE_B 0.6       // M: rays this close over a pole take the full trace (step 2 gate: the stripe reached |b| = 0.56)
 

@@ -21,8 +21,8 @@ Shader "FogOfWar/BlackHole"
         CGINCLUDE
             #include "BlackHoleCore.cginc"
 
-            // Pass 0, the image from the lens table: LENS_SPP table samples per pixel on a 4 × 2 grid (the frame's jitter
-            // moves each one within its own cell). A pixel where any sample can't use the table is discarded and left to
+            // Pass 0, the image from the lens table: _LensSpp table samples per pixel, 8 on a 4 × 2 grid (the frame's
+            // jitter moves each one within its own cell), 1 at the jittered centre. A pixel where any sample can't use the table is discarded and left to
             // pass 1; the stencil marks the pixels this pass served. Debug views 1 and 2 leave every pixel to pass 1.
             float4 fragLens(v2fFS i) : SV_Target
             {
@@ -36,9 +36,10 @@ Shader "FogOfWar/BlackHole"
                 float3 Cr, Cph, Cd, nc; float bc;
                 zamoPhoton(primaryRay(i.ndc + jit, px), nc, bc);
                 lensCentre(-nc, Cr, Cph, Cd);
-                [loop] for (int k = 0; k < LENS_SPP; k++)
+                int spp = _LensSpp > 1.5 ? 8 : 1;
+                [loop] for (int k = 0; k < spp; k++)
                 {
-                    float2 o = (float2(k & 3, k >> 2) + 0.5) / float2(4.0, 2.0) - 0.5 + jit / pixNdc / float2(4.0, 2.0);
+                    float2 o = spp == 1 ? jit / pixNdc : (float2(k & 3, k >> 2) + 0.5) / float2(4.0, 2.0) - 0.5 + jit / pixNdc / float2(4.0, 2.0);
                     float3 n; float boost;
                     zamoPhoton(primaryRay(i.ndc + o * pixNdc, px), n, boost);
                     float b, q, EF; float4 s0;
@@ -50,8 +51,8 @@ Shader "FogOfWar/BlackHole"
                     spotLum += sl;
                 }
                 if (fallback) discard;
-                col /= LENS_SPP;
-                spotLum /= LENS_SPP;
+                col /= spp;
+                spotLum /= spp;
                 // debug view 3: green where the table served the pixel (pass 1 draws red where it did not)
                 if (_DebugFate > 2.5) return float4(0, 1, 0, 1);
                 // alpha carries the hot spot's share of this pixel's luminance, for its light curve (BHPost reads it)
@@ -63,6 +64,7 @@ Shader "FogOfWar/BlackHole"
             float4 fragTrace(v2fFS i) : SV_Target
             {
                 if (_DebugFate > 2.5) return _LensOn > 0.5 ? float4(1, 0, 0, 1) : float4(0, 0, 1, 1);
+                if (_LensOn > 0.5 && _LensNoTrace > 0.5) return 0;
                 float px;
                 float a = _Spin;
                 float M = _Lens > 0.5 ? 1.0 : 0.0;
