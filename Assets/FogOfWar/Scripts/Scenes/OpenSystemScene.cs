@@ -37,7 +37,7 @@ namespace FogOfWar
         double effectiveWarp = 1;
         Body reference;
 
-        class Vis { public Body b; public Transform t; public Material[] mats; public bool model; public TerrainBody terrain; public Renderer r; }
+        class Vis { public Body b; public Transform t; public Material[] mats; public bool model; public TerrainBody terrain; public Renderer r; public GameObject[] lods; public int lod; }
         readonly List<Vis> vis = new List<Vis>();
         Transform shipT, shipModel, engine, plume, sunGlow, stars;
         Vector3 engineScale;
@@ -106,22 +106,35 @@ namespace FogOfWar
                     // irregular body from the art pack: mean radius 1 (volume-equivalent), body frame given by its
                     // Prime / North markers (the FBX axis conversion can't be trusted). Scaled by meanRadiusKm.
                     // Small moons with no shape model borrow one of the instancing rocks.
+                    // With LODs (Blender/lods.py: <Name>_LOD0/1/2, same frame and scale) all three are spawned and the
+                    // one that suits the body's size on screen is shown.
                     var holder = new GameObject(b.Name).transform;
                     holder.SetParent(Root, false);
-                    var go = Models.Spawn(modelPath, holder, b.ColA);
-                    AlignToMarkers(go.transform);
                     if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0) b.Radius = info.meanRadiusKm;
                     v.t = holder; v.model = true;
-                    var rs = go.GetComponentsInChildren<Renderer>();
+                    bool lods = Resources.Load<GameObject>($"Models/Bodies/{b.Name}_LOD0") != null;
+                    var paths = lods ? new[] { $"Bodies/{b.Name}_LOD0", $"Bodies/{b.Name}_LOD1", $"Bodies/{b.Name}_LOD2" } : new[] { modelPath };
+                    bool mappedBody = b.Texture != null && Resources.Load<Texture2D>(b.Texture) != null;
                     var ms = new List<Material>();
-                    var mapped = b.Texture != null && Resources.Load<Texture2D>(b.Texture) != null ? PlanetMaterial(b) : null;
-                    foreach (var r in rs)
+                    var gos = new GameObject[paths.Length];
+                    for (int n = 0; n < paths.Length; n++)
                     {
-                        if (mapped != null) { var arr = new Material[r.sharedMaterials.Length]; for (int i = 0; i < arr.Length; i++) arr[i] = mapped; r.sharedMaterials = arr; ms.Add(mapped); continue; }
-                        // QA-045: SimpleLit's blue rim and gloss are for hulls; on bare rock the rim drew a blue shell
-                        // around the silhouette, night side included
-                        foreach (var m in r.sharedMaterials) { Own(m); m.SetColor("_Rim", Color.black); m.SetFloat("_Spec", 0); ms.Add(m); }
+                        var go = gos[n] = Models.Spawn(paths[n], holder, b.ColA);
+                        AlignToMarkers(go.transform);
+                        // each LOD has its own normal map (baked from LOD0), so its own material
+                        var nrm = Resources.Load<Texture2D>(NormalMapFor(paths[n]));
+                        var mapped = mappedBody ? PlanetMaterial(b) : null;
+                        foreach (var r in go.GetComponentsInChildren<Renderer>())
+                        {
+                            if (mapped != null) { var arr = new Material[r.sharedMaterials.Length]; for (int i = 0; i < arr.Length; i++) arr[i] = mapped; r.sharedMaterials = arr; continue; }
+                            // QA-045: SimpleLit's blue rim and gloss are for hulls; on bare rock the rim drew a blue shell
+                            // around the silhouette, night side included
+                            foreach (var m in r.sharedMaterials) { Own(m); m.SetColor("_Rim", Color.black); m.SetFloat("_Spec", 0); SetLodNormal(m, nrm); ms.Add(m); }
+                        }
+                        if (mapped != null) { SetLodNormal(mapped, nrm); ms.Add(mapped); }
+                        go.SetActive(n == paths.Length - 1);
                     }
+                    if (lods) { v.lods = gos; v.lod = paths.Length - 1; }
                     v.mats = ms.ToArray();
                 }
                 else
@@ -253,6 +266,31 @@ namespace FogOfWar
             if (moon && b.Radius < 150 && (b.Texture == null || Resources.Load<Texture2D>(b.Texture) == null))
                 return $"Asteroids/Asteroid{(b.Name.GetHashCode() & 0x7fffffff) % 32:00}";
             return null;
+        }
+
+        // The baked normal map of a model path (Blender/lods.py, Blender/rocks.py), if the art pack has one.
+        static string NormalMapFor(string modelPath)
+        {
+            var name = modelPath.Substring(modelPath.LastIndexOf('/') + 1);
+            if (modelPath.StartsWith("Asteroids/")) return $"Models/Asteroids/Normals/{name}_Normal";
+            int lod = name.IndexOf("_LOD", StringComparison.Ordinal);
+            return lod > 0 ? $"Models/Bodies/{name.Substring(0, lod)}/{name}_Normal" : null;
+        }
+
+        static void SetLodNormal(Material m, Texture2D nrm)
+        {
+            m.SetFloat("_HasLodNormal", nrm != null ? 1 : 0);
+            if (nrm != null) m.SetTexture("_LodNormal", nrm);
+        }
+
+        // Shape-model LOD by the body's radius on screen (px): LOD2 (10k triangles) below 200, LOD1 (50k) below 800,
+        // LOD0 (200k) above, with 10 % either way so a body on a threshold doesn't flicker between two.
+        static int LodFor(float px, int cur)
+        {
+            int want = px > 800 ? 0 : px > 200 ? 1 : 2;
+            if (want < cur && px < (want == 0 ? 880 : 220)) return cur;
+            if (want > cur && px > (cur == 0 ? 720 : 180)) return cur;
+            return want;
         }
 
         [Serializable] class BodyJson { public float geometricAlbedo; public bool mapIsAbsolute; }
@@ -654,6 +692,12 @@ namespace FogOfWar
                     b.Axes(jd, out _, out var east, out var pole);
                     v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
                     foreach (var m in v.mats) { m.SetMatrix("_WorldToBody", v.t.worldToLocalMatrix); m.SetFloat("_UseBodyFrame", 1); }
+                    if (v.lods != null)
+                    {
+                        float px = v.t.lossyScale.x / Mathf.Max((v.t.position - Cam.transform.position).magnitude, 1e-9f) * pxPerRad;
+                        int lod = LodFor(px, v.lod);
+                        if (lod != v.lod) { v.lods[v.lod].SetActive(false); v.lods[lod].SetActive(true); v.lod = lod; }
+                    }
                 }
                 else
                 {

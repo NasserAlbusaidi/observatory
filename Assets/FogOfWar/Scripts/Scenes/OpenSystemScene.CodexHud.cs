@@ -12,6 +12,13 @@ namespace FogOfWar
     {
         VisualElement codexBox;
         string codexSig;
+
+        // Shape models whose licence asks for a credit where the body is shown (the rest are NASA PDS / NAIF, public
+        // domain; Models/Bodies/LODS.json has every source)
+        static readonly System.Collections.Generic.Dictionary<string, string> ShapeCredits = new System.Collections.Generic.Dictionary<string, string>
+        {
+            ["Ryugu"] = "Shape model of Ryugu: ISAS/JAXA (modified)",
+        };
         float codexT;
         int codexView; // 0 target entry, 1 achievements
 
@@ -61,6 +68,7 @@ namespace FogOfWar
             Ui.L(head, b.Name.ToUpperInvariant(), "t-h2", "f-cond", "accent", "glow").style.flexGrow = 1;
             Ui.L(head, scanned ? "SCANNED" : seen ? "VISITED" : "NOT VISITED", "chip", "f-condm", scanned ? "ok" : seen ? "cold" : "bad");
             Ui.L(c, Kind(b).ToUpperInvariant(), "t-label", "f-condm");
+            if (ShapeCredits.TryGetValue(b.Name, out var credit)) Ui.L(c, credit, "t-note").style.marginTop = 2;
             if (seen || scanned)
             {
                 Ui.Section(c, "Data");

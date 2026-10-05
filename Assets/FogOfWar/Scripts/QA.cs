@@ -592,6 +592,7 @@ namespace FogOfWar
                 }
             }
             os.TestLowPassOff();
+            log.WriteLine("    " + os.TestLods());
         }
 
         IEnumerator Shot(string name)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FogOfWar.OpenWorld;
 using UnityEngine;
 
@@ -57,6 +58,22 @@ namespace FogOfWar
         }
 
         public void TestLowPassOff() => qaBody = null;
+
+        // QA: each shape model with LODs, the LOD on screen now, and which LODs have their baked normal map.
+        public string TestLods()
+        {
+            var parts = new List<string>();
+            foreach (var v in vis)
+            {
+                if (v.lods == null) continue;
+                var maps = new List<string>();
+                for (int n = 0; n < v.lods.Length; n++)
+                    foreach (var r in v.lods[n].GetComponentsInChildren<Renderer>())
+                        if (r.sharedMaterial != null && r.sharedMaterial.GetFloat("_HasLodNormal") > 0.5f) { maps.Add("LOD" + n); break; }
+                parts.Add($"{v.b.Name} LOD{v.lod} (maps {(maps.Count > 0 ? string.Join("/", maps) : "none")})");
+            }
+            return $"{parts.Count} shape models with LODs: " + string.Join(", ", parts);
+        }
 
         public string TestTerrainReport(string body)
         {

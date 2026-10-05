@@ -843,7 +843,7 @@
    1.04,
    0.88
   ],
-  "meanRadiusKm": 0.492,
+  "meanRadiusKm": 0.448,
   "class": "C",
   "geometricAlbedo": 0.045,
   "colour": [
@@ -852,7 +852,7 @@
    0.2274
   ],
   "colourNote": "sRGB display value = srgb(albedo x class hue)",
-  "source": "procedural (seeded by name)"
+  "source": "shape model SHAPE_SFM_3M_v20180804 (ISAS/JAXA, Watanabe et al. 2019, Science 364, 268; modified), mean radius 448 m"
  },
  {
   "name": "Ceres",

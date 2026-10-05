@@ -125,6 +125,18 @@ float3 sphereNormal(sampler2D s, float3 p)
     return normalize(xy.x * east + xy.y * north + max(z, 0.2) * p);
 }
 
+// A shape model's baked normal map (Blender/lods.py: tangent space, MikkTSpace, OpenGL +Y; imported BC5, so only RG
+// arrive). n: world normal; t: world tangent with the bitangent sign in w. Off (has < 0.5): n unchanged.
+float3 lodNormal(sampler2D s, float has, float3 n, float4 t, float2 uv)
+{
+    if (has < 0.5) return n;
+    float2 xy = tex2D(s, uv).rg * 2.0 - 1.0;
+    float z = sqrt(saturate(1.0 - dot(xy, xy)));
+    float3 tw = normalize(t.xyz - n * dot(t.xyz, n));
+    float3 bw = cross(n, tw) * (t.w < 0.0 ? -1.0 : 1.0);
+    return normalize(xy.x * tw + xy.y * bw + z * n);
+}
+
 // A colour texture sampled by the GPU is already linear in Linear projects; convert it back to display values so it
 // mixes with the rest of the shader maths, which is authored in display space and ends with displayToOutput().
 float3 texToDisplay(float3 c)

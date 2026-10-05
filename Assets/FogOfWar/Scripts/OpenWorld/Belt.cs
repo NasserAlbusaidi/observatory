@@ -11,6 +11,7 @@ namespace FogOfWar.OpenWorld
     // this is a ~1 % sample, so it is sparser than reality, never denser.
     public class Belt
     {
+        public const int Shapes = 64;  // rock shapes in the art pack (Models/Asteroids/Asteroid00..63, all PROCEDURAL)
         public enum Group { Main, Family, Hungaria, Hilda, TrojanL4, TrojanL5 }
 
         public readonly int Count;
@@ -122,7 +123,7 @@ namespace FogOfWar.OpenWorld
                 // N(>D) ∝ D^−2.5 between 1 and 60 km
                 double D = Math.Pow(1 - U() * (1 - Math.Pow(60, -2.5)), -1 / 2.5);
                 RadiusKm[k] = (float)(D / 2);
-                Mesh[k] = (byte)rnd.Next(32);
+                Mesh[k] = (byte)rnd.Next(Shapes);
                 Spin0[k] = Quaternion.Euler((float)(U() * 360), (float)(U() * 360), (float)(U() * 360));
                 SpinRate[k] = (float)(2 * Math.PI / (2 + U() * 20) * 24); // 2–22 h periods
             }

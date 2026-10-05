@@ -24,6 +24,8 @@ Shader "FogOfWar/Planet"
         _SunIrr ("Sunlight, 1 AU = 1", Float) = 1
         _Terrain ("Terrain chunk", Float) = 0
         _MapNormalW ("Relief map weight on terrain", Float) = 0
+        _HasLodNormal ("Has a baked normal map", Float) = 0
+        _LodNormal ("Baked normal map (shape models, tangent space)", 2D) = "bump" {}
     }
     SubShader
     {
@@ -42,12 +44,13 @@ Shader "FogOfWar/Planet"
             // shape models: look the map up in the body frame (Prime/North aligned), not the mesh's import space
             float4x4 _WorldToBody;
             float _UseBodyFrame;
-            float _Terrain, _MapNormalW;
+            float _Terrain, _MapNormalW, _HasLodNormal;
+            sampler2D _LodNormal;
             float3 _SunDir;
             float _SunIrr;
             sampler2D _MainTex, _NormalTex;
-            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; };
-            struct v2f { float4 pos : SV_POSITION; float3 n : TEXCOORD0; float3 op : TEXCOORD1; float3 wp : TEXCOORD2; };
+            struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; float4 tangent : TANGENT; float2 uv : TEXCOORD0; };
+            struct v2f { float4 pos : SV_POSITION; float3 n : TEXCOORD0; float3 op : TEXCOORD1; float3 wp : TEXCOORD2; float2 uv : TEXCOORD3; float4 t : TEXCOORD4; };
             v2f vert(appdata v)
             {
                 v2f o;
@@ -55,6 +58,8 @@ Shader "FogOfWar/Planet"
                 o.n = UnityObjectToWorldNormal(v.normal);
                 o.op = v.vertex.xyz;
                 o.wp = mul(unity_ObjectToWorld, v.vertex).xyz;
+                o.uv = v.uv;
+                o.t = float4(UnityObjectToWorldDir(v.tangent.xyz), v.tangent.w * unity_WorldTransformParams.w);
                 return o;
             }
 
@@ -88,7 +93,8 @@ Shader "FogOfWar/Planet"
             float4 frag(v2f i) : SV_Target
             {
                 float3 p = normalize(_UseBodyFrame > 0.5 || _Terrain > 0.5 ? mul(_WorldToBody, float4(i.wp, 1.0)).xyz : i.op);
-                float3 n = normalize(i.n);
+                // shape models: the baked normal map carries the full-resolution relief onto the coarser LODs
+                float3 n = lodNormal(_LodNormal, _HasLodNormal, normalize(i.n), i.t, i.uv);
                 float3 l = normalize(_SunDir);
                 float3 vdir = normalize(_WorldSpaceCameraPos - i.wp);
                 // terrain: the sphere's normal (world) sets where night begins; the mesh (+ map) lights the slopes
