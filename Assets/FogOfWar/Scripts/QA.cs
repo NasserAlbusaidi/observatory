@@ -562,8 +562,17 @@ namespace FogOfWar
                     int f0 = Time.frameCount; float s0 = Time.realtimeSinceStartup;
                     while (Time.realtimeSinceStartup - s0 < 3f) yield return null;
                     float fps = (Time.frameCount - f0) / (Time.realtimeSinceStartup - s0);
-                    log.WriteLine($"    {os.TestTerrainReport(body)}, settled in {settled:0.0} s, steady {fps:0} fps at {Screen.width}x{Screen.height}, " +
-                                  $"heap {GC.GetTotalMemory(false) >> 20} MB, gfx {UnityEngine.Profiling.Profiler.GetAllocatedMemoryForGraphicsDriver() >> 20} MB");
+                    string report = os.TestTerrainReport(body);
+                    // the same view with the quadtree off (whole sphere), so the terrain's own cost shows
+                    OpenWorld.TerrainBody.Off = true;
+                    yield return null;
+                    f0 = Time.frameCount; s0 = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - s0 < 2f) yield return null;
+                    float fpsOff = (Time.frameCount - f0) / (Time.realtimeSinceStartup - s0);
+                    OpenWorld.TerrainBody.Off = false;
+                    log.WriteLine($"    {report}, settled in {settled:0.0} s, steady {fps:0} fps ({fpsOff:0} fps with the quadtree off) at {Screen.width}x{Screen.height}, heap {GC.GetTotalMemory(false) >> 20} MB");
+                    t0 = Time.realtimeSinceStartup; idle = 0;
+                    while (Time.realtimeSinceStartup - t0 < 12f && idle < 20) { yield return null; idle = OpenWorld.TerrainBody.Pending == 0 ? idle + 1 : 0; }
                     yield return Shot($"10-terrain-{site}-{(alt >= 1 ? alt.ToString("0") : alt.ToString("0.0"))}km");
                 }
             }

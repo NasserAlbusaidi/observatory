@@ -7,6 +7,7 @@ namespace FogOfWar
     // Streaming terrain helpers: a QA low-pass camera over a named site (-fowqa), and terrain queries.
     public partial class OpenSystemScene
     {
+        readonly Plane[] frustum = new Plane[6];
         Body qaBody;
         double qaLat, qaLon, qaAlt, qaPitch;
 
@@ -64,7 +65,7 @@ namespace FogOfWar
             if (v?.terrain == null) return $"{body}: no terrain body";
             var t = v.terrain;
             return $"{body}: {(t.Data != null ? t.Data.Product : "smooth")}, quadtree {(t.Active ? "on" : "off")}, {t.ChunksDrawn} chunks drawn " +
-                   $"(deepest L{t.MaxLevelDrawn}), {t.ChunksLive} meshes live, {TerrainBody.Pending} queued, {t.Data?.TilesLoaded ?? 0} tiles loaded";
+                   $"(deepest L{t.MaxLevelDrawn}), {t.ChunksLive} meshes live, {TerrainBody.Pending} queued, {t.Data?.TilesLoaded ?? 0} tiles loaded, quadtree CPU {t.DrawMs:0.00} ms";
         }
 
         // Camera for the QA low pass; false when it isn't on.

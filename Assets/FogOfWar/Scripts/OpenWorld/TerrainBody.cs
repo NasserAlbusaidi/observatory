@@ -327,8 +327,27 @@ namespace FogOfWar.OpenWorld
         // at the body (1 inside the linear zone); bodyRender / rot the holder's render position and rotation.
         // Returns true while the quadtree draws the body (the caller hides the holder's own mesh).
         public bool Draw(Material m, D3 camW, D3 bodyW, D3 prime, D3 pole, D3 east, double k, Vector3 bodyRender, Quaternion rot,
-                         Matrix4x4 rootToWorld, Matrix4x4 worldToBody, int layer, float pxPerRad)
+                         Matrix4x4 rootToWorld, Matrix4x4 worldToBody, int layer, float pxPerRad, Plane[] frustum)
         {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { return DrawInner(m, camW, bodyW, prime, pole, east, k, bodyRender, rot, rootToWorld, worldToBody, layer, pxPerRad, frustum); }
+            finally
+            {
+                double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (Active) DrawMs = DrawMs * 0.95 + ms * 0.05;
+            }
+        }
+
+        // Main-thread cost of Draw while the quadtree is on, ms per frame (smoothed).
+        public double DrawMs { get; private set; }
+
+        // QA: draw every body as its whole mesh, to measure the frame rate without the quadtree.
+        public static bool Off;
+
+        bool DrawInner(Material m, D3 camW, D3 bodyW, D3 prime, D3 pole, D3 east, double k, Vector3 bodyRender, Quaternion rot,
+                       Matrix4x4 rootToWorld, Matrix4x4 worldToBody, int layer, float pxPerRad, Plane[] frustum)
+        {
+            if (Off) { ChunksDrawn = 0; return false; }
             frame++;
             var rel = camW - bodyW;
             double dist = rel.Mag;
@@ -347,7 +366,8 @@ namespace FogOfWar.OpenWorld
             var ctx = new Ctx
             {
                 lx = lx, ly = ly, lz = lz, d = dist, k = k, camW = camW, bodyW = bodyW, prime = prime, pole = pole, east = east,
-                bodyRender = bodyRender, rot = rot, root = rootToWorld, layer = layer, pxPerRad = pxPerRad,
+                bodyRender = bodyRender, rot = rot, root = rootToWorld, layer = layer, pxPerRad = pxPerRad, frustum = frustum,
+                rootScale = Mathf.Max(rootToWorld.GetColumn(0).magnitude, rootToWorld.GetColumn(1).magnitude, rootToWorld.GetColumn(2).magnitude),
             };
             // horizon: anything further round than the horizon of the lowest ground, seen over the highest, is hidden
             double rLo = R - 12, hz = dist > rLo ? Math.Acos(Math.Min(1, rLo / dist)) : Math.PI;
@@ -366,6 +386,24 @@ namespace FogOfWar.OpenWorld
             public double lx, ly, lz, d, k, horizon;
             public D3 camW, bodyW, prime, pole, east;
             public Vector3 bodyRender; public Quaternion rot; public Matrix4x4 root; public int layer; public float pxPerRad;
+            public Plane[] frustum; public float rootScale;
+        }
+
+        // Node centre in render space (before the scene root): camera-relative in double inside the linear zone.
+        static Vector3 RenderPos(Node nd, ref Ctx c)
+        {
+            if (c.k >= 1) return Frame.U(c.bodyW + c.prime * nd.cx + c.pole * nd.cy + c.east * nd.cz - c.camW);
+            return c.bodyRender + c.rot * new Vector3((float)(nd.cx * c.k), (float)(nd.cy * c.k), (float)(nd.cz * c.k));
+        }
+
+        // False when the node's bounding sphere is wholly outside the view frustum: it is neither drawn nor split.
+        bool InView(Node nd, ref Ctx c)
+        {
+            if (c.frustum == null) return true;
+            var centre = c.root.MultiplyPoint3x4(RenderPos(nd, ref c));
+            float rad = (float)((nd.angRad * R * 1.05 + (nd.hHi - nd.hLo) + 0.01) * c.k) * c.rootScale;
+            foreach (var p in c.frustum) if (p.GetDistanceToPoint(centre) < -rad) return false;
+            return true;
         }
 
         void Visit(Node nd, ref Ctx c)
@@ -374,6 +412,7 @@ namespace FogOfWar.OpenWorld
             double cd = (c.lx * nd.dirX + c.ly * nd.dirY + c.lz * nd.dirZ) / Math.Max(c.d, 1e-9);
             double over = R + Math.Max(nd.hHi, 0) > R - 12 ? Math.Acos(Math.Min(1, (R - 12) / (R + Math.Max(nd.hHi, 0) + 0.001))) : 0;
             if (Math.Acos(Math.Max(-1, Math.Min(1, cd))) - nd.angRad > c.horizon + over + 1e-4) return;
+            if (!InView(nd, ref c)) return;
 
             double dx = c.lx - nd.cx, dy = c.ly - nd.cy, dz = c.lz - nd.cz;
             double near = Math.Max(Math.Sqrt(dx * dx + dy * dy + dz * dz) - nd.angRad * R * 1.05 - (nd.hHi - nd.hLo), 1e-4);
@@ -402,13 +441,7 @@ namespace FogOfWar.OpenWorld
 
         void DrawNode(Node nd, ref Ctx c)
         {
-            Vector3 pos;
-            if (c.k >= 1)
-            {
-                var w = c.bodyW + c.prime * nd.cx + c.pole * nd.cy + c.east * nd.cz - c.camW;
-                pos = Frame.U(w);
-            }
-            else pos = c.bodyRender + c.rot * new Vector3((float)(nd.cx * c.k), (float)(nd.cy * c.k), (float)(nd.cz * c.k));
+            var pos = RenderPos(nd, ref c);
             var M = c.root * Matrix4x4.TRS(pos, c.rot, Vector3.one * (float)c.k);
             // the 8K relief map carries the slopes until the mesh is finer than its texels, then the mesh does
             mpb.SetFloat("_MapNormalW", Mathf.Clamp01((float)((nd.quadKm - mapTexelKm) / mapTexelKm)));

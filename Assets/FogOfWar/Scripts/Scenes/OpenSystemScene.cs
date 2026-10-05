@@ -639,6 +639,7 @@ namespace FogOfWar
             var sunW = sys.Pos(sys.Sun, jd);
             TerrainBody.Collect();
             float pxPerRad = Cam.pixelHeight / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
+            GeometryUtility.CalculateFrustumPlanes(Cam, frustum);
             foreach (var v in vis)
             {
                 var b = v.b;
@@ -662,7 +663,7 @@ namespace FogOfWar
                     if (v.terrain != null && v.mats.Length > 0)
                     {
                         bool chunks = v.t.gameObject.activeInHierarchy && v.terrain.Draw(v.mats[0], camW, bw, prime, pole, east, k, v.t.localPosition,
-                            v.t.localRotation, Root.localToWorldMatrix, v.t.worldToLocalMatrix, v.t.gameObject.layer, pxPerRad);
+                            v.t.localRotation, Root.localToWorldMatrix, v.t.worldToLocalMatrix, v.t.gameObject.layer, pxPerRad, frustum);
                         v.r.enabled = !chunks;
                     }
                 }
