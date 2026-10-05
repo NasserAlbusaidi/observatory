@@ -694,7 +694,7 @@ namespace FogOfWar
 
         void DrawOrbits()
         {
-            pts.Clear(); cols.Clear();
+            pts.Clear(); cols.Clear(); targetLine.Clear();
             foreach (var b in sys.Bodies)
             {
                 if (b.Parent == null) continue;
@@ -708,21 +708,60 @@ namespace FogOfWar
                 // planet orbits fade out when the camera is in close: from a ship they'd be streaks across the screen
                 if (!isMoon) c.a *= Mathf.Lerp(tgt ? 0.3f : 0f, 1f, Mathf.Clamp01((float)(Math.Log10(Math.Max(camDist, 1)) - 3) / 4f));
                 if (b.Asteroid && !tgt) c.a *= 0.25f; // two dozen named asteroids: keep their orbits in the background
-                const int N = 180;
-                double period = 360 / Math.Max(Math.Abs(b.dL), 1e-9); // days
-                Vector3 prev = default;
-                for (int i = 0; i <= N; i++)
+                if (b.Path != null)
                 {
-                    double t = jd + period * i / N;
-                    // the real (perturbed) path relative to the parent, drawn around where the parent is now
-                    var p = parentW + (b.Cheb == null && isMoon ? b.Kepler(t) : sys.PosAt(b, t) - (isMoon ? sys.PosAt(b.Parent, t) : D3.Zero));
-                    var q = Map(p, out _);
+                    // a craft on its own course has no orbit: its line is the course itself (QA-065)
+                    if (!CoursePoints(b, line)) continue;
+                }
+                else
+                {
+                    line.Clear();
+                    const int N = 180;
+                    double period = 360 / Math.Max(Math.Abs(b.dL), 1e-9); // days
+                    for (int i = 0; i <= N; i++)
+                    {
+                        double t = jd + period * i / N;
+                        // the real (perturbed) path relative to the parent, drawn around where the parent is now
+                        line.Add(parentW + (b.Cheb == null && isMoon ? b.Kepler(t) : sys.PosAt(b, t) - (isMoon ? sys.PosAt(b.Parent, t) : D3.Zero)));
+                    }
+                }
+                Vector3 prev = default;
+                for (int i = 0; i < line.Count; i++)
+                {
+                    var q = Map(line[i], out _);
                     if (i > 0) { pts.Add(prev); pts.Add(q); cols.Add(c); cols.Add(c); }
                     prev = q;
                 }
+                if (tgt) { targetLine.Clear(); targetLine.AddRange(line); }
             }
             Gfx.SetLines(orbitMesh, pts, cols);
             orbitMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 1e7f);
+        }
+
+        readonly List<D3> line = new List<D3>(), targetLine = new List<D3>();
+
+        // An intercept runner's course from its departure to its arrival, in world km. Other path bodies (the
+        // practice beacon) get no line. Treated as an orbit, a runner sampled its path ~1e9 days out, where it sits
+        // at its destination port at scattered dates: dozens of chords across that port's orbit.
+        bool CoursePoints(Body b, List<D3> outW)
+        {
+            outW.Clear();
+            var job = career?.Active.Find(x => x.Kind == JobKind.Intercept && x.To == b.Name);
+            if (job == null || !(job.T1 > job.T0)) return false;
+            const int N = 120;
+            for (int i = 0; i <= N; i++) outW.Add(sys.PosAt(b, job.T0 + (job.T1 - job.T0) * i / N));
+            return true;
+        }
+
+        // review checks: the line last drawn for the target, in world km: its segments, length and longest segment's share
+        public string TestTargetLineReport(out double longestShare)
+        {
+            longestShare = -1;
+            if (targetLine.Count < 2) return "no line";
+            double len = 0, longest = 0;
+            for (int i = 1; i < targetLine.Count; i++) { double s = (targetLine[i] - targetLine[i - 1]).Mag; len += s; longest = Math.Max(longest, s); }
+            longestShare = longest / Math.Max(len, 1e-9);
+            return $"{targetLine.Count - 1} segments, {len / Frame.AU:F2} AU long, longest {longestShare * 100:F1} %";
         }
 
     }

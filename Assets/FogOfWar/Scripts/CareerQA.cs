@@ -405,6 +405,11 @@ namespace FogOfWar
                     Check(e0 < 50 && e1 < 50 && peak > 0.1 && peak < 0.4, $"runner course: leaves {ic.RunFrom} ({e0:F1} km off), reaches {ic.RunTo} ({e1:F1} km off), peak {peak:F3} g");
                     career.Accept(ic, jd);
                     var runner = sys[ic.To];
+                    // QA-065: the line drawn for it is one smooth course from port to port, not chords across an orbit
+                    Call("SetTarget", runner);
+                    yield return null; yield return null;
+                    string course = s.TestTargetLineReport(out double longest);
+                    Check(longest > 0 && longest < 0.05, $"QA-065: runner course line: {course}");
                     double c4 = career.Credits;
                     yield return Trip(runner, 0, "intercept " + ic.To, () => ic.Dwell > 0 || !career.Active.Contains(ic), 5, 150);
                     Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.2);
