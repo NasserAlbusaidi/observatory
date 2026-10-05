@@ -72,6 +72,34 @@ namespace FogOfWar
             Fx.ResetLook();
             Fx.enabled = false;
             Recorder = new ClipRecorder(this);
+            Application.wantsToQuit += WantsToQuit;
+        }
+
+        void OnDestroy() => Application.wantsToQuit -= WantsToQuit;
+
+        // QA-066: screenshots and clips finish on other threads. Quitting while one is still writing tore the engine
+        // down under a native PNG encode and crashed, so quit waits for them (at most 30 s).
+        static int saving;
+        public static void BeginSave() => Interlocked.Increment(ref saving);
+        public static void EndSave() => Interlocked.Decrement(ref saving);
+        public static bool Saving => Volatile.Read(ref saving) > 0;
+        bool quitWhenSaved;
+
+        bool WantsToQuit()
+        {
+            if (Recorder.Active) Recorder.Stop();
+            if (Volatile.Read(ref saving) <= 0) return true;
+            if (!quitWhenSaved) { quitWhenSaved = true; Toast("Saving before quitting…"); StartCoroutine(QuitWhenSaved()); }
+            return false;
+        }
+
+        IEnumerator QuitWhenSaved()
+        {
+            float t0 = Time.realtimeSinceStartup;
+            while (Volatile.Read(ref saving) > 0 && Time.realtimeSinceStartup - t0 < 30f) yield return null;
+            if (Volatile.Read(ref saving) > 0) Debug.LogWarning("Fog of War: quitting with a capture still saving");
+            Interlocked.Exchange(ref saving, 0);
+            Application.Quit();
         }
 
         UiShell Shell => UiShell.Instance;
@@ -186,6 +214,7 @@ namespace FogOfWar
             Toast(scale > 1 ? $"Saving {w}×{h} screenshot…" : "Screenshot taken", null);
             LastShot = null;
             // PNG encoding of a large shot takes seconds: do it off the main thread
+            BeginSave();
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
@@ -196,6 +225,7 @@ namespace FogOfWar
                     Post(() => { LastShot = path; Toast("Screenshot saved", name); });
                 }
                 catch (Exception e) { Post(() => { Debug.LogError("Fog of War: could not save the screenshot: " + e.Message); Toast("Screenshot failed", e.Message); }); }
+                finally { EndSave(); }
             });
         }
 

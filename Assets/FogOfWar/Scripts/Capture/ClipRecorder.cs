@@ -168,7 +168,8 @@ namespace FogOfWar
             var path = outPath; var proc = ffmpeg; var q = queue; var w = writer;
             bool mp4 = proc != null;
             owner.RecorderMessage("Finishing clip…", $"{n / (float)Fps:0.0} s");
-            // finish encoding without blocking the game
+            // finish encoding without blocking the game (quit waits for it: QA-066)
+            CaptureRunner.BeginSave();
             new Thread(() =>
             {
                 try
@@ -178,6 +179,7 @@ namespace FogOfWar
                     if (proc != null) { proc.WaitForExit(120000); }
                 }
                 catch (Exception) { }
+                finally { CaptureRunner.EndSave(); }
                 string err = writeError;
                 owner.Post(() =>
                 {
