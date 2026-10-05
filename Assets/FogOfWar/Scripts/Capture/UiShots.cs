@@ -247,6 +247,22 @@ namespace FogOfWar
                 log.WriteLine($"  screenshot {scale}x: {Capture.LastShot} {(Capture.LastShot != null ? new FileInfo(Capture.LastShot).Length : 0)} bytes");
                 yield return Wait(1.1f); // distinct file names
             }
+            // QA-066: a 4x shot counts as saving (so quit waits for it) until its file is written
+            GameSettings.ShotScale = 4;
+            Capture.TakeScreenshot();
+            float t2 = Time.realtimeSinceStartup;
+            bool sawSaving = false;
+            while (Time.realtimeSinceStartup - t2 < 30)
+            {
+                sawSaving |= CaptureRunner.Saving;
+                if (sawSaving && !CaptureRunner.Saving) break;
+                yield return null;
+            }
+            while (Capture.LastShot == null && Time.realtimeSinceStartup - t2 < 35) yield return null; // posted to the main thread
+            bool written = Capture.LastShot != null && File.Exists(Capture.LastShot);
+            log.WriteLine($"  QA-066 quit guard: saving seen {sawSaving}, cleared {!CaptureRunner.Saving}, file written {written}");
+            if (!sawSaving || CaptureRunner.Saving || !written) errors++;
+            yield return Wait(1.1f);
             GameSettings.ShotScale = 1;
             Capture.StartClip(3);
             float t1 = Time.realtimeSinceStartup;
