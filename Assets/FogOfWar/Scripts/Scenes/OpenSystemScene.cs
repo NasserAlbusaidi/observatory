@@ -372,6 +372,7 @@ namespace FogOfWar
         void TickInner(float dt)
         {
             if (ship.Crashed != null) { Crashed(); return; }
+            SpawnRunnerTick();
             ReadInput(dt);
             if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
             double simDt = dt * Warps[warpIdx];
