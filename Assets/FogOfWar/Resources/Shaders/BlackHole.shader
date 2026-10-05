@@ -110,8 +110,9 @@ Shader "FogOfWar/BlackHole"
                 if (fallback) discard;
                 col /= refine ? 8.0 : first;
                 spotLum /= refine ? 8.0 : first;
-                // a non-finite result would spread through TAA and bloom: show it magenta in debug view 3, else trace the pixel
-                bool bad = any(!isfinite(col)) || !isfinite(spotLum);
+                // a non-finite result, or one past the half float range of the HDR target (it turns to infinity there),
+                // would spread through TAA and bloom: show it magenta in debug view 3, else trace the pixel
+                bool bad = any(!isfinite(col)) || !isfinite(spotLum) || max(max(col.r, col.g), max(col.b, spotLum)) * _Exposure > 6e4;
                 if (_DebugFate > 2.5 && bad) return float4(1, 0, 1, 1);
                 if (bad) discard;
                 // debug view 3: green where the table served the pixel, yellow with 8 samples (pass 1 draws red)
@@ -141,7 +142,8 @@ Shader "FogOfWar/BlackHole"
                 if (_DebugFate > 1.5) return float4(R.firstHit / (_Isco * 4.0), saturate(R.firstG), 0, 1);
                 if (_DebugFate > 0.5)
                     return R.trans < 0.01 ? float4(1, 1, 1, 1) : float4(R.s.x < _RH + 1e-3 ? 1 : 0, R.escaped ? 1 : 0, R.steps >= _Steps - 1 ? 1 : 0, 1);
-                if (_HDROut > 0.5) return float4(col * _Exposure, R.spotLum * _Exposure);
+                // clamped below the half float limit of the HDR target (a larger value turns to infinity there)
+                if (_HDROut > 0.5) return min(float4(col * _Exposure, R.spotLum * _Exposure), 6e4);
                 return float4(tonemap(col * _Exposure), 1.0);
             }
         ENDCG
