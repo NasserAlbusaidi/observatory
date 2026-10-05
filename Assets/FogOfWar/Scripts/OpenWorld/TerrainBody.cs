@@ -13,13 +13,15 @@ namespace FogOfWar.OpenWorld
     // vertices within ~1.4× of uniform. Heights come from the body's TerrainData (a real DEM) where it has one.
     //
     // Far away, the body is one mesh on its holder (WholeMesh). Once it covers enough of the screen the quadtree takes
-    // over: chunks of 32×32 quads split where a quad would cover too many pixels (or, on a smooth sphere, where the
+    // over: chunks of 64×64 quads split where a quad would cover too many pixels (or, on a smooth sphere, where the
     // facets would show) and merge back when the camera leaves. Chunk vertices are relative to the chunk centre and
     // the centre is placed relative to the camera in double precision, so the surface holds at metre scale.
     // Chunk meshes are built on worker threads; skirts hide the cracks between chunks of different levels.
     public class TerrainBody
     {
-        public const int N = 32;                 // quads per chunk edge
+        public const int N = 64;                 // quads per chunk edge: 64 rather than 32 draws a quarter as many chunks,
+                                                 // at 1 km over Valles that took 1,170 chunks to 366 and 76 to 83 fps
+        const int WholeN = 32;                   // quads per face edge of the whole-body mesh
         const float SplitPx = 10f;               // split a DEM chunk while a quad covers more than this many pixels
         const float SagittaPx = 0.6f;            // ... or while a smooth facet bulges more than this
         const int MaxLevel = 22;
@@ -35,6 +37,11 @@ namespace FogOfWar.OpenWorld
         public int ChunksDrawn { get; private set; }
         public int ChunksLive => live;
         public int MaxLevelDrawn { get; private set; }
+        // QA: how far round from the point under the camera the nearest drawn chunk starts (0 when one covers it, km),
+        // its level and the top of its height range (km from the centre)
+        public double NadirGapKm { get; private set; }
+        public int NadirLevel { get; private set; }
+        public double NadirTopKm { get; private set; }
 
         static readonly Vector3[] FaceN = { Vector3.right, Vector3.left, Vector3.up, Vector3.down, Vector3.forward, Vector3.back };
         static readonly Vector3[] FaceU = { Vector3.forward, Vector3.back, Vector3.right, Vector3.right, Vector3.left, Vector3.right };
@@ -87,7 +94,7 @@ namespace FogOfWar.OpenWorld
 
         static Mesh BuildWhole(TerrainBody tb)
         {
-            int n = N, vpf = (n + 1) * (n + 1);
+            int n = WholeN, vpf = (n + 1) * (n + 1);
             var verts = new Vector3[vpf * 6];
             var norms = new Vector3[vpf * 6];
             var uvs = new Vector2[vpf * 6];
@@ -231,7 +238,9 @@ namespace FogOfWar.OpenWorld
                     nn[k] = GridNormal(g, w, i + 1, j + 1);
                 }
             // skirts: each edge vertex again, dropped toward the centre by more than the neighbour's error can open
-            float drop = (float)(nd.quadKm * 0.6 + (nd.hHi - nd.hLo) * 0.05 + 0.001);
+            // deep enough for a much coarser neighbour: at 1 km in Valles Marineris, skirts of 0.6 quad + 5 % of the
+            // relief left a seam band and a hole under the camera (sky showing through); they hang under the ground
+            float drop = (float)(nd.quadKm * 2 + (nd.hHi - nd.hLo) * 0.3 + 0.001);
             var dir = new Vector3((float)nd.dirX, (float)nd.dirY, (float)nd.dirZ);
             int[] edge = new int[skirtN];
             int e = 0;
@@ -354,7 +363,7 @@ namespace FogOfWar.OpenWorld
             double px = B.Radius / Math.Max(dist - B.Radius, 1e-3) * pxPerRad;
             bool want = Active ? px > LeavePx : px > EnterPx;
             if (want != Active) { Active = want; SetStreaming(m, want); if (!want) FreeAll(); }
-            ChunksDrawn = 0; MaxLevelDrawn = 0;
+            ChunksDrawn = 0; MaxLevelDrawn = 0; NadirGapKm = double.MaxValue;
             if (!Active) return false;
             EnsureRoots();
             mat = m;
@@ -448,6 +457,9 @@ namespace FogOfWar.OpenWorld
             Graphics.DrawMesh(nd.mesh, M, mat, c.layer, null, 0, mpb, UnityEngine.Rendering.ShadowCastingMode.Off, false);
             ChunksDrawn++;
             if (nd.level > MaxLevelDrawn) MaxLevelDrawn = nd.level;
+            // QA: the drawn chunk nearest the point under the camera, to tell a hole from a chunk that is drawn
+            double nadir = Math.Acos(Math.Max(-1, Math.Min(1, (c.lx * nd.dirX + c.ly * nd.dirY + c.lz * nd.dirZ) / Math.Max(c.d, 1e-9)))) - nd.angRad;
+            if (nadir < NadirGapKm / R) { NadirGapKm = Math.Max(nadir, 0) * R; NadirLevel = nd.level; NadirTopKm = R + nd.hHi; }
         }
 
         // Drop subtrees that haven't been split for a while.

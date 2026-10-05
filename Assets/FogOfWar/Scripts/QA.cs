@@ -573,6 +573,21 @@ namespace FogOfWar
                     log.WriteLine($"    {report}, settled in {settled:0.0} s, steady {fps:0} fps ({fpsOff:0} fps with the quadtree off) at {Screen.width}x{Screen.height}, heap {GC.GetTotalMemory(false) >> 20} MB");
                     t0 = Time.realtimeSinceStartup; idle = 0;
                     while (Time.realtimeSinceStartup - t0 < 12f && idle < 20) { yield return null; idle = OpenWorld.TerrainBody.Pending == 0 ? idle + 1 : 0; }
+                    // pitched down, the lower view (left of the panel, above the HUD) is ground: black there is a hole
+                    yield return new WaitForEndOfFrame();
+                    var grab = ScreenCapture.CaptureScreenshotAsTexture();
+                    int dark = 0, all = 0;
+                    for (int y = (int)(grab.height * 0.08f); y < (int)(grab.height * 0.3f); y += 4)
+                        for (int x = (int)(grab.width * 0.05f); x < (int)(grab.width * 0.55f); x += 4)
+                        {
+                            var px = grab.GetPixel(x, y);
+                            all++;
+                            if (Mathf.Max(px.r, Mathf.Max(px.g, px.b)) < 0.06f) dark++;
+                        }
+                    Destroy(grab);
+                    float holeFrac = all > 0 ? (float)dark / all : 0;
+                    log.WriteLine($"    lower view {holeFrac:P0} sky-black{(holeFrac > 0.4f ? "  HOLE" : "")}");
+                    if (holeFrac > 0.4f) errors++; // not 0: low-sun shadows on the Moon are black too
                     yield return Shot($"10-terrain-{site}-{(alt >= 1 ? alt.ToString("0") : alt.ToString("0.0"))}km");
                 }
             }

@@ -65,7 +65,8 @@ namespace FogOfWar
             if (v?.terrain == null) return $"{body}: no terrain body";
             var t = v.terrain;
             return $"{body}: {(t.Data != null ? t.Data.Product : "smooth")}, quadtree {(t.Active ? "on" : "off")}, {t.ChunksDrawn} chunks drawn " +
-                   $"(deepest L{t.MaxLevelDrawn}), {t.ChunksLive} meshes live, {TerrainBody.Pending} queued, {t.Data?.TilesLoaded ?? 0} tiles loaded, quadtree CPU {t.DrawMs:0.00} ms";
+                   $"(deepest L{t.MaxLevelDrawn}), {t.ChunksLive} meshes live, {TerrainBody.Pending} queued, {t.Data?.TilesLoaded ?? 0} tiles loaded, quadtree CPU {t.DrawMs:0.00} ms, " +
+                   $"camera r {(camW - sys.Pos(b, jd)).Mag:0.000} km, chunk nearest the nadir L{t.NadirLevel} {(t.NadirGapKm < 1e9 ? t.NadirGapKm : -1):0.000} km off, top r {t.NadirTopKm:0.000} km";
         }
 
         // Camera for the QA low pass; false when it isn't on.
