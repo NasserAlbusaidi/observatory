@@ -58,6 +58,8 @@ namespace FogOfWar.EditorTools
             bool data = Is("Height") || Is("Clouds") || Is("Ocean") || Is("Normal");
             if (data) ti.sRGBTexture = false;
             if (ti.mipmapEnabled && !sky) ti.streamingMipmaps = true;
+            // belt rocks are drawn instanced (no renderer for mip streaming to measure), so their normal maps stay whole
+            if (assetPath.Contains("/Models/Asteroids/")) ti.streamingMipmaps = false;
             if (!Is("Height"))
                 Standalone(ti, Is("Normal") ? TextureImporterFormat.BC5 : data ? TextureImporterFormat.BC4 : TextureImporterFormat.BC7);
             if (Is("Height") || Is("Clouds") || Is("Ocean"))

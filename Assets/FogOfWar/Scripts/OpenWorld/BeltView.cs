@@ -5,7 +5,7 @@ using UnityEngine;
 namespace FogOfWar.OpenWorld
 {
     // Draws the Belt with GPU instancing: a camera-facing dot for every rock too small to resolve, and an instanced rock
-    // mesh (the art pack's 32-rock set) for the few close enough to show a shape.
+    // mesh (the art pack's 64-rock set, each with its baked normal map) for the few close enough to show a shape.
     public class BeltView
     {
         public delegate Vector3 MapFn(D3 world, out double k);
@@ -13,12 +13,13 @@ namespace FogOfWar.OpenWorld
         readonly Belt belt;
         readonly Mesh quad;
         readonly Material dotMat, rockMat;
-        readonly Mesh[] rockMesh = new Mesh[32];
-        readonly Matrix4x4[] rockLocal = new Matrix4x4[32];
+        readonly Mesh[] rockMesh = new Mesh[Belt.Shapes];
+        readonly Texture2D[] rockNormal = new Texture2D[Belt.Shapes];
+        readonly Matrix4x4[] rockLocal = new Matrix4x4[Belt.Shapes];
         readonly Matrix4x4[] mats = new Matrix4x4[1023];
         readonly Vector4[] cols = new Vector4[1023];
         readonly MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-        readonly List<int>[] near = new List<int>[32];
+        readonly List<int>[] near = new List<int>[Belt.Shapes];
         public double NearestKm { get; private set; }
         public int NearestIndex { get; private set; }
         public bool Visible = true;
@@ -38,7 +39,7 @@ namespace FogOfWar.OpenWorld
             dotMat.enableInstancing = true;
             rockMat = (Material)own(Gfx.Mat("Rock"));
             rockMat.enableInstancing = true;
-            for (int i = 0; i < 32; i++)
+            for (int i = 0; i < Belt.Shapes; i++)
             {
                 near[i] = new List<int>();
                 var go = Resources.Load<GameObject>($"Models/Asteroids/Asteroid{i:00}");
@@ -47,6 +48,7 @@ namespace FogOfWar.OpenWorld
                 rockMesh[i] = mf.sharedMesh;
                 // the mesh's transform inside the prefab (FBX import scale/axes), relative to the prefab root
                 rockLocal[i] = go.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                rockNormal[i] = Resources.Load<Texture2D>($"Models/Asteroids/Normals/Asteroid{i:00}_Normal");
             }
         }
 
@@ -94,7 +96,7 @@ namespace FogOfWar.OpenWorld
             if (n > 0) Flush(quad, dotMat, n);
             NearestKm = Math.Sqrt(NearestKm);
 
-            for (int m = 0; m < 32; m++)
+            for (int m = 0; m < Belt.Shapes; m++)
             {
                 n = 0;
                 foreach (int k in near[m])
@@ -104,16 +106,18 @@ namespace FogOfWar.OpenWorld
                     mats[n] = Matrix4x4.TRS(p, rot, Vector3.one * (float)(belt.RadiusKm[k] * kk)) * rockLocal[m];
                     var c = belt.Colour[k];
                     cols[n] = new Vector4(c.r, c.g, c.b, 1);
-                    if (++n == mats.Length) { Flush(rockMesh[m], rockMat, n); n = 0; }
+                    if (++n == mats.Length) { Flush(rockMesh[m], rockMat, n, rockNormal[m]); n = 0; }
                 }
-                if (n > 0) Flush(rockMesh[m], rockMat, n);
+                if (n > 0) Flush(rockMesh[m], rockMat, n, rockNormal[m]);
             }
         }
 
-        void Flush(Mesh mesh, Material mat, int n)
+        void Flush(Mesh mesh, Material mat, int n, Texture2D normal = null)
         {
             mpb.Clear();
             mpb.SetVectorArray("_Col", cols);
+            mpb.SetFloat("_HasLodNormal", normal != null ? 1 : 0);
+            if (normal != null) mpb.SetTexture("_LodNormal", normal);
             Graphics.DrawMeshInstanced(mesh, 0, mat, mats, n, mpb, UnityEngine.Rendering.ShadowCastingMode.Off, false);
         }
     }

@@ -37,7 +37,7 @@ namespace FogOfWar
         double effectiveWarp = 1;
         Body reference;
 
-        class Vis { public Body b; public Transform t; public Material[] mats; public bool model; }
+        class Vis { public Body b; public Transform t; public Material[] mats; public bool model; public TerrainBody terrain; public Renderer r; public GameObject[] lods; public int lod; }
         readonly List<Vis> vis = new List<Vis>();
         Transform shipT, shipModel, engine, plume, sunGlow, stars;
         Vector3 engineScale;
@@ -77,7 +77,7 @@ namespace FogOfWar
             BuildShip();
             BuildCockpit();
             PlaceShipNearEarth();
-            var sphere = Own(Gfx.UVSphere(128, 64));
+            var sphere = TerrainBody.UnitSphere(); // shared smooth cube-sphere; bodies with a DEM get their own
             foreach (var b in sys.Bodies)
             {
                 var v = new Vis { b = b };
@@ -106,28 +106,45 @@ namespace FogOfWar
                     // irregular body from the art pack: mean radius 1 (volume-equivalent), body frame given by its
                     // Prime / North markers (the FBX axis conversion can't be trusted). Scaled by meanRadiusKm.
                     // Small moons with no shape model borrow one of the instancing rocks.
+                    // With LODs (Blender/lods.py: <Name>_LOD0/1/2, same frame and scale) all three are spawned and the
+                    // one that suits the body's size on screen is shown.
                     var holder = new GameObject(b.Name).transform;
                     holder.SetParent(Root, false);
-                    var go = Models.Spawn(modelPath, holder, b.ColA);
-                    AlignToMarkers(go.transform);
                     if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0) b.Radius = info.meanRadiusKm;
                     v.t = holder; v.model = true;
-                    var rs = go.GetComponentsInChildren<Renderer>();
+                    bool lods = Resources.Load<GameObject>($"Models/Bodies/{b.Name}_LOD0") != null;
+                    var paths = lods ? new[] { $"Bodies/{b.Name}_LOD0", $"Bodies/{b.Name}_LOD1", $"Bodies/{b.Name}_LOD2" } : new[] { modelPath };
+                    bool mappedBody = b.Texture != null && Resources.Load<Texture2D>(b.Texture) != null;
                     var ms = new List<Material>();
-                    var mapped = b.Texture != null && Resources.Load<Texture2D>(b.Texture) != null ? PlanetMaterial(b) : null;
-                    foreach (var r in rs)
+                    var gos = new GameObject[paths.Length];
+                    for (int n = 0; n < paths.Length; n++)
                     {
-                        if (mapped != null) { var arr = new Material[r.sharedMaterials.Length]; for (int i = 0; i < arr.Length; i++) arr[i] = mapped; r.sharedMaterials = arr; ms.Add(mapped); continue; }
-                        // QA-045: SimpleLit's blue rim and gloss are for hulls; on bare rock the rim drew a blue shell
-                        // around the silhouette, night side included
-                        foreach (var m in r.sharedMaterials) { Own(m); m.SetColor("_Rim", Color.black); m.SetFloat("_Spec", 0); ms.Add(m); }
+                        var go = gos[n] = Models.Spawn(paths[n], holder, b.ColA);
+                        AlignToMarkers(go.transform);
+                        // each LOD has its own normal map (baked from LOD0), so its own material
+                        var nrm = Resources.Load<Texture2D>(NormalMapFor(paths[n]));
+                        var mapped = mappedBody ? PlanetMaterial(b) : null;
+                        foreach (var r in go.GetComponentsInChildren<Renderer>())
+                        {
+                            if (mapped != null) { var arr = new Material[r.sharedMaterials.Length]; for (int i = 0; i < arr.Length; i++) arr[i] = mapped; r.sharedMaterials = arr; continue; }
+                            // QA-045: SimpleLit's blue rim and gloss are for hulls; on bare rock the rim drew a blue shell
+                            // around the silhouette, night side included
+                            foreach (var m in r.sharedMaterials) { Own(m); m.SetColor("_Rim", Color.black); m.SetFloat("_Spec", 0); SetLodNormal(m, nrm); ms.Add(m); }
+                        }
+                        if (mapped != null) { SetLodNormal(mapped, nrm); ms.Add(mapped); }
+                        go.SetActive(n == paths.Length - 1);
                     }
+                    if (lods) { v.lods = gos; v.lod = paths.Length - 1; }
                     v.mats = ms.ToArray();
                 }
                 else
                 {
                     var m = PlanetMaterial(b);
-                    v.t = Gfx.Obj(b.Name, Root, sphere, m).transform;
+                    // the streaming quadtree takes over near the body; real relief where the terrain pack has its DEM
+                    var data = b.Look == Look.Rocky ? OpenWorld.TerrainData.Open(b.Name) : null;
+                    v.terrain = new TerrainBody(b, data);
+                    v.t = Gfx.Obj(b.Name, Root, data != null ? Own(v.terrain.WholeMesh()) : sphere, m).transform;
+                    v.r = v.t.GetComponent<Renderer>();
                     v.mats = new[] { m };
                 }
                 vis.Add(v);
@@ -251,6 +268,31 @@ namespace FogOfWar
             return null;
         }
 
+        // The baked normal map of a model path (Blender/lods.py, Blender/rocks.py), if the art pack has one.
+        static string NormalMapFor(string modelPath)
+        {
+            var name = modelPath.Substring(modelPath.LastIndexOf('/') + 1);
+            if (modelPath.StartsWith("Asteroids/")) return $"Models/Asteroids/Normals/{name}_Normal";
+            int lod = name.IndexOf("_LOD", StringComparison.Ordinal);
+            return lod > 0 ? $"Models/Bodies/{name.Substring(0, lod)}/{name}_Normal" : null;
+        }
+
+        static void SetLodNormal(Material m, Texture2D nrm)
+        {
+            m.SetFloat("_HasLodNormal", nrm != null ? 1 : 0);
+            if (nrm != null) m.SetTexture("_LodNormal", nrm);
+        }
+
+        // Shape-model LOD by the body's radius on screen (px): LOD2 (10k triangles) below 200, LOD1 (50k) below 800,
+        // LOD0 (200k) above, with 10 % either way so a body on a threshold doesn't flicker between two.
+        static int LodFor(float px, int cur)
+        {
+            int want = px > 800 ? 0 : px > 200 ? 1 : 2;
+            if (want < cur && px < (want == 0 ? 880 : 220)) return cur;
+            if (want > cur && px > (cur == 0 ? 720 : 180)) return cur;
+            return want;
+        }
+
         [Serializable] class BodyJson { public float geometricAlbedo; public bool mapIsAbsolute; }
         [Serializable] class ArtBody { public string name; public float meanRadiusKm; public float geometricAlbedo; }
         [Serializable] class ArtBodies { public ArtBody[] items; }
@@ -344,6 +386,7 @@ namespace FogOfWar
             if (Cam != null) Cam.nearClipPlane = 0.05f; // on quit the camera may already be gone
             Orbit.enabled = true;
             DisposeCockpit(); // gives the camera back its full culling mask
+            foreach (var v in vis) v.terrain?.Dispose();
             vis.Clear();
             lighting?.Dispose();
             lighting = null;
@@ -603,7 +646,8 @@ namespace FogOfWar
             camDist = Math.Max(camDist, MinCamDist()); // targets change size under a fixed camera distance
             var mode = pivot == Pivot.Ship ? camMode : CamMode.Orbit;
             Cam.transform.position = Vector3.zero;
-            if (App.Rig != null)
+            if (QaCamera()) mode = CamMode.Orbit;
+            else if (App.Rig != null)
             {
                 // photo mode / cinematics: a free camera at an offset (km) from the pivot
                 camW = PivotW() + Frame.FromU(App.Rig.Offset);
@@ -632,6 +676,9 @@ namespace FogOfWar
             LateCockpit(mode == CamMode.Cockpit);
 
             var sunW = sys.Pos(sys.Sun, jd);
+            TerrainBody.Collect();
+            float pxPerRad = Cam.pixelHeight / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
+            GeometryUtility.CalculateFrustumPlanes(Cam, frustum);
             foreach (var v in vis)
             {
                 var b = v.b;
@@ -646,12 +693,24 @@ namespace FogOfWar
                     b.Axes(jd, out _, out var east, out var pole);
                     v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
                     foreach (var m in v.mats) { m.SetMatrix("_WorldToBody", v.t.worldToLocalMatrix); m.SetFloat("_UseBodyFrame", 1); }
+                    if (v.lods != null)
+                    {
+                        float px = v.t.lossyScale.x / Mathf.Max((v.t.position - Cam.transform.position).magnitude, 1e-9f) * pxPerRad;
+                        int lod = LodFor(px, v.lod);
+                        if (lod != v.lod) { v.lods[v.lod].SetActive(false); v.lods[lod].SetActive(true); v.lod = lod; }
+                    }
                 }
                 else
                 {
                     v.t.localScale = Vector3.Scale(b.Shape, new Vector3(1, (float)(1 - b.Flattening), 1)) * s;
                     b.Axes(jd, out var prime, out var east, out var pole);
                     v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
+                    if (v.terrain != null && v.mats.Length > 0)
+                    {
+                        bool chunks = v.t.gameObject.activeInHierarchy && v.terrain.Draw(v.mats[0], camW, bw, prime, pole, east, k, v.t.localPosition,
+                            v.t.localRotation, Root.localToWorldMatrix, v.t.worldToLocalMatrix, v.t.gameObject.layer, pxPerRad, frustum);
+                        v.r.enabled = !chunks;
+                    }
                 }
                 float irr = ShipLighting.Irradiance((sunW - bw).Mag);
                 foreach (var m in v.mats) { m.SetVector("_SunDir", sunDir); m.SetVector("_FOWSunDir", sunDir); m.SetFloat("_SunIrr", irr); }

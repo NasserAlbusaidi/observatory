@@ -179,6 +179,6 @@ Full steps, the game rules in numbers, test tools and the project layout are in 
 ---
 
 <sub>
-Orbits: NASA JPL Horizons and JPL SSD. Maps: NASA, USGS Astrogeology and PDS. Moon: NASA's Scientific Visualization Studio. Jupiter: NASA/JPL/Space Science Institute. Stars: Gaia DR2 (ESA/Gaia/DPAC) and the Yale Bright Star Catalogue. Fonts: Barlow and JetBrains Mono (SIL OFL). Full credits are in the <a href="docs/DEVELOPING.md#credits-and-licence">developer guide</a>.<br><br>
+Orbits: NASA JPL Horizons and JPL SSD. Maps: NASA, USGS Astrogeology and PDS. Moon: NASA's Scientific Visualization Studio. Shape model of Ryugu: ISAS/JAXA (modified). Jupiter: NASA/JPL/Space Science Institute. Stars: Gaia DR2 (ESA/Gaia/DPAC) and the Yale Bright Star Catalogue. Fonts: Barlow and JetBrains Mono (SIL OFL). Full credits are in the <a href="docs/DEVELOPING.md#credits-and-licence">developer guide</a>.<br><br>
 © 2026 Nasser Albusaidi. All rights reserved. See <a href="LICENSE">LICENSE</a>.
 </sub>

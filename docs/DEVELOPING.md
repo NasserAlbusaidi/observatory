@@ -190,6 +190,7 @@ Other flags:
 - `-fowqa` runs the career in sandbox: unlimited reaction mass and no contracts, so the physics tests keep working.
 - `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fowprof` logs frame time every 2 s. `-fownobloom` turns bloom off. `-fowlegacyui` uses the old IMGUI shell.
 - `-fowspawnrunner <class>` (courier, packet, liner, freighter, tanker or hauler) starts a new game, accepts an intercept for that runner and holds the ship 2 km beside it, camera on it, for filming. It accepts a real job, so use it with `-fowsavekey`.
+- `-fowterrain <dir>` loads the terrain pack from that folder only. Without the flag the game looks for a `Terrain` folder next to the exe, then `D:\SpaceSimArtSrc\terrain`. `-fowterrain none` runs on the 8K global maps, as a player without the pack does. `-fowqaterrain` runs only the terrain low passes of `-fowqa`.
 
 ## Repository layout
 
@@ -221,7 +222,7 @@ To add an Observatory scene, write a `SimScene` subclass in `Scripts/Scenes/` an
 - **Earth**: NASA Visible Earth (Blue Marble Next Generation, Black Marble, MODIS clouds) and GEBCO elevation.
 - **Moon**: LRO WAC colour from the CGI Moon Kit and LRO LOLA relief. Credit: NASA's Scientific Visualization Studio.
 - **Planets and moons**: USGS Astrogeology and PDS mosaics from Viking, MGS MOLA, MESSENGER, Magellan, Voyager, Galileo, Cassini and Dawn. Jupiter: Cassini PIA07782 (NASA/JPL/Space Science Institute). Saturn, Uranus, Neptune and the Uranian moons that Voyager 2 saw only in part are modelled from published imagery. Each map's source is in its `Planets/<Body>/Body.json`.
-- **Shape models**: irregular moons and asteroids from NASA PDS Small Bodies Node and NAIF. Bodies without a shape model are procedural.
+- **Shape models**: irregular moons and asteroids from NASA PDS Small Bodies Node and NAIF, decimated to three LODs with baked normal maps (sources in `Resources/Models/Bodies/LODS.json`). Shape model of Ryugu: ISAS/JAXA (modified); the game shows this credit on Ryugu's codex card. Bodies without a shape model, and the belt rocks, are procedural.
 - **Rings**: radii and optical depths from the Voyager, Galileo, Cassini and New Horizons ring literature, rounded.
 - **Sky**: NASA SVS Deep Star Maps 2020. Gaia DR2: ESA/Gaia/DPAC. Stars from the Yale Bright Star Catalogue (`bsc5.csv`).
 - **Fonts**: Barlow and JetBrains Mono, under the SIL Open Font License (licence files in `Resources/UI/Fonts`).
