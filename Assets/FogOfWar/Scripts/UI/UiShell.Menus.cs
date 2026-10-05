@@ -474,12 +474,29 @@ namespace FogOfWar.UI
             if (tone != null) t.AddToClassList(tone);
             t.pickingMode = PickingMode.Ignore;
             Ui.E(t, "dot");
-            Ui.L(t, text, "t-body", "f-semi");
-            if (!string.IsNullOrEmpty(note)) Ui.L(t, note, "t-note", "f-mono");
+            // title and note stack in one column, so a long note wraps under the title instead of squeezing it (QA-063)
+            var col = Ui.E(t, "toast-text");
+            col.pickingMode = PickingMode.Ignore;
+            Ui.L(col, text, "t-body", "f-semi");
+            if (!string.IsNullOrEmpty(note)) Ui.L(col, note, "t-note", "f-mono");
             Ui.Fontify(t);
             t.schedule.Execute(() => t.AddToClassList("in")).StartingIn(16);
             toasts.Add((t, Time.unscaledTime + seconds));
             while (toasts.Count > 4) { toasts[0].e.RemoveFromHierarchy(); toasts.RemoveAt(0); }
+        }
+
+        // review shots: each toast's title size; a title squeezed to one letter per line reads as narrow and tall (QA-063)
+        public string TestToastReport()
+        {
+            var parts = new List<string>();
+            foreach (var (e, _) in toasts)
+            {
+                var title = e.Q(className: "t-body");
+                if (title == null) continue;
+                var r = title.worldBound;
+                parts.Add($"{r.width:0}x{r.height:0}{(r.width < 60 || r.height > 80 ? " SQUEEZED" : "")}");
+            }
+            return string.Join(", ", parts);
         }
 
         void UpdateToasts()

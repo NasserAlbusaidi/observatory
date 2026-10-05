@@ -319,6 +319,23 @@ namespace FogOfWar
                 }
                 Check(ic != null, "an inner-system intercept can be posted");
 
+                // QA-064: a runner nearly at its port can't be caught in time, so it is neither posted nor accepted
+                if (ic != null)
+                {
+                    int posted = 0;
+                    for (int seed = 1; seed < 400; seed++) if (career.Intercept(new System.Random(seed), sys, jd) != null) posted++;
+                    var lateJob = JsonUtility.FromJson<Contract>(JsonUtility.ToJson(ic));
+                    lateJob.Id += 200000; lateJob.To += "L";
+                    double shift = (ic.T1 - jd) * 0.98;
+                    lateJob.T0 -= shift; lateJob.T1 -= shift; lateJob.Days = lateJob.T1 - jd;
+                    var lateRunner = career.TargetOf(lateJob);
+                    bool lateOk = career.CanAccept(lateJob, out string lateWhy);
+                    bool lateCatch = lateRunner != null && career.Catchable(lateJob, lateRunner, sys, jd);
+                    Check(career.CanAccept(ic, out string icWhy), $"QA-064: the posted intercept can be accepted ({icWhy ?? "ok"}), {posted} posted from 399 seeds");
+                    Check(lateRunner != null && !lateCatch && !lateOk && lateWhy != null && lateWhy.Contains("catch"),
+                        $"QA-064: a runner {(lateJob.T1 - jd) * 24:F1} h from {lateJob.RunTo} is refused: {lateWhy}");
+                }
+
                 // QA-041 (1): a job the tank can't fly is refused on accept
                 if (ic != null)
                 {

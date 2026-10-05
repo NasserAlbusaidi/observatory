@@ -59,6 +59,8 @@ namespace FogOfWar.OpenWorld
             // post only what a full tank can fly at full burn, with a margin (QA-041)
             previews[c.Id] = b;
             if (NeedTonnes(c, 1, DryMass + TankCapacity + c.Tonnes) > TankCapacity * 0.9) { previews.Remove(c.Id); return null; }
+            // and only what the drive can catch before the runner arrives (QA-064)
+            if (!Catchable(c, b, sys, jd)) { previews.Remove(c.Id); return null; }
             c.Pay = Math.Round(RefPay(gap, c.Tonnes, out _, 1) * 1.6 / 100) * 100 + 3000;
             c.Days = c.T1 - jd;
             return c;
@@ -84,6 +86,31 @@ namespace FogOfWar.OpenWorld
                 return (p0 * (12 * s - 6) + m0 * (6 * s - 4) + p1 * (6 - 12 * s) + m1 * (6 * s - 2)) / (T * T);
             }
             return new Body { Name = c.To, Parent = sys.Sun, GM = 0, Radius = 0.05, Look = Look.Rocky, Path = Pos, PathAccel = Accel };
+        }
+
+        // Can a flip-and-burn at the drive rating, leaving the dock now, meet the runner (position and velocity) at some
+        // time before it arrives, with the hand-over hold still to come? Each meeting time is tested in a frame moving
+        // with the runner's velocity then, where the meeting point is fixed and the trip is a stop-at-a-point problem.
+        public const double CatchMargin = 1.3;
+
+        internal bool Catchable(Contract c, Body runner, SolarSystem sys, double jd)
+        {
+            var port = sys[Docked.Body];
+            double a = DriveRating * Ship.G0, end = c.T1 - CrossSeconds * 2 / 86400;
+            var p0 = sys.PosAt(port, jd); var v0 = Vel(sys, port, jd);
+            const int n = 64;
+            for (int i = 1; i <= n; i++)
+            {
+                double tc = jd + (end - jd) * i / n, dt = (tc - jd) * 86400;
+                if (dt <= 0) break;
+                var vr = Vel(sys, runner, tc);
+                var rel = sys.PosAt(runner, tc) - vr * dt - p0;
+                var vrel = v0 - vr;
+                double d = rel.Mag, u = d > 1e-9 ? D3.Dot(vrel, rel) / d : 0;
+                double w = Math.Sqrt(Math.Max(vrel.Mag * vrel.Mag - u * u, 0));
+                if ((Ship.TripFrom(d, a, u, w).t + w / a) * CatchMargin <= dt) return true; // TripFrom's time leaves out the sideways drift
+            }
+            return false;
         }
 
         // Peak drive acceleration of the runner's course, in g (the thrust is linear in time, so it peaks at an end).

@@ -351,6 +351,8 @@ namespace FogOfWar.OpenWorld
             if (Docked == null) why = "dock first";
             else if (Active.Count >= MaxActive) why = $"{MaxActive} jobs at most";
             else if (CargoTonnes + c.Load > HoldTonnes) why = "hold full";
+            // an offer left on the board while the runner flew on (QA-064)
+            else if (c.Kind == JobKind.Intercept && Sys != null && TargetOf(c) is Body rb && !Catchable(c, rb, Sys, jd)) why = $"can't catch it before it reaches {c.RunTo}";
             else if (ship != null && (c.Kind == JobKind.Intercept || c.Kind == JobKind.Rescue))
             {
                 // no port out there to refuel at: even a 50 % coast must fit in what is in the tank

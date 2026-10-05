@@ -162,11 +162,15 @@
 .toast { flex-direction: row; align-items: center; padding: 9px 16px; margin-bottom: 8px; background-color: rgba(8, 11, 20, 0.86); border-width: 1px; border-color: rgba(255, 181, 71, 0.55); border-radius: 2px; opacity: 0; translate: 0 -10px; transition-property: opacity, translate; transition-duration: 0.25s; transition-timing-function: ease-out-cubic; }
 .toast.in { opacity: 1; translate: 0 0; }
 .toast > .dot { width: 8px; height: 8px; border-radius: 4px; background-color: rgb(255, 181, 71); margin-right: 10px; }
-.toast > .t-body { color: rgb(230, 233, 245); flex-shrink: 1; }
 .toast { flex-shrink: 1; max-width: 100%; }
+/* QA-063: title over note in one column that shrinks and wraps; the dot sits by the title's first line */
+.toast { align-items: flex-start; max-width: 760px; }
+.toast > .dot { margin-top: 6px; flex-shrink: 0; }
+.toast-text { flex-shrink: 1; min-width: 0; }
+.toast-text > .t-body { color: rgb(230, 233, 245); white-space: normal; }
+.toast-text > .t-note { white-space: normal; margin-top: 2px; }
 /* QA-060: in portrait the target card fills the top right; toasts go in the open left column under the status box */
 .portrait .toasts { top: 180px; left: 20px; right: 420px; align-items: flex-start; }
-.toast .t-note { margin-left: 10px; }
 
 /* ------------------------------------------------------------------ hint bar */
 .hintbar { position: absolute; left: 0; right: 0; bottom: 10px; flex-direction: row; justify-content: center; flex-wrap: wrap; }

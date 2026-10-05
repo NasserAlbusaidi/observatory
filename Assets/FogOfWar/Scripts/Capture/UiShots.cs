@@ -160,8 +160,11 @@ namespace FogOfWar
                             shell.Toast("Test toast: job posted");
                             shell.Toast("Test toast with a note", "and a second line");
                             shell.Toast("Test toast: something went wrong", null, 3.5f, "bad");
+                            // QA-063: the Δv-short warning, a long title over a long note
+                            shell.Toast("Not enough Δv to reach Neptune", "Needs about 14,353 km/s with margin, 5,108 left. Engage again to go anyway.", 6, "bad");
                             yield return Wait(0.4f);
                             yield return Shot(app, shell, camRT, uiRT, tag, "06l-toasts");
+                            log.WriteLine("    toasts: " + shell.TestToastReport());
                             ship.VelRef = null;
                             typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);
                         }
