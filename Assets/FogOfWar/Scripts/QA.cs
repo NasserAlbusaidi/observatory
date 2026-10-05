@@ -339,6 +339,20 @@ namespace FogOfWar
                 yield return UiPass();
                 yield break;
             }
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqaterrain") >= 0)
+            {
+                // just the terrain low passes (the full run includes them too)
+                Directory.CreateDirectory(dir);
+                log = new StreamWriter(Path.Combine(dir, "qa.txt")) { AutoFlush = true };
+                app = GetComponent<FogOfWarApp>();
+                app.InputLocked = true; Controls.Locked = true;
+                log.WriteLine($"screen {UnityEngine.Screen.width}x{UnityEngine.Screen.height}");
+                yield return TerrainPasses();
+                log.WriteLine($"done: {errors} errors, {bad} bad readouts");
+                log.Close(); log = null;
+                Application.Quit();
+                yield break;
+            }
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "qa.txt")) { AutoFlush = true };
             app = GetComponent<FogOfWarApp>();
@@ -420,6 +434,7 @@ namespace FogOfWar
             else { errors++; log.WriteLine($"    new career is not docked ({app.Current?.Title}), so no rescue can be posted"); }
 
             yield return FleetShots();
+            yield return TerrainPasses();
 
             log.WriteLine("window sizes");
             foreach (var (w, h) in new[] { (1280, 720), (1024, 768), (2560, 1440) })
@@ -515,6 +530,44 @@ namespace FogOfWar
                 log.WriteLine($"    {cls} course line: {course}{(lineOk ? "" : "  BAD")}");
                 yield return Shot($"9-fleet-{cls.ToLowerInvariant()}");
             }
+        }
+
+        // Streaming terrain low passes: Tycho, Valles Marineris and Caloris from 100, 10 and 1 km, in local morning light.
+        IEnumerator TerrainPasses()
+        {
+            log.WriteLine("terrain low passes");
+            app.Restart(app.GameIndex);
+            yield return new WaitForSecondsRealtime(1f);
+            var os = app.Current as OpenSystemScene;
+            if (os == null) { errors++; log.WriteLine("    the game scene isn't the open world"); yield break; }
+            foreach (var (body, site, lat, lon) in new[] { ("Moon", "tycho", -43.31, -11.36), ("Mars", "valles", -13.9, -59.2), ("Mercury", "caloris", 30.5, -170.2) })
+            {
+                bool first = true;
+                foreach (var (alt, pitch) in new[] { (100.0, 35.0), (10.0, 20.0), (1.0, 10.0) })
+                {
+                    string line = os.TestLowPass(body, lat, lon, alt, pitch, first);
+                    first = false;
+                    log.WriteLine("    " + line);
+                    if (line.Contains("no terrain")) { errors++; break; }
+                    // let the quadtree refine: until nothing is queued for a few frames, at most 12 s
+                    float t0 = Time.realtimeSinceStartup;
+                    int idle = 0;
+                    while (Time.realtimeSinceStartup - t0 < 12f && idle < 20)
+                    {
+                        yield return null;
+                        idle = OpenWorld.TerrainBody.Pending == 0 ? idle + 1 : 0;
+                    }
+                    float settled = Time.realtimeSinceStartup - t0;
+                    // steady frame rate once the meshes are built (the shot line's fps includes the build frames)
+                    int f0 = Time.frameCount; float s0 = Time.realtimeSinceStartup;
+                    while (Time.realtimeSinceStartup - s0 < 3f) yield return null;
+                    float fps = (Time.frameCount - f0) / (Time.realtimeSinceStartup - s0);
+                    log.WriteLine($"    {os.TestTerrainReport(body)}, settled in {settled:0.0} s, steady {fps:0} fps at {Screen.width}x{Screen.height}, " +
+                                  $"heap {GC.GetTotalMemory(false) >> 20} MB, gfx {UnityEngine.Profiling.Profiler.GetAllocatedMemoryForGraphicsDriver() >> 20} MB");
+                    yield return Shot($"10-terrain-{site}-{(alt >= 1 ? alt.ToString("0") : alt.ToString("0.0"))}km");
+                }
+            }
+            os.TestLowPassOff();
         }
 
         IEnumerator Shot(string name)

@@ -37,7 +37,7 @@ namespace FogOfWar
         double effectiveWarp = 1;
         Body reference;
 
-        class Vis { public Body b; public Transform t; public Material[] mats; public bool model; }
+        class Vis { public Body b; public Transform t; public Material[] mats; public bool model; public TerrainBody terrain; public Renderer r; }
         readonly List<Vis> vis = new List<Vis>();
         Transform shipT, shipModel, engine, plume, sunGlow, stars;
         Vector3 engineScale;
@@ -77,7 +77,7 @@ namespace FogOfWar
             BuildShip();
             BuildCockpit();
             PlaceShipNearEarth();
-            var sphere = Own(Gfx.UVSphere(128, 64));
+            var sphere = TerrainBody.UnitSphere(); // shared smooth cube-sphere; bodies with a DEM get their own
             foreach (var b in sys.Bodies)
             {
                 var v = new Vis { b = b };
@@ -127,7 +127,11 @@ namespace FogOfWar
                 else
                 {
                     var m = PlanetMaterial(b);
-                    v.t = Gfx.Obj(b.Name, Root, sphere, m).transform;
+                    // the streaming quadtree takes over near the body; real relief where the terrain pack has its DEM
+                    var data = b.Look == Look.Rocky ? OpenWorld.TerrainData.Open(b.Name) : null;
+                    v.terrain = new TerrainBody(b, data);
+                    v.t = Gfx.Obj(b.Name, Root, data != null ? Own(v.terrain.WholeMesh()) : sphere, m).transform;
+                    v.r = v.t.GetComponent<Renderer>();
                     v.mats = new[] { m };
                 }
                 vis.Add(v);
@@ -344,6 +348,7 @@ namespace FogOfWar
             if (Cam != null) Cam.nearClipPlane = 0.05f; // on quit the camera may already be gone
             Orbit.enabled = true;
             DisposeCockpit(); // gives the camera back its full culling mask
+            foreach (var v in vis) v.terrain?.Dispose();
             vis.Clear();
             lighting?.Dispose();
             lighting = null;
@@ -602,7 +607,8 @@ namespace FogOfWar
             camDist = Math.Max(camDist, MinCamDist()); // targets change size under a fixed camera distance
             var mode = pivot == Pivot.Ship ? camMode : CamMode.Orbit;
             Cam.transform.position = Vector3.zero;
-            if (App.Rig != null)
+            if (QaCamera()) mode = CamMode.Orbit;
+            else if (App.Rig != null)
             {
                 // photo mode / cinematics: a free camera at an offset (km) from the pivot
                 camW = PivotW() + Frame.FromU(App.Rig.Offset);
@@ -631,6 +637,8 @@ namespace FogOfWar
             LateCockpit(mode == CamMode.Cockpit);
 
             var sunW = sys.Pos(sys.Sun, jd);
+            TerrainBody.Collect();
+            float pxPerRad = Cam.pixelHeight / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
             foreach (var v in vis)
             {
                 var b = v.b;
@@ -651,6 +659,12 @@ namespace FogOfWar
                     v.t.localScale = Vector3.Scale(b.Shape, new Vector3(1, (float)(1 - b.Flattening), 1)) * s;
                     b.Axes(jd, out var prime, out var east, out var pole);
                     v.t.localRotation = Quaternion.LookRotation(Frame.U(east), Frame.U(pole));
+                    if (v.terrain != null && v.mats.Length > 0)
+                    {
+                        bool chunks = v.t.gameObject.activeInHierarchy && v.terrain.Draw(v.mats[0], camW, bw, prime, pole, east, k, v.t.localPosition,
+                            v.t.localRotation, Root.localToWorldMatrix, v.t.worldToLocalMatrix, v.t.gameObject.layer, pxPerRad);
+                        v.r.enabled = !chunks;
+                    }
                 }
                 float irr = ShipLighting.Irradiance((sunW - bw).Mag);
                 foreach (var m in v.mats) { m.SetVector("_SunDir", sunDir); m.SetVector("_FOWSunDir", sunDir); m.SetFloat("_SunIrr", irr); }
