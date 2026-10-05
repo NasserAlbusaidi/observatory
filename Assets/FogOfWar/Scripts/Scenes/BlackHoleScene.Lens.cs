@@ -15,7 +15,8 @@ namespace FogOfWar
         public const int LensN = 1024;
         const int EdgeSamples = 4096;      // photon orbits sampled for the shadow edge (each with both signs of p_θ)
         bool lensTable = true;             // review harness: false = the full trace everywhere (A/B)
-        float lensSpp = 8;                 // review harness: 1 for the cost split
+        float lensSpp = 2;                 // base samples per pixel (review harness: 1 for the cost split)
+        float lensEdgeTest = 1;            // refinement's edge test: 1 corner cells, 2 quad codes, 0 none (review harness)
         float lensPoleB = 0.6f;            // M: rays with |b| below this take the full trace (review harness: 0 = none)
         bool lensNoTrace;                  // review harness: fallback pixels black instead of traced (cost split)
         double lastR, lastMu;
@@ -55,6 +56,7 @@ namespace FogOfWar
             LensActive = want && lensValid;
             mat.SetFloat("_LensOn", LensActive ? 1 : 0);
             mat.SetFloat("_LensSpp", lensSpp);
+            mat.SetFloat("_LensEdgeTest", lensEdgeTest);
             mat.SetFloat("_LensPoleB", lensPoleB);
             mat.SetFloat("_LensNoTrace", lensNoTrace ? 1 : 0);
         }

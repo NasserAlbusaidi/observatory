@@ -14,15 +14,15 @@ VISIBLE = 4   # a channel difference of more than 4/255 counts as visible
 def load(p):
     return np.asarray(Image.open(p).convert('RGB')).astype(np.int32)
 
-def main(d, out):
+def main(d, out, sfx=''):
     print(f'{"view":24s} {"mean |diff|":>11s} {"gate":>5s} {"fallback":>8s} {"8 spp":>6s} {"8x8 tiles":>9s} {"visible px":>10s} {"of which >1 px":>14s} {">1 px":>7s}  worst')
     for v in VIEWS:
-        pa, pb = os.path.join(d, v + '.png'), os.path.join(d, v + '-full.png')
+        pa, pb = os.path.join(d, v + sfx + '.png'), os.path.join(d, v + '-full.png')
         if not (os.path.exists(pa) and os.path.exists(pb)): continue
         A, B = load(pa), load(pb)
         diff = np.abs(A - B)
         mean = diff.mean() / 255 * 100
-        fb = load(os.path.join(d, v + '-fallback.png'))
+        fb = load(os.path.join(d, v + sfx + '-fallback.png'))
         red, green = (fb[..., 0] > 128) & (fb[..., 1] < 128), (fb[..., 1] > 128) & (fb[..., 0] < 128)
         yellow = (fb[..., 0] > 128) & (fb[..., 1] > 128) & (fb[..., 2] < 128)   # adaptive: 8 samples
         frac = red.sum() / max(red.sum() + green.sum() + yellow.sum(), 1)
@@ -46,7 +46,8 @@ def main(d, out):
             img = np.repeat(np.clip(diff.max(2) * 16, 0, 255)[..., None], 3, 2).astype(np.uint8)
             img[edge] = (0, 160, 160)
             img[far] = (255, 40, 40)
-            Image.fromarray(img).save(os.path.join(out, v + '-diff.png'))
+            Image.fromarray(img).save(os.path.join(out, v + sfx + '-diff.png'))
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    # optional third argument: a variant suffix (e.g. -q1) whose <view><suffix>.png and -fallback map are gated instead
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None, sys.argv[3] if len(sys.argv) > 3 else '')

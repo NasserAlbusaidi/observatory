@@ -43,7 +43,9 @@ Shader "FogOfWar/BlackHole"
             // samples' disc light agrees within 10 %. Elsewhere (the critical curve, disc rims, the photon ring, thin lensed
             // images) 8 samples on a 4 × 2 grid replace them. A pixel where any sample can't use the table is discarded
             // and left to pass 1; the stencil marks the pixels this pass served. Debug views 1 and 2 leave every pixel
-            // to pass 1; view 3 shows the fallback pixels red and the 8-sample pixels yellow. _LensSpp 1: one sample.
+            // to pass 1; view 3 shows the fallback pixels red and the 8-sample pixels yellow. _LensSpp 1: one base sample,
+            // refined by the edge test alone. _LensEdgeTest 2 replaces the four corner fetches by the quad's codes at the
+            // pixel centres (derivatives, so taken before the loop of varying length).
             float4 fragLens(v2fFS i) : SV_Target
             {
                 if (_LensOn < 0.5 || (_DebugFate > 0.5 && _DebugFate < 2.5)) discard;
@@ -67,6 +69,8 @@ Shader "FogOfWar/BlackHole"
                     if (!(length(skyDx) < 0.5) || !(length(skyDy) < 0.5)) { skyDx = 0; skyDy = 0; }
                 }
                 int first = _LensSpp > 1.5 ? 2 : 1;
+                float codeC = lensCode(-nc);
+                bool quadEdge = ddx_fine(codeC) != 0.0 || ddy_fine(codeC) != 0.0;
                 float3 col = 0;
                 float spotLum = 0, lum0 = 0, code0 = -2;
                 bool fallback = false, refine = false;
@@ -83,18 +87,22 @@ Shader "FogOfWar/BlackHole"
                     col += e;
                     spotLum += sl;
                     if (k == 0) { lum0 = lumaRGB(c); code0 = code; }
-                    if (k == 1 && !fallback)
+                    if (k == first - 1 && !fallback)
                     {
                         // smooth: both samples and the cells at the pixel's four corners share fate and crossing count,
                         // and the two samples' disc light agrees within 10 % (not the sky: its lookup is already
                         // filtered over the pixel's footprint, and star to star changes would refine most of the sky)
                         float l1 = lumaRGB(c);
-                        refine = code != code0 || abs(l1 - lum0) > 0.1 * max(l1, lum0) + 1e-4;
-                        [loop] for (int m = 0; m < 4 && !refine; m++)
+                        refine = k == 1 && (code != code0 || abs(l1 - lum0) > 0.1 * max(l1, lum0) + 1e-4);
+                        if (_LensEdgeTest > 1.5) refine = refine || quadEdge;
+                        else if (_LensEdgeTest > 0.5)
                         {
-                            float3 nm; float bm;
-                            zamoPhoton(primaryRay(i.ndc + (float2(m & 1, m >> 1) - 0.5) * pixNdc, px), nm, bm);
-                            refine = lensCode(-nm) != code0;
+                            [loop] for (int m = 0; m < 4 && !refine; m++)
+                            {
+                                float3 nm; float bm;
+                                zamoPhoton(primaryRay(i.ndc + (float2(m & 1, m >> 1) - 0.5) * pixNdc, px), nm, bm);
+                                refine = lensCode(-nm) != code0;
+                            }
                         }
                         if (refine) n = 10;
                     }

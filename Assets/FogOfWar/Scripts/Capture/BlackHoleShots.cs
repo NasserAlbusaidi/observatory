@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true); Set(s, "lensSpp", 8f); Set(s, "lensNoTrace", false); Set(s, "lensPoleB", 0.6f);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true); Set(s, "lensSpp", 2f); Set(s, "lensEdgeTest", 1f); Set(s, "lensNoTrace", false); Set(s, "lensPoleB", 0.6f);
             Set(s, "stepKOverride", 0f); Set(s, "stepsOverride", 0);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
@@ -178,6 +178,9 @@ namespace FogOfWar
                 Shot V(string suffix, Action<SimScene> extra) { var v = b; v.name = g + suffix; v.setup = s => { setup(s); extra(s); }; return v; }
                 l.Add(V("-full", s => Set(s, "lensTable", false)));
                 l.Add(V("-fallback", s => Set(s, "debugFate", 3f)));
+                // the 1 base sample variant with the quad edge test (decision shots: its image and its refine map)
+                l.Add(V("-q1", s => { Set(s, "lensSpp", 1f); Set(s, "lensEdgeTest", 2f); }));
+                l.Add(V("-q1-fallback", s => { Set(s, "lensSpp", 1f); Set(s, "lensEdgeTest", 2f); Set(s, "debugFate", 3f); }));
                 l.Add(V("-fate", s => Set(s, "debugFate", 1f)));
                 // the step 1b renderer (full trace, thin disc) at the same disc phase, for before/after sheets
                 l.Add(V("-1b", s => { Set(s, "lensTable", false); Set(s, "thinDisk", true); Set(s, "hotSpot", false); }));
@@ -519,19 +522,30 @@ namespace FogOfWar
                         for (int k = 0; k < N; k++) bt.RebuildLens();
                         ReadOne(trt, small);
                         log.WriteLine($"timing lens table rebuild ({BlackHoleScene.LensN}², quality {q}): {(Time.realtimeSinceStartup - t2) * 1000 / N:0.0} ms");
-                        // cost split of the table path, still camera: adaptive (2, or 8 at edges) or 1 sample per pixel, and
-                        // fallback pixels traced or black
-                        foreach (var (spp, noTrace) in new[] { (8f, false), (8f, true), (1f, true), (1f, false) })
+                        // cost split of the table path, still camera: base samples (2 or 1), the edge test (corner cells,
+                        // quad codes, none: 8 samples never fire), fallback pixels traced or black, and the full trace.
+                        // Three rounds, interleaved, so that clock drift between rows does not decide the comparison.
+                        var split = new[] { (2f, 1f, false), (2f, 2f, false), (2f, 0f, false), (2f, 0f, true), (1f, 2f, false), (1f, 0f, false), (1f, 0f, true), (0f, 0f, false) };
+                        var sum = new float[split.Length];
+                        for (int round = 0; round < 3; round++)
+                            for (int v = 0; v < split.Length; v++)
+                            {
+                                var (spp, edge, noTrace) = split[v];
+                                Set(bt, "lensTable", spp > 0); Set(bt, "lensSpp", Mathf.Max(spp, 1f)); Set(bt, "lensEdgeTest", edge); Set(bt, "lensNoTrace", noTrace);
+                                bt.LateTick(0);
+                                cam.Render(); ReadOne(trt, small);
+                                float t4 = Time.realtimeSinceStartup;
+                                for (int k = 0; k < N; k++) cam.Render();
+                                ReadOne(trt, small);
+                                sum[v] += (Time.realtimeSinceStartup - t4) * 1000 / N;
+                            }
+                        for (int v = 0; v < split.Length; v++)
                         {
-                            Set(bt, "lensSpp", spp); Set(bt, "lensNoTrace", noTrace);
-                            bt.LateTick(0);
-                            cam.Render(); ReadOne(trt, small);
-                            float t4 = Time.realtimeSinceStartup;
-                            for (int k = 0; k < N; k++) cam.Render();
-                            ReadOne(trt, small);
-                            log.WriteLine($"timing {res.x}x{res.y} quality {q}, lens table {(spp > 1 ? "adaptive 2/8" : "1")} spp, fallback {(noTrace ? "black (not traced)" : "traced")}: {(Time.realtimeSinceStartup - t4) * 1000 / N:0.0} ms per frame");
+                            var (spp, edge, noTrace) = split[v];
+                            string what = spp == 0 ? "full trace" : $"lens table {spp:0} base spp, edge test {(edge == 1 ? "corner cells" : edge == 2 ? "quad codes" : "none")}, fallback {(noTrace ? "black (not traced)" : "traced")}";
+                            log.WriteLine($"timing split {res.x}x{res.y} quality {q}, {what}: {sum[v] / 3:0.00} ms per frame (mean of 3 interleaved)");
                         }
-                        Set(bt, "lensSpp", 8f); Set(bt, "lensNoTrace", false);
+                        Set(bt, "lensTable", true); Set(bt, "lensSpp", 2f); Set(bt, "lensEdgeTest", 1f); Set(bt, "lensNoTrace", false);
                         var p0 = new Vector3(0, 0.9f, 24f);
                         int b0 = bt.LensBuilds;
                         float t3 = Time.realtimeSinceStartup;
