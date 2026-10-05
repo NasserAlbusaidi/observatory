@@ -508,6 +508,11 @@ namespace FogOfWar
                 var rt = (Transform)typeof(OpenSystemScene).GetField("runnerT", F).GetValue(os);
                 string model = rt != null && rt.childCount > 0 ? rt.GetChild(0).name : "none";
                 log.WriteLine($"    {cls}: {job.To}, model {model}, {km * 1000:0} m");
+                // QA-065: the target line is the runner's course, with no chords across its destination's orbit
+                string course = os.TestTargetLineReport(out double longest);
+                bool lineOk = longest > 0 && longest < 0.05;
+                if (!lineOk) errors++;
+                log.WriteLine($"    {cls} course line: {course}{(lineOk ? "" : "  BAD")}");
                 yield return Shot($"9-fleet-{cls.ToLowerInvariant()}");
             }
         }
