@@ -40,7 +40,7 @@ Shader "FogOfWar/BlackHole"
             // Pass 0, the image from the lens table, sampled adaptively. Two samples first, one in each half of the pixel
             // (the frame's jitter moves each within its half). Where the pixel is smooth, they are the pixel: both
             // samples and the table cells at the pixel's four corners have the same fate and crossing count, and the two
-            // brightnesses agree within 10 %. Elsewhere (the critical curve, disc rims, the photon ring, thin lensed
+            // samples' disc light agrees within 10 %. Elsewhere (the critical curve, disc rims, the photon ring, thin lensed
             // images) 8 samples on a 4 × 2 grid replace them. A pixel where any sample can't use the table is discarded
             // and left to pass 1; the stencil marks the pixels this pass served. Debug views 1 and 2 leave every pixel
             // to pass 1; view 3 shows the fallback pixels red and the 8-sample pixels yellow. _LensSpp 1: one sample.
@@ -82,12 +82,14 @@ Shader "FogOfWar/BlackHole"
                     if (k == 2) { col = 0; spotLum = 0; }
                     col += e;
                     spotLum += sl;
-                    if (k == 0) { lum0 = lumaRGB(e); code0 = code; }
+                    if (k == 0) { lum0 = lumaRGB(c); code0 = code; }
                     if (k == 1 && !fallback)
                     {
                         // smooth: both samples and the cells at the pixel's four corners share fate and crossing count,
-                        // and the two brightnesses agree within 10 %
-                        refine = code != code0 || abs(lumaRGB(e) - lum0) > 0.1 * max(lumaRGB(e), lum0) + 1e-4;
+                        // and the two samples' disc light agrees within 10 % (not the sky: its lookup is already
+                        // filtered over the pixel's footprint, and star to star changes would refine most of the sky)
+                        float l1 = lumaRGB(c);
+                        refine = code != code0 || abs(l1 - lum0) > 0.1 * max(l1, lum0) + 1e-4;
                         [loop] for (int m = 0; m < 4 && !refine; m++)
                         {
                             float3 nm; float bm;
@@ -100,6 +102,10 @@ Shader "FogOfWar/BlackHole"
                 if (fallback) discard;
                 col /= refine ? 8.0 : first;
                 spotLum /= refine ? 8.0 : first;
+                // a non-finite result would spread through TAA and bloom: show it magenta in debug view 3, else trace the pixel
+                bool bad = any(!isfinite(col)) || !isfinite(spotLum);
+                if (_DebugFate > 2.5 && bad) return float4(1, 0, 1, 1);
+                if (bad) discard;
                 // debug view 3: green where the table served the pixel, yellow with 8 samples (pass 1 draws red)
                 if (_DebugFate > 2.5) return refine ? float4(1, 1, 0, 1) : float4(0, 1, 0, 1);
                 // alpha carries the hot spot's share of this pixel's luminance, for its light curve (BHPost reads it)
