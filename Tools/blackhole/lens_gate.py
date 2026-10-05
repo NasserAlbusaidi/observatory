@@ -15,7 +15,7 @@ def load(p):
     return np.asarray(Image.open(p).convert('RGB')).astype(np.int32)
 
 def main(d, out):
-    print(f'{"view":24s} {"mean |diff|":>11s} {"gate":>5s} {"fallback":>8s} {"8 spp":>6s} {"visible px":>10s} {"of which >1 px":>14s} {">1 px":>7s}  worst')
+    print(f'{"view":24s} {"mean |diff|":>11s} {"gate":>5s} {"fallback":>8s} {"8 spp":>6s} {"8x8 tiles":>9s} {"visible px":>10s} {"of which >1 px":>14s} {">1 px":>7s}  worst')
     for v in VIEWS:
         pa, pb = os.path.join(d, v + '.png'), os.path.join(d, v + '-full.png')
         if not (os.path.exists(pa) and os.path.exists(pb)): continue
@@ -27,6 +27,11 @@ def main(d, out):
         yellow = (fb[..., 0] > 128) & (fb[..., 1] > 128) & (fb[..., 2] < 128)   # adaptive: 8 samples
         frac = red.sum() / max(red.sum() + green.sum() + yellow.sum(), 1)
         refined = yellow.sum() / max(green.sum() + yellow.sum(), 1)
+        # GPU cost follows thread groups, not pixels: the share of 8 x 8 tiles with at least one 8-sample pixel
+        h8, w8 = yellow.shape[0] // 8 * 8, yellow.shape[1] // 8 * 8
+        ty = yellow[:h8, :w8].reshape(h8 // 8, 8, w8 // 8, 8).any((1, 3))
+        tt = (yellow | green)[:h8, :w8].reshape(h8 // 8, 8, w8 // 8, 8).any((1, 3))
+        tiles = ty.sum() / max(tt.sum(), 1)
         fate = load(os.path.join(d, v + '-fate.png'))
         captured = (fate[..., 0] > 128) & (fate[..., 1] < 128) & (fate[..., 2] < 128)
         edge = captured & ~ndimage.binary_erosion(captured) | ~captured & ndimage.binary_dilation(captured)
@@ -34,7 +39,7 @@ def main(d, out):
         vis = diff.max(2) > VISIBLE
         far = vis & (dist > 1.5)
         worst = diff.max()
-        print(f'{v:24s} {mean:10.3f}% {"ok" if mean < 1 else "FAIL":>5s} {frac * 100:7.1f}% {refined * 100:5.1f}% {vis.mean() * 100:9.3f}% {far.sum():14d} {far.mean() * 100:6.3f}%  {worst}')
+        print(f'{v:24s} {mean:10.3f}% {"ok" if mean < 1 else "FAIL":>5s} {frac * 100:7.1f}% {refined * 100:5.1f}% {tiles * 100:8.1f}% {vis.mean() * 100:9.3f}% {far.sum():14d} {far.mean() * 100:6.3f}%  {worst}')
         if out:
             os.makedirs(out, exist_ok=True)
             # diff × 16 in grey, the critical curve in cyan, visible differences farther than 1 px from it in red
