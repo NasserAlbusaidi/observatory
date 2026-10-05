@@ -106,6 +106,8 @@ namespace FogOfWar
             QA.StartIfRequested(this);
             CareerQA.StartIfRequested(this);
             AudioQA.StartIfRequested(this);
+            // filming a runner: straight into a new game, where the open world spawns it (OpenSystemScene.SpawnRunner.cs)
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fowspawnrunner") >= 0) NewGame();
         }
 
         // Switch scene (closes any menu). The open world is the game; the rest are Observatory scenes.
