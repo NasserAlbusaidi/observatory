@@ -60,7 +60,7 @@ namespace FogOfWar
         static readonly Action<SimScene> Default = s =>
         {
             Set(s, "massIdx", 1); Set(s, "shownMassIdx", -2); Call(s, "SyncMass"); Set(s, "disk", true); Set(s, "doppler", true); Set(s, "lens", true); Set(s, "outer", 13f); Set(s, "temp", 4800f);
-            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true); Set(s, "lensSpp", 2f); Set(s, "lensEdgeTest", 1f); Set(s, "lensNoTrace", false); Set(s, "lensPoleB", 0.6f);
+            Set(s, "spin", 0f); Set(s, "clumpy", true); Set(s, "debugFate", 0f); Set(s, "rawHdr", 0f); Set(s, "thinDisk", false); Set(s, "hotSpot", false); Set(s, "lensTable", true); Set(s, "lensSpp", 1f); Set(s, "lensEdgeTest", 2f); Set(s, "lensNoTrace", false); Set(s, "lensPoleB", 0.6f);
             Set(s, "stepKOverride", 0f); Set(s, "stepsOverride", 0);
             var b = (BlackHoleScene)s;
             Call(b, "ClearSandbox"); Set(b, "logWarp", 1.5f); Set(b, "guides", false); Set(b, "showMap", true);
@@ -127,6 +127,9 @@ namespace FogOfWar
                 S("bh-edge-on-pole-table", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "lensPoleB", 0f))),
                 // the hot spot's light curve, with the disc clock running: its period against the orbit readout
                 S("chk-spot-curve", new Vector3(0, 3.5f, 22f), 42, With(s => Set(s, "hotSpot", true))),
+                // flicker with the disc turning and the camera still (the bh-hotspot view): table (1 or 2 base samples)
+                // against the full trace
+                S("chk-flicker", new Vector3(0, 3.5f, 22f), 42, With(s => Set(s, "hotSpot", true))),
                 S("dbg-fate-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 1f))),
                 S("dbg-hit-edge", new Vector3(0, 0.9f, 24f), 42, With(s => Set(s, "debugFate", 2f))),
                 S("dbg-fate-zoom24", new Vector3(0, 2.2f, -24f), 25, With(s => { Set(s, "spin", 0.998f); Set(s, "guides", true); Set(s, "debugFate", 1f); })),
@@ -178,9 +181,9 @@ namespace FogOfWar
                 Shot V(string suffix, Action<SimScene> extra) { var v = b; v.name = g + suffix; v.setup = s => { setup(s); extra(s); }; return v; }
                 l.Add(V("-full", s => Set(s, "lensTable", false)));
                 l.Add(V("-fallback", s => Set(s, "debugFate", 3f)));
-                // the 1 base sample variant with the quad edge test (decision shots: its image and its refine map)
-                l.Add(V("-q1", s => { Set(s, "lensSpp", 1f); Set(s, "lensEdgeTest", 2f); }));
-                l.Add(V("-q1-fallback", s => { Set(s, "lensSpp", 1f); Set(s, "lensEdgeTest", 2f); Set(s, "debugFate", 3f); }));
+                // the 2 base sample variant (the step 2 alternative: its image and its refine map)
+                l.Add(V("-q2", s => Set(s, "lensSpp", 2f)));
+                l.Add(V("-q2-fallback", s => { Set(s, "lensSpp", 2f); Set(s, "debugFate", 3f); }));
                 l.Add(V("-fate", s => Set(s, "debugFate", 1f)));
                 // the step 1b renderer (full trace, thin disc) at the same disc phase, for before/after sheets
                 l.Add(V("-1b", s => { Set(s, "lensTable", false); Set(s, "thinDisk", true); Set(s, "hotSpot", false); }));
@@ -275,6 +278,75 @@ namespace FogOfWar
                     double Q(double p) => sorted[(int)(p * (sorted.Count - 1))];
                     int zeros = fs.FindAll(f => f <= 1e-3 * Q(0.95)).Count;
                     log.WriteLine($"{s.name}: {fs.Count} samples over {span:0.0} s of disc clock; orbit at {R:0.00} M, expected period {P:0.00} s (readout P/15), measured {lagBest / (M - 1) * span:0.00} s; spot flux p5/p50/p95 {Q(0.05):0.000}/{Q(0.5):0.000}/{Q(0.95):0.000}, {100.0 * zeros / fs.Count:0}% of samples ~0 (spot hidden)");
+                    continue;
+                }
+                if (s.name == "chk-flicker")
+                {
+                    // 30 frames at a fixed 1/60 s of game time each, the disc turning, the camera still, as the game draws
+                    // them (TAA on). Per pixel: the luma's standard deviation over the frames, and its mean second
+                    // difference |L(t) − (L(t−1) + L(t+1)) / 2| (frame-to-frame flicker; smooth motion cancels). Masks
+                    // from the full trace: the disc (mean luma > 0.15) and the hot spot (max − mean > 0.2).
+                    const int NF = 30, WARM = 20;
+                    var runs = new (string name, float spp, bool table)[] { ("full trace", 2f, false), ("table 1 base spp", 1f, true), ("table 2 base spp", 2f, true) };
+                    var std = new float[runs.Length][]; var d2 = new float[runs.Length][];
+                    float[] mean0 = null, max0 = null;
+                    Time.captureDeltaTime = 1f / 60;
+                    for (int v = 0; v < runs.Length; v++)
+                    {
+                        Time.timeScale = 1;
+                        s.setup?.Invoke(app.Current);
+                        var fb = (BlackHoleScene)app.Current;
+                        Set(fb, "lensTable", runs[v].table); Set(fb, "lensSpp", runs[v].spp);
+                        app.Orbit.enabled = false;
+                        cam.fieldOfView = s.fov;
+                        cam.transform.SetPositionAndRotation(s.pos, Quaternion.LookRotation(s.look - s.pos, Vector3.up));
+                        Set(fb, "diskClock", 3.0);
+                        fb.Post?.Reset();
+                        var sum = new double[W * H]; var sq = new double[W * H]; var dd = new double[W * H]; var mx = new float[W * H];
+                        float[] l1 = null, l2 = null;
+                        for (int f = 0; f < WARM + NF; f++)
+                        {
+                            yield return null;
+                            cam.Render();
+                            if (f < WARM) continue;
+                            ReadInto(rt, tex);
+                            var px = tex.GetPixels32();
+                            var l = new float[W * H];
+                            for (int p = 0; p < l.Length; p++)
+                            {
+                                float y = (0.2126f * px[p].r + 0.7152f * px[p].g + 0.0722f * px[p].b) / 255f;
+                                l[p] = y; sum[p] += y; sq[p] += y * y; if (y > mx[p]) mx[p] = y;
+                                if (l2 != null) dd[p] += Math.Abs(l1[p] - 0.5 * (l2[p] + y));
+                            }
+                            l2 = l1; l1 = l;
+                        }
+                        std[v] = new float[W * H]; d2[v] = new float[W * H];
+                        if (v == 0) { mean0 = new float[W * H]; max0 = mx; }
+                        for (int p = 0; p < W * H; p++)
+                        {
+                            double m = sum[p] / NF;
+                            std[v][p] = (float)Math.Sqrt(Math.Max(0, sq[p] / NF - m * m));
+                            d2[v][p] = (float)(dd[p] / (NF - 2));
+                            if (v == 0) mean0[p] = (float)m;
+                        }
+                    }
+                    Time.captureDeltaTime = 0;
+                    Time.timeScale = 0;
+                    foreach (var (mask, label) in new (Func<int, bool>, string)[] { (p => mean0[p] > 0.15f, "disc"), (p => max0[p] - mean0[p] > 0.2f, "hot spot") })
+                        for (int v = 0; v < runs.Length; v++)
+                        {
+                            double a = 0, b = 0; int n = 0;
+                            for (int p = 0; p < W * H; p++) if (mask(p)) { a += std[v][p]; b += d2[v][p]; n++; }
+                            log.WriteLine($"{s.name} {label} ({n} px), {runs[v].name}: luma std {a / Math.Max(n, 1) * 100:0.00} %, frame-to-frame flicker {b / Math.Max(n, 1) * 100:0.00} %");
+                        }
+                    // the flicker maps (×16), full trace and 1 base spp
+                    foreach (int v in new[] { 0, 1 })
+                    {
+                        var img = new Color32[W * H];
+                        for (int p = 0; p < W * H; p++) { byte g = (byte)Mathf.Clamp(d2[v][p] * 16 * 255, 0, 255); img[p] = new Color32(g, g, g, 255); }
+                        tex.SetPixels32(img); tex.Apply();
+                        File.WriteAllBytes(Path.Combine(dir, $"{s.name}-{(v == 0 ? "full" : "q1")}.png"), tex.EncodeToPNG());
+                    }
                     continue;
                 }
                 if (s.name.StartsWith("hdr-"))
@@ -545,7 +617,7 @@ namespace FogOfWar
                             string what = spp == 0 ? "full trace" : $"lens table {spp:0} base spp, edge test {(edge == 1 ? "corner cells" : edge == 2 ? "quad codes" : "none")}, fallback {(noTrace ? "black (not traced)" : "traced")}";
                             log.WriteLine($"timing split {res.x}x{res.y} quality {q}, {what}: {sum[v] / 3:0.00} ms per frame (mean of 3 interleaved)");
                         }
-                        Set(bt, "lensTable", true); Set(bt, "lensSpp", 2f); Set(bt, "lensEdgeTest", 1f); Set(bt, "lensNoTrace", false);
+                        Set(bt, "lensTable", true); Set(bt, "lensSpp", 1f); Set(bt, "lensEdgeTest", 2f); Set(bt, "lensNoTrace", false);
                         var p0 = new Vector3(0, 0.9f, 24f);
                         int b0 = bt.LensBuilds;
                         float t3 = Time.realtimeSinceStartup;

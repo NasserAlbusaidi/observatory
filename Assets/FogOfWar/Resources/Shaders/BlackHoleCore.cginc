@@ -599,7 +599,7 @@ float3 skyTerm(float3 dir, float w, float EF, float px)
 Texture2D<float4> _LensT0, _LensT1, _LensT2, _LensT3, _LensT4;
 Texture2D<float> _LensEdge;    // ρc at the centres of _LensN bins over ψ
 float _LensOn, _LensN;
-float _LensSpp;                // base samples per pixel before refinement: 2 (or 1)
+float _LensSpp;                // base samples per pixel before refinement: 1 (or 2)
 float _LensEdgeTest;           // refinement's edge test: 1 cells at the pixel's corners, 2 codes across the 2 x 2 quad, 0 none
 float _LensNoTrace;            // review harness: pass 1 draws fallback pixels black instead of tracing them
 #define LENS_EPS 2e-4
