@@ -90,7 +90,8 @@ namespace FogOfWar
             yield return new WaitForSecondsRealtime(2f);
             Capture.TogglePhoto();
             yield return new WaitForSecondsRealtime(1f);
-            log.WriteLine($"  photo mode active {Capture.PhotoActive}, bloom {(app.Cam.GetComponent<OpenWorld.Bloom>()?.enabled ?? false)}");
+            log.WriteLine($"  photo mode active {Capture.PhotoActive}, bloom {(app.Cam.GetComponent<OpenWorld.Bloom>()?.enabled ?? false)}, " +
+                          $"orbit line segments {(s as OpenSystemScene)?.OrbitSegments ?? -1} (want 0)");
             yield return Shot("photo");
             Capture.TestApproach();
             yield return new WaitForSecondsRealtime(1f);
