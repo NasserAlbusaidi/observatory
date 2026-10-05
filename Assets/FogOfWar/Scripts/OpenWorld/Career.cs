@@ -518,15 +518,17 @@ namespace FogOfWar.OpenWorld
         const double ParkSeconds = 3 * 3600;
 
         // Flip-and-burn with an optional coast: cruise at a fraction f of the brachistochrone peak speed √(a·d).
-        // Δv = 2·f·√(a·d); time = √(d/a)·(f + 1/f). Reaction mass by the rocket equation at the current mass.
-        public static void Trip(double d, double a, double f, double mass, out double seconds, out double dv, out double tonnes)
+        // From rest, Δv = 2·f·√(a·d) and time = √(d/a)·(f + 1/f). QA-061: u and w are the ship's closing speed and
+        // sideways drift relative to the target (Ship.TripFrom); left at 0 they give the from-rest figures that pay is
+        // set from. Reaction mass by the rocket equation at the current mass.
+        public static void Trip(double d, double a, double f, double mass, out double seconds, out double dv, out double tonnes, double u = 0, double w = 0)
         {
             f = Math.Max(0.05, Math.Min(f, 1));
-            double peak = Math.Sqrt(a * d);
-            dv = 2 * f * peak;
+            var (v, t) = Ship.TripFrom(d, a, u, w, f < 1 ? f * Math.Sqrt(a * d) : 0);
+            dv = v;
             // the formula is from rest to rest; leaving orbit and parking at the far end add a few hours (measured by
             // CareerQA: +0.7 h to the Moon, +5 h Luna → Earth, +7 h to Pallas)
-            seconds = Math.Sqrt(d / a) * (f + 1 / f) * 1.1 + ParkSeconds;
+            seconds = t * 1.1 + ParkSeconds;
             tonnes = mass * (1 - Math.Exp(-dv / Ship.Ve));
         }
 

@@ -95,6 +95,27 @@ namespace FogOfWar
             return $"label x {a.xMin:0}–{a.xMax:0}, panels from x {b.xMin:0}: {(a.Overlaps(b) ? "OVERLAP" : "clear")}";
         }
 
+        // review shots: put the ship `km` beyond the target's parking distance, at rest relative to it (QA-062)
+        public void TestOffsetFromTarget(double km)
+        {
+            var t = ship.Target;
+            if (t == null) return;
+            var tp = sys.Pos(t, jd);
+            var dir = (ship.Pos - tp).Mag > 1e-6 ? (ship.Pos - tp).Norm : new D3(1, 0, 0);
+            ship.Pos = tp + dir * (Ship.Standoff(t) + km);
+            ship.Vel = sys.Vel(t, jd);
+        }
+
+        // review shots: the target card's travel line, and whether the lesson card clears the right column (QA-059)
+        public string TestTravelLine() => tcBrach?.text?.Replace("\n", " / ") ?? "none";
+
+        public string TestLessonReport()
+        {
+            if (lessonCard == null || lessonCard.resolvedStyle.display != DisplayStyle.Flex) return "lesson card hidden";
+            var a = lessonCard.worldBound; var b = rightCol.worldBound;
+            return $"lesson y {a.yMin:0}–{a.yMax:0}, right column y {b.yMin:0}–{b.yMax:0}: {(a.Overlaps(b) ? "OVERLAP" : "clear")}";
+        }
+
         string CraftKind(Body b)
         {
             switch (KindOf(b))

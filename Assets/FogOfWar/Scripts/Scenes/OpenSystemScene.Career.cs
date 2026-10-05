@@ -143,6 +143,33 @@ namespace FogOfWar
             : ship.CruiseCap > 0 ? Math.Min(1, ship.CruiseCap / Math.Sqrt(ship.AMax * Math.Max(d, 1e-6))) : 1;
         string PlannerLead() => FlyingPlan ? "Active plan, from here at" : "At";
 
+        // QA-061: the trip the plan would fly, from the ship's motion relative to the target (a target moving away costs
+        // a stop first). Coast fraction f defaults to the planner's.
+        void PlanTrip(out double seconds, out double dv, out double tonnes, double f = -1)
+        {
+            double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
+            var (u, w) = ship.RelToTarget(sys, jd);
+            Career.Trip(d, ship.AMax, f >= 0 ? f : PlannerFrac(d), ship.Mass, out seconds, out dv, out tonnes, u, w);
+        }
+
+        // Headroom over the estimate for what it leaves out: steering, gravity, the guidance's own lag. CareerQA measures
+        // the flown Δv against the estimate.
+        const double DvMargin = 1.1;
+        bool DvShort(double dv) => !ship.UnlimitedFuel && dv * DvMargin > Career.DvLeft(ship);
+
+        // The target card's and nav computer's full-burn line from the ship's state, plus a warning when the plan as
+        // selected (coast included) needs more Δv than is left (QA-061: it read from rest and said 2,299 for 5,000).
+        string BrachLine(double d, out bool shortDv)
+        {
+            var (u, w) = ship.RelToTarget(sys, jd);
+            var (dv, t) = Ship.TripFrom(d, ship.AMax, u, w);
+            double peak = Math.Max(Math.Sqrt(ship.AMax * d + u * u / 2), u);
+            PlanTrip(out _, out double planDv, out _);
+            shortDv = DvShort(planDv);
+            return $"{Fmt.Num(ship.MaxG, 1)} g brachistochrone: {Dur(t)}\nΔv {BrachSpeed(dv)} · peak {BrachSpeed(peak)}" +
+                   (shortDv ? $"\nΔV SHORT: plan needs ~{planDv * DvMargin:N0} km/s, {Career.DvLeft(ship):N0} left" : "");
+        }
+
         void TickCareer(double simDt)
         {
             // a plan starts (or restarts on a new target in the same frame): fix its cruise speed from the distance to go.
@@ -319,10 +346,9 @@ namespace FogOfWar
             ui.Section("Trip planner: " + ship.Target.Name);
             int ci = ui.Buttons(Array.ConvertAll(new[] { 0, 1, 2 }, i => (cruiseIdx == i ? "● " : "") + CruiseNames[i]));
             if (ci >= 0) cruiseIdx = ci;
-            double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
-            Career.Trip(d, ship.AMax, PlannerFrac(d), ship.Mass, out double t, out double dv, out double fuel);
-            GUILayout.Label($"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", fuel > ship.Fuel ? ui.label : ui.note);
-            if (fuel > ship.Fuel) GUILayout.Label("Not enough reaction mass. Coast, lower the g, or refuel.", ui.label);
+            PlanTrip(out double t, out double dv, out double fuel);
+            GUILayout.Label($"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", DvShort(dv) ? ui.label : ui.note);
+            if (DvShort(dv)) GUILayout.Label("Not enough reaction mass. Coast, lower the g, or refuel.", ui.label);
             foreach (var c in career.Active)
             {
                 var body = career.TargetOf(c);

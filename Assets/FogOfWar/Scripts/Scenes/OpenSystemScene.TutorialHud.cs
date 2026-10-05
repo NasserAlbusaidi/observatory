@@ -37,6 +37,15 @@ namespace FogOfWar
             var t = TutorialText;
             bool on = !string.IsNullOrEmpty(t) && pivot != Pivot.Sun;
             Ui.Show(lessonCard, on);
+            // QA-059: in portrait the card sits under the right column; a tall card pushes the column's bottom up
+            if (hudShell != null && hudShell.Portrait && rightCol != null)
+            {
+                float bottom = 350;
+                var box = lessonCard.layout;
+                if (on && lessonCard.parent != null && !float.IsNaN(box.y))
+                    bottom = Mathf.Max(bottom, lessonCard.parent.layout.height - box.y + 12);
+                rightCol.style.bottom = bottom;
+            }
             if (!on || t == lessonShown) return;
             lessonShown = t;
             var m = StepRx.Match(t);
