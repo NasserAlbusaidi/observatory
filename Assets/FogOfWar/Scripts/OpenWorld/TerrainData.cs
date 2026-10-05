@@ -45,9 +45,13 @@ namespace FogOfWar.OpenWorld
                 var args = Environment.GetCommandLineArgs();
                 int i = Array.IndexOf(args, "-fowterrain");
                 var tries = new List<string>();
+                // an explicit -fowterrain is the only place looked (-fowterrain none runs on the 8K globals, as a player without the pack does)
                 if (i >= 0 && i + 1 < args.Length) tries.Add(args[i + 1]);
-                tries.Add(Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? ".", "Terrain"));
-                tries.Add(@"D:\SpaceSimArtSrc\terrain"); // the dev machine's pack
+                else
+                {
+                    tries.Add(Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? ".", "Terrain"));
+                    tries.Add(@"D:\SpaceSimArtSrc\terrain"); // the dev machine's pack
+                }
                 foreach (var t in tries) if (Directory.Exists(t)) { root = t; break; }
                 Debug.Log("Fog of War: terrain pack " + (root ?? "not found (8K globals only)"));
                 return root;

@@ -536,6 +536,7 @@ namespace FogOfWar
         IEnumerator TerrainPasses()
         {
             log.WriteLine("terrain low passes");
+            if (OpenWorld.TerrainData.Root == null) { log.WriteLine("    skipped: no terrain pack, bodies on their 8K globals"); yield break; }
             app.Restart(app.GameIndex);
             yield return new WaitForSecondsRealtime(1f);
             var os = app.Current as OpenSystemScene;
