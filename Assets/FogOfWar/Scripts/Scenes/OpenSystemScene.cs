@@ -415,6 +415,7 @@ namespace FogOfWar
         void TickInner(float dt)
         {
             if (ship.Crashed != null) { Crashed(); return; }
+            SpawnRunnerTick();
             ReadInput(dt);
             if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
             double simDt = dt * Warps[warpIdx];
@@ -793,11 +794,15 @@ namespace FogOfWar
                 }
                 if (tgt) { targetLine.Clear(); targetLine.AddRange(line); }
             }
+            // photo mode and F2 (HUD hidden) take the orbit and course lines out of the picture too
+            if (App.HideGui || !App.ShowUI) { pts.Clear(); cols.Clear(); }
+            OrbitSegments = pts.Count / 2;
             Gfx.SetLines(orbitMesh, pts, cols);
             orbitMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 1e7f);
         }
 
         readonly List<D3> line = new List<D3>(), targetLine = new List<D3>();
+        public int OrbitSegments { get; private set; }   // line segments drawn last frame (checks)
 
         // An intercept runner's course from its departure to its arrival, in world km. Other path bodies (the
         // practice beacon) get no line. Treated as an orbit, a runner sampled its path ~1e9 days out, where it sits

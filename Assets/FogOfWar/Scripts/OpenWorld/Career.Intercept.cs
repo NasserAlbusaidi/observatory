@@ -38,6 +38,14 @@ namespace FogOfWar.OpenWorld
 
         static readonly string[] Runners = { "courier Halcyon", "liner Meridian", "freighter Okavango", "tanker Ross 128", "packet Wren", "hauler Tisiphone" };
 
+        // The runner's name for a hull class ("courier" -> "Halcyon"), or null for an unknown class.
+        public static string RunnerName(string cls)
+        {
+            foreach (var h in Runners)
+                if (h.StartsWith(cls + " ", StringComparison.OrdinalIgnoreCase)) return h.Substring(h.IndexOf(' ') + 1);
+            return null;
+        }
+
         internal Contract Intercept(System.Random rng, SolarSystem sys, double jd)
         {
             var from = Ports[rng.Next(Ports.Length)];
