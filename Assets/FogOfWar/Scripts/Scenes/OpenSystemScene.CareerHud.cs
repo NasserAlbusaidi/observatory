@@ -197,6 +197,7 @@ namespace FogOfWar
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
               .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
+            for (int i = 1; i < Career.Factions.Length; i++) sb.Append('s').Append(career.Standing((Faction)i));
             foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell));
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
             return sb.ToString();
@@ -232,6 +233,15 @@ namespace FogOfWar
             Ui.KV(c, "Drive", $"{career.DriveRating:0} g" + (career.CarryingPassengers ? " (1 g, passengers)" : ""));
             Ui.KV(c, "Speed change left", $"{Career.DvLeft(ship):N0} km/s");
             Ui.KV(c, "Record", CareerRecord());
+            // standing with each port owner (Career.Factions.cs): the tier sets the pay on that faction's boards
+            for (int i = 1; i < Career.Factions.Length; i++)
+            {
+                var f = (Faction)i;
+                double pay = career.PayFactor(f);
+                var (_, tier) = Ui.KV(c, Career.Factions[i].Name, $"{career.TierName(f)} ({career.Standing(f):+0;−0;0}) · {career.PayText(f)}");
+                if (pay != 1) tier.AddToClassList(pay > 1 ? "ok" : "warn");
+            }
+            Ui.L(c, $"A job done on time: +{Career.StandingGain} with the faction whose port posted it. A failed or abandoned job: −{Career.StandingLoss}.", "t-note").style.marginTop = 2;
             // the long goal: buy the ship out from the yard
             if (career.OwnsShip) Ui.KV(c, "Ship", "Yours: bought out from the yard", "ok");
             else
@@ -280,6 +290,8 @@ namespace FogOfWar
                         : j.Kind == JobKind.Survey
                         ? $"Survey {j.To}: {Fmt.Num(100 * j.Dwell / j.DwellNeeded, 0)} % scanned. Stay within {Km(career.Codex.ScanRange(sys[j.To]))} with the drive off."
                         : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To}" : $"{j.Tonnes:N0} t to {j.To}";
+                    var owner = Career.OwnerOf(j);
+                    if (owner != Faction.None) what += " · for " + Career.Factions[(int)owner].Name;
                     Ui.L(card, what, "t-note");
                     double expressLeft = j.ExpressJd - jd;
                     if (j.ExpressJd > 0 && expressLeft >= 0)
@@ -305,6 +317,8 @@ namespace FogOfWar
             {
                 Ui.Section(c, "Docked at " + port.Name);
                 Ui.L(c, $"Fuel {port.FuelPrice:N0} cr/t. {port.Note}", "t-note");
+                var who = Career.Factions[(int)port.Owner];
+                Ui.L(c, $"Owned by the {who.Name}. You are {career.TierName(port.Owner)} with them: {career.PayText(port.Owner)} on this board. {who.Blurb}", "t-note").style.marginTop = 2;
                 double fill = career.TankCapacity - ship.Fuel;
                 var row = Ui.E(c, "row", "wrap");
                 row.style.marginTop = 6;

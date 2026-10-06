@@ -9,6 +9,7 @@ namespace FogOfWar.OpenWorld
     {
         public string Name, Body, Note;
         public double FuelPrice; // cr per tonne
+        public Faction Owner;
     }
 
     public enum JobKind { Cargo, Passengers, Survey, Rescue, Intercept }
@@ -50,6 +51,7 @@ namespace FogOfWar.OpenWorld
         public List<Contract> active = new List<Contract>();
         public int sensors;
         public double shipPaid, startJd; // the buyout so far; the career's first day (0 for saves made before either existed)
+        public int[] standing;           // by Faction; null for saves made before factions: neutral with all
         public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
     }
 
@@ -59,15 +61,15 @@ namespace FogOfWar.OpenWorld
     {
         public static readonly Port[] Ports =
         {
-            new Port { Name = "Earth orbit", Body = "Earth", FuelPrice = 60, Note = "Deep gravity well: water is lifted from the ground." },
-            new Port { Name = "Luna", Body = "Moon", FuelPrice = 35, Note = "Water from the polar craters." },
-            new Port { Name = "Mars orbit", Body = "Mars", FuelPrice = 30, Note = "Water from the ice under the surface." },
-            new Port { Name = "Ceres", Body = "Ceres", FuelPrice = 8, Note = "Ice-rich. The belt's water port." },
-            new Port { Name = "Vesta", Body = "Vesta", FuelPrice = 25, Note = "Dry rock: water is shipped in." },
-            new Port { Name = "Ganymede", Body = "Ganymede", FuelPrice = 10, Note = "Ice shell." },
-            new Port { Name = "Callisto", Body = "Callisto", FuelPrice = 10, Note = "Ice and rock, outside Jupiter's worst radiation." },
-            new Port { Name = "Titan", Body = "Titan", FuelPrice = 15, Note = "Water ice under the haze." },
-            new Port { Name = "Enceladus", Body = "Enceladus", FuelPrice = 9, Note = "Plume water from the south pole." },
+            new Port { Name = "Earth orbit", Body = "Earth", FuelPrice = 60, Owner = Faction.Guard, Note = "Deep gravity well: water is lifted from the ground." },
+            new Port { Name = "Luna", Body = "Moon", FuelPrice = 35, Owner = Faction.Guard, Note = "Water from the polar craters." },
+            new Port { Name = "Mars orbit", Body = "Mars", FuelPrice = 30, Owner = Faction.Tharsis, Note = "Water from the ice under the surface." },
+            new Port { Name = "Ceres", Body = "Ceres", FuelPrice = 8, Owner = Faction.Compact, Note = "Ice-rich. The belt's water port." },
+            new Port { Name = "Vesta", Body = "Vesta", FuelPrice = 25, Owner = Faction.Tharsis, Note = "Dry rock: water is shipped in." },
+            new Port { Name = "Ganymede", Body = "Ganymede", FuelPrice = 10, Owner = Faction.Compact, Note = "Ice shell." },
+            new Port { Name = "Callisto", Body = "Callisto", FuelPrice = 10, Owner = Faction.Compact, Note = "Ice and rock, outside Jupiter's worst radiation." },
+            new Port { Name = "Titan", Body = "Titan", FuelPrice = 15, Owner = Faction.Compact, Note = "Water ice under the haze." },
+            new Port { Name = "Enceladus", Body = "Enceladus", FuelPrice = 9, Owner = Faction.Compact, Note = "Plume water from the south pole." },
         };
 
         public static readonly double[] DriveG = { 1, 3, 5 };
@@ -129,7 +131,7 @@ namespace FogOfWar.OpenWorld
 
         // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
         // player action. Docked/Undocked/TankDry carry the port name or an empty string.
-        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned }
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned, Standing }
         public event Action<Happening, string> OnEvent;
 
         void Say(Happening what, string text, bool good = true)
@@ -186,6 +188,7 @@ namespace FogOfWar.OpenWorld
                     if (c.Kind != JobKind.Intercept && c.Kind != JobKind.Rescue) continue;
                     Active.RemoveAt(i); Failed++; RemoveDerelict(c);
                     Say(Happening.JobFailed, "Tank dry: " + c.Title + " failed", false);
+                    ChangeStanding(c, -StandingLoss);
                 }
                 Say(Happening.TankDry, $"Out of fuel. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
             }
@@ -289,6 +292,7 @@ namespace FogOfWar.OpenWorld
             Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid,
                 $"{what}: +{pay:N0} cr" + (Spoiled(c, jd) ? " (cargo spoiled, half pay)" : "") + (late ? " (late, half pay)" : express ? $" (express bonus +{expressExtra:N0} cr)" : "") +
                 (hand > 0 ? $" (flown in by hand +{hand:N0} cr)" : ""));
+            if (!late) ChangeStanding(c, StandingGain);
         }
 
         // Where the pilot took the helm: the target and its distance when the nav plan last stopped (none while a plan flies).
@@ -413,6 +417,7 @@ namespace FogOfWar.OpenWorld
                 Active.RemoveAt(i); Failed++;
                 RemoveDerelict(c);
                 Say(Happening.JobFailed, "Contract failed, far past its deadline: " + c.Title, false);
+                ChangeStanding(c, -StandingLoss);
             }
         }
 
@@ -459,6 +464,7 @@ namespace FogOfWar.OpenWorld
             RemoveDerelict(c);
             Failed++;
             Say(Happening.JobFailed, "Abandoned: " + c.Title, false);
+            ChangeStanding(c, -StandingLoss);
         }
 
         void RefreshBoard(SolarSystem sys, Ship ship, double jd)
@@ -494,6 +500,8 @@ namespace FogOfWar.OpenWorld
                 return c;
             }
 
+            // standing with the port's owner sets the pay; neutral leaves every job as posted
+            double payFactor = PayFactor(Docked.Owner);
             for (int k = 0; k < 8; k++)
             {
                 var c = k == 0 ? Tiered(local, localName) : k == 1 ? Tiered(near, "interplanetary") : k == 2 ? Tiered(far, "far")
@@ -502,6 +510,7 @@ namespace FogOfWar.OpenWorld
                       : k == 7 ? (rng.NextDouble() < 0.6 ? Intercept(rng, sys, jd) : null)
                       : Survey(rng, sys, jd);
                 if (c == null) continue;
+                if (payFactor != 1) c.Pay = Math.Round(c.Pay * payFactor / 100) * 100;
                 c.Key = $"{Docked.Name}/{day}/{k}";
                 if (!taken.Contains(c.Key)) Board.Add(c);
             }
@@ -672,7 +681,8 @@ namespace FogOfWar.OpenWorld
         {
             credits = Credits, earned = Earned, fuel = ship.Fuel, drive = DriveLevel, tank = TankLevel, nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
-            sensors = Codex.SensorLevel, shipPaid = ShipPaid, startJd = StartJd, visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
+            sensors = Codex.SensorLevel, shipPaid = ShipPaid, startJd = StartJd, standing = (int[])this.standing.Clone(),
+            visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
             achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt),
         };
 
@@ -687,6 +697,8 @@ namespace FogOfWar.OpenWorld
             foreach (var c in Active) taken.Add(c.Key);
             Codex.SensorLevel = s.sensors;
             ShipPaid = Math.Max(0, Math.Min(ShipPrice, s.shipPaid)); StartJd = s.startJd;
+            Array.Clear(standing, 0, standing.Length);
+            for (int i = 0; s.standing != null && i < Math.Min(standing.Length, s.standing.Length); i++) standing[i] = Mathf.Clamp(s.standing[i], StandingMin, StandingMax);
             void Fill(HashSet<string> set, List<string> l) { set.Clear(); if (l != null) set.UnionWith(l); }
             Fill(Codex.Visited, s.visited); Fill(Codex.Scanned, s.scanned); Fill(Codex.Achieved, s.achieved); Fill(Codex.DockedAt, s.dockedAt);
             ship.Fuel = s.fuel;

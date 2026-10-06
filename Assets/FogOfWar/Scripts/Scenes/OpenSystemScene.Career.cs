@@ -282,6 +282,9 @@ namespace FogOfWar
                             $"   ·   Δv left {Career.DvLeft(ship):N0} km/s", ui.note);
             GUILayout.Label(career.OwnsShip ? "The ship is yours." : $"Ship buyout: {career.ShipPaid:N0} / {Career.ShipPrice:N0} cr paid", ui.note);
             if (!career.OwnsShip && career.Docked != null && career.Credits >= career.ShipStepNow && ui.Button($"Pay {career.ShipStepNow:N0} cr toward the ship")) career.PayTowardShip();
+            var standings = new string[Career.Factions.Length - 1];
+            for (int i = 1; i < Career.Factions.Length; i++) standings[i - 1] = $"{Career.Factions[i].Name} {career.TierName((Faction)i)} ({career.Standing((Faction)i):+0;−0;0})";
+            GUILayout.Label("Standing: " + string.Join("   ·   ", standings), ui.note);
             if (ship.Fuel < 1)
             {
                 GUILayout.Label("The tank is dry. You are adrift.", ui.label);
@@ -296,6 +299,7 @@ namespace FogOfWar
             {
                 ui.Section("Docked at " + port.Name);
                 GUILayout.Label($"Reaction mass {port.FuelPrice:N0} cr/t. {port.Note}", ui.note);
+                GUILayout.Label($"Owned by the {Career.Factions[(int)port.Owner].Name}. You are {career.TierName(port.Owner)} with them: {career.PayText(port.Owner)} on this board.", ui.note);
                 double fill = career.TankCapacity - ship.Fuel;
                 if (fill > 0.05)
                 {
