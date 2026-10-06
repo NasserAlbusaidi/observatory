@@ -296,7 +296,18 @@ namespace FogOfWar
                 var wreck = sys[res.To];
                 Check(wreck != null && Career.IsDerelict(wreck), $"derelict is in the system: {res.To} around {res.Parent}");
                 double c3 = career.Credits;
-                yield return Trip(wreck, 0, "rescue " + res.To, () => res.Dwell > 0 || !career.Active.Contains(res), 4, 120);
+                // closest approach, and which side it came in on: a frame at warp can hide a pass through the wreck
+                double wreckMin = double.MaxValue; D3 wreckSide = D3.Zero;
+                yield return Trip(wreck, 0, "rescue " + res.To, () =>
+                {
+                    var rel = ship.Pos - sys.Pos(wreck, jd);
+                    wreckMin = Math.Min(wreckMin, rel.Mag);
+                    if (wreckSide.Sqr == 0 && rel.Mag < 50) wreckSide = rel.Norm;
+                    return res.Dwell > 0 || !career.Active.Contains(res);
+                }, 4, 120);
+                var wreckRel = ship.Pos - sys.Pos(wreck, jd);
+                Check(wreckMin > 0.3 && wreckRel.Mag < 3 && D3.Dot(wreckSide, wreckRel.Norm) > 0,
+                    $"the ship stops beside the wreck, not through it: closest {wreckMin:F2} km, {wreckRel.Mag:F2} km as the crew crosses, same side {D3.Dot(wreckSide, wreckRel.Norm):F2}");
                 // a close look at the wreck while the crew crosses over
                 Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.12);
                 yield return new WaitForSecondsRealtime(1.5f);
@@ -416,7 +427,17 @@ namespace FogOfWar
                     string course = s.TestTargetLineReport(out double longest);
                     Check(longest > 0 && longest < 0.05, $"QA-065: runner course line: {course}");
                     double c4 = career.Credits;
-                    yield return Trip(runner, 0, "intercept " + ic.To, () => ic.Dwell > 0 || !career.Active.Contains(ic), 5, 150);
+                    double runnerMin = double.MaxValue; D3 runnerSide = D3.Zero;
+                    yield return Trip(runner, 0, "intercept " + ic.To, () =>
+                    {
+                        var rel = ship.Pos - sys.Pos(runner, jd);
+                        runnerMin = Math.Min(runnerMin, rel.Mag);
+                        if (runnerSide.Sqr == 0 && rel.Mag < 50) runnerSide = rel.Norm;
+                        return ic.Dwell > 0 || !career.Active.Contains(ic);
+                    }, 5, 150);
+                    var runnerRel = ship.Pos - sys.Pos(runner, jd);
+                    Check(runnerMin > 0.3 && runnerRel.Mag < 3 && D3.Dot(runnerSide, runnerRel.Norm) > 0,
+                        $"the ship stops beside the runner, not through it: closest {runnerMin:F2} km, {runnerRel.Mag:F2} km as the cargo crosses, same side {D3.Dot(runnerSide, runnerRel.Norm):F2}");
                     Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.2);
                     Put("warpIdx", 0);
                     yield return new WaitForSecondsRealtime(1.5f);
