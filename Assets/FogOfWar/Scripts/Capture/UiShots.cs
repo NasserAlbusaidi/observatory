@@ -261,8 +261,10 @@ namespace FogOfWar
                     }
                 }
                 // the full-screen Jobs and Codex pages
+                os?.TestHandJob(true);
                 os?.OpenPage(0);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06a-jobs-page");
+                os?.TestHandJob(false);
                 os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
                 os?.ShowCodex(1);

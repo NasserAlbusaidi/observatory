@@ -222,6 +222,7 @@ namespace FogOfWar
                 // a 1 g ship with a 50 % coast makes the window on a short hop, and the note names the bonus
                 Check(jd <= expressBy && career.Credits - c1 >= job.Pay * (1 + Career.ExpressBonus) - 1 && career.Notes.Exists(n => n.Text.Contains("express bonus")),
                     $"1 g with a 50 % coast makes the express window: pay ×{1 + Career.ExpressBonus} ({(expressBy - jd) * 24:F1} h to spare)");
+                Check(!career.Notes.Exists(n => n.Text.Contains("by hand")), "the autopilot's arrival earns no flown-in-by-hand bonus");
                 yield return Shot("c04-delivered");
             }
 
@@ -339,6 +340,44 @@ namespace FogOfWar
                 yield return null;
                 Check(career.Call == null, "with the job gone, no call is left");
                 ship.Fuel = fuelWas;
+            }
+
+            // 5d. flown in by hand: the helm taken outside the dock range, then a bound orbit with the drive off, pays the
+            // bonus; the helm taken inside the range does not. The ship is put in place, not flown (test cargo runs to Mars)
+            {
+                var mars = sys["Mars"];
+                double range = Career.DockRange(mars);
+                var rdir = (sys.Pos(mars, jd) - sys.Pos(sys.Sun, jd)).Norm;
+                var vdir = D3.Cross(D3.Cross(rdir, sys.Vel(mars, jd).Norm), rdir).Norm;
+                double rOrbit = Ship.Standoff(mars);
+                foreach (var (from, paid) in new[] { (1.5, true), (0.8, false) })
+                {
+                    var run = new Contract { Id = 900002, Kind = JobKind.Cargo, Title = "QA ore", From = "Luna", To = "Mars orbit", Tonnes = 10, Pay = 10000, Days = 100, Key = "qa/hand" };
+                    run.IssuedJd = jd; run.DeadlineJd = jd + run.Days;
+                    // the autopilot flies a frame, then the pilot takes the helm at rest relative to Mars, `from` × the dock range out
+                    // (a fall with no orbit: not docked, so the job, added after, is not paid there)
+                    ship.Landed = null; ship.ThrottleCmd = 0; ship.Throttle = 0;
+                    Call("SetTarget", mars);
+                    ship.Pos = sys.Pos(mars, jd) + rdir * (range * from); ship.Vel = sys.Vel(mars, jd);
+                    ship.Plan = Plan.Brachistochrone;
+                    yield return null;
+                    ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
+                    ship.Pos = sys.Pos(mars, jd) + rdir * (range * from); ship.Vel = sys.Vel(mars, jd);
+                    career.Active.Add(run);
+                    yield return null;
+                    bool shown = career.HandArrival(run) == paid;
+                    // then a circular orbit at the autopilot's parking height, drive off: the port docks it and pays
+                    double handC0 = career.Credits;
+                    ship.Pos = sys.Pos(mars, jd) + rdir * rOrbit; ship.Vel = sys.Vel(mars, jd) + vdir * Math.Sqrt(mars.GM / rOrbit);
+                    yield return null;
+                    yield return null;
+                    double got = career.Credits - handC0, want = paid ? Math.Round(run.Pay * (1 + Career.HandBonus)) : run.Pay;
+                    Check(!career.Active.Contains(run) && career.Docked?.Name == "Mars orbit" && shown && Math.Abs(got - want) < 1e-6
+                          && paid == career.Notes.Exists(n => n.Text.Contains("by hand")),
+                        $"helm taken {from} × the dock range out ({range * from:N0} km), docked in orbit: {got:N0} cr, {(paid ? "flown-in-by-hand bonus" : "no bonus")}{(shown ? "" : ", job card wrong")}");
+                    career.Active.Remove(run);
+                    career.Notes.Clear();
+                }
             }
 
             // 6. the career save round-trips (through JSON only: the player's own save slot is left alone)

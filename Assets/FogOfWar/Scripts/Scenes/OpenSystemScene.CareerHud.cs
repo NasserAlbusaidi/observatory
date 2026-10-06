@@ -122,6 +122,12 @@ namespace FogOfWar
         public string TestRouteCallReport() => $"call {career.Call?.Title ?? "none"} about {(career.Active.Count > 0 ? career.Active[0].Title + " to " + career.Active[0].To : "no job")}, docked {career.Docked?.Name ?? "-"}, " +
             $"card {callCard.resolvedStyle.display} opacity {callCard.resolvedStyle.opacity:F2} at {callCard.layout}, on screen {callCard.layout.yMax <= callCard.parent.layout.height && callCard.layout.y >= 0}" +
             (lessonCard.resolvedStyle.display == DisplayStyle.Flex ? $", above the lesson {callCard.layout.yMax <= lessonCard.layout.y}" : "");
+        // review shots: a cargo run to Mars on the Jobs page, so the flown-in-by-hand line shows; false takes it off
+        public void TestHandJob(bool on)
+        {
+            career.Active.RemoveAll(c => c.Key == "qa/hand-shot");
+            if (on) career.Active.Add(new Contract { Id = 900003, Kind = JobKind.Cargo, Title = "Reactor parts", From = "Earth orbit", To = "Mars orbit", Tonnes = 40, Pay = 52000, IssuedJd = jd, DeadlineJd = jd + 30, Days = 30, Key = "qa/hand-shot" });
+        }
         public void TestRouteCallClear() { if (career.Call != null) career.Answer(false, jd); }
 
         // review shots: a payday of `cr` credits the way Complete makes one (credits and a JobPaid note), in career mode;
@@ -226,8 +232,14 @@ namespace FogOfWar
                     double expressLeft = j.ExpressJd - jd;
                     if (j.ExpressJd > 0 && expressLeft >= 0)
                         Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done in {Days(expressLeft)}", "t-label", "f-mono", "ok");
-                    Ui.L(card, left >= 0 ? "Due in " + Days(left) : "LATE by " + Days(-left), "t-label", "f-mono", left >= 0 ? "dim" : "warn");
                     var body = career.TargetOf(j);
+                    if (body != null && left >= 0 && career.CanFlyInByHand(j))
+                    {
+                        // green while the pilot has the helm and it counts
+                        Ui.L(card, $"Flown in by hand +{j.Pay * Career.HandBonus:N0} cr: nav computer off from {Km(Career.DockRange(body))} out to the dock",
+                            "t-label", "f-mono", career.HandArrival(j) ? "ok" : "dim");
+                    }
+                    Ui.L(card, left >= 0 ? "Due in " + Days(left) : "LATE by " + Days(-left), "t-label", "f-mono", left >= 0 ? "dim" : "warn");
                     var row = Ui.E(card, "row");
                     row.style.marginTop = 6;
                     var st = Ui.B(row, "Set target", () => { if (body != null) SetTarget(body); }, "small");

@@ -86,6 +86,10 @@ namespace FogOfWar.OpenWorld
         // 2–14 % of the pay, so the bonus is worth a harder burn, and a bigger drive makes the window with a longer coast.
         public const double ExpressBonus = 0.25;
         const double ExpressG = 1, ExpressMargin = 1.15;
+        // Flown in by hand: a cargo or passenger job that docks or lands with the nav computer off, the helm taken
+        // outside the destination's dock range, pays this much more. The autopilot parks with its plan still on, so it
+        // never earns this; the pilot who brakes into orbit or sets down on the surface does.
+        public const double HandBonus = 0.15;
 
         public double Credits = 25000, Earned;
         public int DriveLevel, TankLevel, Done, Failed;
@@ -150,6 +154,7 @@ namespace FogOfWar.OpenWorld
         public void Tick(SolarSystem sys, Ship ship, double jd, double simDt)
         {
             this.ship = ship; this.jd = jd;
+            TrackHelm(sys, ship, jd);
             StartSpan(ship, jd, simDt);
             Apply(ship);
             Notes.RemoveAll(n => UnityEngine.Time.realtimeSinceStartup - n.Time > 8);
@@ -264,13 +269,37 @@ namespace FogOfWar.OpenWorld
         void Complete(Contract c, double jd, string what)
         {
             if (FinallyExpired(c, jd)) return; // Expire fails it; nothing pays after the final cutoff (#24)
-            double pay = PayAt(c, jd, out bool late, out bool express);
+            double pay = PayAt(c, jd, out bool late, out bool express), expressExtra = pay - c.Pay;
+            double hand = !late && HandArrival(c) ? Math.Round(c.Pay * HandBonus) : 0;
+            pay += hand;
             Credits += pay; Earned += pay; Done++;
             Active.Remove(c);
             RemoveDerelict(c);
             if (c.Kind == JobKind.Rescue || c.Kind == JobKind.Intercept) DropWarp = true;
             Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid,
-                $"{what}: +{pay:N0} cr" + (Spoiled(c, jd) ? " (cargo spoiled, half pay)" : "") + (late ? " (late, half pay)" : express ? $" (express bonus +{pay - c.Pay:N0} cr)" : ""));
+                $"{what}: +{pay:N0} cr" + (Spoiled(c, jd) ? " (cargo spoiled, half pay)" : "") + (late ? " (late, half pay)" : express ? $" (express bonus +{expressExtra:N0} cr)" : "") +
+                (hand > 0 ? $" (flown in by hand +{hand:N0} cr)" : ""));
+        }
+
+        // Where the pilot took the helm: the target and its distance when the nav plan last stopped (none while a plan flies).
+        Body helmTarget;
+        double helmKm;
+        void TrackHelm(SolarSystem sys, Ship ship, double jd)
+        {
+            if (ship.PlanActive || ship.Target == null) { helmTarget = null; return; }
+            if (ship.Target == helmTarget) return;
+            helmTarget = ship.Target;
+            helmKm = (ship.Pos - sys.Pos(helmTarget, jd)).Mag;
+        }
+
+        // A job the pay on arrival would count as flown in by hand: the nav computer off now, the helm taken outside the
+        // destination's dock range. Only jobs paid on a dock: rescues, intercepts and surveys pay on a rendezvous or a scan; the first-flight job teaches the autopilot.
+        public bool CanFlyInByHand(Contract c) => !c.Tutorial && (c.Kind == JobKind.Cargo || c.Kind == JobKind.Passengers);
+        public bool HandArrival(Contract c)
+        {
+            if (!CanFlyInByHand(c) || ship == null || ship.PlanActive) return false;
+            var dest = TargetOf(c);
+            return dest != null && helmTarget == dest && helmKm >= DockRange(dest);
         }
 
         // What a job pays if it is done at jd: the express bonus inside its window, half pay after the deadline.
