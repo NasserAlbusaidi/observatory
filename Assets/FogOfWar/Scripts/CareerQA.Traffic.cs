@@ -19,6 +19,21 @@ namespace FogOfWar
             return string.Join(",", n);
         }
 
+        // the ships in one set and not the other, with their departure and arrival in hours from jd
+        static string Diff(Traffic a, Traffic b, double jd)
+        {
+            var d = new List<string>();
+            void One(Traffic x, Traffic y, string sign)
+            {
+                var names = new HashSet<string>();
+                foreach (var t in y.Flying) names.Add(t.Name);
+                foreach (var t in x.Flying)
+                    if (!names.Contains(t.Name)) d.Add($"{sign}{t.Name} {t.From.Name}>{t.To.Name} dep {(t.Dep - jd) * 24:+0.00;-0.00} h arr {(t.Arr - jd) * 24:+0.00;-0.00} h");
+            }
+            One(a, b, "+"); One(b, a, "-");
+            return string.Join("; ", d);
+        }
+
         IEnumerator TrafficChecks()
         {
             var qs = SolarSystem.Build(); // a system of its own, so the checks add no ships to the scene's
@@ -34,6 +49,17 @@ namespace FogOfWar
             }
             string a1 = Trips(new Traffic(qs, 1)), a2 = Trips(new Traffic(qs, 1)), b1 = Trips(new Traffic(qs, 2));
             Check(a1.Length > 0 && a1 == a2 && a1 != b1, "traffic: the same seed and day give the same trips, another seed gives others");
+
+            // A reset looks back LookbackDays for the ships still in flight, so no trip may take longer. One day a week over
+            // a Jupiter–Saturn synodic period (about 20 years) meets their widest spacing.
+            var scan = new Traffic(qs, 1);
+            Traffic.Trip longest = null;
+            var swScan = Stopwatch.StartNew();
+            for (long d = day0; d < day0 + 20 * 366; d += 7)
+                foreach (var t in scan.Day(d))
+                    if (longest == null || t.Arr - t.Dep > longest.Arr - longest.Dep) longest = t;
+            Check(longest != null && longest.Arr - longest.Dep < Traffic.LookbackDays,
+                $"traffic: the longest trip in 20 years ({longest?.From.Name} > {longest?.To.Name}, {longest?.Name}) takes {(longest != null ? longest.Arr - longest.Dep : 0):F1} days, inside the {Traffic.LookbackDays:0}-day lookback ({swScan.Elapsed.TotalMilliseconds:F0} ms)");
 
             // the cost of a trip: drawing it, its Rail and the cheap clearance test
             var cost = new Traffic(qs, 3);
@@ -107,7 +133,8 @@ namespace FogOfWar
             bool inSys = live != null;
             if (live != null) foreach (var t in live.Flying) inSys &= t.Body != null && sys.Bodies.Contains(t.Body);
             Check(live != null && live.Flying.Count > 0 && inSys && Names(live) == Names(check),
-                $"traffic: the scene's ships in flight after 5 s at 1M× match the schedule ({live?.Flying.Count ?? 0} ships, all in the system; {sceneFrames} frames)");
+                $"traffic: the scene's ships in flight after 5 s at 1M× match the schedule ({live?.Flying.Count ?? 0} ships, {(inSys ? "all" : "not all")} in the system; {sceneFrames} frames)"
+                + (live != null && Names(live) != Names(check) ? $" (scene against schedule: {Diff(live, check, jd)})" : ""));
             check.Clear();
         }
 
