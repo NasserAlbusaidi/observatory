@@ -335,7 +335,7 @@ namespace FogOfWar
                 if (scanned) foreach (var f in Codex.Facts(b.Name)) GUILayout.Label("• " + f, ui.note);
                 else
                 {
-                    string sale = career.Sandbox ? "" : $" First data sells for {Codex.DataValue(sys, b, jd):N0} cr.";
+                    string sale = career.Sandbox ? "" : $" First data sells for {cx.SaleValue(sys, b, jd):N0} cr.";
                     if (cx.ScanTarget == b.Name && cx.ScanProgress > 0)
                         GUILayout.Label($"Scanning: {Fmt.Num(100 * cx.ScanProgress / cx.ScanSeconds, 0)} %. Keep the drive off within {Km(cx.ScanRange(b))}.{sale}", ui.label);
                     else GUILayout.Label($"Scan: stay within {Km(cx.ScanRange(b))} with the drive off for {Dur(cx.ScanSeconds)}.{sale}", ui.note);

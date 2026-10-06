@@ -207,9 +207,9 @@ namespace FogOfWar.OpenWorld
             if (q <= 0) return;
             Codex.ScanProgress += q;
             if (Codex.ScanProgress < Codex.ScanSeconds) return;
+            double v = Codex.SaleValue(sys, t, jd); // before it joins Scanned and counts against its own market
             Codex.Scanned.Add(t.Name); Codex.Visited.Add(t.Name);
             if (Sandbox) { Say(Happening.Scanned, "Codex: " + t.Name + " scanned"); return; }
-            double v = Codex.DataValue(sys, t, jd);
             Credits += v; Earned += v;
             Say(Happening.Scanned, $"Codex: {t.Name} scanned. First data sold: +{v:N0} cr");
         }

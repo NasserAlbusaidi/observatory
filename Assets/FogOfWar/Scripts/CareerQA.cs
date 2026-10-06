@@ -418,6 +418,37 @@ namespace FogOfWar
             cx.Visited.Clear(); cx.Scanned.Clear(); cx.Achieved.Clear();
             career.FromSave(JsonUtility.FromJson<CareerSave>(cj), ship);
             Check(cx.Visited.Count == nv && cx.Scanned.Count == ns && cx.Achieved.Count == na, "codex and achievements survive a save");
+
+            // 8b. the data market: each first scan in a system sells for less than the one before, other systems unaffected
+            {
+                var saturn = sys["Saturn"];
+                var moons = sys.Bodies.FindAll(o => o.Parent == saturn && !Career.IsCraft(o) && !cx.Scanned.Contains(o.Name));
+                var jovian = sys.Bodies.Find(o => o.Parent == sys["Jupiter"] && !Career.IsCraft(o) && !cx.Scanned.Contains(o.Name));
+                var rock = sys.Bodies.Find(o => o.Asteroid && !cx.Scanned.Contains(o.Name));
+                var keep = new System.Collections.Generic.List<string>(cx.Scanned);
+                cx.Scanned.Clear();
+                double first = cx.SaleValue(sys, moons[0], jd), jFirst = cx.SaleValue(sys, jovian, jd);
+                for (int i = 1; i <= 3; i++) cx.Scanned.Add(moons[i].Name);
+                double fourth = cx.SaleValue(sys, moons[0], jd), jAfter = cx.SaleValue(sys, jovian, jd);
+                Check(Math.Abs(fourth - Math.Round(Codex.DataValue(sys, moons[0], jd) * 0.512 / 10) * 10) < 1e-6 && fourth < first && jAfter == jFirst
+                      && Codex.Market(sys, rock) == sys.Sun && Codex.Market(sys, moons[0]) == saturn && Codex.Share(40) == Codex.MarketFloor,
+                    $"{moons[0].Name} sells for {first:N0} cr, {fourth:N0} cr after 3 other Saturn scans; {jovian.Name} {jFirst:N0} → {jAfter:N0} cr; {rock.Name} sells to the asteroid market");
+                // what every first scan in the game is worth, sold in the order the bodies are listed
+                cx.Scanned.Clear();
+                double all = 0, uncapped = 0, inSaturn = 0;
+                var sold = new System.Collections.Generic.Dictionary<Body, int>();
+                foreach (var o in sys.Bodies)
+                {
+                    if (o.Parent == null || Career.IsCraft(o)) continue;
+                    var m = Codex.Market(sys, o);
+                    sold.TryGetValue(m, out int k); sold[m] = k + 1;
+                    double v = Codex.DataValue(sys, o, jd), sale = Math.Round(v * Codex.Share(k) / 10) * 10;
+                    all += sale; uncapped += v;
+                    if (m == saturn) inSaturn += sale;
+                }
+                log.WriteLine($"  codex data market: every first scan sells for {all:N0} cr in all ({uncapped:N0} uncapped), the Saturn system {inSaturn:N0} cr; all upgrades cost {Career.DriveCost[1] + Career.DriveCost[2] + Career.MaxTankLevel * Career.TankCost + Codex.SensorCost:N0} cr");
+                cx.Scanned.UnionWith(keep);
+            }
             career.Sandbox = false;
             Put("cruiseIdx", 0);
             Call("SetTarget", sys["Titan"]);
