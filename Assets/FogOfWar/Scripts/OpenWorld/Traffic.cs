@@ -28,8 +28,9 @@ namespace FogOfWar.OpenWorld
         // is the runners'.
         static readonly int[] PerDay = { 2, 1, 2, 1, 1, 1, 1, 1, 1 };
         const double DistPower = 0.25, DriveG = Career.RunnerG;
-        // longer than the longest trip (Earth to Saturn across the Sun, about 23 days), so a reset finds every ship in flight
-        public const double LookbackDays = 25;
+        // longer than the longest trip, so a reset finds every ship in flight: Jupiter to Saturn across the Sun, both at
+        // aphelion, is 15.6 AU and 27.6 days [calc]
+        public const double LookbackDays = 30;
         static readonly string[] Hulls = { "courier", "packet", "liner", "freighter", "tanker", "hauler" }; // the Fleet.json classes
 
         readonly SolarSystem sys;
