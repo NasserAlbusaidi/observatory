@@ -11,8 +11,9 @@ namespace FogOfWar
     public partial class OpenSystemScene
     {
         static readonly string[] HoldNames = { "Off", "Prograde", "Retrograde", "Normal", "Anti-normal", "Radial out", "Radial in", "Target", "Anti-target", "Flip 180°" };
-        static readonly string[] PlanShort = { "", "Fast", "Match velocity", "Hold station" };
-        static readonly string[] PlanNames = { "", "Fast (full burn)", "Match velocity", "Hold station" };
+        // indexed by (int)Plan; the pickers list their plans by hand, so Pursue (a pirate's) is never offered
+        static readonly string[] PlanShort = { "", "Fast", "Match velocity", "Hold station", "Pursue" };
+        static readonly string[] PlanNames = { "", "Fast (full burn)", "Match velocity", "Hold station", "Pursue" };
 
         // ---------------------------------------------------------------- pilot input (polled every frame)
 
