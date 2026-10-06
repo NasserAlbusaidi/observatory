@@ -133,6 +133,16 @@ namespace FogOfWar
             Check(!sh.PlanActive && sh.Throttle == 0 && sh.ThrottleCmd == 0 && warp == 0, $"QA cut during autopilot: plan {sh.Plan}, throttle {sh.Throttle}, warp index {warp}");
         }
 
+        static void FlightLogCheck(SimScene s)
+        {
+            var path = (string)s.GetType().GetField("recPath", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            string text = "";
+            if (path != null && File.Exists(path))
+                using (var r = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))) text = r.ReadToEnd();
+            Check(text.Contains(" MARK ") && text.Contains(" R jd=") && text.Contains("hold: Prograde -> Off") && text.Contains("hold: Custom -> Off") && text.Contains("keys=Flip"),
+                $"QA flight log: {path}, {text.Length} chars");
+        }
+
         static object Ship(SimScene s) => s.GetType().GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(s);
         static object PivotShip(SimScene s) => Enum.ToObject(s.GetType().GetNestedType("Pivot", BindingFlags.NonPublic), 0);
         static void Invoke(object o, string method, params object[] args)
@@ -206,9 +216,14 @@ namespace FogOfWar
                 ("throttle-full", s => Controls.Tap(Controls.Action.ThrottleFull), 2f),
                 ("throttle-cut", s => Controls.Tap(Controls.Action.ThrottleCut), 1f),
                 ("rcs-forward", s => Controls.Hold(Controls.Action.RcsForward, true), 2f),
-                ("rcs-release", s => { Controls.Hold(Controls.Action.RcsForward, false); Invoke(s, "SetHold", OpenWorld.Hold.Off); }, 1f),
+                // RCS translation keeps the hold; a rotation key ends it
+                ("rcs-release", s => { Controls.Hold(Controls.Action.RcsForward, false); Check(((OpenWorld.Ship)Ship(s)).Hold == OpenWorld.Hold.Prograde, $"QA RCS under a hold: hold {((OpenWorld.Ship)Ship(s)).Hold}"); Controls.Hold(Controls.Action.YawLeft, true); }, 0.5f),
+                ("stick-drops-hold", s => { Controls.Hold(Controls.Action.YawLeft, false); Check(((OpenWorld.Ship)Ship(s)).Hold == OpenWorld.Hold.Off, $"QA stick over a hold: hold {((OpenWorld.Ship)Ship(s)).Hold}"); }, 2f),
                 ("flip", s => { flipFrom = ((OpenWorld.Ship)Ship(s)).Heading; Controls.Tap(Controls.Action.Flip); }, 8f),
-                ("flip-check", s => { var h = ((OpenWorld.Ship)Ship(s)).Heading; Debug.LogWarning($"QA flip: nose turned {Math.Acos(Math.Max(-1, Math.Min(1, OpenWorld.D3.Dot(h, flipFrom)))) * 180 / Math.PI:F1} deg (hold {((OpenWorld.Ship)Ship(s)).Hold}, plan {((OpenWorld.Ship)Ship(s)).Plan}, warp {s.GetType().GetField("warpIdx", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(s)}, angvel {((OpenWorld.Ship)Ship(s)).AngVel.magnitude:F2})"); }, 0.5f),
+                ("flip-check", s => { var h = ((OpenWorld.Ship)Ship(s)).Heading; Debug.LogWarning($"QA flip: nose turned {Math.Acos(Math.Max(-1, Math.Min(1, OpenWorld.D3.Dot(h, flipFrom)))) * 180 / Math.PI:F1} deg (hold {((OpenWorld.Ship)Ship(s)).Hold}, plan {((OpenWorld.Ship)Ship(s)).Plan}, warp {s.GetType().GetField("warpIdx", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(s)}, angvel {((OpenWorld.Ship)Ship(s)).AngVel.magnitude:F2})"); Check(OpenWorld.D3.Dot(h, flipFrom) < -0.99 && ((OpenWorld.Ship)Ship(s)).Hold == OpenWorld.Hold.Off, $"QA flip ends on arrival: hold {((OpenWorld.Ship)Ship(s)).Hold}"); }, 0.5f),
+                // the flight recorder: F8 bookmarks the session file, which by now holds the hold and flip changes above
+                ("flight-log-mark", s => Controls.Tap(Controls.Action.MarkLog), 1f),
+                ("flight-log-check", s => FlightLogCheck(s), 0.5f),
                 ("cam-orbit", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
                 ("cam-cockpit", s => Controls.Tap(Controls.Action.CameraMode), 1.5f),
                 // the cabin: red high-g lighting under a 3 g burn, then a look round the interior

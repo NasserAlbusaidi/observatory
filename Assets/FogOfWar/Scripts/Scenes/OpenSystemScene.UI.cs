@@ -44,6 +44,12 @@ namespace FogOfWar
             if (!Ctl.Locked)
                 for (int i = 0; i < 9; i++)
                     if (Input.GetKeyDown(KeyCode.Alpha1 + i)) SetHold((Hold)i);
+            // steering in the chase view brings the camera back behind the ship: seen from the bow, yaw and pitch look mirrored
+            if (ship.RotInput.sqrMagnitude > 0 && pivot == Pivot.Ship && camMode == CamMode.Chase)
+            {
+                chaseYaw = Mathf.MoveTowardsAngle(chaseYaw, 0, 240 * dt);
+                chasePitch = Mathf.MoveTowards(chasePitch, ChasePitch0, 120 * dt);
+            }
             // warping with the stick or RCS held makes no sense: drop to 1× while flying by hand
             if (ship.ManualInput && warpIdx > 0) warpIdx = 0;
         }
@@ -125,8 +131,10 @@ namespace FogOfWar
         {
             if (pivot != Pivot.Ship) { SetPivot(Pivot.Ship, 0.16); camMode = CamMode.Chase; return; }
             camMode = camMode == CamMode.Chase ? CamMode.Orbit : camMode == CamMode.Orbit ? CamMode.Cockpit : CamMode.Chase;
-            lookYaw = lookPitch = 0;
+            ResetLook();
         }
+
+        void ResetLook() { lookYaw = lookPitch = 0; chaseYaw = 0; chasePitch = ChasePitch0; }
 
         public override bool HandleDrag(Vector2 delta, int button)
         {
@@ -319,10 +327,7 @@ namespace FogOfWar
             if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "approximate (JPL fits: Jul 2000 – Jun 2099)", Tone.Bad));
             if (ship.Target != null)
             {
-                var tp = sys.Pos(ship.Target, jd);
-                var r = tp - ship.Pos;
-                var vr = ship.Vel - sys.Vel(ship.Target, jd);
-                double closing = D3.Dot(vr, r.Norm);
+                TargetRel(out var r, out var vr, out double closing);
                 list.Add(new Readout("Target", ship.Target.Name + (ship.Target.SizeEstimated ? " (size unknown, shown 2 km)" : ""), Tone.Hot));
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
@@ -378,7 +383,7 @@ namespace FogOfWar
             for (int i = 0; i < Gs.Length; i++) gl[i] = (Math.Abs(ship.MaxG - Gs[i]) < 1e-6 ? "● " : "") + Fmt.Num(Gs[i], 1) + " g" + (Gs[i] >= 10 ? " (juice: fictional)" : "");
             int gi = ui.Buttons(gl);
             if (gi >= 0) ship.MaxG = Gs[gi];
-            ship.FlightAssist = ui.Toggle("Flight assist (" + Ctl.Keys(A.FlightAssist) + "): stop rotating when the stick is released", ship.FlightAssist);
+            ship.FlightAssist = ui.Toggle("Flight assist (" + Ctl.Keys(A.FlightAssist) + "): the stick sets the turn rate; release it to stop", ship.FlightAssist);
             int fb = ui.Buttons("Flip 180° (" + Ctl.Keys(A.Flip) + ")", "Kill rotation");
             if (fb == 0) Flip();
             if (fb == 1) { ship.AngVel = Vector3.zero; ship.Hold = Hold.Off; }
@@ -419,7 +424,7 @@ namespace FogOfWar
             if (wi >= 0) warpIdx = wi;
             int ci = ui.Buttons((pivot == Pivot.Ship && camMode == CamMode.Chase ? "● " : "") + "Chase", (pivot == Pivot.Ship && camMode == CamMode.Orbit ? "● " : "") + "Orbit ship",
                 (pivot == Pivot.Ship && camMode == CamMode.Cockpit ? "● " : "") + "Cockpit", (pivot == Pivot.Target ? "● " : "") + "Target", (pivot == Pivot.Sun ? "● " : "") + "System map");
-            if (ci >= 0 && ci <= 2) { SetPivot(Pivot.Ship, 0.16); camMode = (CamMode)(ci == 0 ? 0 : ci == 1 ? 1 : 2); lookYaw = lookPitch = 0; Cam.fieldOfView = 55; }
+            if (ci >= 0 && ci <= 2) { SetPivot(Pivot.Ship, 0.16); camMode = (CamMode)(ci == 0 ? 0 : ci == 1 ? 1 : 2); ResetLook(); Cam.fieldOfView = 55; }
             if (ci == 3 && ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4);
             if (ci == 4) { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
             beltView.Visible = ui.Toggle("Show the asteroid belt (a 1 % sample: real rocks are ~1 million km apart)", beltView.Visible);

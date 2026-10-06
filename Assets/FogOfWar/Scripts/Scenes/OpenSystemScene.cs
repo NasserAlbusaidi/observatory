@@ -52,7 +52,8 @@ namespace FogOfWar
         enum Pivot { Ship, Target, Sun }
         enum CamMode { Chase, Orbit, Cockpit }
         CamMode camMode = CamMode.Chase;
-        float chaseYaw, chasePitch = 14, lookYaw, lookPitch;
+        const float ChasePitch0 = 14;
+        float chaseYaw, chasePitch = ChasePitch0, lookYaw, lookPitch;
         Pivot pivot;
         double camDist = 0.15;
         float yaw = 30, pitch = 12;
@@ -391,6 +392,7 @@ namespace FogOfWar
             lighting?.Dispose();
             lighting = null;
             Bloom.Enable(Cam, false);
+            RecorderClose();
         }
 
         // ---------------------------------------------------------------- simulation
@@ -468,6 +470,7 @@ namespace FogOfWar
             if (warpIdx != lastWarpIdx) { lastWarpIdx = warpIdx; limitedAt = -10; effectiveWarp = Warps[warpIdx]; }
             reference = Ship.Dominant(sys, ship.Pos, jd);
             TickCareer(achieved);
+            RecorderTick(dt, steps);
         }
 
         // #25: an impact above Ship.SafeTouchdown ends the flight. The last save comes back (under the active
