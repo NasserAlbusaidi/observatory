@@ -94,11 +94,11 @@ namespace FogOfWar
                 case Lesson.Turn:
                     return $"First flight {Step(Lesson.Turn)}. Turn the ship: {Ctl.Keys(A.PitchUp)} / {Ctl.Keys(A.PitchDown)} pitch, {Ctl.Keys(A.YawLeft)} / {Ctl.Keys(A.YawRight)} yaw, {Ctl.Keys(A.RollLeft)} / {Ctl.Keys(A.RollRight)} roll. Drag the mouse to look around.";
                 case Lesson.Assist:
-                    return $"{Step(Lesson.Assist)} Let go. Flight assist uses the reaction wheels to stop the rotation; they run on power, so turning costs no reaction mass. With assist off, the ship keeps turning, as Newton says.";
+                    return $"{Step(Lesson.Assist)} Let go. With flight assist on, the keys set how fast you turn, and the reaction wheels stop the ship when you release them; they run on power, so turning costs no reaction mass. With assist off, the ship keeps turning, as Newton says.";
                 case Lesson.Burn:
                     return $"{Step(Lesson.Burn)} A short burn: {Ctl.Keys(A.ThrottleFull)} for full throttle, then {Ctl.Keys(A.ThrottleCut)} to cut it. At 1 g you gain 9.8 m/s every second, and every second costs reaction mass.";
                 case Lesson.Hold:
-                    return $"{Step(Lesson.Hold)} Press 2 to hold prograde: the nose follows your velocity. Keys 1–9 pick the other holds; 1 turns the hold off.";
+                    return $"{Step(Lesson.Hold)} Press 2 to hold prograde: the nose follows your velocity. Keys 1–9 pick the other holds; 1 turns the hold off, and so does turning by hand.";
                 case Lesson.Target:
                     return $"{Step(Lesson.Target)} Your first job: medical supplies to Luna. Set the Moon as the target: press {Ctl.Keys(A.NextTarget)} until it shows, click its label, or use Set target in the panel.";
                 case Lesson.Engage:
