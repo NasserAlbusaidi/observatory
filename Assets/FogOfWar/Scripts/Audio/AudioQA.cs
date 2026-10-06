@@ -190,8 +190,10 @@ namespace FogOfWar
         IEnumerator Sliders()
         {
             (float rms, float peak) on = default, off = default;
-            Note("sliders: drive at full burn in the cockpit");
+            Note("sliders: drive at full burn in the cockpit, cabin bed muted");
             Put("camMode", 2);
+            // the cabin bed and its random creaks would set the floor of the drive-off window, not the drive
+            GameSettings.Music = 0;
             Controls.Tap(Controls.Action.ThrottleFull);
             yield return new WaitForSecondsRealtime(1.5f);
             yield return Meter(1f, l => on = l);
@@ -210,6 +212,7 @@ namespace FogOfWar
             GameSettings.Master = 0.8f;
             Note($"meter: Master at 40 % {off.rms:F1} dBFS RMS");
             Check(Mathf.Abs(off.rms - (on.rms - 6.02f)) < 2, "Master slider at half level lowers the mix by about 6 dB");
+            GameSettings.Music = 0.6f;
 
             Controls.Tap(Controls.Action.ThrottleCut);
             yield return new WaitForSecondsRealtime(3f);
