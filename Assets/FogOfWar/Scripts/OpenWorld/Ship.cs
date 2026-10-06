@@ -435,7 +435,9 @@ namespace FogOfWar.OpenWorld
         // when the steering opposes comp: a 2 g pirate behind a 1 g ship burning away could brake at only 1 g against a
         // curve that assumed 1.7 g, and flew past it at 16 km/s (pirate spike, S2b). Here steering gets all the drive has
         // left along it, and the braking curve all it has left along the braking line. With nothing left (|comp| ≥ AMax)
-        // the pirate only matches: one of the same g behind a ship at full burn does not close, so burning harder escapes.
+        // the pirate only matches: a hand burn at exactly its g leaves it no spare, and one of the same g behind the
+        // autopilot's full burn closes only on Budget's reserve (about 4e-4 g), so burning harder escapes. The curve
+        // counts on the target's present thrust: a target that cuts its drive or flips under it takes that spare away.
         public const double PursueMargin = 0.85; // [design] the braking curve's share of that spare, as Brachistochrone's
 
         D3? Pursue(SolarSystem sys, double jd, D3 r, double dist, D3 vrel, D3 comp, double tau)
