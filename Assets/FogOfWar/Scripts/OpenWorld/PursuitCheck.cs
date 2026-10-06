@@ -15,8 +15,10 @@ namespace FogOfWar.OpenWorld
     {
         public const double Jd0 = 2461316.5; // 2026-10-03 TDB, as FogOfWarEphemCheck
         const double SampleS = 60, DomS = 60, SteadyS = 600, PreHoldS = 600;
-        // the pre-registered gates (header): G2 range change, G3 catch time over the closed form, G4 stand-in velocity error
-        public const double GateRange = 0.02, GateCatch = 1.2, GateVel = 1e-4;
+        const double DwellCapS = 30; // Career.Intercept credits at most 30 s of dwell per frame
+        // the pre-registered gates (header): G2 range change, G3 catch time over the closed form, G4 stand-in velocity
+        // error, G5 range change against a hand burn at the pirate's own g
+        public const double GateRange = 0.02, GateCatch = 1.2, GateVel = 1e-4, GateHand = 0.001;
         static readonly double[] SmallHs = { 1.0 / 60, 0.05 }, Hs = { 1, 5 }, Spans = { 30, 50 }, ProbeHs = { 1.0 / 60, 0.05, 1, 5, 30 };
 
         struct Init { public Ship Player; public D3 PiratePos, PirateVel; public double PirateG, Jd; }
@@ -28,6 +30,8 @@ namespace FogOfWar.OpenWorld
             public Body Centre;   // the body the player is at (pirate altitude, dock time), or null
             public bool TrackDock;
             public double BurnG;  // S5: the player's hand burns once the pirate is alongside (0: none)
+            public string Evade;  // S2b-cut, S2b-flip: "cut" or "flip" once the range falls under EvadeKm (null: none)
+            public double EvadeKm;
             public Func<Init> Make;
         }
 
@@ -36,17 +40,21 @@ namespace FogOfWar.OpenWorld
             public string Id, What;
             public double H, PirateG, Rs = Pursuit.Radius;
             public Plan Plan;
-            public double FirstAlong = -1, Longest, EntryVrel, SteadyVrelMax, SteadyVrelMed = double.NaN, MedRangeAlong = double.NaN;
-            public double MinRange = double.MaxValue, MinRangeT, Range0, EndRange, Dv, ErrVel, Gap, UsPirate, ClosedForm = double.NaN;
-            public double MinAlt = double.MaxValue, DockT = -1, AlongAtDock, AlongTotalAtDock, CatchT = -1, BurnStart = -1;
-            public int Stale, Breaks, Rebounds, Spans, SubSteps, ClimbIn, TurnIn;
+            public double FirstAlong = -1, Capture = -1, Longest, EntryVrel, SteadyVrelMax, SteadyVrelMed = double.NaN, MedRangeAlong = double.NaN;
+            public double MinRange = double.MaxValue, MinRangeT, MinRangeVrel = double.NaN, Range0, EndRange, Dv, ErrVel, Gap, UsPirate, ClosedForm = double.NaN;
+            public double MinAlt = double.MaxValue, DockT = -1, AlongAtDock, AlongTotalAtDock, CatchT = -1, BurnStart = -1, PeakVrel, SteadyPreDock;
+            // S2b-cut, S2b-flip: when the player acted, at what range and closing speed; the pass that followed (closest
+            // approach inside a pirate step and the relative speed there) and how far the pirate then ran past
+            public double EvadeT = -1, EvadeRange, EvadeClosing, PassRange = double.NaN, PassVrel = double.NaN, Apex = double.NaN;
+            public int Stale, Breaks, Rebounds, Spans, SubSteps, ClimbIn, TurnIn, TurnInPreDock;
             public bool EarlyStop;
             public readonly Dictionary<string, double> Phases = new Dictionary<string, double>();
             public readonly List<double> Minima = new List<double>();
             public string Note = "";
             public bool Holds => Longest >= Threat.BoardingSeconds;
             public double RangeChange => Math.Abs(EndRange - Range0) / Range0;
-            public bool Caught => FirstAlong >= 0 && FirstAlong <= GateCatch * ClosedForm;
+            // the start of the first hold that lasts 600 s, not the first alongside: that can be an overshoot's apex under 500 km
+            public bool Caught => Capture >= 0 && Capture <= GateCatch * ClosedForm;
         }
 
         static void Echo(TextWriter w, string line)
@@ -67,27 +75,49 @@ namespace FogOfWar.OpenWorld
             "Coast() is a private instance method of OpenSystemScene and needs the scene, so it cannot be called here. The copy keeps its chunk rule,",
             "Rails.Propagate with halving, Pos/Vel from the dominant body at the chunk's end, Turn, and a planned ship's 1 ms re-check Step. It leaves out",
             "FirstSurfaceHit and CheckTouchdown (Near is empty) and looks the dominant body up every 60 s, not every chunk.",
+            "The integrate branch steps the whole frame and leaves out OpenSystemScene.SubstepSize. No run here would split differently: above 0.25 s",
+            "the attitude slews by MaxRate h and leaves AngVel 0, so the 0.05 s rotation cap never applies; the plan term 0.05 d/v is over 21 s on every",
+            "powered leg (S2 toward Mars; S3 on the 0.85 g curve, d/v >= 435 s); the orbit term is over 53 s at Vesta; at h <= 0.05 s the step is the frame.",
             "Stand-in radius Rs = 0.05 km (Pursuit.Radius): the pirate holds 1.05 km off. Pirate from Pursuit's constructor: UnlimitedFuel, CruiseCap 0,",
             "Att facing the player, Obstacles by the scene's rule (Parent != null, Radius >= 100), Near empty.",
             "Measures. alongside = |pirate.Pos - player.Pos| < 500 km AND |pirate.Vel - player.Vel| < 0.1 km/s, from the two Ships at each span end.",
-            " hold = the span lengths summed while alongside, reset to 0 on any break; breaks = on-to-off transitions (the run's counter).",
-            " minRng = the least distance inside every pirate step: the pirate on the quadratic through its step's ends, the player on the stand-in path.",
-            " entryVrel = max |vrel| in the first 600 s of each hold; steady = max/median |vrel| in holds after their first 600 s.",
+            " hold = the boarding clock: Career.Intercept's min(frame, 30 s) per frame, as span time x min(1, 30 s / h) while alongside, reset to 0 on",
+            "   any break (span time for h <= 30 s, 0.6 of it at h = 50 s); breaks = on-to-off transitions (the run's counter).",
+            " capt = the start of the first alongside spell that lasts 600 s of sim time. first = the first alongside span end, which can be the apex of",
+            "   an overshoot that turns round under 500 km.",
+            " minRng = the least distance inside every pirate step: the pirate on the quadratic through its step's ends, the player on the stand-in path;",
+            "   vMin = the relative speed there. gap = the largest distance between the quadratic's end and the player's actual end of a span.",
+            " entryVrel = max |vrel| in the first 600 s of each spell; steady = max/median |vrel| in spells after their first 600 s.",
             " errVel = |sys.Vel(stand-in, j) - (v0 + a t)| at every pirate step start j. stale = sys.Pos(stand-in, j) != its path at j.",
             " Runs with h < 1 s stop once a hold reaches 7800 s (7200 s plus a 600 s steady window).",
+            " S5: the pirate is alongside when the burns start, so a loss of contact at the first burn counts as a break; peak vrel = max |vrel| in burns.",
+            "G1 at h < 1 s passes by the alongside rule only. Coast() (the scene's, so the copy's) propagates the raw chunk while jd advances by the chunk",
+            "rounded to its 40 us grid, so a coasting player's conic drifts against the pirate's clock: about 11 m/s at 1/60 s and 3.6 m/s at 0.05 s at",
+            "18.6 km/s heliocentric. The hold is then a limit cycle (steady vrel, turn entries). S4 here is the drive off (Plan.None) at Pallas, not the",
+            "design's plan-on 'in orbit' at Vesta, which Coast()'s 1 ms re-check moves. PR 5b fixes Coast() and reruns S1, S4 and that S4 at 1/60 s.",
             "",
-            "PRE-REGISTERED VERDICT RULE (committed before the first run of the scenarios):",
+            "PRE-REGISTERED VERDICT RULE. Committed in 25ea354 before the first run of the scenarios. AMENDED after review, in the commit that adds this",
+            "paragraph, before any run of the amended check. Each amendment tightens a gate or restates one; none loosens a gate: G1's hold is the",
+            "boarding clock; G3 times the lasting hold, not the first alongside, and adds the 7200 s hold; G4 adds no stale reads; G5 is new; G2's",
+            "limit is unchanged and now says where it came from.",
             " G1  S1 and S4 (Pallas) with Pursue hold >= 7200 s continuously in every run: h = 1/60, 0.05, 1, 5 s and spans of 30 and 50 s (12 runs).",
-            " G2  S2a with Pursue at h = 1 and 5 s: |range(6 h) - range(0)| / range(0) < 2 %.",
-            " G3  S2b with Pursue at h = 0.05, 1 and 5 s: first alongside <= 1.2 x the closed form, and minRng >= Rs over the whole run.",
+            " G2  S2a with Pursue at h = 1 and 5 s: |range(6 h) - range(0)| / range(0) < 2 %. Not a blind prediction. The player's autopilot burns",
+            "     through Budget, which keeps back what cancels the target's gravity, so it accelerates a little under 1 g (comp/AMax 0.9996 in the",
+            "     trace), and the pirate closes on that reserve alone, about 4e-4 g (comp is along the line of sight, so Share does what Budget does;",
+            "     the range falls with t^2). The 2 % limit was set from the spike's measured 1.75 % for this scenario.",
+            " G3  S2b with Pursue at h = 0.05, 1 and 5 s: capt <= 1.2 x the closed form, minRng >= Rs over the whole run, and hold >= 7200 s.",
             "     Closed form: rest-to-rest relative motion along the line of sight, closing at a1 = Ship.Spare(comp0, +los, AMax) and braking at",
             "     a2 = 0.85 Ship.Spare(comp0, -los, AMax); comp0 = the stand-in's acceleration less the pirate's gravity in the first span, los the",
             "     line of sight at t = 0, d = range(0) - standoff: v^2 = 2 d a1 a2 / (a1 + a2), t = v / a1 + v / a2. For a 1 g target and a 2 g",
             "     pirate 50,000 km back on its thrust line: a1 = 1 g, a2 = 2.55 g, t = 3768 s, gate 4521 s.",
-            " G4  errVel < 1e-4 km/s in every run and in the probe.",
-            " VERDICT pass if G1, G2, G3 and G4 all hold, else fail. Exit code 0 on pass, 1 on fail.",
-            " Report only: S4v (Vesta) and S4r (Pallas, in-plane start), S3, S5, and S1 on Plan.Brachistochrone (first alongside against the",
-            " spike's 6650 s at h = 1 and 5).",
+            " G4  errVel < 1e-4 km/s in every run and in the probe, and 0 stale reads over all runs.",
+            " G5  S2h with Pursue at h = 1 and 5 s: range change < 0.1 % in 6 h. A 1 g pirate 50,000 km behind a 1 g hand burn (no plan, a held",
+            "     heading, throttle 1) at relative rest has no spare drive: |comp| = AMax to within the gravity gradient (about 3e-8 g), so it only",
+            "     matches ('matching its burn', or Share with a spare near 0). Burning at the pirate's own g escapes. Closed form: under 0.1 km in 6 h.",
+            " VERDICT pass if G1, G2, G3, G4 and G5 all hold, else fail. Exit code 0 on pass, 1 on fail.",
+            " Report only: S2b-cut and S2b-flip (under 10,000 km the player cuts the drive, or flips and burns at the pirate: the pass and the run-out),",
+            " S4v (Vesta), S4r (Pallas, in-plane start), S3 (S3m-2g, 375,000 km out, tests the 2 g boarding band), S5 (S5-1g also at 1/60 s, S5-2g",
+            " also at 1/60 and 0.05 s), and S1 on Plan.Brachistochrone (first alongside and hold against the spike's).",
         };
 
         static D3 TangentOf(D3 p, D3 v) { var r = p.Norm; return (v - r * D3.Dot(v, r)).Norm; }
@@ -147,6 +177,15 @@ namespace FogOfWar.OpenWorld
                 return new Init { Player = pl, PiratePos = pl.Pos - pl.Heading * 5e4, PirateVel = pl.Vel, PirateG = g, Jd = jd };
             }
 
+            // as Accelerating, then by hand: full throttle on the heading it had, no plan, so no Budget holds any drive back
+            Init HandBurn(double g)
+            {
+                var i = Accelerating(g);
+                var pl = i.Player;
+                pl.Plan = Plan.None; pl.Hold = Hold.Custom; pl.CustomDir = pl.Heading; pl.ThrottleCmd = 1;
+                return i;
+            }
+
             // braking into Vesta on its 0.85 g curve from 600,000 km at 100 km/s; the pirate at rest relative to Vesta,
             // `out` km out on the approach line and 20,000 km along-track
             Init Braking(double g, double out_)
@@ -161,13 +200,16 @@ namespace FogOfWar.OpenWorld
             list.Add(new Scenario { Id = "S4v", What = "as S4 at Vesta (a port; 788.1 km)", Duration = 10 * 3600, Centre = vesta, Make = () => Parked(vesta, true) });
             list.Add(new Scenario { Id = "S4r", What = "as S4 with the pirate on the Pallas->player line, in the orbit plane", Duration = 10 * 3600, Centre = pallas, Make = () => Parked(pallas, false) });
             list.Add(new Scenario { Id = "S2a", What = "player 1 g brachistochrone to Mars; 1 g pirate 50,000 km behind on its thrust line, at relative rest", Duration = 6 * 3600, Make = () => Accelerating(1) });
+            list.Add(new Scenario { Id = "S2h", What = "as S2a, but the player burns 1 g by hand on its heading (no plan); 1 g pirate", Duration = 6 * 3600, Make = () => HandBurn(1) });
             list.Add(new Scenario { Id = "S2b", What = "as S2a with a 2 g pirate", Duration = 10 * 3600, Make = () => Accelerating(2) });
-            foreach (var (tag, out_) in new[] { ("n", 1.5e5), ("l", 3e5) })
-                foreach (var g in new[] { 1.0, 2.0 })
+            list.Add(new Scenario { Id = "S2b-cut", What = "as S2b; under 10,000 km the player cuts the drive (the scene's CutDrive)", Duration = 10 * 3600, Evade = "cut", EvadeKm = 1e4, Make = () => Accelerating(2) });
+            list.Add(new Scenario { Id = "S2b-flip", What = "as S2b; under 10,000 km the player flips and burns 1 g at the pirate (Flip, full throttle)", Duration = 10 * 3600, Evade = "flip", EvadeKm = 1e4, Make = () => Accelerating(2) });
+            foreach (var (tag, out_, gs) in new[] { ("n", 1.5e5, new[] { 1.0, 2.0 }), ("l", 3e5, new[] { 1.0, 2.0 }), ("m", 3.75e5, new[] { 2.0 }) })
+                foreach (var g in gs)
                     list.Add(new Scenario
                     {
                         Id = $"S3{tag}-{g:F0}g", Duration = 6 * 3600, Centre = vesta, TrackDock = true, Make = () => Braking(g, out_),
-                        What = $"player braking into Vesta from 600,000 km at 100 km/s; {g:F0} g pirate at rest relative to Vesta, {out_ / 1000:F0},000 km out on the approach line, 20,000 km along-track",
+                        What = $"player braking into Vesta from 600,000 km at 100 km/s; {g:F0} g pirate at rest relative to Vesta, {out_:N0} km out on the approach line, 20,000 km along-track",
                     });
             foreach (var g in new[] { 1.0, 2.0, 3.0 })
                 list.Add(new Scenario { Id = $"S5-{g:F0}g", What = $"S1 with a 3 g pirate; once alongside {PreHoldS:F0} s, the player burns {g:F0} g by hand and flips every 1800 s for 6 h", Duration = 4 * 3600, BurnG = g, Make = () => Coasting(3) });
@@ -203,8 +245,10 @@ namespace FogOfWar.OpenWorld
 
         // Least distance between the pirate (on the quadratic through its step's ends) and the player (on the stand-in's
         // path) over one pirate step of h seconds that starts t seconds into the span; skipped when it cannot beat `best`.
-        static double Closest(Pursuit pu, double t, double h, D3 pp, D3 vp, D3 pp1, double best)
+        // speed: the relative speed at that point, when it beats `best`.
+        static double Closest(Pursuit pu, double t, double h, D3 pp, D3 vp, D3 pp1, double best, out double speed)
         {
+            speed = double.NaN;
             D3 r0 = pp - pu.PlayerPos(t), w0 = vp - pu.PlayerVel(t);
             D3 ar = (pp1 - pp - vp * h) * (2 / (h * h)) - pu.StandIn.PathAccel(0);
             if (r0.Mag - w0.Mag * h - 0.5 * ar.Mag * h * h > best) return best;
@@ -218,7 +262,10 @@ namespace FogOfWar.OpenWorld
                 double m1 = lo + (hi - lo) * 0.382, m2 = lo + (hi - lo) * 0.618;
                 if (R2(m1) < R2(m2)) hi = m2; else lo = m1;
             }
-            return Math.Min(best, Math.Sqrt(Math.Min(bv, R2(0.5 * (lo + hi)))));
+            double sm = 0.5 * (lo + hi), vm = R2(sm), s = bv <= vm ? h * bi / K : sm, d = Math.Sqrt(Math.Min(bv, vm));
+            if (d >= best) return best;
+            speed = (w0 + ar * s).Mag;
+            return d;
         }
 
         // One scenario at frame length h with the pirate on the given plan. raw (optional) gets the trace.
@@ -248,9 +295,12 @@ namespace FogOfWar.OpenWorld
             var steady = new List<double>();
             // S5: metrics start with the first burn; everything else from t = 0
             double t0 = sc.BurnG > 0 ? -1 : 0, nextFlip = 0, pre = 0, maxRange = 0;
-            double along = 0, alongTotal = 0, ext = res.Range0;
+            double along = 0, alongTotal = 0, ext = res.Range0, spell = 0, spellStart = 0;
             bool on = false, falling = true, stop = false;
             int events = 0;
+            // S2b-cut, S2b-flip: 0 before the player acts, 1 closing on the pass, 2 running past it, 3 done
+            int ev = 0;
+            double evMin = double.MaxValue, evMinV = double.NaN, evMinS = double.MaxValue;
             raw?.WriteLine($"RUN {sc.Id} {plan} h={h0:G4} | {sc.What} | range0 {res.Range0:F0} km");
             raw?.WriteLine("        t_s     range_km   vrel_kms  thr    along_s  comp/AMax  pirate phase | player phase");
             while (t < end - 1e-9 && !stop)
@@ -261,6 +311,15 @@ namespace FogOfWar.OpenWorld
                     if (pl.ThrottleCmd == 0) { pl.MaxG = sc.BurnG; pl.ThrottleCmd = 1; }
                     else { pl.Plan = Plan.None; pl.CustomDir = -pl.Heading; pl.Hold = Hold.Custom; }
                     nextFlip += 1800;
+                }
+                if (sc.Evade != null && ev == 0 && (pi.Pos - pl.Pos).Mag < sc.EvadeKm)
+                {
+                    var rel = pl.Pos - pi.Pos;
+                    ev = 1; res.EvadeT = t; res.EvadeRange = rel.Mag; res.EvadeClosing = D3.Dot(pi.Vel - pl.Vel, rel.Norm);
+                    // the scene's CutDrive(); or SetThrottle(1) then Flip(): a full burn while it slews to the reverse heading
+                    if (sc.Evade == "cut") { pl.ThrottleCmd = 0; pl.Throttle = 0; pl.Plan = Plan.None; pl.Phase = "drive cut"; }
+                    else { pl.ThrottleCmd = 1; pl.Plan = Plan.None; pl.Phase = "pilot override"; pl.CustomDir = -pl.Heading; pl.Hold = Hold.Custom; }
+                    raw?.WriteLine($"  EVENT t={t:F0} player {(sc.Evade == "cut" ? "cuts the drive" : "flips and burns at the pirate")} (range {res.EvadeRange:F1} km, closing {res.EvadeClosing:F2} km/s)");
                 }
                 double simDt = h0;
                 while (simDt > 1e-9)
@@ -302,12 +361,13 @@ namespace FogOfWar.OpenWorld
                         double hp = (j2 - j) * 86400;
                         if (t0 >= 0)
                         {
-                            double m = Closest(pu, tj, hp, pp, vp, pi.Pos, res.MinRange);
-                            if (m < res.MinRange) { res.MinRange = m; res.MinRangeT = t - t0 + tj; }
+                            double m = Closest(pu, tj, hp, pp, vp, pi.Pos, res.MinRange, out var sp);
+                            if (m < res.MinRange) { res.MinRange = m; res.MinRangeT = t - t0 + tj; res.MinRangeVrel = sp; }
+                            if (ev == 1) { double me = Closest(pu, tj, hp, pp, vp, pi.Pos, evMin, out var se); if (me < evMin) { evMin = me; evMinV = se; } }
                             res.Phases.TryGetValue(pi.Phase, out var ph);
                             res.Phases[pi.Phase] = ph + hp;
                             if (pi.Phase.StartsWith("climbing") && !ph0.StartsWith("climbing")) res.ClimbIn++;
-                            if (pi.Phase == "turning" && ph0 != "turning") res.TurnIn++;
+                            if (pi.Phase == "turning" && ph0 != "turning") { res.TurnIn++; if (res.DockT < 0) res.TurnInPreDock++; }
                         }
                         j = j2;
                     }
@@ -320,20 +380,30 @@ namespace FogOfWar.OpenWorld
                     if (t0 < 0)
                     {
                         pre = now ? pre + h : 0;
-                        if (pre >= PreHoldS) { t0 = t; res.CatchT = t - pre; res.BurnStart = t; nextFlip = t; end = t + 6 * 3600; ext = range; }
+                        // alongside now, so a loss of contact when the burns start is a break
+                        if (pre >= PreHoldS) { t0 = t; res.CatchT = t - pre; res.BurnStart = t; nextFlip = t; end = t + 6 * 3600; ext = range; on = true; }
                         continue;
                     }
                     double tm = t - t0;
+                    if (sc.BurnG > 0) res.PeakVrel = Math.Max(res.PeakVrel, vrel);
                     if (now)
                     {
-                        if (!on && events++ < 40) raw?.WriteLine($"  EVENT t={tm:F0} alongside starts (range {range:F2} km, vrel {vrel:F4} km/s)");
+                        if (!on)
+                        {
+                            spell = 0; spellStart = tm;
+                            if (events++ < 40) raw?.WriteLine($"  EVENT t={tm:F0} alongside starts (range {range:F2} km, vrel {vrel:F4} km/s)");
+                        }
                         if (res.FirstAlong < 0) res.FirstAlong = tm;
-                        along += h; alongTotal += h;
+                        spell += h;
+                        double credit = h * Math.Min(1, DwellCapS / h0); // the boarding clock (header)
+                        along += credit; alongTotal += credit;
                         res.Longest = Math.Max(res.Longest, along);
-                        if (along <= SteadyS) res.EntryVrel = Math.Max(res.EntryVrel, vrel);
+                        if (res.Capture < 0 && spell >= SteadyS) res.Capture = spellStart;
+                        if (spell <= SteadyS) res.EntryVrel = Math.Max(res.EntryVrel, vrel);
                         else
                         {
                             res.SteadyVrelMax = Math.Max(res.SteadyVrelMax, vrel);
+                            if (sc.TrackDock && res.DockT < 0) res.SteadyPreDock = Math.Max(res.SteadyPreDock, vrel);
                             if (t >= nextSteady) { steady.Add(vrel); nextSteady = t + 1; } // a 1 s sample, for the median
                         }
                         alongRanges.Add(range);
@@ -346,6 +416,14 @@ namespace FogOfWar.OpenWorld
                         along = 0;
                     }
                     on = now;
+                    if (ev == 1)
+                    {
+                        // the pass ends when the range climbs 10 % + 5 km off its least value (as a rebound below), or alongside
+                        evMinS = Math.Min(evMinS, range);
+                        if (now) ev = 3; else if (range > evMinS * 1.1 + 5) { ev = 2; res.Apex = range; }
+                        if (ev > 1) { res.PassRange = evMin; res.PassVrel = evMinV; }
+                    }
+                    else if (ev == 2) { res.Apex = Math.Max(res.Apex, range); if (now || range < res.Apex * 0.9 - 5) ev = 3; }
                     maxRange = Math.Max(maxRange, range);
                     // a rebound: the range climbs 10 % + 5 km off a minimum before it falls again (overshoot, orbiting)
                     if (falling) { if (range < ext) ext = range; else if (range > ext * 1.1 + 5) { res.Rebounds++; if (res.Minima.Count < 6) res.Minima.Add(ext); falling = false; ext = range; } }
@@ -379,15 +457,21 @@ namespace FogOfWar.OpenWorld
             if (alongRanges.Count > 0) { alongRanges.Sort(); res.MedRangeAlong = alongRanges[alongRanges.Count / 2]; }
             if (steady.Count > 0) { steady.Sort(); res.SteadyVrelMed = steady[steady.Count / 2]; }
             if (res.MinRange == double.MaxValue) res.MinRange = double.NaN;
+            if (ev == 1) { res.PassRange = evMin; res.PassVrel = evMinV; }
             if (sc.Id.StartsWith("S2")) res.Note += $"range {res.Range0:F0}->{res.EndRange:F0} km ({(res.EndRange - res.Range0) / res.Range0 * 100:+0.00;-0.00}%); ";
+            if (res.EvadeT >= 0)
+                res.Note += $"{(sc.Evade == "cut" ? "drive cut" : "flip")} at {res.EvadeT:F0} s ({res.EvadeRange:F0} km, closing {res.EvadeClosing:F2} km/s), " +
+                    $"pass {res.PassRange:F3} km at {res.PassVrel:F2} km/s{(double.IsNaN(res.Apex) ? "" : $", out to {res.Apex:F0} km")}; ";
             if (sc.TrackDock) res.Note += res.DockT < 0 ? "player never docks; " : $"player docks at {res.DockT:F0} s, alongside then {res.AlongAtDock:F0} s continuous, {res.AlongTotalAtDock:F0} s total; ";
-            if (sc.BurnG > 0 && res.CatchT >= 0) res.Note += $"caught at {res.CatchT:F0} s, burns from {res.BurnStart:F0} s; max range in burns {maxRange:F2} km; ";
+            if (sc.TrackDock) res.Note += $"before the dock: steady vrel max {res.SteadyPreDock:E1} km/s, {res.TurnInPreDock} turn entries; ";
+            if (sc.BurnG > 0 && res.CatchT >= 0) res.Note += $"caught at {res.CatchT:F0} s, burns from {res.BurnStart:F0} s; max range in burns {maxRange:F2} km, peak vrel {res.PeakVrel:F4} km/s; ";
             if (sc.Centre != null) res.Note += $"pirate min alt over {sc.Centre.Name} {res.MinAlt:F0} km; ";
             if (res.Rebounds > 0) res.Note += $"minima {string.Join("/", res.Minima.Select(m => m.ToString("F1")))} km; ";
             if (res.EarlyStop) res.Note += "stopped at hold 7800 s; ";
             res.Note += $"end: pirate '{pi.Phase}', player '{pl.Phase}'";
-            raw?.WriteLine($"END {sc.Id} {plan} h={h0:G4} | first {res.FirstAlong:F0} s, longest {res.Longest:F0} s, breaks {res.Breaks}, min range {res.MinRange:F3} km at {res.MinRangeT:F0} s, " +
-                $"spans {res.Spans}, pirate steps {res.SubSteps}, stale {res.Stale}, errVel {res.ErrVel:E2} | {res.Note}");
+            raw?.WriteLine($"END {sc.Id} {plan} h={h0:G4} | first {res.FirstAlong:F0} s, capture {res.Capture:F0} s, longest {res.Longest:F0} s, breaks {res.Breaks}, " +
+                $"min range {res.MinRange:F3} km at {res.MinRangeT:F0} s ({res.MinRangeVrel:F4} km/s), spans {res.Spans}, pirate steps {res.SubSteps}, stale {res.Stale}, " +
+                $"errVel {res.ErrVel:E2}, gap {res.Gap:E2} km | {res.Note}");
             raw?.WriteLine();
             raw?.Flush();
             return res;
@@ -432,7 +516,7 @@ namespace FogOfWar.OpenWorld
         public static double Probe(TextWriter t) => Probe(SolarSystem.Build(), t);
 
         static string Row(params string[] c) =>
-            $"{c[0],-3} {c[1],-6} {c[2],-5} {c[3],6} {c[4],7} {c[5],6} {c[6],9} {c[7],-4} {c[8],4} {c[9],8} {c[10],17} {c[11],7} {c[12],9} {c[13],9} {c[14],7} {c[15],6} {c[16],4} {c[17],5} {c[18],8} {c[19],5} {c[20],6} {c[21],-9} {c[22],-40} {c[23]}";
+            $"{c[0],-3} {c[1],-8} {c[2],-5} {c[3],6} {c[4],7} {c[5],7} {c[6],6} {c[7],9} {c[8],-4} {c[9],4} {c[10],9} {c[11],17} {c[12],7} {c[13],9} {c[14],8} {c[15],9} {c[16],7} {c[17],6} {c[18],4} {c[19],5} {c[20],8} {c[21],8} {c[22],5} {c[23],6} {c[24],-9} {c[25],-40} {c[26]}";
 
         static string Format(int n, Result r)
         {
@@ -445,11 +529,14 @@ namespace FogOfWar.OpenWorld
             var ph = tot > 0 ? string.Join(" ", r.Phases.OrderByDescending(kv => kv.Value).Select(kv => $"{P(kv.Key)}{kv.Value * 100 / tot:F0}")) : "-";
             bool any = r.FirstAlong >= 0;
             return Row(n.ToString(), r.Id, r.Plan == Plan.Pursue ? "Purs" : "Brach", r.H.ToString("G3"), any ? r.FirstAlong.ToString("F0") : "never",
+                r.Capture >= 0 ? r.Capture.ToString("F0") : "never",
                 double.IsNaN(r.ClosedForm) || double.IsInfinity(r.ClosedForm) ? "-" : r.ClosedForm.ToString("F0"), r.Longest.ToString("F0"), r.Holds ? "YES" : "no", r.Breaks.ToString(),
                 any ? r.EntryVrel.ToString("F4") : "-", r.SteadyVrelMax > 0 ? $"{r.SteadyVrelMax:E1}/{r.SteadyVrelMed:E1}" : "-",
-                double.IsNaN(r.MedRangeAlong) ? "-" : r.MedRangeAlong.ToString("F2"), r.MinRange.ToString("F3"), r.EndRange.ToString("F1"),
+                double.IsNaN(r.MedRangeAlong) ? "-" : r.MedRangeAlong.ToString("F2"), r.MinRange.ToString("F3"),
+                double.IsNaN(r.MinRangeVrel) ? "-" : r.MinRangeVrel.ToString("F4"), r.EndRange.ToString("F1"),
                 (100 * (r.EndRange - r.Range0) / r.Range0).ToString("+0.00;-0.00"), r.Dv.ToString("F1"), r.Rebounds.ToString(), r.Stale.ToString(),
-                r.ErrVel.ToString("E1"), r.UsPirate.ToString("F0"), (r.SubSteps / (double)Math.Max(r.Spans, 1)).ToString("F2"), $"c{r.ClimbIn}/t{r.TurnIn}", ph, r.Note);
+                r.ErrVel.ToString("E1"), r.Gap.ToString("E1"), r.UsPirate.ToString("F0"), (r.SubSteps / (double)Math.Max(r.Spans, 1)).ToString("F2"),
+                $"c{r.ClimbIn}/t{r.TurnIn}", ph, r.Note);
         }
 
         public static int Run(TextWriter table, TextWriter raw)
@@ -461,15 +548,18 @@ namespace FogOfWar.OpenWorld
             Echo(table, "");
             var runs = new List<(string id, double h, Plan plan)>();
             foreach (var id in new[] { "S1", "S4" }) foreach (var h in SmallHs.Concat(Hs).Concat(Spans)) runs.Add((id, h, Plan.Pursue));
-            foreach (var h in Hs) runs.Add(("S2a", h, Plan.Pursue));
+            foreach (var id in new[] { "S2a", "S2h" }) foreach (var h in Hs) runs.Add((id, h, Plan.Pursue));
             foreach (var h in new[] { 0.05 }.Concat(Hs)) runs.Add(("S2b", h, Plan.Pursue));
-            foreach (var id in new[] { "S4v", "S4r", "S3n-1g", "S3n-2g", "S3l-1g", "S3l-2g", "S5-1g", "S5-2g", "S5-3g" }) foreach (var h in Hs) runs.Add((id, h, Plan.Pursue));
+            foreach (var id in new[] { "S2b-cut", "S2b-flip", "S4v", "S4r", "S3n-1g", "S3n-2g", "S3l-1g", "S3l-2g", "S3m-2g", "S5-1g", "S5-2g", "S5-3g" })
+                foreach (var h in Hs) runs.Add((id, h, Plan.Pursue));
+            runs.Add(("S5-1g", SmallHs[0], Plan.Pursue));
+            foreach (var h in SmallHs) runs.Add(("S5-2g", h, Plan.Pursue));
             foreach (var h in Hs) runs.Add(("S1", h, Plan.Brachistochrone));
             var scenarios = Scenarios(sys);
-            foreach (var sc in scenarios.Where(s => runs.Any(r => r.id == s.Id))) Echo(table, $"  {sc.Id,-6} {sc.What}");
+            foreach (var sc in scenarios.Where(s => runs.Any(r => r.id == s.Id))) Echo(table, $"  {sc.Id,-8} {sc.What}");
             Echo(table, "");
-            Echo(table, Row("run", "scen", "plan", "h_s", "first_s", "cf_s", "longest_s", "hold", "brk", "entryVrel", "steadyVrel max/med", "medRng", "minRng_km",
-                "endRng_km", "rng%", "dv", "reb", "stale", "errVel", "us/st", "st/sp", "climb/trn", "phases (% of time)", "notes"));
+            Echo(table, Row("run", "scen", "plan", "h_s", "first_s", "capt_s", "cf_s", "longest_s", "hold", "brk", "entryVrel", "steadyVrel max/med", "medRng", "minRng_km",
+                "vMin_kms", "endRng_km", "rng%", "dv", "reb", "stale", "errVel", "gap_km", "us/st", "st/sp", "climb/trn", "phases (% of time)", "notes"));
             var results = new List<Result>();
             var total = Stopwatch.StartNew();
             foreach (var (id, h, plan) in runs)
@@ -498,17 +588,24 @@ namespace FogOfWar.OpenWorld
             bool g2 = s2a.Count == 2 && s2a.All(r => r.RangeChange < GateRange);
             Echo(t, $"  G2 S2a: {Each(s2a, r => $"{r.RangeChange * 100:F2} %")} (gate < {GateRange * 100:F0} %): {(g2 ? "PASS" : "FAIL")}");
             var s2b = Of("S2b").ToList();
-            bool g3 = s2b.Count == 3 && s2b.All(r => r.Caught && r.MinRange >= r.Rs);
-            Echo(t, $"  G3 S2b: {Each(s2b, r => $"first {(r.FirstAlong < 0 ? "never" : r.FirstAlong.ToString("F0"))} s against {GateCatch} x {r.ClosedForm:F0} = {GateCatch * r.ClosedForm:F0} s, minRng {r.MinRange:F3} km")}: {(g3 ? "PASS" : "FAIL")}");
+            bool g3 = s2b.Count == 3 && s2b.All(r => r.Caught && r.MinRange >= r.Rs && r.Holds);
+            Echo(t, $"  G3 S2b: {Each(s2b, r => $"capt {(r.Capture < 0 ? "never" : r.Capture.ToString("F0"))} s (first {(r.FirstAlong < 0 ? "never" : r.FirstAlong.ToString("F0"))} s) against {GateCatch} x {r.ClosedForm:F0} = {GateCatch * r.ClosedForm:F0} s, minRng {r.MinRange:F3} km, hold {r.Longest:F0} s")}: {(g3 ? "PASS" : "FAIL")}");
             double worst = Math.Max(probe, rs.Max(r => r.ErrVel));
-            bool g4 = worst < GateVel;
-            Echo(t, $"  G4 worst stand-in velocity error {worst:E2} km/s (probe {probe:E2}; gate < {GateVel:E0}): {(g4 ? "PASS" : "FAIL")}");
-            Echo(t, $"  stale stand-in reads: {rs.Sum(r => r.Stale)} in {rs.Sum(r => r.SubSteps):N0} pirate steps");
+            int stale = rs.Sum(r => r.Stale);
+            bool g4 = worst < GateVel && stale == 0;
+            Echo(t, $"  G4 worst stand-in velocity error {worst:E2} km/s (probe {probe:E2}; gate < {GateVel:E0}); stale reads {stale} in {rs.Sum(r => r.SubSteps):N0} pirate steps (gate 0): {(g4 ? "PASS" : "FAIL")}");
+            var s2h = Of("S2h").ToList();
+            bool g5 = s2h.Count == 2 && s2h.All(r => r.RangeChange < GateHand);
+            Echo(t, $"  G5 S2h: {Each(s2h, r => $"{r.Range0:F1} -> {r.EndRange:F1} km ({r.RangeChange * 100:F4} %)")} (gate < {GateHand * 100:F1} %): {(g5 ? "PASS" : "FAIL")}");
+            foreach (var id in new[] { "S2b-cut", "S2b-flip" })
+                Echo(t, $"  {id} (report): {Each(Of(id), r => r.EvadeT < 0 ? "never under the trigger range" : $"at {r.EvadeT:F0} s, {r.EvadeRange:F0} km, closing {r.EvadeClosing:F2} km/s; pass {r.PassRange:F3} km at {r.PassVrel:F2} km/s{(double.IsNaN(r.Apex) ? "" : $", out to {r.Apex:F0} km")}; capt {(r.Capture < 0 ? "never" : r.Capture.ToString("F0") + " s")}, hold {r.Longest:F0} s")}");
             var brach = Of("S1", Plan.Brachistochrone).ToList();
-            Echo(t, $"  S1 on Brachistochrone (report): {Each(brach, r => $"first {r.FirstAlong:F0} s (spike 6650 s), longest {r.Longest:F0} s")}");
-            foreach (var id in new[] { "S3n-1g", "S3n-2g", "S3l-1g", "S3l-2g" })
-                Echo(t, $"  {id} (report): {Each(Of(id), r => r.DockT < 0 ? "player never docks" : $"dock {r.DockT:F0} s, first alongside {(r.FirstAlong < 0 ? "never" : r.FirstAlong.ToString("F0") + " s")}, alongside at dock {r.AlongAtDock:F0} s continuous, {r.AlongTotalAtDock:F0} s total")}");
-            bool pass = g1 && g2 && g3 && g4;
+            Echo(t, $"  S1 on Brachistochrone (report; spike, variant A, Rs 0.05: first 6650 s at h 1 and 5, longest 22152 s at h 1 and 22155 s at h 5): {Each(brach, r => $"first {r.FirstAlong:F0} s, longest {r.Longest:F0} s")}");
+            foreach (var id in new[] { "S3n-1g", "S3n-2g", "S3l-1g", "S3l-2g", "S3m-2g" })
+                Echo(t, $"  {id} (report): {Each(Of(id), r => r.DockT < 0 ? "player never docks" : $"dock {r.DockT:F0} s, first alongside {(r.FirstAlong < 0 ? "never" : r.FirstAlong.ToString("F0") + " s")}, alongside at dock {r.AlongAtDock:F0} s continuous, {r.AlongTotalAtDock:F0} s total{(r.AlongAtDock >= Threat.BoardingSeconds ? " (boards first)" : "")}")}");
+            foreach (var id in new[] { "S5-1g", "S5-2g", "S5-3g" })
+                Echo(t, $"  {id} (report): {Each(Of(id), r => r.CatchT < 0 ? "never caught" : $"peak vrel in the burns {r.PeakVrel:F4} km/s against {Career.InterceptKms} km/s, breaks {r.Breaks}, longest {r.Longest:F0} s")}");
+            bool pass = g1 && g2 && g3 && g4 && g5;
             Echo(t, $"  VERDICT: {(pass ? "pass" : "fail")}");
             return pass ? 0 : 1;
         }
