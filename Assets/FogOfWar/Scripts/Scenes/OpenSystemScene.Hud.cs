@@ -469,7 +469,7 @@ namespace FogOfWar
             r.style.marginTop = 6;
             swAssist = new Switch(ship.FlightAssist, v => ship.FlightAssist = v);
             r.Add(swAssist);
-            Ui.L(r, $"Flight assist ({UiShell.Keys(A.FlightAssist)}): stop rotating when the stick is released", "t-body");
+            Ui.L(r, $"Flight assist ({UiShell.Keys(A.FlightAssist)}): the stick sets the turn rate; release it to stop", "t-body");
             var row = Ui.E(c, "row", "wrap");
             row.style.marginTop = 6;
             Ui.B(row, "Flip 180°  " + UiShell.Keys(A.Flip), Flip);
@@ -573,7 +573,7 @@ namespace FogOfWar
 
         void SetCam(int ci)
         {
-            if (ci <= 2) { SetPivot(Pivot.Ship, 0.16); camMode = (CamMode)ci; lookYaw = lookPitch = 0; Cam.fieldOfView = 55; }
+            if (ci <= 2) { SetPivot(Pivot.Ship, 0.16); camMode = (CamMode)ci; ResetLook(); Cam.fieldOfView = 55; }
             if (ci == 3 && ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4);
             if (ci == 4) { SetPivot(Pivot.Sun, 6 * Frame.AU); pitch = 65; }
         }
