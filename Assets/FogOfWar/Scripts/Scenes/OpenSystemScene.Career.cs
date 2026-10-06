@@ -32,6 +32,35 @@ namespace FogOfWar
             if (Cam.GetComponent<AudioListener>() == null) Cam.gameObject.AddComponent<AudioListener>();
             sound = new ShipAudio(Root, o => Own(o)) { Muted = muted };
             if (!career.Sandbox) StartTutorial();
+            WatchCareer(fresh: true);
+        }
+
+        // Autosave at the career's milestones (a port reached, a job taken or paid, an upgrade) into the one save slot,
+        // so a crash never costs more than the last stop. A new career arms it only on reaching a port other than the
+        // one it starts at: New game clicked by mistake (or the tutorial's throttle blip, which undocks and redocks at
+        // Earth) leaves the old save alone. A loaded career is armed at once. The first ticks only find the dock the
+        // career starts or loads in, so they never save. The write waits for the end of the career tick.
+        bool autosaveArmed, autosaveDue;
+        string autosaveNote, homePort;
+        int careerTicks;
+        void WatchCareer(bool fresh)
+        {
+            autosaveArmed = !fresh; autosaveDue = false; autosaveNote = null; homePort = null; careerTicks = 0;
+            if (career.Sandbox) return;
+            career.OnEvent += (what, port) =>
+            {
+                if (careerTicks < 2) { if (what == Career.Happening.Docked) homePort = port; return; }
+                if (what == Career.Happening.Docked && port != homePort) autosaveArmed = true;
+                switch (what)
+                {
+                    case Career.Happening.Docked:
+                        if (autosaveArmed) autosaveNote = "Autosaved at " + port;
+                        goto case Career.Happening.Upgrade;
+                    case Career.Happening.JobAccepted: case Career.Happening.JobPaid: case Career.Happening.RescueDone:
+                    case Career.Happening.InterceptDone: case Career.Happening.SurveyDone: case Career.Happening.Upgrade:
+                        autosaveDue |= autosaveArmed; break;
+                }
+            };
         }
 
         ShipAudio sound;
@@ -188,6 +217,15 @@ namespace FogOfWar
             planTarget = ship.Target;
             planCruiseIdx = cruiseIdx;
             career.Tick(sys, ship, jd, simDt);
+            if (careerTicks < 2) careerTicks++;
+            if (autosaveDue)
+            {
+                autosaveDue = false;
+                WriteSave();
+                // only a port reached says so; a job taken or paid already has its own notice
+                if (autosaveNote != null) hudShell?.Toast(autosaveNote);
+                autosaveNote = null;
+            }
             // QA-041: a job ending out there, or a dry tank, drops time compression; a crossing caps it at 100×
             if (career.DropWarp) { warpIdx = 0; career.DropWarp = false; }
             if (career.TransferInProgress && warpIdx > 2) warpIdx = 2;

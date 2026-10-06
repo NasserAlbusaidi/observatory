@@ -42,6 +42,7 @@ namespace FogOfWar
         SolarSystem sys => Get<SolarSystem>("sys");
         double jd => Get<double>("jd");
         Career career => s.Career;
+        static string SaveKey => (string)typeof(OpenSystemScene).GetField("SaveKey", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
 
         void Check(bool ok, string what) { if (!ok) fails++; log.WriteLine((ok ? "  PASS " : "  FAIL ") + what); }
 
@@ -150,7 +151,9 @@ namespace FogOfWar
             Check(career.Active.Count == 1 && career.Active[0].Tutorial, "first job is the Luna run");
             yield return Shot("c01-start");
 
-            // 0. the first-flight lessons, done the way a player does them
+            // 0. the first-flight lessons, done the way a player does them. The burn lesson undocks and redocks at Earth:
+            // a new career must not autosave over the old save for that
+            string oldSave = PlayerPrefs.GetString(SaveKey);
             Check(s.TutorialText != null && s.TutorialText.StartsWith("First flight"), "tutorial starts on a new career");
             Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
             Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
@@ -161,6 +164,7 @@ namespace FogOfWar
             Call("SetHold", Hold.Prograde); yield return new WaitForSecondsRealtime(0.4f);
             Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/11)") && ship.Target?.Name == "Practice beacon",
                 "burn and prograde hold lessons pass; the practice beacon is the target");
+            Check(PlayerPrefs.GetString(SaveKey) == oldSave, "the burn lesson at Earth does not autosave over the old save");
             Call("SetHold", Hold.Off);
             // #27: the beacon practice is optional, so the Trip below (which targets the Moon) skips it
 
@@ -170,6 +174,7 @@ namespace FogOfWar
             yield return Trip(sys.Moon, 0, "Earth → Moon full burn", () => career.Docked?.Name == "Luna" && ship.Phase == "in orbit", moonWarp, 60);
             State("at Luna");
             Check(career.Docked?.Name == "Luna", "docked at Luna after the autopilot parks");
+            Check(PlayerPrefs.GetString(SaveKey) != oldSave && PlayerPrefs.GetString(SaveKey).Length > 0, "reaching Luna autosaves");
             Check(sys["Practice beacon"] == null, "retargeting ended the practice and removed the beacon");
             Check(career.Credits - c0 >= 3000, $"first job paid ({career.Credits - c0:N0} cr)");
             Check(s.TutorialText == null, "tutorial ends with the first job");
@@ -507,12 +512,20 @@ namespace FogOfWar
                 else log.WriteLine("  (rescue not accepted: Continue check skipped)");
             }
 
-            // #25: a slow touchdown lands; a fast one destroys the ship, and the last save (a Luna parking orbit) comes back
+            // #25: a slow touchdown lands; a fast one destroys the ship, and the last save comes back. Landing at Luna (a
+            // port) autosaves, so that save is the landing, not the parking orbit saved by hand before it.
             {
                 app.Restart(app.GameIndex);
                 yield return new WaitForSecondsRealtime(1f);
                 s = (OpenSystemScene)app.Current;
                 Put("warpIdx", 0);
+                string saveKey = SaveKey;
+                string kept = PlayerPrefs.GetString(saveKey);
+                var first = career.Board.Count > 0 ? career.Board[0] : null;
+                if (first != null) career.Accept(first, jd);
+                yield return null; yield return null;
+                Check(first != null && career.Active.Contains(first) && PlayerPrefs.GetString(saveKey) == kept,
+                    "a new career still docked at Earth does not autosave over the old save (a job accepted)");
                 var moon = sys.Moon;
                 var up = new D3(1, 0, 0);
                 ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Landed = null;
@@ -522,13 +535,15 @@ namespace FogOfWar
                 yield return Fly(() => ship.Landed != null, 0, 20);
                 Check(ship.Landed == moon && ship.Phase.StartsWith("landed") && ship.ImpactSpeed < Ship.SafeTouchdown,
                     $"a {ship.ImpactSpeed * 1000:F0} m/s touchdown lands ({ship.Phase})");
+                yield return null; yield return null;
+                Check(PlayerPrefs.GetString(saveKey).Contains("\"landed\":\"Moon\""), "landing at Luna, a port, autosaves");
                 ship.Landed = null;
                 ship.Pos = sys.Pos(moon, jd) + up * (Ship.SurfaceRadius(moon, up) + 50); ship.Vel = sys.Vel(moon, jd) - up * 2;
                 yield return Fly(() => career.Notes.Exists(n => n.Text.StartsWith("Destroyed")), 1, 30);
                 Put("warpIdx", 0);
                 double alt = (ship.Pos - sys.Pos(moon, jd)).Mag;
-                Check(career.Notes.Exists(n => n.Text.StartsWith("Destroyed: hit Moon")) && ship.Landed == null && Math.Abs(alt - 5000) < 50,
-                    $"a 2 km/s impact destroys the ship and reloads the parking-orbit save ({alt:F0} km from Luna, {ship.Phase})");
+                Check(career.Notes.Exists(n => n.Text.StartsWith("Destroyed: hit Moon")) && ship.Landed == moon && Math.Abs(alt - Ship.SurfaceRadius(moon, up)) < 1,
+                    $"a 2 km/s impact destroys the ship and reloads the autosaved landing ({alt:F0} km from Luna's centre, {ship.Phase})");
             }
 
             // New game while a rescue is active: the rebuilt scene must not touch the old wreck's materials

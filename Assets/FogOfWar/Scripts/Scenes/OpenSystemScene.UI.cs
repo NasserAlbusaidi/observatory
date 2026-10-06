@@ -477,7 +477,7 @@ namespace FogOfWar
             int i = Array.IndexOf(args, "-fowsavekey");
             if (i >= 0 && i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
             // the unattended suites save and load too (the -fowqa "save" step): keep them off the player's save
-            foreach (var a in new[] { "-fowqa", "-fowcareer", "-fowtour" }) if (Array.IndexOf(args, a) >= 0) return "fow-save-qa";
+            foreach (var a in new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots" }) if (Array.IndexOf(args, a) >= 0) return "fow-save-qa";
             return "fow-save-v1";
         }
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
@@ -496,10 +496,15 @@ namespace FogOfWar
 
         public void SaveGame()
         {
+            WriteSave();
+            ship.Phase = "game saved";
+        }
+
+        void WriteSave()
+        {
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(ship.ToSave(jd, warpIdx)));
             SaveCareer();
             PlayerPrefs.Save();
-            ship.Phase = "game saved";
         }
 
         public void LoadGame()
@@ -516,6 +521,7 @@ namespace FogOfWar
             SetPivot(Pivot.Ship, 0.16);
             camMode = CamMode.Chase;
             LoadCareer();
+            WatchCareer(fresh: false);
             // rescue and intercept ships exist again only now: resolve the saved target after the career (a finished
             // job's ship is gone, so its target stays empty)
             ship.Target = string.IsNullOrEmpty(s.target) ? null : sys[s.target];
