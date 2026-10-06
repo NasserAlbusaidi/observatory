@@ -137,6 +137,7 @@ namespace FogOfWar.OpenWorld
                 {
                     Active.RemoveAt(i); Failed++; RemoveDerelict(c); DropWarp = true;
                     Say(Happening.JobFailed, $"Missed: the {c.To.Substring(RunnerPrefix.Length)} reached {c.RunTo}", false);
+                    ChangeStanding(c, -StandingLoss);
                     continue;
                 }
                 var b = sys[c.To];

@@ -430,6 +430,96 @@ namespace FogOfWar
                 career.Credits = bank; career.ShipPaid = paid0; career.Codex.Achieved.Remove("owner"); career.Notes.Clear();
             }
 
+            // 6c. standing (Career.Factions.cs): every port has an owner; the run's own jobs moved it; on time it goes up, late
+            // it stays, an abandon or an expiry takes more off; a new tier says so and reprices the day's board; a save keeps
+            // it and an old save loads neutral. Test jobs to the port the ship is docked at; the career is put back after
+            {
+                var keep = JsonUtility.ToJson(career.ToSave(ship));
+                var here = career.Docked;
+                Check(Career.PortAt("Earth orbit").Owner == Faction.Guard && Career.PortAt("Luna").Owner == Faction.Guard && Career.PortAt("Mars orbit").Owner == Faction.Tharsis
+                      && Career.PortAt("Vesta").Owner == Faction.Tharsis && Array.TrueForAll(new[] { "Ceres", "Ganymede", "Callisto", "Titan", "Enceladus" }, p => Career.PortAt(p).Owner == Faction.Compact),
+                    "every port has its owner: the Guard at Earth and Luna, Tharsis at Mars and Vesta, the Compact at the ice ports");
+                // jobs posted at Earth and Luna were paid (Guard); the distress rescue near Mars was taken on and dropped (Tharsis)
+                Check(career.Standing(Faction.Guard) > 0 && career.Standing(Faction.Tharsis) < 0,
+                    $"the run's jobs moved standing: Guard {career.Standing(Faction.Guard):+0;-0;0}, Tharsis {career.Standing(Faction.Tharsis):+0;-0;0}, Compact {career.Standing(Faction.Compact):+0;-0;0}");
+
+                int n = 0;
+                Contract Job(string from, double issuedAgo, double days) => new Contract
+                {
+                    Id = 900100 + n, Kind = JobKind.Cargo, Title = "QA standing", From = from, To = here?.Name, Tonnes = 1, Pay = 1000,
+                    IssuedJd = jd - issuedAgo, DeadlineJd = jd - issuedAgo + days, Days = days, Key = "qa/standing/" + n++,
+                };
+                int Cx() => career.Standing(Faction.Compact);
+                int s0 = Cx();
+                career.Active.Add(Job("Ceres", 0, 10));
+                yield return null; yield return null;
+                int s1 = Cx();
+                career.Active.Add(Job("Titan", 3, 2));            // 1 day late, not yet failed: half pay
+                yield return null; yield return null;
+                int s2 = Cx();
+                var drop = Job("Ganymede", 0, 10);
+                career.Active.Add(drop); career.Abandon(drop);     // before a tick can deliver it
+                int s3 = Cx();
+                career.Active.Add(Job("Callisto", 10, 2));        // far past twice its time: fails before it can pay
+                yield return null; yield return null;
+                int s4 = Cx();
+                Check(here != null && s1 - s0 == Career.StandingGain && s2 == s1 && s3 - s2 == -Career.StandingLoss && s4 - s3 == -Career.StandingLoss && !career.Active.Exists(x => x.Title == "QA standing"),
+                    $"Compact standing: {s0:+0;-0;0}, on time {s1:+0;-0;0}, late {s2:+0;-0;0}, abandoned {s3:+0;-0;0}, expired {s4:+0;-0;0} (docked at {here?.Name ?? "-"})");
+
+                // one job short of Known with this port's owner: the next delivery here makes the tier and reprices the board
+                if (here != null)
+                {
+                    var owner = here.Owner;
+                    var cs = career.ToSave(ship);
+                    cs.standing[(int)owner] = 4;
+                    career.FromSave(cs, ship);
+                    yield return null;
+                    var before = new System.Collections.Generic.Dictionary<string, double>();
+                    foreach (var b in career.Board) if (b.Kind == JobKind.Cargo || b.Kind == JobKind.Passengers) before[b.Key] = b.Pay;
+                    career.Notes.Clear();
+                    career.Active.Add(Job(here.Name, 0, 10));
+                    yield return null; yield return null;
+                    double was = 0, now = 0; int same = 0;
+                    foreach (var b in career.Board) if (before.TryGetValue(b.Key, out double p)) { was += p; now += b.Pay; same++; }
+                    bool note = career.Notes.Exists(x => x.What == Career.Happening.Standing && x.Good && x.Text.Contains("Known"));
+                    Check(career.TierName(owner) == "Known" && Math.Abs(career.PayFactor(owner) - 1.05) < 1e-9 && note && same > 0 && same == before.Count && now / was > 1.035 && now / was < 1.065,
+                        $"{Career.Factions[(int)owner].Name} at {career.Standing(owner):+0;-0;0}: {career.TierName(owner)}, note {note}; {same} of {before.Count} board jobs repriced ×{now / Math.Max(1, was):F3}");
+                    career.Notes.Clear();
+                    var lose = Job(here.Name, 0, 10);
+                    career.Active.Add(lose); career.Abandon(lose);
+                    note = career.Notes.Exists(x => x.What == Career.Happening.Standing && !x.Good && x.Text.Contains("Neutral"));
+                    Check(career.TierName(owner) == "Neutral" && career.PayFactor(owner) == 1 && note, $"an abandon drops back to {career.TierName(owner)} ({career.Standing(owner):+0;-0;0}), note {note}");
+                }
+
+                // the tier table at its edges, the clamp, a save round trip and a save from before factions
+                {
+                    var cs = career.ToSave(ship);
+                    var tiers = new System.Text.StringBuilder();
+                    bool edges = true;
+                    foreach (var (v, name, pay) in new[] { (-5, "Distrusted", 0.90), (-4, "Neutral", 1.0), (4, "Neutral", 1.0), (5, "Known", 1.05), (14, "Known", 1.05),
+                                                          (15, "Trusted", 1.10), (29, "Trusted", 1.10), (30, "Valued", 1.15), (99, "Valued", 1.15) })
+                    {
+                        cs.standing[(int)Faction.Guard] = v;
+                        career.FromSave(cs, ship);
+                        edges &= career.TierName(Faction.Guard) == name && Math.Abs(career.PayFactor(Faction.Guard) - pay) < 1e-9;
+                        tiers.Append($"{v}:{career.TierName(Faction.Guard)} ×{career.PayFactor(Faction.Guard):F2}  ");
+                    }
+                    Check(edges && career.Standing(Faction.Guard) == Career.StandingMax, $"tiers {tiers}(99 kept as {career.Standing(Faction.Guard)})");
+                    cs.standing[(int)Faction.Guard] = 7; cs.standing[(int)Faction.Tharsis] = -3; cs.standing[(int)Faction.Compact] = 12;
+                    career.FromSave(cs, ship);
+                    var sj = JsonUtility.ToJson(career.ToSave(ship));
+                    career.FromSave(JsonUtility.FromJson<CareerSave>(sj), ship);
+                    bool kept = career.Standing(Faction.Guard) == 7 && career.Standing(Faction.Tharsis) == -3 && career.Standing(Faction.Compact) == 12;
+                    var old = System.Text.RegularExpressions.Regex.Replace(sj, "\"standing\":\\[[^\\]]*\\],", "");
+                    career.FromSave(JsonUtility.FromJson<CareerSave>(old), ship);
+                    bool neutral = career.Standing(Faction.Guard) == 0 && career.Standing(Faction.Tharsis) == 0 && career.Standing(Faction.Compact) == 0 && career.PayFactor(Faction.Tharsis) == 1;
+                    Check(kept && neutral && sj.Contains("\"standing\"") && !old.Contains("\"standing\""), $"a save keeps standing ({kept}); a save from before factions loads neutral ({neutral})");
+                }
+                career.FromSave(JsonUtility.FromJson<CareerSave>(keep), ship);
+                career.Notes.Clear();
+                yield return null;
+            }
+
             // 7. autopilot arrivals with the target behind its planet (the climb-away rule must not stop it parking)
             career.Sandbox = true;
             foreach (var (name, from, g) in new[] { ("Phobos", 2e6, 1.0), ("Io", 5e6, 1.0), ("Moon", 1e6, 1.0), ("Titan", 1e7, 3.0), ("Ganymede", 2e5, 1.0), ("Moon", 60000.0, 0.3) })
