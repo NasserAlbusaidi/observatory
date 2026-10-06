@@ -641,10 +641,11 @@ namespace FogOfWar
                 Check(ic != null, "an inner-system intercept can be posted");
 
                 // QA-064: a runner nearly at its port can't be caught in time, so it is neither posted nor accepted
+                var postedRunners = new System.Collections.Generic.List<Contract>();
                 if (ic != null)
                 {
-                    int posted = 0;
-                    for (int seed = 1; seed < 400; seed++) if (career.Intercept(new System.Random(seed), sys, jd) != null) posted++;
+                    for (int seed = 1; seed < 400; seed++) { var p = career.Intercept(new System.Random(seed), sys, jd); if (p != null) postedRunners.Add(p); }
+                    int posted = postedRunners.Count;
                     var lateJob = JsonUtility.FromJson<Contract>(JsonUtility.ToJson(ic));
                     lateJob.Id += 200000; lateJob.To += "L";
                     double shift = (ic.T1 - jd) * 0.98;
@@ -655,6 +656,54 @@ namespace FogOfWar
                     Check(career.CanAccept(ic, out string icWhy), $"QA-064: the posted intercept can be accepted ({icWhy ?? "ok"}), {posted} posted from 399 seeds");
                     Check(lateRunner != null && !lateCatch && !lateOk && lateWhy != null && lateWhy.Contains("catch"),
                         $"QA-064: a runner {(lateJob.T1 - jd) * 24:F1} h from {lateJob.RunTo} is refused: {lateWhy}");
+                }
+
+                // W2 rails (Rail.cs, docs/design-world.md): runner courses between every pair of ports, every 60 days for two
+                // years. Some pass too near the Sun or through another body's parking orbit; the boards post none of those.
+                {
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    int n = 0, nearSun = 0, throughBody = 0;
+                    double sunMin = double.MaxValue, ratioMin = double.MaxValue;
+                    string sunWorst = "", bodyWorst = "";
+                    var byBody = new System.Collections.Generic.SortedDictionary<string, int>();
+                    for (int k = 0; k < 13; k++)
+                    {
+                        double t0 = jd + 60 * k;
+                        foreach (var a in Career.Ports)
+                            foreach (var z in Career.Ports)
+                            {
+                                if (a == z) continue;
+                                Body ba = sys[a.Body], bz = sys[z.Body];
+                                double T = Math.Sqrt(6 * (sys.PosAt(bz, t0) - sys.PosAt(ba, t0)).Mag / (Career.RunnerG * Ship.G0)) / 86400;
+                                var cl = new Rail(sys, ba, bz, t0, t0 + T).Check();
+                                n++;
+                                string at = $"{a.Name} → {z.Name} on {Frame.UtcFromTdb(t0):yyyy-MM-dd}";
+                                if (cl.SunAu < Rail.MinSunAu) { nearSun++; if (cl.SunAu < sunMin) { sunMin = cl.SunAu; sunWorst = at; } }
+                                if (cl.Ratio < 0.99)
+                                {
+                                    throughBody++;
+                                    byBody.TryGetValue(cl.Nearest.Name, out int h); byBody[cl.Nearest.Name] = h + 1;
+                                    if (cl.Ratio < ratioMin) { ratioMin = cl.Ratio; bodyWorst = $"{at}, {cl.Nearest.Name} at {cl.Ratio:P0} of its parking orbit"; }
+                                }
+                            }
+                    }
+                    var hit = new System.Collections.Generic.List<string>();
+                    foreach (var kv in byBody) hit.Add($"{kv.Key} {kv.Value}");
+                    log.WriteLine($"  rails: {n} runner courses ({Career.Ports.Length} ports, 13 dates 60 days apart), {watch.Elapsed.TotalMilliseconds / n:F1} ms to build and check each");
+                    log.WriteLine($"    {nearSun} pass within {Rail.MinSunAu} AU of the Sun" + (nearSun > 0 ? $"; closest {sunMin:F3} AU, {sunWorst}" : ""));
+                    log.WriteLine($"    {throughBody} cross another body's parking orbit" + (throughBody > 0 ? $" ({string.Join(", ", hit)}); worst {bodyWorst}" : ""));
+                    Check(nearSun + throughBody > 0, $"rails: the clearance test finds courses to refuse ({nearSun} near the Sun, {throughBody} through a body)");
+
+                    int clear = 0, onOrbit = 0;
+                    foreach (var p in postedRunners)
+                    {
+                        var r = Career.RunnerRail(p, sys);
+                        if (r.Check().Clear) clear++;
+                        double s0 = (r.Pos(p.T0) - sys.PosAt(r.From, p.T0)).Mag / Ship.Standoff(r.From), s1 = (r.Pos(p.T1) - sys.PosAt(r.To, p.T1)).Mag / Ship.Standoff(r.To);
+                        if (Math.Abs(s0 - 1) < 1e-3 && Math.Abs(s1 - 1) < 1e-3) onOrbit++;
+                    }
+                    Check(postedRunners.Count > 0 && clear == postedRunners.Count && onOrbit == postedRunners.Count,
+                        $"rails: of {postedRunners.Count} posted runners, {clear} keep clear of the Sun and the bodies on the way, {onOrbit} start and end on a parking orbit");
                 }
 
                 // QA-041 (1): a job the tank can't fly is refused on accept
@@ -720,10 +769,12 @@ namespace FogOfWar
                 if (ic != null)
                 {
                     var probe = Career.MakeRunner(ic, sys);
-                    double e0 = (probe.Path(ic.T0 + 1e-7) - sys.PosAt(sys[Career.PortAt(ic.RunFrom).Body], ic.T0)).Mag;
-                    double e1 = (probe.Path(ic.T1 - 1e-7) - sys.PosAt(sys[Career.PortAt(ic.RunTo).Body], ic.T1)).Mag;
+                    Body rf = sys[Career.PortAt(ic.RunFrom).Body], rt = sys[Career.PortAt(ic.RunTo).Body];
+                    double e0 = (probe.Path(ic.T0 + 1e-7) - sys.PosAt(rf, ic.T0)).Mag - Ship.Standoff(rf);
+                    double e1 = (probe.Path(ic.T1 - 1e-7) - sys.PosAt(rt, ic.T1)).Mag - Ship.Standoff(rt);
                     double peak = Career.RunnerPeakG(probe, ic);
-                    Check(e0 < 50 && e1 < 50 && peak > 0.1 && peak < 0.4, $"runner course: leaves {ic.RunFrom} ({e0:F1} km off), reaches {ic.RunTo} ({e1:F1} km off), peak {peak:F3} g");
+                    Check(Math.Abs(e0) < 50 && Math.Abs(e1) < 50 && peak > 0.1 && peak < 0.4,
+                        $"runner course: leaves {ic.RunFrom} from its parking orbit ({Ship.Standoff(rf):N0} km out, {e0:+0.0;-0.0} km), reaches {ic.RunTo}'s ({Ship.Standoff(rt):N0} km, {e1:+0.0;-0.0} km), peak {peak:F3} g");
                     career.Accept(ic, jd);
                     var runner = sys[ic.To];
                     // QA-065: the line drawn for it is one smooth course from port to port, not chords across an orbit
