@@ -15,7 +15,7 @@ namespace FogOfWar
             ThrottleUp, ThrottleDown, ThrottleFull, ThrottleCut,
             RcsForward, RcsBack, RcsUp, RcsDown, RcsLeft, RcsRight,
             FlightAssist, Flip, Engage, NextTarget, WarpUp, WarpDown, Map, CameraMode, Help, QuickSave,
-            Screenshot, PhotoMode, RecordClip, Floodlights, VelocityRef,
+            Screenshot, PhotoMode, RecordClip, Floodlights, VelocityRef, MarkLog,
         }
 
         public static readonly Dictionary<Action, string> Label = new Dictionary<Action, string>
@@ -31,6 +31,7 @@ namespace FogOfWar
             [Action.Screenshot] = "Screenshot", [Action.PhotoMode] = "Photo mode", [Action.RecordClip] = "Record a clip",
             [Action.Floodlights] = "Hull floodlights on/off",
             [Action.VelocityRef] = "Velocity reference: orbit / target",
+            [Action.MarkLog] = "Mark the flight log (something went wrong)",
         };
 
         static readonly Dictionary<Action, (KeyCode, KeyCode)> Defaults = new Dictionary<Action, (KeyCode, KeyCode)>
@@ -51,6 +52,7 @@ namespace FogOfWar
             [Action.Screenshot] = (KeyCode.F12, KeyCode.None), [Action.PhotoMode] = (KeyCode.F10, KeyCode.None), [Action.RecordClip] = (KeyCode.F9, KeyCode.None),
             [Action.Floodlights] = (KeyCode.G, KeyCode.None),
             [Action.VelocityRef] = (KeyCode.B, KeyCode.None),
+            [Action.MarkLog] = (KeyCode.F8, KeyCode.None),
         };
 
         static readonly Dictionary<Action, KeyCode[]> bind = new Dictionary<Action, KeyCode[]>();
@@ -142,12 +144,19 @@ namespace FogOfWar
             return (k[0] != KeyCode.None && Input.GetKey(k[0])) || (k[1] != KeyCode.None && Input.GetKey(k[1]));
         }
 
+        // Actions that fired since the flight recorder last looked, so its log can say what the pilot pressed.
+        public static readonly List<Action> Fired = new List<Action>();
+
         public static bool Pressed(Action a)
         {
-            if (virtualTap.Remove(a)) return true;
-            if (Locked) return false;
-            var k = bind[a];
-            return (k[0] != KeyCode.None && Input.GetKeyDown(k[0])) || (k[1] != KeyCode.None && Input.GetKeyDown(k[1]));
+            bool on = virtualTap.Remove(a);
+            if (!on && !Locked)
+            {
+                var k = bind[a];
+                on = (k[0] != KeyCode.None && Input.GetKeyDown(k[0])) || (k[1] != KeyCode.None && Input.GetKeyDown(k[1]));
+            }
+            if (on && Fired.Count < 32) Fired.Add(a);
+            return on;
         }
 
         public static float Axis(Action neg, Action pos) => (Held(pos) ? 1 : 0) - (Held(neg) ? 1 : 0);

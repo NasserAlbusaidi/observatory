@@ -265,7 +265,7 @@ namespace FogOfWar.UI
                 ("Thrusters (RCS)", new[] { A.RcsForward, A.RcsBack, A.RcsUp, A.RcsDown, A.RcsLeft, A.RcsRight }),
                 ("Flight computer", new[] { A.FlightAssist, A.Flip, A.Engage, A.NextTarget, A.WarpUp, A.WarpDown }),
                 ("View and game", new[] { A.Map, A.CameraMode, A.Help, A.QuickSave }),
-                ("Capture", new[] { A.Screenshot, A.PhotoMode, A.RecordClip }),
+                ("Capture", new[] { A.Screenshot, A.PhotoMode, A.RecordClip, A.MarkLog }),
             };
             // anything added to Controls later still shows up
             var listed = new HashSet<A>();

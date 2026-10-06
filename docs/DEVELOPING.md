@@ -133,6 +133,7 @@ Press **F1** in flight for the full list. Rebind any action in **Esc → Setting
 | Capture | Photo mode | F10 |
 | | Record a clip | F9 |
 | | Screenshot | F12 |
+| | Mark the flight log | F8 |
 | Other | Hull floodlights on/off | G |
 | | Velocity reference: orbit / target | B |
 
@@ -169,6 +170,7 @@ The **Build … review copy** menu items build the same game under another name,
 - **Settings** (Esc → Settings) has five tabs: Graphics (display mode, v-sync, frame cap, texture detail, ray-trace quality), Interface, Controls, Capture and Audio.
 - **Screenshots and clips** go to `Pictures\FogOfWar`. Screenshots can be 1×, 2× or 4× the screen size.
 - **Clips** are MP4 through ffmpeg, found on `PATH` or at `ffmpeg\ffmpeg.exe` next to the game. Without ffmpeg, the game writes PNG frames and an `encode.bat`.
+- **Flight log.** Each run of the game writes `flight-<date>.log` to the capture folder; the newest 20 are kept. It holds a state line each second (`S`), a line for each change of hold, plan, phase, warp, target, camera, throttle or stick with the keys pressed in that frame (`EVT`), sanity rules such as `passed-target` (`WARN`) and Unity errors (`ERR`). **F8** writes a bookmark (`MARK`), the last 10 s at 10 Hz, and a screenshot. Press it when the ship does something you did not intend.
 - **Photo mode** stops or slows time, hides the HUD and gives you a free camera with lens and colour controls. Its Cinema tab flies an orbit, a flyby or a keyframed path and can record it.
 
 ## Unattended test runs

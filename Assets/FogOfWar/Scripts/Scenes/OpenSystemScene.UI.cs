@@ -327,10 +327,7 @@ namespace FogOfWar
             if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "approximate (JPL fits: Jul 2000 – Jun 2099)", Tone.Bad));
             if (ship.Target != null)
             {
-                var tp = sys.Pos(ship.Target, jd);
-                var r = tp - ship.Pos;
-                var vr = ship.Vel - sys.Vel(ship.Target, jd);
-                double closing = D3.Dot(vr, r.Norm);
+                TargetRel(out var r, out var vr, out double closing);
                 list.Add(new Readout("Target", ship.Target.Name + (ship.Target.SizeEstimated ? " (size unknown, shown 2 km)" : ""), Tone.Hot));
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
