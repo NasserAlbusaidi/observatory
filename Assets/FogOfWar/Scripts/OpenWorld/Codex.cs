@@ -46,6 +46,34 @@ namespace FogOfWar.OpenWorld
             return Math.Round((400 + 600 * au) * (b.Radius < 100 ? 1.5 : 1) / 10) * 10;
         }
 
+        // Each system's data buyers pay less for every first scan they already have: the nth sells for MarketDecay^n of
+        // its value, never under MarketFloor. Every first scan in the game sold for 4.2M uncapped, 14× all the upgrades
+        // (300k); now it is 417k, and the Saturn system 156k (CareerQA logs these). The far systems stay the best paid,
+        // so the pull outward stays, and job pay still matters.
+        public const double MarketDecay = 0.8, MarketFloor = 0.05;
+        public static double Share(int earlier) => Math.Max(MarketFloor, Math.Pow(MarketDecay, earlier));
+
+        // The system a body's data sells into: a planet's (the planet and its moons), or the Sun's for the asteroids
+        // and their moons.
+        public static Body Market(SolarSystem sys, Body b)
+        {
+            while (b.Parent != null && b.Parent != sys.Sun) b = b.Parent;
+            return b.Asteroid ? sys.Sun : b;
+        }
+        public static string MarketName(SolarSystem sys, Body m) => m == sys.Sun ? "Asteroids" : m.Name + " system";
+
+        // Scanned bodies in a market. Survey jobs count too: the client's data reaches the same buyers.
+        public int ScannedIn(SolarSystem sys, Body market)
+        {
+            int n = 0;
+            foreach (var name in Scanned) { var o = sys[name]; if (o != null && Market(sys, o) == market) n++; }
+            return n;
+        }
+
+        // What a first scan of b sells for now.
+        public double SaleValue(SolarSystem sys, Body b, double jd) =>
+            Math.Round(DataValue(sys, b, jd) * Share(ScannedIn(sys, Market(sys, b))) / 10) * 10;
+
         // ------------------------------------------------------------ the entry text
 
         // Numbers from the game's own body data, so they always match what you fly around.
@@ -87,9 +115,10 @@ namespace FogOfWar.OpenWorld
             new Feat { Id = "rich", Title = "Six figures", How = "Hold 100,000 cr." },
             new Feat { Id = "drive3", Title = "Hard burn", How = "Fit the 3 g drive." },
             new Feat { Id = "landed", Title = "Touchdown", How = "Touch down on any body." },
-            new Feat { Id = "fumes", Title = "Running on fumes", How = "Dock with less than 5 t of reaction mass." },
+            new Feat { Id = "fumes", Title = "Running on fumes", How = "Dock with less than 5 t of fuel." },
             new Feat { Id = "icarus", Title = "Icarus", How = "Go within 0.3 AU of the Sun." },
             new Feat { Id = "far", Title = "Edge of the map", How = "Go 30 AU from the Sun." },
+            new Feat { Id = "owner", Title = "Owner-operator", How = "Buy out the ship from the yard." },
         };
 
         static readonly string[] Planets = { "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune" };
@@ -118,6 +147,7 @@ namespace FogOfWar.OpenWorld
             Earn("fumes", c.Docked != null && ship.Fuel < 5);
             Earn("icarus", au < 0.3);
             Earn("far", au > 30);
+            Earn("owner", c.OwnsShip);
             return got;
         }
     }

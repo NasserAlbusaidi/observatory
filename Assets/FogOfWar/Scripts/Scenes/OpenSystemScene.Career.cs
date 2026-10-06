@@ -23,7 +23,7 @@ namespace FogOfWar
 
         void InitCareer()
         {
-            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys };
+            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys, RouteEvents = !Unattended() };
             career.StartNew(jd);
             ship.Fuel = career.TankCapacity;
             career.Apply(ship);
@@ -32,6 +32,36 @@ namespace FogOfWar
             if (Cam.GetComponent<AudioListener>() == null) Cam.gameObject.AddComponent<AudioListener>();
             sound = new ShipAudio(Root, o => Own(o)) { Muted = muted };
             if (!career.Sandbox) StartTutorial();
+            WatchCareer(fresh: true);
+        }
+
+        // Autosave at the career's milestones (a port reached, a job taken or paid, an upgrade) into the one save slot,
+        // so a crash never costs more than the last stop. A new career arms it only on reaching a port other than the
+        // one it starts at: New game clicked by mistake (or the tutorial's throttle blip, which undocks and redocks at
+        // Earth) leaves the old save alone. A loaded career is armed at once. The first ticks only find the dock the
+        // career starts or loads in, so they never save. The write waits for the end of the career tick.
+        bool autosaveArmed, autosaveDue;
+        string autosaveNote, homePort;
+        int careerTicks;
+        void WatchCareer(bool fresh)
+        {
+            autosaveArmed = !fresh; autosaveDue = false; autosaveNote = null; homePort = null; careerTicks = 0;
+            if (career.Sandbox) return;
+            career.OnEvent += (what, port) =>
+            {
+                if (careerTicks < 2) { if (what == Career.Happening.Docked) homePort = port; return; }
+                if (what == Career.Happening.Docked && port != homePort) autosaveArmed = true;
+                switch (what)
+                {
+                    case Career.Happening.Docked:
+                        if (autosaveArmed) autosaveNote = "Autosaved at " + port;
+                        goto case Career.Happening.Upgrade;
+                    case Career.Happening.JobAccepted: case Career.Happening.JobPaid: case Career.Happening.RescueDone:
+                    case Career.Happening.InterceptDone: case Career.Happening.SurveyDone: case Career.Happening.Upgrade:
+                    case Career.Happening.ShipPayment: case Career.Happening.ShipOwned:
+                        autosaveDue |= autosaveArmed; break;
+                }
+            };
         }
 
         ShipAudio sound;
@@ -112,7 +142,18 @@ namespace FogOfWar
                 if (dry && !fuelDry) sound.Warning();
                 fuelLow = low; fuelDry = dry;
             }
-            foreach (var n in career.Notes) if (n.Time > heardNote) { heardNote = n.Time; sound.Notice(n.Good); }
+            // one sound for a frame's new notes, the most important: a payday over a scan over a plain chime
+            int rank = -1; bool good = true; float since = heardNote;
+            foreach (var n in career.Notes)
+            {
+                if (n.Time <= since) continue;
+                heardNote = Mathf.Max(heardNote, n.Time);
+                int r = Career.IsPay(n.What) || n.What == Career.Happening.ShipOwned ? 3 : n.What == Career.Happening.Scanned || n.What == Career.Happening.Visited ? 2 : !n.Good ? 1 : 0;
+                if (r > rank) { rank = r; good = n.Good; }
+            }
+            if (rank == 3) sound.Payday();
+            else if (rank == 2) sound.ScanDone();
+            else if (rank >= 0) sound.Notice(good);
         }
 
         // in the dominant body's shadow (a cylinder; the penumbra is ignored)
@@ -166,8 +207,8 @@ namespace FogOfWar
             double peak = Math.Max(Math.Sqrt(ship.AMax * d + u * u / 2), u);
             PlanTrip(out _, out double planDv, out _);
             shortDv = DvShort(planDv);
-            return $"{Fmt.Num(ship.MaxG, 1)} g brachistochrone: {Dur(t)}\nΔv {BrachSpeed(dv)} · peak {BrachSpeed(peak)}" +
-                   (shortDv ? $"\nΔV SHORT: plan needs ~{planDv * DvMargin:N0} km/s, {Career.DvLeft(ship):N0} left" : "");
+            return $"{Fmt.Num(ship.MaxG, 1)} g full burn: {Dur(t)}\nspeed change {BrachSpeed(dv)} · top speed {BrachSpeed(peak)}" +
+                   (shortDv ? $"\nFUEL SHORT: plan needs ~{ship.Mass * (1 - Math.Exp(-planDv * DvMargin / Ship.Ve)):N1} t, {ship.Fuel:N1} t aboard" : "");
         }
 
         void TickCareer(double simDt)
@@ -188,6 +229,15 @@ namespace FogOfWar
             planTarget = ship.Target;
             planCruiseIdx = cruiseIdx;
             career.Tick(sys, ship, jd, simDt);
+            if (careerTicks < 2) careerTicks++;
+            if (autosaveDue)
+            {
+                autosaveDue = false;
+                WriteSave();
+                // only a port reached says so; a job taken or paid already has its own notice
+                if (autosaveNote != null) hudShell?.Toast(autosaveNote);
+                autosaveNote = null;
+            }
             // QA-041: a job ending out there, or a dry tank, drops time compression; a crossing caps it at 100×
             if (career.DropWarp) { warpIdx = 0; career.DropWarp = false; }
             if (career.TransferInProgress && warpIdx > 2) warpIdx = 2;
@@ -230,6 +280,8 @@ namespace FogOfWar
             GUILayout.Label($"{career.Credits:N0} cr   ·   reaction mass {ship.Fuel:N1} / {career.TankCapacity:N0} t   ·   hold {career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t", ui.label);
             GUILayout.Label($"Drive rated {career.DriveRating:0} g" + (career.CarryingPassengers ? ": passengers aboard, held to 1 g" : "") +
                             $"   ·   Δv left {Career.DvLeft(ship):N0} km/s", ui.note);
+            GUILayout.Label(career.OwnsShip ? "The ship is yours." : $"Ship buyout: {career.ShipPaid:N0} / {Career.ShipPrice:N0} cr paid", ui.note);
+            if (!career.OwnsShip && career.Docked != null && career.Credits >= career.ShipStepNow && ui.Button($"Pay {career.ShipStepNow:N0} cr toward the ship")) career.PayTowardShip();
             if (ship.Fuel < 1)
             {
                 GUILayout.Label("The tank is dry. You are adrift.", ui.label);
@@ -286,7 +338,7 @@ namespace FogOfWar
                 if (scanned) foreach (var f in Codex.Facts(b.Name)) GUILayout.Label("• " + f, ui.note);
                 else
                 {
-                    string sale = career.Sandbox ? "" : $" First data sells for {Codex.DataValue(sys, b, jd):N0} cr.";
+                    string sale = career.Sandbox ? "" : $" First data sells for {cx.SaleValue(sys, b, jd):N0} cr.";
                     if (cx.ScanTarget == b.Name && cx.ScanProgress > 0)
                         GUILayout.Label($"Scanning: {Fmt.Num(100 * cx.ScanProgress / cx.ScanSeconds, 0)} %. Keep the drive off within {Km(cx.ScanRange(b))}.{sale}", ui.label);
                     else GUILayout.Label($"Scan: stay within {Km(cx.ScanRange(b))} with the drive off for {Dur(cx.ScanSeconds)}.{sale}", ui.note);
@@ -530,7 +582,7 @@ namespace FogOfWar
         void LoadCareer()
         {
             foreach (var old in career.Active.ToArray()) career.Abandon(old); // drop this session's derelicts from the system
-            career = new Career { Sys = sys };
+            career = new Career { Sys = sys, RouteEvents = !Unattended() };
             if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); ResumeTutorial(); return; }
             try { career.FromSave(JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey)), ship); }
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the career save: " + e.Message); career.StartNew(jd); ship.Fuel = career.TankCapacity; }

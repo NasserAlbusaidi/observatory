@@ -11,8 +11,8 @@ namespace FogOfWar
     public partial class OpenSystemScene
     {
         static readonly string[] HoldNames = { "Off", "Prograde", "Retrograde", "Normal", "Anti-normal", "Radial out", "Radial in", "Target", "Anti-target", "Flip 180°" };
-        static readonly string[] PlanShort = { "", "Brachistochrone", "Match velocity", "Hold station" };
-        static readonly string[] PlanNames = { "", "Brachistochrone (fast)", "Match velocity", "Hold station" };
+        static readonly string[] PlanShort = { "", "Fast", "Match velocity", "Hold station" };
+        static readonly string[] PlanNames = { "", "Fast (full burn)", "Match velocity", "Hold station" };
 
         // ---------------------------------------------------------------- pilot input (polled every frame)
 
@@ -90,13 +90,13 @@ namespace FogOfWar
         {
             bool drive = !ship.Dry && ship.AMax > 0;
             a = drive ? ship.AMax : ship.Dry ? 0 : Ship.RcsAccel;
-            by = drive ? Fmt.Num(ship.MaxG, 1) + " g drive" : ship.Dry ? "no reaction mass" : "RCS";
+            by = drive ? Fmt.Num(ship.MaxG, 1) + " g drive" : ship.Dry ? "no fuel" : "RCS";
             double v = vr.Mag;
             t = a > 0 ? v / a : double.PositiveInfinity;
             d = a > 0 ? v * v / (2 * a) : double.PositiveInfinity;
         }
 
-        static string Spd(double kms) => Math.Abs(kms) < 1 ? Fmt.Num(kms * 1000, Math.Abs(kms) < 0.01 ? 1 : 0) + " m/s" : Fmt.Num(kms, 2) + " km/s";
+        static string Spd(double kms) => Math.Abs(kms) < 1 ? (Math.Abs(kms) < 5e-5 ? "0" : Fmt.Num(kms * 1000, Math.Abs(kms) < 0.01 ? 1 : 0)) + " m/s" : Fmt.Num(kms, 2) + " km/s";
 
         void TogglePlan()
         {
@@ -109,9 +109,9 @@ namespace FogOfWar
                 if (DvShort(dv) && !(shortArmed == ship.Target && Time.unscaledTime < shortUntil))
                 {
                     shortArmed = ship.Target; shortUntil = Time.unscaledTime + 8;
-                    ship.Phase = "Δv short: engage again to go anyway";
-                    hudShell?.Toast($"Not enough Δv to reach {ship.Target.Name}",
-                        $"Needs about {dv * DvMargin:N0} km/s with margin, {Career.DvLeft(ship):N0} left. Engage again to go anyway.", 6f, "bad");
+                    ship.Phase = "fuel short: engage again to go anyway";
+                    hudShell?.Toast($"Not enough fuel to reach {ship.Target.Name}",
+                        $"Needs about {ship.Mass * (1 - Math.Exp(-dv * DvMargin / Ship.Ve)):N1} t with margin, {ship.Fuel:N1} t aboard. Engage again to go anyway.", 6f, "bad");
                     return;
                 }
             }
@@ -347,15 +347,22 @@ namespace FogOfWar
             if (ship.PlanActive) list.Add(new Readout("Plan", PlanShort[(int)ship.Plan]));
         }
 
+        // Fmt.Num writes powers of ten from 10^6 up and under 10^-3; a flight readout wants "4,170,345 km" and "0 m"
+        static string Whole(double x)
+        {
+            double r = Math.Round(x);
+            return (r == 0 ? 0 : r).ToString("#,0", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         static string Km(double km)
         {
             double a = Math.Abs(km);
-            return a > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : a >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
+            return a > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : a >= 1 ? Whole(km) + " km" : Whole(km * 1000) + " m";
         }
 
         static string Dur(double s)
         {
-            if (s < 120) return Fmt.Num(s, 0) + " s";
+            if (s < 120) return Whole(s) + " s";
             if (s < 7200) return Fmt.Num(s / 60, 1) + " min";
             if (s < 172800) return Fmt.Num(s / 3600, 1) + " h";
             return Fmt.Num(s / 86400, 1) + " days";
@@ -469,10 +476,13 @@ namespace FogOfWar
             var args = Environment.GetCommandLineArgs();
             int i = Array.IndexOf(args, "-fowsavekey");
             if (i >= 0 && i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
-            // the unattended suites save and load too (the -fowqa "save" step): keep them off the player's save
-            foreach (var a in new[] { "-fowqa", "-fowcareer", "-fowtour" }) if (Array.IndexOf(args, a) >= 0) return "fow-save-qa";
-            return "fow-save-v1";
+            // the unattended suites save, load and autosave too (the -fowqa "save" step, a dock): keep them off the player's save
+            return Unattended() ? "fow-save-qa" : "fow-save-v1";
         }
+        // an unattended suite is running: no player save, and no route calls to drop the warp mid-trip (a method, not a
+        // static field, so SaveKey's initialiser never sees it unset)
+        static bool Unattended() => Array.Exists(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots" },
+            a => Array.IndexOf(Environment.GetCommandLineArgs(), a) >= 0);
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
         public static string SaveSummary
         {
@@ -489,10 +499,15 @@ namespace FogOfWar
 
         public void SaveGame()
         {
+            WriteSave();
+            ship.Phase = "game saved";
+        }
+
+        void WriteSave()
+        {
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(ship.ToSave(jd, warpIdx)));
             SaveCareer();
             PlayerPrefs.Save();
-            ship.Phase = "game saved";
         }
 
         public void LoadGame()
@@ -509,6 +524,7 @@ namespace FogOfWar
             SetPivot(Pivot.Ship, 0.16);
             camMode = CamMode.Chase;
             LoadCareer();
+            WatchCareer(fresh: false);
             // rescue and intercept ships exist again only now: resolve the saved target after the career (a finished
             // job's ship is gone, so its target stays empty)
             ship.Target = string.IsNullOrEmpty(s.target) ? null : sys[s.target];

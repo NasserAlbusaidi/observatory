@@ -34,12 +34,14 @@ namespace FogOfWar.OpenWorld
             "ore barge Hypatia", "courier Swift Return", "water tug Tiamat", "mining skiff Pemba", "science sloop Leavitt",
         };
 
-        internal Contract Rescue(System.Random rng, SolarSystem sys, double jd)
+        internal Contract Rescue(System.Random rng, SolarSystem sys, double jd) => Rescue(rng, sys, jd, sys[Docked.Body], Docked.Name);
+
+        // A wreck near `here` (a port's body): posted on that port's board, or called in on the way there (route events).
+        internal Contract Rescue(System.Random rng, SolarSystem sys, double jd, Body here, string from)
         {
-            var here = sys[Docked.Body];
             // around the port's planet; belt ports put the wreck on a heliocentric orbit near the port
             var parent = here.Parent == sys.Sun ? (here.Asteroid ? sys.Sun : here) : here.Parent;
-            var c = new Contract { Id = nextId++, Kind = JobKind.Rescue, From = Docked.Name, Parent = parent.Name, Epoch = jd };
+            var c = new Contract { Id = nextId++, Kind = JobKind.Rescue, From = from, Parent = parent.Name, Epoch = jd };
             string hull = Hulls[rng.Next(Hulls.Length)];
             c.To = DerelictPrefix + hull.Substring(hull.IndexOf(' ') + 1) + " " + c.Id;
             c.Title = $"Rescue the {hull}: drive dead, {2 + rng.Next(9)} crew aboard";
@@ -72,6 +74,7 @@ namespace FogOfWar.OpenWorld
             double slack = 1.1 + rng.NextDouble() * 0.6; // their air is running out
             c.Pay = Math.Round(RefPay(d, 0, out c.Days, slack) * 2 / 100) * 100 + 4000;
             c.Days += TransferSeconds / 86400;
+            c.ExpressDays = ExpressDaysFor(d, TransferSeconds, c.Days);
             return c;
         }
 

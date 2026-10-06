@@ -59,8 +59,9 @@ namespace FogOfWar.OpenWorld
         public bool PlanActive => Plan != Plan.None && Target != null;
         public bool ManualInput => RotInput.sqrMagnitude > 0 || RcsInput.sqrMagnitude > 0;
 
-        // Standoff from a target's centre where the autopilot parks the ship in orbit.
-        public static double Standoff(Body b) => Math.Max(b.Radius * 3, b.Radius + 300);
+        // Standoff from a target's centre where the autopilot parks the ship in orbit. A craft (derelict, runner,
+        // beacon) has no gravity or surface to keep clear of, so the ship holds 1 km off it, close enough to see it.
+        public static double Standoff(Body b) => Career.IsCraft(b) ? b.Radius + 1 : Math.Max(b.Radius * 3, b.Radius + 300);
 
         // Smallest sphere of influence the ship is inside; the Sun otherwise.
         public static Body Dominant(SolarSystem sys, D3 p, double jd)
@@ -105,7 +106,7 @@ namespace FogOfWar.OpenWorld
                 want = HoldDirMid(sys, jd, h, reference, g);
                 Phase = ThrottleCmd > 0 ? "burning" : RcsInput.sqrMagnitude > 0 ? "RCS" : "coasting";
             }
-            if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of reaction mass"; }
+            if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of fuel"; }
             UpdateAttitude(want, h);
             // the drive fires only along the commanded line: flip first, then burn
             if (PlanActive && want.HasValue && D3.Dot(Heading, want.Value) < Math.Cos(3 * Math.PI / 180)) { throttle = 0; Phase = "turning"; }
@@ -381,7 +382,15 @@ namespace FogOfWar.OpenWorld
             }
             // bodies too small to orbit against their parent's tides (Phobos, Deimos): station-keep beside them instead
             bool hover = orbiting && T.GM < 1;
-            if (hover) vDes = (-r).Norm * (-(dist - standoff) * 0.002);
+            if (hover)
+            {
+                vDes = (-r).Norm * (-(dist - standoff) * 0.002);
+                // The braking feedforward ends at 1.25 standoffs, and the 20 s controller alone carried the ship 830 m
+                // past a 1 km craft standoff. Keep braking at what it takes to stop by half the standoff: v²/2s fades
+                // to nothing at rest, so it does not kick at the 30 s steps of a ship holding station.
+                double closing = D3.Dot(vrel, r.Norm);
+                if (closing > 0) ff = -r.Norm * Math.Min(aMax * 0.85, closing * closing / (2 * Math.Max(dist - standoff * 0.5, 0.05)));
+            }
             var err = vDes - vrel;
             // in orbit, gravity is what keeps us there; otherwise cancel it first, then steer with what is left
             var cmd = orbiting && !hover ? err / tau : Budget(err / tau + ff, gRel);

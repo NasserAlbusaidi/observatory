@@ -24,9 +24,12 @@ namespace FogOfWar.OpenWorld
         public int People;
         public double Pay, Days;         // Days: time allowed, from acceptance
         public double IssuedJd, DeadlineJd;
+        public double ExpressDays, ExpressJd; // the bonus window from acceptance; 0 = none (intercepts, the tutorial, older saves)
+        public double SpoilJd;           // cargo trouble ridden out: delivered after this, it pays half; 0 = none
         public double Dwell, DwellNeeded; // survey: seconds spent in scan range with the drive off
         public bool Tutorial;
-        public string Key;               // board slot, so an accepted job doesn't come back the same day
+        [NonSerialized] public string Tier;  // board cargo: local, interplanetary or far, as seen from the posting port
+        public string Key;              // board slot, so an accepted job doesn't come back the same day
         // rescue: the derelict's two-body orbit about Parent (Body element conventions, deg and km, at Epoch)
         public string Parent;
         public double A, E, I, Node, Peri, L, DL, Epoch;
@@ -46,6 +49,7 @@ namespace FogOfWar.OpenWorld
         public int tutorial;             // first-flight lesson + 1; 0 = done or skipped (and for saves made before it existed)
         public List<Contract> active = new List<Contract>();
         public int sensors;
+        public double shipPaid, startJd; // the buyout so far; the career's first day (0 for saves made before either existed)
         public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
     }
 
@@ -79,8 +83,24 @@ namespace FogOfWar.OpenWorld
         public const double EmergencyTonnes = 30, EmergencyCost = 20000;
         const double RefG = 0.6;                             // deadlines and pay are set against this acceleration
         const double RefFuelPrice = 30;
+        // Time has a price: a job delivered inside its express window pays this much more. The fuel a coast saves is
+        // 2–14 % of the pay, so the bonus is worth a harder burn, and a bigger drive makes the window with a longer coast.
+        public const double ExpressBonus = 0.25;
+        const double ExpressG = 1, ExpressMargin = 1.15;
+        // Flown in by hand: a cargo or passenger job that docks or lands with the nav computer off, the helm taken
+        // outside the destination's dock range, pays this much more. The autopilot parks with its plan still on, so it
+        // never earns this; the pilot who brakes into orbit or sets down on the surface does.
+        public const double HandBonus = 0.15;
+        // The long goal: the ship is the yard's until the pilot buys it out, in steps at any port, with no interest and no
+        // schedule. Owning it is the career's end state; the game goes on after. Jobs pay 6k–25k (audit table), more with
+        // the express and by-hand bonuses; all upgrades cost 300k and every first scan sells for 417k at most. So the
+        // buyout is about 50 jobs past the upgrades: hours of play, not an evening.
+        public const double ShipPrice = 1000000, ShipStep = 50000;
 
         public double Credits = 25000, Earned;
+        public double ShipPaid, StartJd;
+        public bool OwnsShip => ShipPaid >= ShipPrice;
+        public double ShipStepNow => Math.Min(ShipStep, ShipPrice - ShipPaid);
         public int DriveLevel, TankLevel, Done, Failed;
         public bool Sandbox;
         public int TutorialStep;         // the scene's first-flight lesson + 1, kept so Continue resumes it (or not) — QA-051
@@ -92,7 +112,10 @@ namespace FogOfWar.OpenWorld
         long boardDay = long.MinValue;
         readonly HashSet<string> taken = new HashSet<string>();
 
-        public struct Note { public string Text; public bool Good; public float Time; }
+        // What is the event the note reports (left at JobAccepted for notes made outside Say), so the HUD and the sound
+        // can make a payday feel different from a fuel purchase.
+        public struct Note { public string Text; public bool Good; public float Time; public Happening What; }
+        public static bool IsPay(Happening h) => h == Happening.JobPaid || h == Happening.RescueDone || h == Happening.SurveyDone || h == Happening.InterceptDone;
         public readonly List<Note> Notes = new List<Note>();
 
         public double TankCapacity => 200 + TankStep * TankLevel;
@@ -106,12 +129,12 @@ namespace FogOfWar.OpenWorld
 
         // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
         // player action. Docked/Undocked/TankDry carry the port name or an empty string.
-        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone }
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned }
         public event Action<Happening, string> OnEvent;
 
         void Say(Happening what, string text, bool good = true)
         {
-            Notes.Add(new Note { Text = text, Good = good, Time = UnityEngine.Time.realtimeSinceStartup });
+            Notes.Add(new Note { Text = text, Good = good, Time = UnityEngine.Time.realtimeSinceStartup, What = what });
             OnEvent?.Invoke(what, text);
         }
 
@@ -119,6 +142,7 @@ namespace FogOfWar.OpenWorld
         public void StartNew(double jd)
         {
             TutorialStep = 1;
+            StartJd = jd;
             Active.Add(new Contract
             {
                 Id = nextId++, Kind = JobKind.Cargo, Title = "Medical supplies for Shackleton base", From = "Earth orbit", To = "Luna",
@@ -140,6 +164,7 @@ namespace FogOfWar.OpenWorld
         public void Tick(SolarSystem sys, Ship ship, double jd, double simDt)
         {
             this.ship = ship; this.jd = jd;
+            TrackHelm(sys, ship, jd);
             StartSpan(ship, jd, simDt);
             Apply(ship);
             Notes.RemoveAll(n => UnityEngine.Time.realtimeSinceStartup - n.Time > 8);
@@ -162,7 +187,7 @@ namespace FogOfWar.OpenWorld
                     Active.RemoveAt(i); Failed++; RemoveDerelict(c);
                     Say(Happening.JobFailed, "Tank dry: " + c.Title + " failed", false);
                 }
-                Say(Happening.TankDry, $"Reaction mass gone. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
+                Say(Happening.TankDry, $"Out of fuel. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
             }
             wasDry = dry;
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
@@ -170,6 +195,7 @@ namespace FogOfWar.OpenWorld
             TransferInProgress = false;
             Rescues(sys, ship, jd, simDt);
             Intercepts(sys, ship, jd, simDt);
+            RouteTick(sys, ship, jd, simDt);
             foreach (var t in Codex.CheckFeats(this, ship)) Say(Happening.Achievement, "Achievement: " + t);
         }
 
@@ -191,9 +217,9 @@ namespace FogOfWar.OpenWorld
             if (q <= 0) return;
             Codex.ScanProgress += q;
             if (Codex.ScanProgress < Codex.ScanSeconds) return;
+            double v = Codex.SaleValue(sys, t, jd); // before it joins Scanned and counts against its own market
             Codex.Scanned.Add(t.Name); Codex.Visited.Add(t.Name);
             if (Sandbox) { Say(Happening.Scanned, "Codex: " + t.Name + " scanned"); return; }
-            double v = Codex.DataValue(sys, t, jd);
             Credits += v; Earned += v;
             Say(Happening.Scanned, $"Codex: {t.Name} scanned. First data sold: +{v:N0} cr");
         }
@@ -253,14 +279,61 @@ namespace FogOfWar.OpenWorld
         void Complete(Contract c, double jd, string what)
         {
             if (FinallyExpired(c, jd)) return; // Expire fails it; nothing pays after the final cutoff (#24)
-            bool late = jd > c.DeadlineJd;
-            double pay = late ? c.Pay * 0.5 : c.Pay;
+            double pay = PayAt(c, jd, out bool late, out bool express), expressExtra = pay - c.Pay;
+            double hand = !late && HandArrival(c) ? Math.Round(c.Pay * HandBonus) : 0;
+            pay += hand;
             Credits += pay; Earned += pay; Done++;
             Active.Remove(c);
             RemoveDerelict(c);
             if (c.Kind == JobKind.Rescue || c.Kind == JobKind.Intercept) DropWarp = true;
-            Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid, $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
+            Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid,
+                $"{what}: +{pay:N0} cr" + (Spoiled(c, jd) ? " (cargo spoiled, half pay)" : "") + (late ? " (late, half pay)" : express ? $" (express bonus +{expressExtra:N0} cr)" : "") +
+                (hand > 0 ? $" (flown in by hand +{hand:N0} cr)" : ""));
         }
+
+        // Where the pilot took the helm: the target and its distance when the nav plan last stopped (none while a plan flies).
+        Body helmTarget;
+        double helmKm;
+        void TrackHelm(SolarSystem sys, Ship ship, double jd)
+        {
+            if (ship.PlanActive || ship.Target == null) { helmTarget = null; return; }
+            if (ship.Target == helmTarget) return;
+            helmTarget = ship.Target;
+            helmKm = (ship.Pos - sys.Pos(helmTarget, jd)).Mag;
+        }
+
+        // A job the pay on arrival would count as flown in by hand: the nav computer off now, the helm taken outside the
+        // destination's dock range. Only jobs paid on a dock: rescues, intercepts and surveys pay on a rendezvous or a scan; the first-flight job teaches the autopilot.
+        public bool CanFlyInByHand(Contract c) => !c.Tutorial && (c.Kind == JobKind.Cargo || c.Kind == JobKind.Passengers);
+        public bool HandArrival(Contract c)
+        {
+            if (!CanFlyInByHand(c) || ship == null || ship.PlanActive) return false;
+            var dest = TargetOf(c);
+            return dest != null && helmTarget == dest && helmKm >= DockRange(dest);
+        }
+
+        // What a job pays if it is done at jd: the express bonus inside its window, half pay after the deadline.
+        public static double PayAt(Contract c, double jd, out bool late, out bool express)
+        {
+            late = jd > c.DeadlineJd;
+            bool spoiled = Spoiled(c, jd);
+            express = !late && !spoiled && c.ExpressJd > 0 && jd <= c.ExpressJd;
+            double pay = late ? c.Pay * 0.5 : express ? Math.Round(c.Pay * (1 + ExpressBonus)) : c.Pay;
+            return spoiled ? pay * 0.5 : pay;
+        }
+
+        // cargo trouble ridden out (route events): past SpoilJd the load is spoiled and pays half
+        public static bool Spoiled(Contract c, double jd) => c.SpoilJd > 0 && jd > c.SpoilJd;
+
+        // The express window for a trip of d km: a 1 g full burn's flight time plus a margin, then time to park, never past
+        // the deadline. Parking takes up to 7 h (Trip's note), which a short hop's margin can't cover, so it gets its own
+        // allowance. A 1 g drive makes the window with a light coast; a 3 g drive with a long one.
+        static double ExpressDaysFor(double d, double extraSeconds, double days)
+        {
+            Trip(d, ExpressG * Ship.G0, 1, 1, out double s, out _, out _);
+            return Math.Min(days, ((s - ParkSeconds) * ExpressMargin + ExpressParkSeconds + extraSeconds) / 86400);
+        }
+        const double ExpressParkSeconds = 8 * 3600;
 
         public static double ScanRange(Body b) => Math.Max(Ship.Standoff(b) * 2, b.Radius + 1000);
 
@@ -357,7 +430,7 @@ namespace FogOfWar.OpenWorld
             {
                 // no port out there to refuel at: even a 50 % coast must fit in what is in the tank
                 double need = NeedTonnes(c, 0.5);
-                if (need > ship.Fuel * 0.95) why = $"needs ≈ {need:N0} t of reaction mass even with a coast, {ship.Fuel:N0} t aboard";
+                if (need > ship.Fuel * 0.95) why = $"needs ≈ {need:N0} t of fuel even with a coast, {ship.Fuel:N0} t aboard";
             }
             return why == null;
         }
@@ -365,9 +438,16 @@ namespace FogOfWar.OpenWorld
         public void Accept(Contract c, double jd)
         {
             if (!CanAccept(c, out _)) return;
+            Add(c, jd);
+        }
+
+        // Start a job: from the board (Accept) or from a call in flight (route events).
+        void Add(Contract c, double jd)
+        {
             Board.Remove(c);
             taken.Add(c.Key);
             c.IssuedJd = jd; c.DeadlineJd = jd + c.Days;
+            c.ExpressJd = c.ExpressDays > 0 ? jd + c.ExpressDays : 0;
             Active.Add(c);
             SpawnDerelict(c);
             Say(Happening.JobAccepted, "Accepted: " + c.Title);
@@ -390,14 +470,33 @@ namespace FogOfWar.OpenWorld
             var rng = new System.Random(Docked.Name.GetHashCode() * 7919 + (int)(day % 100000));
             var here = sys[Docked.Body];
             var others = Array.FindAll(Ports, p => p != Docked && sys[p.Body] != null);
-            // nearer ports get more work: weight by distance^-0.75, so the far ports still show up now and then
+            double Dist(Port p) => (sys.Pos(sys[p.Body], jd) - sys.Pos(here, jd)).Mag;
+            // passengers: nearer ports get more work, weighted by distance^-0.75
             var w = new double[others.Length]; double wsum = 0;
-            for (int i = 0; i < others.Length; i++) { w[i] = 1 / Math.Pow((sys.Pos(sys[others[i].Body], jd) - sys.Pos(here, jd)).Mag, 0.75); wsum += w[i]; }
+            for (int i = 0; i < others.Length; i++) { w[i] = 1 / Math.Pow(Dist(others[i]), 0.75); wsum += w[i]; }
             Port Pick() { double x = rng.NextDouble() * wsum; for (int i = 0; i < others.Length; i++) if ((x -= w[i]) <= 0) return others[i]; return others[others.Length - 1]; }
+
+            // cargo: one run per tier, so a board is never all Earth ↔ Luna shuttles. Local is a port in the same planet's
+            // system; the other ports split by distance into the nearer half (interplanetary) and the farther half (far).
+            var local = Array.FindAll(others, p => SystemOf(sys[p.Body], sys) == SystemOf(here, sys));
+            var rest = Array.FindAll(others, p => Array.IndexOf(local, p) < 0);
+            Array.Sort(rest, (x, y) => Dist(x).CompareTo(Dist(y)));
+            var near = new Port[(rest.Length + 1) / 2];
+            var far = new Port[rest.Length - near.Length];
+            Array.Copy(rest, near, near.Length); Array.Copy(rest, near.Length, far, 0, far.Length);
+            string localName = "local";
+            if (local.Length == 0) { local = near; localName = "interplanetary"; } // Mars, Ceres, Vesta: no neighbour port
+            Contract Tiered(Port[] tier, string name)
+            {
+                if (tier.Length == 0) return null;
+                var c = Haul(rng, tier[rng.Next(tier.Length)], JobKind.Cargo, sys, jd, tier == far);
+                c.Tier = name;
+                return c;
+            }
 
             for (int k = 0; k < 8; k++)
             {
-                var c = k < 3 ? Haul(rng, Pick(), JobKind.Cargo, sys, jd)
+                var c = k == 0 ? Tiered(local, localName) : k == 1 ? Tiered(near, "interplanetary") : k == 2 ? Tiered(far, "far")
                       : k < 5 ? Haul(rng, Pick(), JobKind.Passengers, sys, jd)
                       : k == 6 ? (rng.NextDouble() < 0.6 ? Rescue(rng, sys, jd) : null)
                       : k == 7 ? (rng.NextDouble() < 0.6 ? Intercept(rng, sys, jd) : null)
@@ -428,10 +527,13 @@ namespace FogOfWar.OpenWorld
             return (fuel * RefFuelPrice * 2.5 + 2000 + tonnes * 40) * urgency;
         }
 
-        Contract Haul(System.Random rng, Port to, JobKind kind, SolarSystem sys, double jd)
+        static Body SystemOf(Body b, SolarSystem sys) => b.Parent == sys.Sun || b.Parent == null ? b : b.Parent;
+
+        // far: more slack, so a 1 g ship with the first tank can still make the deadline with a coast
+        Contract Haul(System.Random rng, Port to, JobKind kind, SolarSystem sys, double jd, bool far = false)
         {
             double d = (sys.Pos(sys[to.Body], jd) - sys.Pos(sys[Docked.Body], jd)).Mag;
-            double slack = 1 + rng.NextDouble();
+            double slack = far ? 1.5 + 0.5 * rng.NextDouble() : 1 + rng.NextDouble();
             var c = new Contract { Id = nextId++, Kind = kind, From = Docked.Name, To = to.Name };
             if (kind == JobKind.Cargo)
             {
@@ -448,6 +550,7 @@ namespace FogOfWar.OpenWorld
                 c.Days = Math.Max(c.Days, (1.15 * 2 * Math.Sqrt(d / (PassengerG * Ship.G0)) + 43200) / 86400);
             }
             c.Pay = Math.Round(c.Pay / 100) * 100;
+            c.ExpressDays = ExpressDaysFor(d, 0, c.Days);
             return c;
         }
 
@@ -473,6 +576,7 @@ namespace FogOfWar.OpenWorld
             };
             c.Pay = Math.Round(RefPay(d, 0, out c.Days, slack) * 1.2 / 100) * 100 + 1000;
             c.Days += DwellSeconds / 86400;
+            c.ExpressDays = ExpressDaysFor(d, DwellSeconds, c.Days);
             return c;
         }
 
@@ -480,15 +584,23 @@ namespace FogOfWar.OpenWorld
 
         public double FillCost(Ship ship) => Docked == null ? 0 : (TankCapacity - ship.Fuel) * Docked.FuelPrice;
 
+        // A port never strands a ship: what the credits don't cover, up to a tender's load in the tank, it sells on credit
+        // at its own price (debt is allowed, as for the tender). Docked, dry and broke used to be a dead end.
         public void BuyFuel(Ship ship, double tonnes)
         {
             if (Docked == null) return;
             tonnes = Math.Min(tonnes, TankCapacity - ship.Fuel);
-            tonnes = Math.Min(tonnes, Math.Max(Credits, 0) / Docked.FuelPrice);
-            if (tonnes <= 0.01) return;
+            double afford = Math.Max(Credits, 0) / Docked.FuelPrice;
+            double onCredit = Math.Max(0, Math.Min(tonnes, EmergencyTonnes - ship.Fuel) - afford);
+            tonnes = Math.Min(tonnes, afford + onCredit);
+            if (tonnes <= 0.01)
+            {
+                Notes.Add(new Note { Text = "Not enough credits for fuel", Good = false, Time = UnityEngine.Time.realtimeSinceStartup });
+                return;
+            }
             ship.Fuel += tonnes;
             Credits -= tonnes * Docked.FuelPrice;
-            Say(Happening.FuelBought, $"Bought {tonnes:N1} t of reaction mass: −{tonnes * Docked.FuelPrice:N0} cr");
+            Say(Happening.FuelBought, $"Bought {tonnes:N1} t of fuel: −{tonnes * Docked.FuelPrice:N0} cr" + (onCredit > 0.01 ? $" ({onCredit:N1} t on credit)" : ""));
         }
 
         // Adrift with a dry tank: a tender brings reaction mass. Debt is allowed.
@@ -496,7 +608,7 @@ namespace FogOfWar.OpenWorld
         {
             ship.Fuel = Math.Min(TankCapacity, ship.Fuel + EmergencyTonnes);
             Credits -= EmergencyCost;
-            Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of reaction mass, −{EmergencyCost:N0} cr", false);
+            Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of fuel, −{EmergencyCost:N0} cr", false);
         }
 
         public bool BuyDrive()
@@ -512,6 +624,17 @@ namespace FogOfWar.OpenWorld
             if (Docked == null || TankLevel >= MaxTankLevel || Credits < TankCost) return false;
             Credits -= TankCost; TankLevel++;
             Say(Happening.Upgrade, $"Tank enlarged to {TankCapacity:N0} t");
+            return true;
+        }
+
+        // One step toward the buyout, the last one only what is left. Docked, with the credits in hand: no debt for this.
+        public bool PayTowardShip()
+        {
+            double step = ShipStepNow;
+            if (Sandbox || Docked == null || OwnsShip || Credits < step) return false;
+            Credits -= step; ShipPaid += step;
+            if (OwnsShip) Say(Happening.ShipOwned, "The ship is yours: bought out from the yard");
+            else Say(Happening.ShipPayment, $"Paid {step:N0} cr toward the ship: {ShipPaid / ShipPrice * 100:0} % yours");
             return true;
         }
 
@@ -549,7 +672,7 @@ namespace FogOfWar.OpenWorld
         {
             credits = Credits, earned = Earned, fuel = ship.Fuel, drive = DriveLevel, tank = TankLevel, nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
-            sensors = Codex.SensorLevel, visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
+            sensors = Codex.SensorLevel, shipPaid = ShipPaid, startJd = StartJd, visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
             achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt),
         };
 
@@ -563,6 +686,7 @@ namespace FogOfWar.OpenWorld
             Board.Clear(); boardPort = null; taken.Clear();
             foreach (var c in Active) taken.Add(c.Key);
             Codex.SensorLevel = s.sensors;
+            ShipPaid = Math.Max(0, Math.Min(ShipPrice, s.shipPaid)); StartJd = s.startJd;
             void Fill(HashSet<string> set, List<string> l) { set.Clear(); if (l != null) set.UnionWith(l); }
             Fill(Codex.Visited, s.visited); Fill(Codex.Scanned, s.scanned); Fill(Codex.Achieved, s.achieved); Fill(Codex.DockedAt, s.dockedAt);
             ship.Fuel = s.fuel;

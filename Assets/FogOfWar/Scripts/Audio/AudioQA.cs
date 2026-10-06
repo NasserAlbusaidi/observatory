@@ -144,6 +144,19 @@ namespace FogOfWar
             Check(sy.CinematicOn == 1, "cinematic switch reaches the synth");
             GameSettings.CinematicSound = false;
             Controls.Tap(Controls.Action.ThrottleCut);
+            yield return new WaitForSecondsRealtime(2f);
+
+            Note("payday in the chase view: the console sting is heard outside the hull");
+            int p0 = Mark();
+            yield return new WaitForSecondsRealtime(1f);
+            var still = Level(p0, Mark());
+            bool wasSandbox = s.TestPayday(5000);
+            int p1 = Mark();
+            yield return new WaitForSecondsRealtime(1.5f);
+            var pay = Level(p1, Mark());
+            s.TestPaydayUndo(5000, wasSandbox);
+            Note($"meter, chase view: quiet RMS {still.rms:F1} peak {still.peak:F1} dBFS; payday RMS {pay.rms:F1} peak {pay.peak:F1} dBFS");
+            Check(pay.rms > still.rms + 6 && pay.peak > still.peak + 10, "a payday is clearly audible in the chase view");
             Put("camMode", 2);
             yield return new WaitForSecondsRealtime(3f);
 

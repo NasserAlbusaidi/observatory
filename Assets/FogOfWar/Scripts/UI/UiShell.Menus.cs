@@ -376,7 +376,8 @@ namespace FogOfWar.UI
             Ui.Show(recChip, rec);
             if (rec) Ui.Text(recText, $"REC  {Capture.RecordElapsed:0.0} s   ·   {Capture.RecordKey} stop");
             Ui.Show(fpsLabel, GameSettings.ShowFps && !HideHud);
-            bool hints = GameSettings.ShowHints && !app.MenuOpen && app.ShowUI && !HideHud && !app.HelpOpen;
+            bool hints = GameSettings.ShowHints && !app.MenuOpen && app.ShowUI && !HideHud && !app.HelpOpen
+                && (app.Current == null || app.Current.WantsKeyHints);
             Ui.Show(hintBar, hints);
             if (!hints) return;
             string key = (app.InGame ? "g" : "o") + Keys(A.Help) + Keys(A.Map) + Keys(A.CameraMode) + Capture.PhotoKey + Capture.ShotKey;
@@ -454,7 +455,7 @@ namespace FogOfWar.UI
             }
             Ui.L(sv.contentContainer, "1–9: attitude hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. " +
                 $"Flip ({Keys(A.Flip)}) turns the nose 180° from where it points now; 3 points it against your velocity. Turning alone doesn't slow you: burn to brake. " +
-                "Turning uses reaction wheels, which run on power and spend no reaction mass. " +
+                "Turning uses reaction wheels, which run on power and spend no fuel. " +
                 "Mouse: drag to look, scroll to zoom, click a label to target it. Change keys in Esc → Settings → Controls.", "t-note").style.marginTop = 12;
             var row = Ui.E(p, "row");
             row.style.marginTop = 10;
@@ -494,7 +495,7 @@ namespace FogOfWar.UI
                 var title = e.Q(className: "t-body");
                 if (title == null) continue;
                 var r = title.worldBound;
-                parts.Add($"{r.width:0}x{r.height:0}{(r.width < 60 || r.height > 80 ? " SQUEEZED" : "")}");
+                parts.Add($"{r.width:0}x{r.height:0}{(r.width < 60 || r.height > 80 ? " SQUEEZED" : "")}{(e.ClassListContains("pay") ? " pay" : e.ClassListContains("bad") ? " bad" : "")}");
             }
             return string.Join(", ", parts);
         }

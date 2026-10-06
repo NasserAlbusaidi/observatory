@@ -107,7 +107,10 @@ namespace FogOfWar
         }
 
         // review shots: the target card's travel line, and whether the lesson card clears the right column (QA-059)
-        public string TestTravelLine() => tcBrach?.text?.Replace("\n", " / ") ?? "none";
+        public string TestTravelLine() => tcBrach == null ? "none" : tcTrip.text + " || " + tcBrach.text.Replace("\n", " / ");
+
+        // review shots: the target card's values in one line
+        public string TestCardReport() => tcDist == null ? "" : string.Join(" | ", tcDist.text, tcRel.text, tcClose.text, tcDrift.text, tcStop.text);
 
         public string TestLessonReport()
         {

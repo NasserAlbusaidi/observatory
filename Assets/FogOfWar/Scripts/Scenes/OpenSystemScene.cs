@@ -67,6 +67,9 @@ namespace FogOfWar
             targets = sys.Bodies.FindAll(b => b != sys.Sun && (b.Parent == sys.Sun || b.Radius >= 100 || b == sys.Moon)); // T cycles these
             jd = Frame.JulianDateTdb(DateTime.UtcNow);
             warpIdx = 0;
+            // the scene object lives across New game: a new flight starts with the drawer closed, no page open and a
+            // compact target card
+            consoleOpen = false; pageView = -1; lessonSeen = null; cardExpanded = false;
 
             Orbit.enabled = false;
             Cam.nearClipPlane = 0.003f;
@@ -758,6 +761,11 @@ namespace FogOfWar
         void DrawOrbits()
         {
             pts.Clear(); cols.Clear(); targetLine.Clear();
+            var own = OwnBody();
+            ownSegs = 0;
+            // the map with a target set: the rest of the orbits step back
+            float rest = MapView && ship.Target != null ? 0.5f : 1f;
+            float fade = Mathf.Clamp01((float)(Math.Log10(Math.Max(camDist, 1)) - 3) / 4f);
             foreach (var b in sys.Bodies)
             {
                 if (b.Parent == null) continue;
@@ -767,10 +775,12 @@ namespace FogOfWar
                 bool tgt = ship.Target == b;
                 if (isMoon && (parentW - camW).Mag > b.A * 400) continue;
                 if (isMoon && !tgt && b.Radius < 50) continue; // hundreds of small moons: their orbits would be a hairball
-                var c = tgt ? new Color(1f, 0.71f, 0.28f, 0.75f) : isMoon ? new Color(0.5f, 0.6f, 0.85f, 0.35f) : new Color(0.45f, 0.55f, 0.85f, 0.4f);
+                bool mine = b == own && !tgt;
+                var c = tgt ? new Color(1f, 0.71f, 0.28f, 0.75f) : mine ? OwnOrbitCol : isMoon ? new Color(0.5f, 0.6f, 0.85f, 0.35f) : new Color(0.45f, 0.55f, 0.85f, 0.4f);
                 // planet orbits fade out when the camera is in close: from a ship they'd be streaks across the screen
-                if (!isMoon) c.a *= Mathf.Lerp(tgt ? 0.3f : 0f, 1f, Mathf.Clamp01((float)(Math.Log10(Math.Max(camDist, 1)) - 3) / 4f));
-                if (b.Asteroid && !tgt) c.a *= 0.25f; // two dozen named asteroids: keep their orbits in the background
+                if (!isMoon) c.a *= Mathf.Lerp(tgt || mine ? 0.3f : 0f, 1f, fade);
+                if (b.Asteroid && !tgt && !mine) c.a *= 0.25f; // two dozen named asteroids: keep their orbits in the background
+                if (!tgt && !mine) c.a *= rest;
                 if (b.Path != null)
                 {
                     // a craft on its own course has no orbit: its line is the course itself (QA-065)
@@ -792,11 +802,12 @@ namespace FogOfWar
                 for (int i = 0; i < line.Count; i++)
                 {
                     var q = Map(line[i], out _);
-                    if (i > 0) { pts.Add(prev); pts.Add(q); cols.Add(c); cols.Add(c); }
+                    if (i > 0) { pts.Add(prev); pts.Add(q); cols.Add(c); cols.Add(c); if (mine) ownSegs++; }
                     prev = q;
                 }
                 if (tgt) { targetLine.Clear(); targetLine.AddRange(line); }
             }
+            DrawMapLines(own, Mathf.Lerp(0.3f, 1f, fade));
             // photo mode and F2 (HUD hidden) take the orbit and course lines out of the picture too
             if (App.HideGui || !App.ShowUI) { pts.Clear(); cols.Clear(); }
             OrbitSegments = pts.Count / 2;

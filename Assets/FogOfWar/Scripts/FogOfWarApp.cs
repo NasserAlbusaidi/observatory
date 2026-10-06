@@ -244,6 +244,7 @@ namespace FogOfWar
             {
                 if (Capture.HandleEscape()) { }
                 else if (HelpOpen) HelpOpen = false;
+                else if (!MenuOpen && Current != null && Current.CloseOverlay()) { }
                 else if (menu == Screen.Controls || menu == Screen.Observatory || menu == Screen.Settings) { menu = Screen.Main; rebindNote = null; }
                 else if (MenuOpen) { if (gameStarted && InGame) menu = Screen.None; }
                 else menu = Screen.Main;
@@ -353,7 +354,7 @@ namespace FogOfWar
             }
             GUILayout.Label("1–9: hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. " +
                 $"Flip ({Controls.Keys(Controls.Action.Flip)}) turns the nose 180° from where it points now, then lets go; 3 points it against your velocity and keeps it there. Turning by hand ends any hold. Turning alone doesn't slow you: burn to brake. " +
-                "Turning uses reaction wheels, which run on power and spend no reaction mass. " +
+                "Turning uses reaction wheels, which run on power and spend no fuel. " +
                 "Mouse: drag to look around, scroll to zoom. Change keys under Esc → Controls.", ui.note);
             GUILayout.Space(6);
             if (GUILayout.Button("Close (F1)", ui.button)) HelpOpen = false;

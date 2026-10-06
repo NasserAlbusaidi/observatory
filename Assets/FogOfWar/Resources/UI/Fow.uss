@@ -253,6 +253,12 @@
 /* toasts for things that went wrong */
 .toast.bad { border-color: rgba(255, 107, 94, 0.75); }
 .toast.bad > .dot { background-color: rgb(255, 107, 94); }
+/* a job paid: green, a larger title, and the credits count up in green */
+.toast.pay { border-color: rgba(126, 231, 135, 0.85); border-width: 2px; padding: 12px 20px; }
+.toast.pay > .dot { background-color: rgb(126, 231, 135); }
+.toast.pay > .toast-text > .t-body { font-size: 19px; color: rgb(214, 255, 218); }
+.credits { transition-property: scale, color; transition-duration: 0.2s; transform-origin: left; }
+.credits.payday { color: rgb(126, 231, 135); scale: 1.15 1.15; }
 
 .panel-head, .row { flex-shrink: 0; }
 .job-title { flex-grow: 1; flex-shrink: 1; white-space: normal; margin-right: 8px; }
@@ -268,6 +274,8 @@
           border-left-width: 3px; border-left-color: rgb(255, 181, 71); background-color: rgba(8, 11, 20, 0.84);
           opacity: 0; translate: 0 10px; transition-property: opacity, translate; transition-duration: 0.3s; transition-timing-function: ease-out-cubic; }
 .lesson.in { opacity: 1; translate: 0 0; }
+/* a route call (distress, cargo trouble) takes the lesson card's place with a red edge */
+.lesson.call { border-left-color: rgb(255, 107, 94); }
 .lesson-text { font-size: 16px; color: rgb(236, 239, 250); white-space: normal; margin-top: 4px; }
 .pip { width: 14px; height: 4px; margin-left: 4px; background-color: rgba(255, 255, 255, 0.15); }
 .pip.done { background-color: rgba(255, 181, 71, 0.55); }

@@ -18,6 +18,7 @@ namespace FogOfWar
         string only;
         StreamWriter log;
         int errors;
+        bool classicWas; // the player's "classic panel" setting, off for the run (no HUD to shoot) and put back at the end
 
         public static void StartIfRequested(FogOfWarApp app)
         {
@@ -56,6 +57,8 @@ namespace FogOfWar
             yield return null;
             var shell = UiShell.Instance;
             if (shell == null) { log.WriteLine("no UI shell"); Quit(); yield break; }
+            classicWas = GameSettings.ClassicPanel;
+            if (classicWas) { GameSettings.ClassicPanel = false; log.WriteLine("classic panel setting on: off for this run"); }
 
             foreach (var size in sizes)
             {
@@ -82,6 +85,23 @@ namespace FogOfWar
                 app.NewGame();
                 yield return Wait(1.5f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "05-flight");
+                if (app.Current is OpenSystemScene first)
+                {
+                    log.WriteLine("    05-flight: console " + (first.TestConsoleOpen ? "open" : "closed"));
+                    if (first.TestConsoleOpen) { errors++; log.WriteLine("    ERROR 05-flight: the console drawer should start closed"); }
+                    // the target card: compact in cruise, everything with the details open
+                    string rows = first.TestCardRows();
+                    log.WriteLine("    05-flight: card rows " + rows);
+                    if (rows != "Distance Closing Trip Engage") { errors++; log.WriteLine("    ERROR 05-flight: expected the compact card 'Distance Closing Trip Engage'"); }
+                    first.SetCardExpanded(true);
+                    yield return Wait(0.3f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "05b-card-expanded");
+                    rows = first.TestCardRows();
+                    log.WriteLine("    05b-card-expanded: card rows " + rows);
+                    foreach (var want in new[] { "Kind", "Rel", "Drift", "Stop", "Brach", "Note" })
+                        if (Array.IndexOf(rows.Split(' '), want) < 0) { errors++; log.WriteLine($"    ERROR 05b-card-expanded: no {want} row"); }
+                    first.SetCardExpanded(false);
+                }
                 Controls.Tap(Controls.Action.ThrottleFull);
                 yield return Wait(1.2f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06-flight-burn");
@@ -97,6 +117,8 @@ namespace FogOfWar
                     setCam.Invoke(os, new object[] { 2 });
                     yield return Wait(0.5f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06f-cockpit");
+                    log.WriteLine("    06f-cockpit: target card " + (os.TestCardShown ? "shown" : "hidden"));
+                    if (os.TestCardShown) { errors++; log.WriteLine("    ERROR 06f-cockpit: the MFDs carry the target in cruise; the card should hide"); }
                     lookPitch.SetValue(os, 22f);
                     yield return Wait(0.3f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06g-cockpit-look-down");
@@ -156,26 +178,114 @@ namespace FogOfWar
                             yield return Wait(0.3f);
                             yield return Shot(app, shell, camRT, uiRT, tag, "06k-travel-5km");
                             log.WriteLine("    travel line, 5 km out: " + os.TestTravelLine());
+                            // the approach HUD: brake gauge early, at the burn point and too late, then docking with the RCS split
+                            foreach (var (aShot, aKm, aKms, aDrift, aWant) in new[] {
+                                ("06n-approach", 200.0, 1.5, 0.05, "Approach early"), ("06o-approach-burn", 130.0, 1.5, 0.0, "Approach now"),
+                                ("06p-approach-late", 80.0, 1.5, 0.0, "Approach late"), ("06q-docking", 3.0, 0.03, 0.005, "Docking") })
+                            {
+                                os.TestApproachTarget(aKm, aKms, aDrift);
+                                os.TestAimTargetAt(0.35f);
+                                yield return Wait(0.3f);
+                                yield return Shot(app, shell, camRT, uiRT, tag, aShot);
+                                string aRep = os.TestApproachReport();
+                                log.WriteLine($"    {aShot}: {aRep}");
+                                if (!aRep.StartsWith(aWant)) { errors++; log.WriteLine($"    ERROR {aShot}: expected '{aWant}'"); }
+                            }
+                            // the stop marker (target-relative retrograde) with its burn cue, looking away from the target
+                            os.TestApproachTarget(130, 1.5);
+                            os.TestLookAwayFromTarget();
+                            yield return Wait(0.3f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06s-stop-marker");
+                            string stopRep = os.TestStopMarkerReport();
+                            log.WriteLine("    06s-stop-marker: " + stopRep);
+                            if (!stopRep.Contains("BURN NOW")) { errors++; log.WriteLine("    ERROR 06s-stop-marker: expected the BURN NOW cue"); }
+                            // a lesson that names a card row keeps it on the compact card: Brake (the Stop row, closing
+                            // fast) and Beacon (Closing, under the gauge; that lesson holds only under 20 m/s)
+                            var lessonF = typeof(OpenSystemScene).GetField("lesson", F);
+                            var lessonWas = lessonF.GetValue(os);
+                            foreach (var (lName, lKm, lKms, lRow) in new[] { ("Brake", 130.0, 1.5, "Stop"), ("Beacon", 3.0, 0.01, "Closing") })
+                            {
+                                os.TestApproachTarget(lKm, lKms);
+                                lessonF.SetValue(os, Enum.Parse(lessonF.FieldType, lName));
+                                yield return Wait(0.3f);
+                                string lRows = os.TestCardRows();
+                                log.WriteLine($"    lesson {lName}: card rows {lRows}");
+                                var lSet = lRows.Split(' ');
+                                if (Array.IndexOf(lSet, lRow) < 0 || Array.IndexOf(lSet, "Gauge") < 0) { errors++; log.WriteLine($"    ERROR lesson {lName}: expected the gauge and the {lRow} row"); }
+                            }
+                            lessonF.SetValue(os, lessonWas);
+                            // cockpit: the card shows while the gauge is up (the MFDs repeat the rest of it)
+                            os.TestApproachTarget(130, 1.5);
+                            var setCamA = typeof(OpenSystemScene).GetMethod("SetCam", F);
+                            setCamA.Invoke(os, new object[] { 2 });
+                            yield return Wait(0.5f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06r-cockpit-approach");
+                            log.WriteLine("    06r-cockpit-approach: " + os.TestApproachReport());
+                            setCamA.Invoke(os, new object[] { 0 });
+                            os.TestOffsetFromTarget(5);
+                            yield return null;
                             // QA-060: toasts stay clear of the target card
                             shell.Toast("Test toast: job posted");
                             shell.Toast("Test toast with a note", "and a second line");
                             shell.Toast("Test toast: something went wrong", null, 3.5f, "bad");
-                            // QA-063: the Δv-short warning, a long title over a long note
-                            shell.Toast("Not enough Δv to reach Neptune", "Needs about 14,353 km/s with margin, 5,108 left. Engage again to go anyway.", 6, "bad");
+                            // QA-063: the fuel-short warning, a long title over a long note
+                            shell.Toast("Not enough fuel to reach Neptune", "Needs about 412.6 t with margin, 196.4 t aboard. Engage again to go anyway.", 6, "bad");
                             yield return Wait(0.4f);
                             yield return Shot(app, shell, camRT, uiRT, tag, "06l-toasts");
                             log.WriteLine("    toasts: " + shell.TestToastReport());
+                            // a payday: a green toast with the bank line, the credits counting up, then settled on the new total
+                            bool wasSandbox = os.TestPayday(12345);
+                            yield return Wait(0.4f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06p-payday");
+                            string payMid = os.TestPaydayReport();
+                            yield return Wait(1.2f);
+                            string payEnd = os.TestPaydayReport();
+                            log.WriteLine($"    06p-payday: {payMid}  ->  {payEnd}");
+                            string bank = payEnd.Substring(payEnd.LastIndexOf("bank ") + 5);
+                            if (!payMid.Contains("counting True") || payMid.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to be counting up"); }
+                            if (!payEnd.Contains("counting False") || !payEnd.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to settle on the new total"); }
+                            if (!shell.TestToastReport().Contains("pay")) { errors++; log.WriteLine("    ERROR 06p-payday: expected a pay toast"); }
+                            // a route call: the distress card with its two answers
+                            bool called = os.TestRouteCall(OpenWorld.Career.RouteKind.Distress);
+                            yield return Wait(0.4f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06t-route-call");
+                            if (!called) { errors++; log.WriteLine("    ERROR 06t-route-call: expected a distress call"); }
+                            string callRep = os.TestRouteCallReport();
+                            log.WriteLine($"    06t-route-call: {callRep}");
+                            if (!callRep.Contains("card Flex opacity 1.00") || !callRep.Contains("on screen True") || callRep.Contains("above the lesson False")) { errors++; log.WriteLine("    ERROR 06t-route-call: expected the call card on screen"); }
+                            os.TestRouteCallClear();
+                            os.TestPaydayUndo(12345, wasSandbox);
                             ship.VelRef = null;
                             typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);
                         }
                     }
                 }
-                os?.ShowConsoleTab(5);
+                // the full-screen Jobs and Codex pages
+                os?.TestHandJob(true);
+                os?.TestShipPaid(350000);
+                os?.OpenPage(0);
+                yield return Shot(app, shell, camRT, uiRT, tag, "06a-jobs-page");
+                os?.TestShipPaid(double.NaN);
+                os?.TestHandJob(false);
+                if (os != null)
+                {
+                    // the long goal reached: the buyout card says the career so far
+                    os.ClosePage();
+                    os.TestBuyout();
+                    yield return Wait(0.6f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06o-ship-owned");
+                    string own = os.TestBuyoutReport();
+                    log.WriteLine($"    06o-ship-owned: {own}");
+                    if (!own.Contains("owned True") || !own.Contains("cr earned")) { errors++; log.WriteLine("    ERROR 06o-ship-owned: expected the ship owned and the record"); }
+                    os.TestBuyoutUndo();
+                    os.OpenPage(0);
+                }
+                os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
                 os?.ShowCodex(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
-                if (os != null) log.WriteLine("    codex tab: " + os.TestLessonReport());
                 os?.ShowCodex(0);
+                os?.ClosePage();
                 os?.ShowConsoleTab(0);
                 if (os != null)
                 {
@@ -183,6 +293,20 @@ namespace FogOfWar
                     yield return Wait(0.3f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06m-lesson-console");
                     log.WriteLine("    flight tab: " + os.TestLessonReport());
+                    // the first flight's payday card, with its two answers, and a step of the hand-flying practice
+                    var lessonFld = typeof(OpenSystemScene).GetField("lesson", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var lessonBefore = lessonFld.GetValue(os);
+                    foreach (var (pName, pShot, pWant) in new[] { ("Payday", "06u-payday-card", "FIRST FLIGHT  ·  PAID | pips 3 | skip False | answers True"),
+                                                                 ("Turn", "06v-practice-card", "HAND-FLYING PRACTICE  ·  STEP 1 OF 8 | pips 8 | skip True | answers False") })
+                    {
+                        lessonFld.SetValue(os, Enum.Parse(lessonFld.FieldType, pName));
+                        yield return Wait(0.4f);
+                        yield return Shot(app, shell, camRT, uiRT, tag, pShot);
+                        string pRep = os.TestLessonCardReport();
+                        log.WriteLine($"    {pShot}: {pRep}");
+                        if (!pRep.StartsWith(pWant)) { errors++; log.WriteLine($"    ERROR {pShot}: expected '{pWant}'"); }
+                    }
+                    lessonFld.SetValue(os, lessonBefore);
                 }
                 if (os != null)
                     foreach (var k in new[] { OpenWorld.JobKind.Intercept, OpenWorld.JobKind.Rescue })
@@ -206,6 +330,26 @@ namespace FogOfWar
                 Controls.Tap(Controls.Action.Map);
                 yield return Wait(1.0f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "08-system-map");
+                if (app.Current is OpenSystemScene mapOs)
+                {
+                    // the map as a trip planner: your orbit and the target's stand out, the planned path with its marks
+                    const BindingFlags MF = BindingFlags.Instance | BindingFlags.NonPublic;
+                    var mapSys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", MF).GetValue(mapOs);
+                    var setTarget = typeof(OpenSystemScene).GetMethod("SetTarget", MF);
+                    foreach (var (mName, mShot) in new[] { ((string)null, "08-system-map"), ("Mars", "08b-map-mars"), ("Jupiter", "08c-map-jupiter") })
+                    {
+                        if (mName != null)
+                        {
+                            setTarget.Invoke(mapOs, new object[] { mapSys[mName] });
+                            yield return Wait(0.5f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, mShot);
+                        }
+                        string mRep = mapOs.TestMapReport();
+                        log.WriteLine($"    {mShot}: {mRep}");
+                        // Jupiter's meet point is off screen at the map's opening zoom; Mars barely moves, so its ring gives way
+                        if (mRep.Contains(" 0 segs") || mRep.Contains("path off") || !mRep.Contains("flip mark on") || mRep.Contains("meet mark none")) { errors++; log.WriteLine($"    ERROR {mShot}: expected your orbit, the planned path and its marks"); }
+                    }
+                }
                 Controls.Tap(Controls.Action.Map);
                 yield return Wait(0.5f);
                 app.ShowMenu(UiShell.MenuMain);
@@ -307,6 +451,12 @@ namespace FogOfWar
             }
             cam.SetPixels32(a);
             File.WriteAllBytes(Path.Combine(dir, $"{tag}-{name}.png"), cam.EncodeToPNG());
+            // the target card reads in plain units: no "×10^-4 m/s" at rest, no "4.17 ×10^6 km" stop distance
+            if (app.Current is OpenSystemScene card && card.TestCardReport() is string cr && cr.Contains("×10"))
+            {
+                errors++;
+                log.WriteLine("    target card has a power of ten: " + cr);
+            }
             Destroy(cam); Destroy(ui);
             log.WriteLine($"  {name}");
         }
@@ -333,6 +483,7 @@ namespace FogOfWar
 
         void Quit()
         {
+            if (classicWas) GameSettings.ClassicPanel = true;
             log?.Close(); log = null;
             Application.Quit();
         }

@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 
 namespace FogOfWar
 {
-    // The Codex tab of the ship console: the target's entry (data once visited, survey notes once scanned, scan
+    // The Codex page (F4): the target's entry (data once visited, survey notes once scanned, scan
     // progress) and the achievement list. Same rules as CodexPanel in OpenSystemScene.Career.cs.
     public partial class OpenSystemScene
     {
@@ -68,6 +68,11 @@ namespace FogOfWar
             Ui.L(head, b.Name.ToUpperInvariant(), "t-h2", "f-cond", "accent", "glow").style.flexGrow = 1;
             Ui.L(head, scanned ? "SCANNED" : seen ? "VISITED" : "NOT VISITED", "chip", "f-condm", scanned ? "ok" : seen ? "cold" : "bad");
             Ui.L(c, Kind(b).ToUpperInvariant(), "t-label", "f-condm");
+            // the exploration track: how much of this body's system is scanned, and what the next first scan sells at
+            var market = Codex.Market(sys, b);
+            int inMarket = cx.ScannedIn(sys, market), ofMarket = sys.Bodies.FindAll(o => o.Parent != null && !Career.IsCraft(o) && Codex.Market(sys, o) == market).Count;
+            Ui.L(c, $"{Codex.MarketName(sys, market)}: {inMarket} of {ofMarket} scanned" +
+                (career.Sandbox ? "" : $" · the next first scan here sells at {Codex.Share(inMarket) * 100:0} % of its value"), "t-label", "f-mono", "dim").style.marginTop = 2;
             if (ShapeCredits.TryGetValue(b.Name, out var credit)) Ui.L(c, credit, "t-note").style.marginTop = 2;
             if (seen || scanned)
             {
@@ -89,7 +94,7 @@ namespace FogOfWar
                 return;
             }
             Ui.Section(c, "Scan");
-            string sale = career.Sandbox ? "" : $" First data sells for {Codex.DataValue(sys, b, jd):N0} cr.";
+            string sale = career.Sandbox ? "" : $" First data sells for {cx.SaleValue(sys, b, jd):N0} cr.";
             if (cx.ScanTarget == b.Name && cx.ScanProgress > 0)
             {
                 float f = (float)(cx.ScanProgress / cx.ScanSeconds);

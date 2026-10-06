@@ -105,8 +105,8 @@ namespace FogOfWar
             mfdLines.Add(new Readout("Assist", ship.FlightAssist ? "on" : "off", ship.FlightAssist ? Tone.Normal : Tone.Bad));
             mfdLines.Add(new Readout("RCS", ship.RcsActive ? "firing" : "idle", ship.RcsActive ? Tone.Hot : Tone.Normal));
             if (career != null && !career.Sandbox && career.TankCapacity > 0)
-                mfdLines.Add(new Readout("Reaction mass", $"{ship.Fuel:N0} / {career.TankCapacity:N0} t", ship.Fuel < 0.15 * career.TankCapacity ? Tone.Bad : Tone.Normal));
-            else mfdLines.Add(new Readout("Reaction mass", ship.UnlimitedFuel ? "unmetered" : Fmt.Num(ship.Fuel, 1) + " t", ship.Dry ? Tone.Bad : Tone.Normal));
+                mfdLines.Add(new Readout("Fuel", $"{ship.Fuel:N0} / {career.TankCapacity:N0} t", ship.Fuel < 0.15 * career.TankCapacity ? Tone.Bad : Tone.Normal));
+            else mfdLines.Add(new Readout("Fuel", ship.UnlimitedFuel ? "unmetered" : Fmt.Num(ship.Fuel, 1) + " t", ship.Dry ? Tone.Bad : Tone.Normal));
             mfdLines.Add(new Readout("Speed", MfdSpeed((ship.Vel - sys.Vel(reference, jd)).Mag) + " vs " + reference.Name));
             if (g >= 2.5) mfdLines.Add(new Readout("High g", "stay in your couch", Tone.Bad));
             m.Page(0, "DRIVE", mfdLines);
