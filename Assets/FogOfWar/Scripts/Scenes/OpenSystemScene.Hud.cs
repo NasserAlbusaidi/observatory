@@ -471,7 +471,7 @@ namespace FogOfWar
         {
             Ui.Section(c, "Planets");
             var row = Ui.E(c, "row", "wrap");
-            foreach (var p in sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid))
+            foreach (var p in sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x)))
             {
                 var b = p;
                 var l = Ui.B(row, p.Name, () => SetTarget(b), "small");

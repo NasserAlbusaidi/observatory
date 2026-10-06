@@ -186,7 +186,7 @@ namespace FogOfWar
         public override void OnGUIOverlay()
         {
             if (Prof) swGui.Start();
-            try { if (GameSettings.ShowLabels) DrawLabels(); if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
+            try { if (GameSettings.ShowLabels) { DrawLabels(); DrawTraffic(); } if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
         }
 
         GUIStyle labelStyle, labelOn, hudStyle, hudBig;
@@ -438,7 +438,7 @@ namespace FogOfWar
 
             // --- targets
             ui.Section("Targets");
-            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid);
+            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x));
             var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
             int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
             if (si >= 0) SetTarget(planets[si]);

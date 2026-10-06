@@ -10,7 +10,7 @@ namespace FogOfWar
     // Unattended career run: `FogOfWar.exe -fowcareer <dir>` plays the first jobs of a new career through the autopilot
     // and logs credits, reaction mass and trip estimates against what the flight really used. Screenshots unless the
     // player runs in -batchmode. Writes career.txt and quits.
-    public class CareerQA : MonoBehaviour
+    public partial class CareerQA : MonoBehaviour
     {
         string dir;
         StreamWriter log;
@@ -983,6 +983,8 @@ namespace FogOfWar
                 yield return null;
                 Check(s.TutorialText == null, "an older save without tutorial state stays quiet");
             }
+
+            yield return TrafficChecks();
 
             State("end");
             log.WriteLine($"done: {fails} failed checks");
