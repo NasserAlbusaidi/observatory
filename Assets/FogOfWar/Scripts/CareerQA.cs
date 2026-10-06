@@ -489,6 +489,19 @@ namespace FogOfWar
                 ship.Pos = sys.Pos(moon, jd) + new D3(5000, 0, 0); ship.Vel = sys.Vel(moon, jd) + new D3(0, Math.Sqrt(moon.GM / 5000), 0);
                 yield return null; yield return null;
                 Check(career.Docked?.Name == "Luna", $"circular orbit at Luna docks ({career.Docked?.Name ?? "none"})");
+                // docked, dry and in debt was a dead end: the tender comes only out there, and fuel needed credits
+                if (career.Docked != null)
+                {
+                    double fuelWas = ship.Fuel, crWas = career.Credits;
+                    ship.Fuel = 0; career.Credits = -5000;
+                    career.BuyFuel(ship, career.TankCapacity);
+                    double price = career.Docked.FuelPrice;
+                    Check(Math.Abs(ship.Fuel - Career.EmergencyTonnes) < 0.01 && Math.Abs(career.Credits - (-5000 - Career.EmergencyTonnes * price)) < 1,
+                        $"docked, dry and broke: the port sells a tender's load on credit ({ship.Fuel:N1} t, {career.Credits:N0} cr)");
+                    career.BuyFuel(ship, 20);
+                    Check(Math.Abs(ship.Fuel - Career.EmergencyTonnes) < 0.01, $"no more credit past a tender's load ({ship.Fuel:N1} t)");
+                    ship.Fuel = fuelWas; career.Credits = crWas;
+                }
                 var rj = career.Docked != null ? career.Rescue(new System.Random(5), sys, jd) : null;
                 if (rj != null) career.Accept(rj, jd);
                 if (rj != null && career.Active.Contains(rj))

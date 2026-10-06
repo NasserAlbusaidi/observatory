@@ -480,15 +480,23 @@ namespace FogOfWar.OpenWorld
 
         public double FillCost(Ship ship) => Docked == null ? 0 : (TankCapacity - ship.Fuel) * Docked.FuelPrice;
 
+        // A port never strands a ship: what the credits don't cover, up to a tender's load in the tank, it sells on credit
+        // at its own price (debt is allowed, as for the tender). Docked, dry and broke used to be a dead end.
         public void BuyFuel(Ship ship, double tonnes)
         {
             if (Docked == null) return;
             tonnes = Math.Min(tonnes, TankCapacity - ship.Fuel);
-            tonnes = Math.Min(tonnes, Math.Max(Credits, 0) / Docked.FuelPrice);
-            if (tonnes <= 0.01) return;
+            double afford = Math.Max(Credits, 0) / Docked.FuelPrice;
+            double onCredit = Math.Max(0, Math.Min(tonnes, EmergencyTonnes - ship.Fuel) - afford);
+            tonnes = Math.Min(tonnes, afford + onCredit);
+            if (tonnes <= 0.01)
+            {
+                Notes.Add(new Note { Text = "Not enough credits for reaction mass", Good = false, Time = UnityEngine.Time.realtimeSinceStartup });
+                return;
+            }
             ship.Fuel += tonnes;
             Credits -= tonnes * Docked.FuelPrice;
-            Say(Happening.FuelBought, $"Bought {tonnes:N1} t of reaction mass: −{tonnes * Docked.FuelPrice:N0} cr");
+            Say(Happening.FuelBought, $"Bought {tonnes:N1} t of reaction mass: −{tonnes * Docked.FuelPrice:N0} cr" + (onCredit > 0.01 ? $" ({onCredit:N1} t on credit)" : ""));
         }
 
         // Adrift with a dry tank: a tender brings reaction mass. Debt is allowed.
