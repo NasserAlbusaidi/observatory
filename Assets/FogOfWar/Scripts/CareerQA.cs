@@ -278,6 +278,69 @@ namespace FogOfWar
                 Check(bad == 0, $"every board job but an intercept has an express window inside its deadline ({n - bad} of {n})");
             }
 
+            // 5c. route events: calls in flight about a job (a test cargo run to Mars, removed afterwards)
+            {
+                Check(!career.RouteEvents, "route events are off in the unattended suite");
+                double fuelWas = ship.Fuel;
+                ship.Fuel = career.TankCapacity;
+                var mars = sys["Mars"];
+                var run = new Contract { Id = 900001, Kind = JobKind.Cargo, Title = "QA coolant", From = "Luna", To = "Mars orbit", Tonnes = 10, Pay = 10000, Days = 100, Key = "qa/route" };
+                run.IssuedJd = jd; run.DeadlineJd = jd + run.Days;
+                career.Active.Add(run);
+                Call("SetTarget", mars);
+                yield return null;
+
+                // a distress call: a rescue near Mars, with the rest of this trip in its time; yes takes it on
+                Check(career.MakeCall(Career.RouteKind.Distress, run, sys, ship, jd) && career.Call?.Offer != null, "a distress call comes in");
+                var offer = career.Call?.Offer;
+                var (ru, rw) = ship.RelToTarget(sys, jd);
+                Career.Trip(Math.Max((sys.Pos(mars, jd) - ship.Pos).Mag - Ship.Standoff(mars), 0), ship.MaxG * Ship.G0, 1, ship.Mass, out double burn, out _, out _, ru, rw);
+                career.Answer(true, jd);
+                yield return null;
+                Check(offer != null && career.Active.Contains(offer) && sys[offer.To] != null && sys[offer.To].Parent == mars && offer.Days > burn / 86400 && offer.ExpressDays == 0 && career.Call == null,
+                    $"answering takes on the rescue: its wreck orbits Mars, {offer?.Days:F1} days allowed for a {burn / 86400:F1}-day trip");
+                if (offer != null) career.Abandon(offer);
+                career.MakeCall(Career.RouteKind.Distress, run, sys, ship, jd);
+                var ignored = career.Call?.Offer;
+                career.Answer(false, jd);
+                Check(ignored != null && !career.Active.Contains(ignored) && sys[ignored.To] == null && career.Call == null, "ignoring a distress call takes nothing on");
+
+                // cargo trouble: venting costs the fuel shown; pushing on halves the pay after the spoil time
+                career.MakeCall(Career.RouteKind.CargoTrouble, run, sys, ship, jd);
+                double vent = career.Call?.VentTonnes ?? -1, f0 = ship.Fuel;
+                career.Answer(true, jd);
+                Check(vent > 0 && Math.Abs(f0 - ship.Fuel - vent) < 1e-6 && run.SpoilJd == 0, $"venting costs the {vent:N1} t shown and leaves the cargo whole");
+                career.MakeCall(Career.RouteKind.CargoTrouble, run, sys, ship, jd);
+                double spoilDays = career.Call?.SpoilDays ?? -1;
+                career.Answer(false, jd);
+                Check(spoilDays > burn / 86400 && Math.Abs(run.SpoilJd - (jd + spoilDays)) < 1e-9 && Career.PayAt(run, run.SpoilJd - 0.01, out _, out _) == 10000 && Career.PayAt(run, run.SpoilJd + 0.01, out _, out _) == 5000,
+                    $"pushing on: full pay within {spoilDays * 24:F0} h, half after (a full burn takes {burn / 3600:F0} h)");
+                run.SpoilJd = 0;
+
+                // a real roll: flying the job with events on, a call comes in and drops the warp
+                yield return null; // the calls above left DropWarp set: let the scene take it before the warp goes up
+                career.RouteEvents = true;
+                Put("cruiseIdx", 1);
+                Put("selectedPlan", Plan.Brachistochrone);
+                Call("TogglePlan");
+                if (!ship.PlanActive && ship.Phase.StartsWith("fuel short")) Call("TogglePlan");
+                Put("warpIdx", 6);
+                float t0 = Time.realtimeSinceStartup;
+                double jd0 = jd;
+                while (career.Call == null && Time.realtimeSinceStartup - t0 < 30) yield return null;
+                yield return null;
+                Check(career.Call != null && Get<int>("warpIdx") == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, warp {Get<int>("warpIdx")}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
+                yield return Shot("c05c-route-call");
+                career.RouteEvents = false;
+                career.Answer(false, jd);
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0;
+                run.SpoilJd = 0;
+                career.Active.Remove(run);
+                yield return null;
+                Check(career.Call == null, "with the job gone, no call is left");
+                ship.Fuel = fuelWas;
+            }
+
             // 6. the career save round-trips (through JSON only: the player's own save slot is left alone)
             double credits = career.Credits, fuel = ship.Fuel; int done = career.Done;
             var json = JsonUtility.ToJson(career.ToSave(ship));

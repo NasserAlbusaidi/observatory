@@ -117,6 +117,7 @@ namespace FogOfWar
             rotVal = Ui.L(rg, "", "t-label", "f-mono");
 
             BuildLessonCard(layer);
+            BuildCallCard(layer);
             pills = Ui.E(layer, "pills");
             pills.pickingMode = PickingMode.Ignore;
             pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV");

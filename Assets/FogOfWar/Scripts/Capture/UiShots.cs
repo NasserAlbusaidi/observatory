@@ -245,6 +245,15 @@ namespace FogOfWar
                             if (!payMid.Contains("counting True") || payMid.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to be counting up"); }
                             if (!payEnd.Contains("counting False") || !payEnd.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to settle on the new total"); }
                             if (!shell.TestToastReport().Contains("pay")) { errors++; log.WriteLine("    ERROR 06p-payday: expected a pay toast"); }
+                            // a route call: the distress card with its two answers
+                            bool called = os.TestRouteCall(OpenWorld.Career.RouteKind.Distress);
+                            yield return Wait(0.4f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06t-route-call");
+                            if (!called) { errors++; log.WriteLine("    ERROR 06t-route-call: expected a distress call"); }
+                            string callRep = os.TestRouteCallReport();
+                            log.WriteLine($"    06t-route-call: {callRep}");
+                            if (!callRep.Contains("card Flex opacity 1.00") || !callRep.Contains("on screen True") || callRep.Contains("above the lesson False")) { errors++; log.WriteLine("    ERROR 06t-route-call: expected the call card on screen"); }
+                            os.TestRouteCallClear();
                             os.TestPaydayUndo(12345, wasSandbox);
                             ship.VelRef = null;
                             typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);

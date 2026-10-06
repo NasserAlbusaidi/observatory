@@ -23,7 +23,7 @@ namespace FogOfWar
 
         void InitCareer()
         {
-            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys };
+            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys, RouteEvents = !Unattended() };
             career.StartNew(jd);
             ship.Fuel = career.TankCapacity;
             career.Apply(ship);
@@ -579,7 +579,7 @@ namespace FogOfWar
         void LoadCareer()
         {
             foreach (var old in career.Active.ToArray()) career.Abandon(old); // drop this session's derelicts from the system
-            career = new Career { Sys = sys };
+            career = new Career { Sys = sys, RouteEvents = !Unattended() };
             if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); ResumeTutorial(); return; }
             try { career.FromSave(JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey)), ship); }
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the career save: " + e.Message); career.StartNew(jd); ship.Fuel = career.TankCapacity; }

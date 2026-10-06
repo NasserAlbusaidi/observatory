@@ -39,6 +39,7 @@ namespace FogOfWar
         void UpdateCareerStrip()
         {
             if (career == null || rmText == null) return;
+            UpdateCallCard();
             // career notes become toasts; a payday gets its own look, stays longer and says where the business stands
             float newest = lastNoteTime;
             bool paid = false;
@@ -80,6 +81,48 @@ namespace FogOfWar
                 Ui.SetClass(creditsLabel, "payday", countT0 >= 0);
             }
         }
+
+        // a route call (Career.Route.cs): a card with the two answers, in the lesson card's place
+        VisualElement callCard;
+        Label callTitle, callText;
+        Label callYes, callNo;
+        Career.RouteCall callShown;
+
+        void BuildCallCard(VisualElement layer)
+        {
+            callCard = Ui.E(layer, "panel", "lesson", "call");
+            Ui.Corners(callCard);
+            callTitle = Ui.L(callCard, "", "t-micro", "f-condm", "warn");
+            callText = Ui.L(callCard, "", "t-body", "lesson-text");
+            var row = Ui.E(callCard, "row");
+            row.style.marginTop = 8;
+            callYes = Ui.B(row, "", () => career?.Answer(true, jd), "small", "primary");
+            callNo = Ui.B(row, "", () => career?.Answer(false, jd), "small");
+            Ui.Show(callCard, false);
+        }
+
+        void UpdateCallCard()
+        {
+            var call = career != null && !career.Sandbox ? career.Call : null;
+            // a lesson on screen keeps its place: the call sits above it
+            bool lessonUp = lessonCard != null && lessonCard.parent != null && lessonCard.resolvedStyle.display == DisplayStyle.Flex && !float.IsNaN(lessonCard.layout.y);
+            callCard.style.bottom = lessonUp ? new StyleLength(lessonCard.parent.layout.height - lessonCard.layout.y + 10) : new StyleLength(StyleKeyword.Null);
+            if (call == callShown) return;
+            callShown = call;
+            Ui.Show(callCard, call != null);
+            Ui.SetClass(callCard, "in", call != null);
+            if (call == null) return;
+            Ui.Text(callTitle, call.Title.ToUpperInvariant());
+            Ui.Text(callText, call.Text);
+            Ui.Text(callYes, call.Yes); Ui.Text(callNo, call.No);
+        }
+
+        // review shots: a route call of the given kind about the first active job, made the way a trip makes one
+        public bool TestRouteCall(Career.RouteKind kind) => career.Active.Count > 0 && career.MakeCall(kind, career.Active[0], sys, ship, jd);
+        public string TestRouteCallReport() => $"call {career.Call?.Title ?? "none"} about {(career.Active.Count > 0 ? career.Active[0].Title + " to " + career.Active[0].To : "no job")}, docked {career.Docked?.Name ?? "-"}, " +
+            $"card {callCard.resolvedStyle.display} opacity {callCard.resolvedStyle.opacity:F2} at {callCard.layout}, on screen {callCard.layout.yMax <= callCard.parent.layout.height && callCard.layout.y >= 0}" +
+            (lessonCard.resolvedStyle.display == DisplayStyle.Flex ? $", above the lesson {callCard.layout.yMax <= lessonCard.layout.y}" : "");
+        public void TestRouteCallClear() { if (career.Call != null) career.Answer(false, jd); }
 
         // review shots: a payday of `cr` credits the way Complete makes one (credits and a JobPaid note), in career mode;
         // TestPaydayUndo takes it back and restores the sandbox flag this returns

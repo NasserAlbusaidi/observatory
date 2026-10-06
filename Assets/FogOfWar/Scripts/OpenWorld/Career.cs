@@ -25,6 +25,7 @@ namespace FogOfWar.OpenWorld
         public double Pay, Days;         // Days: time allowed, from acceptance
         public double IssuedJd, DeadlineJd;
         public double ExpressDays, ExpressJd; // the bonus window from acceptance; 0 = none (intercepts, the tutorial, older saves)
+        public double SpoilJd;           // cargo trouble ridden out: delivered after this, it pays half; 0 = none
         public double Dwell, DwellNeeded; // survey: seconds spent in scan range with the drive off
         public bool Tutorial;
         [NonSerialized] public string Tier;  // board cargo: local, interplanetary or far, as seen from the posting port
@@ -115,7 +116,7 @@ namespace FogOfWar.OpenWorld
 
         // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
         // player action. Docked/Undocked/TankDry carry the port name or an empty string.
-        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone }
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall }
         public event Action<Happening, string> OnEvent;
 
         void Say(Happening what, string text, bool good = true)
@@ -179,6 +180,7 @@ namespace FogOfWar.OpenWorld
             TransferInProgress = false;
             Rescues(sys, ship, jd, simDt);
             Intercepts(sys, ship, jd, simDt);
+            RouteTick(sys, ship, jd, simDt);
             foreach (var t in Codex.CheckFeats(this, ship)) Say(Happening.Achievement, "Achievement: " + t);
         }
 
@@ -268,16 +270,21 @@ namespace FogOfWar.OpenWorld
             RemoveDerelict(c);
             if (c.Kind == JobKind.Rescue || c.Kind == JobKind.Intercept) DropWarp = true;
             Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid,
-                $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : express ? $" (express bonus +{pay - c.Pay:N0} cr)" : ""));
+                $"{what}: +{pay:N0} cr" + (Spoiled(c, jd) ? " (cargo spoiled, half pay)" : "") + (late ? " (late, half pay)" : express ? $" (express bonus +{pay - c.Pay:N0} cr)" : ""));
         }
 
         // What a job pays if it is done at jd: the express bonus inside its window, half pay after the deadline.
         public static double PayAt(Contract c, double jd, out bool late, out bool express)
         {
             late = jd > c.DeadlineJd;
-            express = !late && c.ExpressJd > 0 && jd <= c.ExpressJd;
-            return late ? c.Pay * 0.5 : express ? Math.Round(c.Pay * (1 + ExpressBonus)) : c.Pay;
+            bool spoiled = Spoiled(c, jd);
+            express = !late && !spoiled && c.ExpressJd > 0 && jd <= c.ExpressJd;
+            double pay = late ? c.Pay * 0.5 : express ? Math.Round(c.Pay * (1 + ExpressBonus)) : c.Pay;
+            return spoiled ? pay * 0.5 : pay;
         }
+
+        // cargo trouble ridden out (route events): past SpoilJd the load is spoiled and pays half
+        public static bool Spoiled(Contract c, double jd) => c.SpoilJd > 0 && jd > c.SpoilJd;
 
         // The express window for a trip of d km: a 1 g full burn's flight time plus a margin, then time to park, never past
         // the deadline. Parking takes up to 7 h (Trip's note), which a short hop's margin can't cover, so it gets its own
@@ -392,6 +399,12 @@ namespace FogOfWar.OpenWorld
         public void Accept(Contract c, double jd)
         {
             if (!CanAccept(c, out _)) return;
+            Add(c, jd);
+        }
+
+        // Start a job: from the board (Accept) or from a call in flight (route events).
+        void Add(Contract c, double jd)
+        {
             Board.Remove(c);
             taken.Add(c.Key);
             c.IssuedJd = jd; c.DeadlineJd = jd + c.Days;

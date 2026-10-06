@@ -274,6 +274,8 @@
           border-left-width: 3px; border-left-color: rgb(255, 181, 71); background-color: rgba(8, 11, 20, 0.84);
           opacity: 0; translate: 0 10px; transition-property: opacity, translate; transition-duration: 0.3s; transition-timing-function: ease-out-cubic; }
 .lesson.in { opacity: 1; translate: 0 0; }
+/* a route call (distress, cargo trouble) takes the lesson card's place with a red edge */
+.lesson.call { border-left-color: rgb(255, 107, 94); }
 .lesson-text { font-size: 16px; color: rgb(236, 239, 250); white-space: normal; margin-top: 4px; }
 .pip { width: 14px; height: 4px; margin-left: 4px; background-color: rgba(255, 255, 255, 0.15); }
 .pip.done { background-color: rgba(255, 181, 71, 0.55); }

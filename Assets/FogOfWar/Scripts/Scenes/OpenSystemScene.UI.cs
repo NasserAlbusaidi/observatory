@@ -477,9 +477,12 @@ namespace FogOfWar
             int i = Array.IndexOf(args, "-fowsavekey");
             if (i >= 0 && i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
             // the unattended suites save, load and autosave too (the -fowqa "save" step, a dock): keep them off the player's save
-            foreach (var a in new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots" }) if (Array.IndexOf(args, a) >= 0) return "fow-save-qa";
-            return "fow-save-v1";
+            return Unattended() ? "fow-save-qa" : "fow-save-v1";
         }
+        // an unattended suite is running: no player save, and no route calls to drop the warp mid-trip (a method, not a
+        // static field, so SaveKey's initialiser never sees it unset)
+        static bool Unattended() => Array.Exists(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots" },
+            a => Array.IndexOf(Environment.GetCommandLineArgs(), a) >= 0);
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
         public static string SaveSummary
         {
