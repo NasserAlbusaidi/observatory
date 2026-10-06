@@ -120,7 +120,7 @@ namespace FogOfWar
             string note;
             if (atRest) note = "At rest against " + t.Name + ".";
             else if (closing <= 0) note = "Moving away: opening at " + SpeedText(-closing) + ".";
-            else if (aStop <= 0) note = "No way to brake: no reaction mass.";
+            else if (aStop <= 0) note = "No way to brake: no fuel.";
             else if (late) note = $"TOO FAST: a full burn now stops {Km(dStop - room)} past the target.";
             else
             {

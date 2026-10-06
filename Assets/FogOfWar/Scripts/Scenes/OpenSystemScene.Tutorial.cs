@@ -94,15 +94,15 @@ namespace FogOfWar
                 case Lesson.Turn:
                     return $"First flight {Step(Lesson.Turn)}. Turn the ship: {Ctl.Keys(A.PitchUp)} / {Ctl.Keys(A.PitchDown)} pitch, {Ctl.Keys(A.YawLeft)} / {Ctl.Keys(A.YawRight)} yaw, {Ctl.Keys(A.RollLeft)} / {Ctl.Keys(A.RollRight)} roll. Drag the mouse to look around.";
                 case Lesson.Assist:
-                    return $"{Step(Lesson.Assist)} Let go. With flight assist on, the keys set how fast you turn, and the reaction wheels stop the ship when you release them; they run on power, so turning costs no reaction mass. With assist off, the ship keeps turning, as Newton says.";
+                    return $"{Step(Lesson.Assist)} Let go. With flight assist on, the keys set how fast you turn, and the reaction wheels stop the ship when you release them; they run on power, so turning costs no fuel. With assist off, the ship keeps turning, as Newton says.";
                 case Lesson.Burn:
-                    return $"{Step(Lesson.Burn)} A short burn: {Ctl.Keys(A.ThrottleFull)} for full throttle, then {Ctl.Keys(A.ThrottleCut)} to cut it. At 1 g you gain 9.8 m/s every second, and every second costs reaction mass.";
+                    return $"{Step(Lesson.Burn)} A short burn: {Ctl.Keys(A.ThrottleFull)} for full throttle, then {Ctl.Keys(A.ThrottleCut)} to cut it. At 1 g you gain 9.8 m/s every second, and every second costs fuel.";
                 case Lesson.Hold:
                     return $"{Step(Lesson.Hold)} Press 2 to hold prograde: the nose follows your velocity. Keys 1–9 pick the other holds; 1 turns the hold off, and so does turning by hand.";
                 case Lesson.Target:
                     return $"{Step(Lesson.Target)} Your first job: medical supplies to Luna. Set the Moon as the target: press {Ctl.Keys(A.NextTarget)} until it shows, click its label, or use Set target on the Jobs page ({Ctl.Keys(A.Jobs)}).";
                 case Lesson.Engage:
-                    return $"{Step(Lesson.Engage)} Check the trip planner for time and reaction mass, then press {Ctl.Keys(A.Engage)}. The autopilot burns, flips at the midpoint and brakes.";
+                    return $"{Step(Lesson.Engage)} Check the trip planner for time and fuel, then press {Ctl.Keys(A.Engage)}. The autopilot burns, flips at the midpoint and brakes.";
                 case Lesson.Warp:
                     return $"{Step(Lesson.Warp)} Speed up time with {Ctl.Keys(A.WarpUp)} (try 1k×). Time compression saves your patience, not game days: deadlines run on the game clock.";
                 case Lesson.Beacon:

@@ -89,7 +89,7 @@ namespace FogOfWar
             Put("selectedPlan", Plan.Brachistochrone);
             Call("TogglePlan");
             // QA-061: these trips are meant to fly; if the Δv guard asks first, say so and go anyway
-            if (!ship.PlanActive && ship.Phase.StartsWith("Δv short"))
+            if (!ship.PlanActive && ship.Phase.StartsWith("fuel short"))
             {
                 log.WriteLine($"  {tag}: Δv guard asked first (est {estDv:F0} km/s × 1.1, {Career.DvLeft(ship):F0} left)");
                 Call("TogglePlan");
@@ -477,7 +477,7 @@ namespace FogOfWar
                 // tank holding 90 % of the estimate: the first press warns, the second goes anyway
                 ship.Fuel = (ship.DryMass + ship.Cargo) * (Math.Exp(0.9 * estDv / Ship.Ve) - 1);
                 Call("TogglePlan");
-                Check(!ship.PlanActive && ship.Phase.StartsWith("Δv short"), $"short tank ({Career.DvLeft(ship):F0} km/s left): first engage warns ({ship.Phase})");
+                Check(!ship.PlanActive && ship.Phase.StartsWith("fuel short"), $"short tank ({Career.DvLeft(ship):F0} km/s left): first engage warns ({ship.Phase})");
                 Call("TogglePlan");
                 Check(ship.PlanActive, "second engage goes anyway");
                 ship.Plan = Plan.None;

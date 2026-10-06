@@ -87,7 +87,7 @@ namespace FogOfWar.OpenWorld
             new Feat { Id = "rich", Title = "Six figures", How = "Hold 100,000 cr." },
             new Feat { Id = "drive3", Title = "Hard burn", How = "Fit the 3 g drive." },
             new Feat { Id = "landed", Title = "Touchdown", How = "Touch down on any body." },
-            new Feat { Id = "fumes", Title = "Running on fumes", How = "Dock with less than 5 t of reaction mass." },
+            new Feat { Id = "fumes", Title = "Running on fumes", How = "Dock with less than 5 t of fuel." },
             new Feat { Id = "icarus", Title = "Icarus", How = "Go within 0.3 AU of the Sun." },
             new Feat { Id = "far", Title = "Edge of the map", How = "Go 30 AU from the Sun." },
         };

@@ -41,13 +41,13 @@ namespace FogOfWar
 
         UiShell hudShell;
         VisualElement markers, mkPro, mkRetro, mkHead, mkTgt, mkEdge, mapHead, rightCol, consoleBody;
-        Label stDate, stWarp, stNear, stSun, stLimited;
+        Label stDate, stWarp, stNear, stLimited;
         VisualElement mkIcon;
         Label dvHead;
         VisualElement statusBox;
         Label spdVal, spdRef, drvVal, drvSub, dvVal, rotVal, mkTgtName, mkTgtDist, mkEdgeName, consoleToggle;
         VisualElement thrFill, thrCmd, pills;
-        Label pAssist, pHold, pNav, pLimited, pEphem, pJet, pLanded;
+        Label pAssist, pHold, pNav, pLimited, pLanded;
         FowSlider thrSlider;
         Segmented segG, segPlan, segWarp, segCam, segWarpTop;
         Switch swAssist, swBelt, swHist, swRings;
@@ -82,7 +82,6 @@ namespace FogOfWar
             stLimited = Ui.L(st, "", "t-note", "warn");
             stNear = Ui.L(st, "", "t-body", "f-semi");
             stNear.style.marginTop = 6;
-            stSun = Ui.L(st, "", "t-label", "f-mono");
             var stStatus = st;
             statusBox = st;
 
@@ -113,7 +112,7 @@ namespace FogOfWar
             drvSub = Ui.L(dr, "", "t-label", "f-condm");
             BuildCareerStrip(dr, stStatus);
             var rg = Ui.E(fl, "gauge", "right-g");
-            dvHead = Ui.L(rg, "Δv SPENT", "t-micro", "f-condm");
+            dvHead = Ui.L(rg, "SPEED CHANGE SPENT", "t-micro", "f-condm");
             dvVal = Ui.L(rg, "", "t-big", "f-mono");
             rotVal = Ui.L(rg, "", "t-label", "f-mono");
 
@@ -121,7 +120,7 @@ namespace FogOfWar
             pills = Ui.E(layer, "pills");
             pills.pickingMode = PickingMode.Ignore;
             pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV");
-            pLanded = Pill("LANDED"); pLimited = Pill("WARP LIMITED"); pEphem = Pill("EPHEMERIS"); pJet = Pill("JET POWER");
+            pLanded = Pill("LANDED"); pLimited = Pill("WARP LIMITED");
 
             // ---- system map header
             mapHead = Ui.E(layer, "col");
@@ -456,7 +455,7 @@ namespace FogOfWar
             navHohmann = Ui.L(c, "", "t-note", "f-mono");
             Ui.Section(c, "Plan");
             var pl = new[] { Plan.Brachistochrone, Plan.MatchVelocity, Plan.HoldStation };
-            segPlan = new Segmented(new[] { "Brachistochrone", "Match velocity", "Hold station" }, Array.IndexOf(pl, selectedPlan), i => selectedPlan = pl[i]);
+            segPlan = new Segmented(new[] { "Fast", "Match velocity", "Hold station" }, Array.IndexOf(pl, selectedPlan), i => selectedPlan = pl[i]);
             c.Add(segPlan);
             planEngage = Ui.B(c, "ENGAGE  " + UiShell.Keys(A.Engage), TogglePlan, "primary", "f-cond");
             planEngage.style.marginTop = 4;
@@ -464,7 +463,7 @@ namespace FogOfWar
             Ui.Section(c, "Time compression");
             segWarp = new Segmented(WarpNames, warpIdx, i => warpIdx = i);
             c.Add(segWarp);
-            Ui.L(c, $"{UiShell.Keys(A.WarpUp)} faster · {UiShell.Keys(A.WarpDown)} slower. Flying by hand drops to 10×.", "t-note");
+            Ui.L(c, $"{UiShell.Keys(A.WarpUp)} faster · {UiShell.Keys(A.WarpDown)} slower. Flying by hand drops to 1×.", "t-note");
         }
 
         void TargetsTab(VisualElement c)
@@ -585,7 +584,7 @@ namespace FogOfWar
 
             // status
             var date = Frame.UtcFromTdb(jd);
-            Ui.Text(stDate, date.ToString("yyyy-MM-dd  HH:mm:ss") + " UTC");
+            Ui.Text(stDate, date.ToString("ddd d MMM yyyy  ·  HH:mm", System.Globalization.CultureInfo.InvariantCulture));
             segWarpTop.Value = warpIdx;
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
             Ui.Text(stLimited, limited ? $"Limited by the frame budget: running at {Fmt.Num(effectiveWarp, 0)}×" : "");
@@ -593,7 +592,6 @@ namespace FogOfWar
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             Ui.Text(stNear, (ship.Landed != null ? "ON " : "NEAR ") + reference.Name.ToUpperInvariant() + "  ·  " + Km(alt) + (reference == sys.Sun ? " out" : " up"));
-            Ui.Text(stSun, Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU from the Sun");
 
             UpdateTargetCard();
 
@@ -610,7 +608,7 @@ namespace FogOfWar
             // what is left decides the next trip; with an unmetered tank only what was spent means anything
             bool metered = !ship.UnlimitedFuel;
             double dvShown = metered ? Career.DvLeft(ship) : ship.DvUsed;
-            Ui.Text(dvHead, metered ? "Δv LEFT" : "Δv SPENT");
+            Ui.Text(dvHead, metered ? "SPEED CHANGE LEFT" : "SPEED CHANGE SPENT");
             Ui.Text(dvVal, Fmt.Num(dvShown, dvShown < 100 ? 2 : 0));
             Ui.Text(rotVal, "KM/S  ·  ROT " + Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s");
 
@@ -623,8 +621,6 @@ namespace FogOfWar
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : null, "hot");
             SetPill(pLanded, ship.Landed != null ? "LANDED " + ship.Landed.Name.ToUpperInvariant() : null, "ok");
             SetPill(pLimited, limited ? "WARP LIMITED " + Fmt.Num(effectiveWarp, 0) + "×" : null, "bad");
-            SetPill(pEphem, sys.Approximate(jd) ? "EPHEMERIS APPROXIMATE" : null, "bad");
-            SetPill(pJet, ship.Throttle > 0 ? "JET " + Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW (FICTIONAL)" : null, null);
 
             UpdatePages();
             if (!consoleOpen) return;
@@ -654,7 +650,7 @@ namespace FogOfWar
                 if (t.Parent == sys.Sun)
                 {
                     var (dv, tt) = Ship.Hohmann(ship.Pos.Mag, tp.Mag, sys.Sun.GM);
-                    Ui.Text(navHohmann, $"Economy (Hohmann, circular orbits): {Dur(tt)}, Δv ≈ {Fmt.Num(dv, 1)} km/s");
+                    Ui.Text(navHohmann, $"Slow route (orbit transfer, not on autopilot): {Dur(tt)}, about {Fmt.Num(ship.Mass * (1 - Math.Exp(-dv / Ship.Ve)), 1)} t of fuel");
                 }
                 else Ui.Text(navHohmann, "");
             }

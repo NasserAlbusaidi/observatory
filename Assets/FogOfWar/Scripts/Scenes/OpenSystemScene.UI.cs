@@ -11,8 +11,8 @@ namespace FogOfWar
     public partial class OpenSystemScene
     {
         static readonly string[] HoldNames = { "Off", "Prograde", "Retrograde", "Normal", "Anti-normal", "Radial out", "Radial in", "Target", "Anti-target", "Flip 180°" };
-        static readonly string[] PlanShort = { "", "Brachistochrone", "Match velocity", "Hold station" };
-        static readonly string[] PlanNames = { "", "Brachistochrone (fast)", "Match velocity", "Hold station" };
+        static readonly string[] PlanShort = { "", "Fast", "Match velocity", "Hold station" };
+        static readonly string[] PlanNames = { "", "Fast (full burn)", "Match velocity", "Hold station" };
 
         // ---------------------------------------------------------------- pilot input (polled every frame)
 
@@ -90,7 +90,7 @@ namespace FogOfWar
         {
             bool drive = !ship.Dry && ship.AMax > 0;
             a = drive ? ship.AMax : ship.Dry ? 0 : Ship.RcsAccel;
-            by = drive ? Fmt.Num(ship.MaxG, 1) + " g drive" : ship.Dry ? "no reaction mass" : "RCS";
+            by = drive ? Fmt.Num(ship.MaxG, 1) + " g drive" : ship.Dry ? "no fuel" : "RCS";
             double v = vr.Mag;
             t = a > 0 ? v / a : double.PositiveInfinity;
             d = a > 0 ? v * v / (2 * a) : double.PositiveInfinity;
@@ -109,9 +109,9 @@ namespace FogOfWar
                 if (DvShort(dv) && !(shortArmed == ship.Target && Time.unscaledTime < shortUntil))
                 {
                     shortArmed = ship.Target; shortUntil = Time.unscaledTime + 8;
-                    ship.Phase = "Δv short: engage again to go anyway";
-                    hudShell?.Toast($"Not enough Δv to reach {ship.Target.Name}",
-                        $"Needs about {dv * DvMargin:N0} km/s with margin, {Career.DvLeft(ship):N0} left. Engage again to go anyway.", 6f, "bad");
+                    ship.Phase = "fuel short: engage again to go anyway";
+                    hudShell?.Toast($"Not enough fuel to reach {ship.Target.Name}",
+                        $"Needs about {ship.Mass * (1 - Math.Exp(-dv * DvMargin / Ship.Ve)):N1} t with margin, {ship.Fuel:N1} t aboard. Engage again to go anyway.", 6f, "bad");
                     return;
                 }
             }

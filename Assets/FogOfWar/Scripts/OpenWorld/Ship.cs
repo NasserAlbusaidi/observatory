@@ -106,7 +106,7 @@ namespace FogOfWar.OpenWorld
                 want = HoldDirMid(sys, jd, h, reference, g);
                 Phase = ThrottleCmd > 0 ? "burning" : RcsInput.sqrMagnitude > 0 ? "RCS" : "coasting";
             }
-            if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of reaction mass"; }
+            if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of fuel"; }
             UpdateAttitude(want, h);
             // the drive fires only along the commanded line: flip first, then burn
             if (PlanActive && want.HasValue && D3.Dot(Heading, want.Value) < Math.Cos(3 * Math.PI / 180)) { throttle = 0; Phase = "turning"; }

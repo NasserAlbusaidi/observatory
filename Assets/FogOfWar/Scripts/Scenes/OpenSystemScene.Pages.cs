@@ -124,8 +124,8 @@ namespace FogOfWar
             tripLines.Clear();
             PlanTrip(out double t, out double dv, out double fuel);
             bool short_ = DvShort(dv);
-            Ui.L(tripLines, $"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", "t-note", "f-mono", short_ ? "warn" : "dim");
-            if (short_) Ui.L(tripLines, "Not enough reaction mass. Coast, lower the g, or refuel.", "t-body", "warn");
+            Ui.L(tripLines, $"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, {fuel:N1} t of fuel of {ship.Fuel:N1} t aboard", "t-note", "f-mono", short_ ? "warn" : "dim");
+            if (short_) Ui.L(tripLines, "Not enough fuel. Coast, lower the g, or refuel.", "t-body", "warn");
             foreach (var j in career.Active)
             {
                 if (career.TargetOf(j) != ship.Target) continue;
@@ -134,7 +134,7 @@ namespace FogOfWar
                 Ui.L(tripLines, $"{j.Title}: arrives with {Days(Math.Abs(j.DeadlineJd - jd - arrive))} {(onTime ? "to spare" : "too late")}", "t-body", onTime ? "ok" : "warn");
             }
             if (ship.PlanActive && ship.CruiseCap > 0) Ui.L(tripLines, $"Cruise speed {ship.CruiseCap:N0} km/s", "t-note");
-            Ui.L(tripLines, "Δv grows with √g: a gentler burn or a coast saves reaction mass and costs days.", "t-note");
+            Ui.L(tripLines, "A gentler burn or a coast saves fuel and costs days.", "t-note");
             Ui.Fontify(tripLines);
         }
 

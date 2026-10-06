@@ -206,8 +206,8 @@ namespace FogOfWar
             double peak = Math.Max(Math.Sqrt(ship.AMax * d + u * u / 2), u);
             PlanTrip(out _, out double planDv, out _);
             shortDv = DvShort(planDv);
-            return $"{Fmt.Num(ship.MaxG, 1)} g brachistochrone: {Dur(t)}\nΔv {BrachSpeed(dv)} · peak {BrachSpeed(peak)}" +
-                   (shortDv ? $"\nΔV SHORT: plan needs ~{planDv * DvMargin:N0} km/s, {Career.DvLeft(ship):N0} left" : "");
+            return $"{Fmt.Num(ship.MaxG, 1)} g full burn: {Dur(t)}\nspeed change {BrachSpeed(dv)} · top speed {BrachSpeed(peak)}" +
+                   (shortDv ? $"\nFUEL SHORT: plan needs ~{ship.Mass * (1 - Math.Exp(-planDv * DvMargin / Ship.Ve)):N1} t, {ship.Fuel:N1} t aboard" : "");
         }
 
         void TickCareer(double simDt)

@@ -111,7 +111,7 @@ namespace FogOfWar
                 double d = Math.Max(r.Mag - Ship.Standoff(t), 0);
                 // QA-062: inside the parking distance there is no trip to plan; short trips read in m/s
                 bool dvShort = false;
-                Ui.Text(tcBrach, d < 1 ? "Within parking distance: no brachistochrone needed." : BrachLine(d, out dvShort));
+                Ui.Text(tcBrach, d < 1 ? "Within parking distance: no burn needed." : BrachLine(d, out dvShort));
                 Ui.SetClass(tcBrach, "warn", dvShort);
                 Ui.Text(tcTrip, d < 1 ? "Within parking distance" : TripLine(dvShort));
                 Ui.SetClass(tcTrip, "warn", dvShort);
@@ -125,12 +125,12 @@ namespace FogOfWar
         }
 
         // the trip the autopilot would fly (the trip planner's coast choice, parking included) in one line: its time,
-        // and the reaction mass it burns (Δv with an unmetered tank)
+        // and the fuel it burns (the speed change with an unmetered tank)
         string TripLine(bool dvShort)
         {
             PlanTrip(out double secs, out double dv, out double tonnes);
-            string cost = ship.UnlimitedFuel ? "Δv " + BrachSpeed(dv) : tonnes < 0.05 ? "< 0.1 t" : Fmt.Num(tonnes, 1) + " t";
-            return (FlyingPlan ? "ETA " : "TRIP ") + Dur(secs) + "  ·  " + cost + (dvShort ? "  ·  Δv SHORT" : "");
+            string cost = ship.UnlimitedFuel ? BrachSpeed(dv) + " burn" : tonnes < 0.05 ? "< 0.1 t" : Fmt.Num(tonnes, 1) + " t";
+            return (FlyingPlan ? "ETA " : "TRIP ") + Dur(secs) + "  ·  " + cost + (dvShort ? "  ·  FUEL SHORT" : "");
         }
 
         // review shots

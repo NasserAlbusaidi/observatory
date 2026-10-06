@@ -165,7 +165,7 @@ namespace FogOfWar.OpenWorld
                     Active.RemoveAt(i); Failed++; RemoveDerelict(c);
                     Say(Happening.JobFailed, "Tank dry: " + c.Title + " failed", false);
                 }
-                Say(Happening.TankDry, $"Reaction mass gone. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
+                Say(Happening.TankDry, $"Out of fuel. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
             }
             wasDry = dry;
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
@@ -360,7 +360,7 @@ namespace FogOfWar.OpenWorld
             {
                 // no port out there to refuel at: even a 50 % coast must fit in what is in the tank
                 double need = NeedTonnes(c, 0.5);
-                if (need > ship.Fuel * 0.95) why = $"needs ≈ {need:N0} t of reaction mass even with a coast, {ship.Fuel:N0} t aboard";
+                if (need > ship.Fuel * 0.95) why = $"needs ≈ {need:N0} t of fuel even with a coast, {ship.Fuel:N0} t aboard";
             }
             return why == null;
         }
@@ -494,12 +494,12 @@ namespace FogOfWar.OpenWorld
             tonnes = Math.Min(tonnes, afford + onCredit);
             if (tonnes <= 0.01)
             {
-                Notes.Add(new Note { Text = "Not enough credits for reaction mass", Good = false, Time = UnityEngine.Time.realtimeSinceStartup });
+                Notes.Add(new Note { Text = "Not enough credits for fuel", Good = false, Time = UnityEngine.Time.realtimeSinceStartup });
                 return;
             }
             ship.Fuel += tonnes;
             Credits -= tonnes * Docked.FuelPrice;
-            Say(Happening.FuelBought, $"Bought {tonnes:N1} t of reaction mass: −{tonnes * Docked.FuelPrice:N0} cr" + (onCredit > 0.01 ? $" ({onCredit:N1} t on credit)" : ""));
+            Say(Happening.FuelBought, $"Bought {tonnes:N1} t of fuel: −{tonnes * Docked.FuelPrice:N0} cr" + (onCredit > 0.01 ? $" ({onCredit:N1} t on credit)" : ""));
         }
 
         // Adrift with a dry tank: a tender brings reaction mass. Debt is allowed.
@@ -507,7 +507,7 @@ namespace FogOfWar.OpenWorld
         {
             ship.Fuel = Math.Min(TankCapacity, ship.Fuel + EmergencyTonnes);
             Credits -= EmergencyCost;
-            Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of reaction mass, −{EmergencyCost:N0} cr", false);
+            Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of fuel, −{EmergencyCost:N0} cr", false);
         }
 
         public bool BuyDrive()

@@ -455,7 +455,7 @@ namespace FogOfWar.UI
             }
             Ui.L(sv.contentContainer, "1–9: attitude hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. " +
                 $"Flip ({Keys(A.Flip)}) turns the nose 180° from where it points now; 3 points it against your velocity. Turning alone doesn't slow you: burn to brake. " +
-                "Turning uses reaction wheels, which run on power and spend no reaction mass. " +
+                "Turning uses reaction wheels, which run on power and spend no fuel. " +
                 "Mouse: drag to look, scroll to zoom, click a label to target it. Change keys in Esc → Settings → Controls.", "t-note").style.marginTop = 12;
             var row = Ui.E(p, "row");
             row.style.marginTop = 10;

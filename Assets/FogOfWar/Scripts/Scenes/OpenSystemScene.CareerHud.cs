@@ -26,7 +26,7 @@ namespace FogOfWar
         {
             var head = Ui.E(drive, "row");
             head.style.marginTop = 6;
-            Ui.L(head, "REACTION MASS", "t-micro", "f-condm").style.flexGrow = 1;
+            Ui.L(head, "FUEL", "t-micro", "f-condm").style.flexGrow = 1;
             rmText = Ui.L(head, "", "t-label", "f-mono");
             var bar = Ui.E(drive, "thr", "rm");
             bar.style.height = 6;
@@ -143,7 +143,7 @@ namespace FogOfWar
         {
             if (career.Sandbox)
             {
-                Ui.L(c, "Sandbox: unlimited reaction mass, no contracts.", "t-body");
+                Ui.L(c, "Sandbox: unlimited fuel, no contracts.", "t-body");
                 var r = Ui.E(c, "check-row");
                 r.Add(new Switch(true, v => career.Sandbox = v));
                 Ui.L(r, "Sandbox", "t-body");
@@ -151,10 +151,10 @@ namespace FogOfWar
             }
             Ui.Section(c, "Ship's business");
             Ui.KV(c, "Credits", $"{career.Credits:N0} cr", career.Credits < 0 ? "warn" : "accent");
-            Ui.KV(c, "Reaction mass", $"{ship.Fuel:N1} / {career.TankCapacity:N0} t");
+            Ui.KV(c, "Fuel", $"{ship.Fuel:N1} / {career.TankCapacity:N0} t");
             Ui.KV(c, "Hold", $"{career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t");
             Ui.KV(c, "Drive", $"{career.DriveRating:0} g" + (career.CarryingPassengers ? " (1 g, passengers)" : ""));
-            Ui.KV(c, "Δv left", $"{Career.DvLeft(ship):N0} km/s");
+            Ui.KV(c, "Speed change left", $"{Career.DvLeft(ship):N0} km/s");
             if (ship.Fuel < 1)
             {
                 Ui.L(c, career.Docked == null ? "The tank is dry. You are adrift." : $"The tank is dry. The port sells up to {Career.EmergencyTonnes:N0} t on credit.", "t-body", "warn").style.marginTop = 6;
@@ -194,7 +194,7 @@ namespace FogOfWar
             if (port != null)
             {
                 Ui.Section(c, "Docked at " + port.Name);
-                Ui.L(c, $"Reaction mass {port.FuelPrice:N0} cr/t. {port.Note}", "t-note");
+                Ui.L(c, $"Fuel {port.FuelPrice:N0} cr/t. {port.Note}", "t-note");
                 double fill = career.TankCapacity - ship.Fuel;
                 var row = Ui.E(c, "row", "wrap");
                 row.style.marginTop = 6;
