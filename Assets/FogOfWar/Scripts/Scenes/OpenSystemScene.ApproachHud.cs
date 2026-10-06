@@ -94,7 +94,8 @@ namespace FogOfWar
             Ui.Text(mkTRetroLabel, stopCue == "late" ? "STOP · TOO FAST" : stopCue == "now" ? "STOP · BURN NOW" : "STOP");
         }
 
-        // Called from UpdateHud with the target card's own numbers; sets the mode, the brake gauge and the stop cue.
+        // Called from UpdateTargetCard with the card's own numbers; sets the mode, the brake gauge and the stop cue.
+        // CardRows decides which rows show.
         void UpdateApproach(Body t, D3 r, D3 vr, double closing, double aStop, double tStop, double dStop, double room)
         {
             bool atRest = vr.Mag < 1e-4;
@@ -103,13 +104,8 @@ namespace FogOfWar
             bool approach = !atRest && closing > 0 && !ship.PlanActive && ratio > (flightMode == FlightMode.Approach ? 0.1 : 0.2);
             flightMode = room < DockKm ? FlightMode.Docking : approach ? FlightMode.Approach : FlightMode.Cruise;
 
-            bool gauge = flightMode != FlightMode.Cruise;
-            Ui.Show(brakeBox, gauge);
-            Ui.Show(tcCloseRow, !gauge || LessonNames("Closing"));
-            Ui.Show(tcDriftRow, flightMode == FlightMode.Approach || LessonNames("drift"));
-            Ui.Show(tcStopRow, LessonNames("Stop row"));
             stopCue = "";
-            if (!gauge) { brakeState = "cruise"; return; }
+            if (flightMode == FlightMode.Cruise) { brakeState = "cruise"; return; }
 
             Ui.Text(brakeHead, flightMode == FlightMode.Docking ? "DOCKING" : "APPROACH");
             Ui.Text(brakeClose, atRest ? "at rest" : (closing >= 0 ? "+" : "") + SpeedText(closing));
@@ -138,7 +134,6 @@ namespace FogOfWar
             brakeState = flightMode + " " + (late ? "late" : now ? "now" : "early") + " " + Mathf.RoundToInt(frac * 100) + "%";
 
             // docking: velocity against the target along the ship's axes, the way the RCS keys push
-            Ui.Show(dockSplit, flightMode == FlightMode.Docking);
             if (flightMode == FlightMode.Docking)
             {
                 double fwd = D3.Dot(vr, ship.Heading);

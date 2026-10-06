@@ -89,6 +89,18 @@ namespace FogOfWar
                 {
                     log.WriteLine("    05-flight: console " + (first.TestConsoleOpen ? "open" : "closed"));
                     if (first.TestConsoleOpen) { errors++; log.WriteLine("    ERROR 05-flight: the console drawer should start closed"); }
+                    // the target card: compact in cruise, everything with the details open
+                    string rows = first.TestCardRows();
+                    log.WriteLine("    05-flight: card rows " + rows);
+                    if (rows != "Distance Closing Trip Engage") { errors++; log.WriteLine("    ERROR 05-flight: expected the compact card 'Distance Closing Trip Engage'"); }
+                    first.SetCardExpanded(true);
+                    yield return Wait(0.3f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "05b-card-expanded");
+                    rows = first.TestCardRows();
+                    log.WriteLine("    05b-card-expanded: card rows " + rows);
+                    foreach (var want in new[] { "Kind", "Rel", "Drift", "Stop", "Brach", "Note" })
+                        if (Array.IndexOf(rows.Split(' '), want) < 0) { errors++; log.WriteLine($"    ERROR 05b-card-expanded: no {want} row"); }
+                    first.SetCardExpanded(false);
                 }
                 Controls.Tap(Controls.Action.ThrottleFull);
                 yield return Wait(1.2f);
@@ -187,6 +199,21 @@ namespace FogOfWar
                             string stopRep = os.TestStopMarkerReport();
                             log.WriteLine("    06s-stop-marker: " + stopRep);
                             if (!stopRep.Contains("BURN NOW")) { errors++; log.WriteLine("    ERROR 06s-stop-marker: expected the BURN NOW cue"); }
+                            // a lesson that names a card row keeps it on the compact card: Brake (the Stop row, closing
+                            // fast) and Beacon (Closing, under the gauge; that lesson holds only under 20 m/s)
+                            var lessonF = typeof(OpenSystemScene).GetField("lesson", F);
+                            var lessonWas = lessonF.GetValue(os);
+                            foreach (var (lName, lKm, lKms, lRow) in new[] { ("Brake", 130.0, 1.5, "Stop"), ("Beacon", 3.0, 0.01, "Closing") })
+                            {
+                                os.TestApproachTarget(lKm, lKms);
+                                lessonF.SetValue(os, Enum.Parse(lessonF.FieldType, lName));
+                                yield return Wait(0.3f);
+                                string lRows = os.TestCardRows();
+                                log.WriteLine($"    lesson {lName}: card rows {lRows}");
+                                var lSet = lRows.Split(' ');
+                                if (Array.IndexOf(lSet, lRow) < 0 || Array.IndexOf(lSet, "Gauge") < 0) { errors++; log.WriteLine($"    ERROR lesson {lName}: expected the gauge and the {lRow} row"); }
+                            }
+                            lessonF.SetValue(os, lessonWas);
                             // cockpit: the card shows while the gauge is up (the MFDs repeat the rest of it)
                             os.TestApproachTarget(130, 1.5);
                             var setCamA = typeof(OpenSystemScene).GetMethod("SetCam", F);
