@@ -4,7 +4,7 @@ namespace FogOfWar.OpenWorld
 {
     // Who owns the ports (docs/design-world.md, W1). Saved by index: add a faction at the end. None is for a job no port
     // posted, such as a distress rescue near a survey body.
-    public enum Faction { None, Guard, Tharsis, Compact }
+    public enum Faction { None, Guard, Tharsis, Compact, Raiders }
 
     public class FactionInfo
     {
@@ -23,7 +23,11 @@ namespace FogOfWar.OpenWorld
             new FactionInfo { Name = "Cislunar Guard", Blurb = "Earth's coast guard. It patrols from Earth orbit to Luna, runs customs and answers distress calls. The only fleet with capital ships." },
             new FactionInfo { Name = "Tharsis Company", Blurb = "Mars is a company town. The Company owns Mars orbit and mines Vesta, which buys its water from the Compact. It asks its contractors few questions." },
             new FactionInfo { Name = "Ice Compact", Blurb = "The water ports of the belt and the outer moons. Water flows toward the Sun, and the Compact wants Earth to pay more for it." },
+            // no port, so no board and no standing shown before weapons (W3; havens in Threat.cs)
+            new FactionInfo { Name = "Raiders", Blurb = "They work the belt from havens on Pallas, whose orbit tilts far out of the ports' plane, and Hektor, a Jupiter Trojan. They take cargo from ships that are slow and far from a patrol." },
         };
+
+        public static bool OwnsPort(Faction f) => Array.Exists(Ports, p => p.Owner == f);
 
         public const int StandingGain = 1, StandingLoss = 2, StandingMin = -20, StandingMax = 40;
 

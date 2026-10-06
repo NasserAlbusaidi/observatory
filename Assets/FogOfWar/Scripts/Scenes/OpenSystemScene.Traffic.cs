@@ -15,6 +15,7 @@ namespace FogOfWar
         static readonly Color[] FactionColours =
         {
             new Color(0.75f, 0.75f, 0.75f), new Color(0.5f, 0.72f, 1f), new Color(1f, 0.6f, 0.35f), new Color(0.55f, 1f, 0.85f),
+            new Color(1f, 0.35f, 0.3f),
         };
         const double TrafficTagKm = 5e4;
 

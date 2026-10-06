@@ -237,6 +237,7 @@ namespace FogOfWar
             for (int i = 1; i < Career.Factions.Length; i++)
             {
                 var f = (Faction)i;
+                if (!Career.OwnsPort(f)) continue; // the Raiders post no jobs
                 double pay = career.PayFactor(f);
                 var (_, tier) = Ui.KV(c, Career.Factions[i].Name, $"{career.TierName(f)} ({career.Standing(f):+0;−0;0}) · {career.PayText(f)}");
                 if (pay != 1) tier.AddToClassList(pay > 1 ? "ok" : "warn");
