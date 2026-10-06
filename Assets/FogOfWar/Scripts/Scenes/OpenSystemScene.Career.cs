@@ -369,6 +369,8 @@ namespace FogOfWar
                     : c.Kind == JobKind.Survey
                     ? $"{c.Title}: {Fmt.Num(100 * c.Dwell / c.DwellNeeded, 0)} % scanned (stay within {Km(career.Codex.ScanRange(sys[c.To]))}, drive off)"
                     : c.Kind == JobKind.Passengers ? $"{c.People} × {c.Title} → {c.To}" : $"{c.Tonnes:N0} t {c.Title} → {c.To}";
+                var owner = Career.OwnerOf(c);
+                if (owner != Faction.None) what += "   ·   for " + Career.Factions[(int)owner].Name;
                 GUILayout.Label($"{what}   ·   {due}   ·   {c.Pay:N0} cr", left >= 0 ? ui.label : ui.note);
                 var body = career.TargetOf(c);
                 int b = ui.Buttons((ship.Target == body ? "● " : "") + "Set target", "Abandon");
