@@ -143,6 +143,8 @@ Press **F1** in flight for the full list. Rebind any action in **Esc → Setting
 
 **Mouse**: drag to look, scroll to zoom, click a label to target that body.
 
+With flight assist on, the attitude keys set the turn rate, and the ship stops turning when you release them. With it off, they apply torque and the spin stays. Turning by hand ends an attitude hold. Flip ends by itself when the turn is complete.
+
 Turning uses reaction wheels and costs no reaction mass. Turning alone doesn't slow you down: burn to brake.
 
 ## Open and build

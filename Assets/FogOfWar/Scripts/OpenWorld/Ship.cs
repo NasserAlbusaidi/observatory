@@ -85,6 +85,7 @@ namespace FogOfWar.OpenWorld
             var g = sys == gEndSys && jd == gEndJd && (Pos - gEndPos).Sqr == 0 ? gEnd : sys.Gravity(Pos, jd);
             // the pilot's stick or RCS takes over from the nav computer (RCS is not a trim on top of the plan)
             if (ManualInput && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
+            StickDropsHold();
 
             D3? want = null;
             double throttle = ThrottleCmd;
@@ -161,8 +162,13 @@ namespace FogOfWar.OpenWorld
         public void Turn(SolarSystem sys, double jd, double h, Body reference)
         {
             if (ManualInput && PlanActive) { Plan = Plan.None; Phase = "pilot override"; }
+            StickDropsHold();
             UpdateAttitude(PlanActive ? (D3?)null : HoldDir(sys, jd, reference), h);
         }
+
+        // The stick always wins: turning by hand releases the hold for good. A hold that came back when the key was
+        // released swung the nose away from where the pilot had just put it. RCS translation keeps the hold.
+        void StickDropsHold() { if (RotInput.sqrMagnitude > 0) Hold = Hold.Off; }
 
         // #27: the body velocity holds and the speed readout are measured against; null means the dominant body (the
         // orbit). The pilot can switch it to the target to brake against that instead (not saved).
@@ -207,11 +213,12 @@ namespace FogOfWar.OpenWorld
             return null;
         }
 
-        // Rigid-body attitude. Pilot input accelerates the rotation; with flight assist on, the ship stops rotating when
-        // the stick is released. A hold or plan slews the nose with the same acceleration and rate limits. Torque comes
-        // from reaction wheels (electric), so turning spends no reaction mass and works with a dry tank. Long steps are
-        // split into short ones so the result doesn't depend on frame rate or time compression (#16); only a hold or
-        // plan over a long step (time compression) slews at the rate limit alone, and a free spin turns exactly.
+        // Rigid-body attitude. With flight assist on, the stick sets the turn rate (an axis stops when its key is
+        // released, even with another held); with it off, the stick is torque and the spin stays. A hold or plan slews
+        // the nose with the same acceleration and rate limits. Torque comes from reaction wheels (electric), so turning
+        // spends no reaction mass and works with a dry tank. Long steps are split into short ones so the result doesn't
+        // depend on frame rate or time compression (#16); only a hold or plan over a long step (time compression) slews
+        // at the rate limit alone, and a free spin turns exactly.
         const float AttStep = 0.05f;  // s, longest rigid-body substep
         const int MaxAttSteps = 64;
 
@@ -224,6 +231,7 @@ namespace FogOfWar.OpenWorld
                 var to = Quaternion.LookRotation(Frame.U(want.Value), Att * Vector3.up);
                 Att = Quaternion.RotateTowards(Att, to, MaxRate * dt * Mathf.Rad2Deg);
                 AngVel = Vector3.zero;
+                FlipDone(want.Value);
                 return;
             }
             if (!manual && !want.HasValue)
@@ -240,11 +248,21 @@ namespace FogOfWar.OpenWorld
             int n = Mathf.Clamp(Mathf.CeilToInt(dt / AttStep), 1, MaxAttSteps);
             for (int i = 0; i < n; i++) AttitudeStep(want, dt / n, manual);
             Att = Quaternion.Normalize(Att);
+            if (!manual && want.HasValue) FlipDone(want.Value);
+        }
+
+        // A flip is one manoeuvre, not a standing hold: on arrival the wheels stop the ship and the hold ends, so the
+        // nose doesn't keep going back to a direction fixed when the key was pressed.
+        void FlipDone(D3 want)
+        {
+            if (Hold != Hold.Custom || AngVel.magnitude > 0.12f || Vector3.Angle(Att * Vector3.forward, Frame.U(want)) > 0.25f) return;
+            Hold = Hold.Off; AngVel = Vector3.zero;
         }
 
         void AttitudeStep(D3? want, float dt, bool manual)
         {
-            if (manual) AngVel += RotInput * (AngAccel * dt);
+            if (manual && FlightAssist) AngVel = Vector3.MoveTowards(AngVel, Vector3.ClampMagnitude(RotInput, 1) * MaxRate, AngAccel * dt);
+            else if (manual) AngVel += RotInput * (AngAccel * dt);
             else if (want.HasValue)
             {
                 var fwd = Att * Vector3.forward;
