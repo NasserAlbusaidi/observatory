@@ -495,7 +495,7 @@ namespace FogOfWar.UI
                 var title = e.Q(className: "t-body");
                 if (title == null) continue;
                 var r = title.worldBound;
-                parts.Add($"{r.width:0}x{r.height:0}{(r.width < 60 || r.height > 80 ? " SQUEEZED" : "")}");
+                parts.Add($"{r.width:0}x{r.height:0}{(r.width < 60 || r.height > 80 ? " SQUEEZED" : "")}{(e.ClassListContains("pay") ? " pay" : e.ClassListContains("bad") ? " bad" : "")}");
             }
             return string.Join(", ", parts);
         }

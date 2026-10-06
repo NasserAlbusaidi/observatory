@@ -72,6 +72,8 @@ namespace FogOfWar
         }
 
         public void Notice(bool goodNews) => synth.Play(goodNews ? ShipSound.ChimeGood : ShipSound.ChimeBad);
+        public void Payday() => synth.Play(ShipSound.Payday);
+        public void ScanDone() => synth.Play(ShipSound.ScanDone);
         public void Caution() => synth.Play(ShipSound.CautionTone);
         public void Warning() => synth.Play(ShipSound.WarningBeep);
         public void Touchdown(float strength) => synth.Play(ShipSound.Touchdown, Mathf.Clamp01(strength));

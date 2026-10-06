@@ -233,6 +233,19 @@ namespace FogOfWar
                             yield return Wait(0.4f);
                             yield return Shot(app, shell, camRT, uiRT, tag, "06l-toasts");
                             log.WriteLine("    toasts: " + shell.TestToastReport());
+                            // a payday: a green toast with the bank line, the credits counting up, then settled on the new total
+                            bool wasSandbox = os.TestPayday(12345);
+                            yield return Wait(0.4f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06p-payday");
+                            string payMid = os.TestPaydayReport();
+                            yield return Wait(1.2f);
+                            string payEnd = os.TestPaydayReport();
+                            log.WriteLine($"    06p-payday: {payMid}  ->  {payEnd}");
+                            string bank = payEnd.Substring(payEnd.LastIndexOf("bank ") + 5);
+                            if (!payMid.Contains("counting True") || payMid.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to be counting up"); }
+                            if (!payEnd.Contains("counting False") || !payEnd.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to settle on the new total"); }
+                            if (!shell.TestToastReport().Contains("pay")) { errors++; log.WriteLine("    ERROR 06p-payday: expected a pay toast"); }
+                            os.TestPaydayUndo(12345, wasSandbox);
                             ship.VelRef = null;
                             typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);
                         }

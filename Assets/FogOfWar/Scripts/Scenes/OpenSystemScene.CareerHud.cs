@@ -18,6 +18,9 @@ namespace FogOfWar
         Label rmText, creditsLabel;
         string jobsSig;
         float jobsT, lastNoteTime;
+        // a payday counts the credits up instead of swapping the number; anything else (a purchase, a load) snaps
+        double shownCredits = double.NaN, countFrom;
+        float countT0 = -1;
 
         void BuildCareerStrip(VisualElement drive, VisualElement status)
         {
@@ -29,13 +32,35 @@ namespace FogOfWar
             bar.style.height = 6;
             rmFill = Ui.E(bar, "fill");
             rmFill.style.backgroundColor = new Color(0.41f, 0.82f, 1f, 0.85f);
-            creditsLabel = Ui.L(status, "", "t-h3", "f-mono", "accent");
+            creditsLabel = Ui.L(status, "", "t-h3", "f-mono", "accent", "credits");
             creditsLabel.style.marginTop = 6;
         }
 
         void UpdateCareerStrip()
         {
             if (career == null || rmText == null) return;
+            // career notes become toasts; a payday gets its own look, stays longer and says where the business stands
+            float newest = lastNoteTime;
+            bool paid = false;
+            foreach (var n in career.Notes)
+            {
+                if (n.Time <= lastNoteTime) continue;
+                if (Career.IsPay(n.What))
+                {
+                    paid = true;
+                    hudShell.Toast(n.Text, $"{career.Credits:N0} cr in the bank  ·  {career.Done} {(career.Done == 1 ? "job" : "jobs")} done", 7f, "pay");
+                }
+                else hudShell.Toast(n.Text, null, 5f, n.Good ? null : "bad");
+                newest = Mathf.Max(newest, n.Time);
+            }
+            lastNoteTime = newest;
+
+            // by the clock, not by frame steps: one long frame (a save, a shot) must not skip the count
+            double cr = career.Credits;
+            if (paid && !double.IsNaN(shownCredits) && cr > shownCredits) { countFrom = shownCredits; countT0 = Time.realtimeSinceStartup; }
+            float k = countT0 < 0 ? 1 : (Time.realtimeSinceStartup - countT0) / 1.2f;
+            if (k >= 1 || cr < countFrom) countT0 = -1;
+            shownCredits = countT0 < 0 ? cr : countFrom + (cr - countFrom) * Math.Min(1, k);
             if (career.Sandbox)
             {
                 Ui.Text(rmText, "SANDBOX: UNLIMITED");
@@ -50,19 +75,28 @@ namespace FogOfWar
                 bool low = frac < 0.15;
                 Ui.SetClass(rmText, "warn", low);
                 rmFill.style.backgroundColor = low ? new Color(1f, 0.42f, 0.37f, 0.9f) : new Color(0.41f, 0.82f, 1f, 0.85f);
-                Ui.Text(creditsLabel, $"{career.Credits:N0} CR" + (career.Docked != null ? "  ·  DOCKED " + career.Docked.Name.ToUpperInvariant() : ""));
+                Ui.Text(creditsLabel, $"{shownCredits:N0} CR" + (career.Docked != null ? "  ·  DOCKED " + career.Docked.Name.ToUpperInvariant() : ""));
                 Ui.SetClass(creditsLabel, "warn", career.Credits < 0);
+                Ui.SetClass(creditsLabel, "payday", countT0 >= 0);
             }
-            // career notes become toasts
-            float newest = lastNoteTime;
-            foreach (var n in career.Notes)
-            {
-                if (n.Time <= lastNoteTime) continue;
-                hudShell.Toast(n.Text, null, 5f, n.Good ? null : "bad");
-                newest = Mathf.Max(newest, n.Time);
-            }
-            lastNoteTime = newest;
         }
+
+        // review shots: a payday of `cr` credits the way Complete makes one (credits and a JobPaid note), in career mode;
+        // TestPaydayUndo takes it back and restores the sandbox flag this returns
+        public bool TestPayday(double cr)
+        {
+            bool wasSandbox = career.Sandbox;
+            career.Sandbox = false;
+            career.Credits += cr; career.Earned += cr; career.Done++;
+            career.Notes.Add(new Career.Note { Text = $"Test delivery: +{cr:N0} cr", Good = true, Time = Time.realtimeSinceStartup, What = Career.Happening.JobPaid });
+            return wasSandbox;
+        }
+        public void TestPaydayUndo(double cr, bool wasSandbox)
+        {
+            career.Credits -= cr; career.Earned -= cr; career.Done--;
+            career.Sandbox = wasSandbox;
+        }
+        public string TestPaydayReport() => creditsLabel == null ? "none" : $"{creditsLabel.text} | counting {creditsLabel.ClassListContains("payday")} | bank {career.Credits:N0}";
 
         // drive-limit buttons above what the drive (or the passengers) allow are disabled, not silently clamped
         void UpdateDriveLimit()

@@ -7,7 +7,7 @@ namespace FogOfWar.Audio
         RcsPulse, RcsClose, DriveLight, DriveCut,
         Creak, Groan, ThermalTick, Ping,
         DockContact, ClampMotor, ClampMotorReverse, Latch, Equalise, PushOff, Touchdown, ScrubberValve,
-        ChimeGood, ChimeBad, CautionTone, WarningBeep, ScanDone,
+        ChimeGood, ChimeBad, CautionTone, WarningBeep, ScanDone, Payday,
     }
 
     // The ship's sound, made sample by sample. The game writes the parameters once a frame and queues one-shot sounds;
@@ -367,6 +367,18 @@ namespace FogOfWar.Audio
                 case ShipSound.ChimeGood:
                     T(Console, 0.21f, 0, 660, 660, 0.005f, 0.005f, 0.055f)?.Harmonics(0.15f, 0, 0);
                     T(Console, 0.21f, 0, 990, 990, 0.005f, 0.005f, 0.055f)?.Harmonics(0.15f, 0, 0).Wait(0.09f);
+                    break;
+                case ShipSound.Payday:
+                    // a job paid: a rising major arpeggio that rings out, longer and brighter than any other chime
+                    {
+                        float[] f = { 523.25f, 659.25f, 783.99f, 1046.5f };
+                        for (int i = 0; i < 4; i++)
+                        {
+                            bool last = i == 3;
+                            T(Console, last ? 0.2f : 0.16f, (i - 1.5f) * 0.15f, f[i], f[i], 0.004f, last ? 0.12f : 0.03f, last ? 0.9f : 0.18f)?.Harmonics(0.25f, 0.08f, 0.03f).Wait(i * 0.075f);
+                        }
+                        T(Console, 0.07f, 0, 2093f, 2093f, 0.004f, 0.02f, 0.7f)?.Harmonics(0.1f, 0, 0).Wait(0.3f);
+                    }
                     break;
                 case ShipSound.ScanDone:
                     T(Console, 0.16f, 0, 1320, 1320, 0.004f, 0.004f, 0.08f)?.Harmonics(0.1f, 0, 0);

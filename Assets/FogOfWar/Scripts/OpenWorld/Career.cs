@@ -92,7 +92,10 @@ namespace FogOfWar.OpenWorld
         long boardDay = long.MinValue;
         readonly HashSet<string> taken = new HashSet<string>();
 
-        public struct Note { public string Text; public bool Good; public float Time; }
+        // What is the event the note reports (left at JobAccepted for notes made outside Say), so the HUD and the sound
+        // can make a payday feel different from a fuel purchase.
+        public struct Note { public string Text; public bool Good; public float Time; public Happening What; }
+        public static bool IsPay(Happening h) => h == Happening.JobPaid || h == Happening.RescueDone || h == Happening.SurveyDone || h == Happening.InterceptDone;
         public readonly List<Note> Notes = new List<Note>();
 
         public double TankCapacity => 200 + TankStep * TankLevel;
@@ -111,7 +114,7 @@ namespace FogOfWar.OpenWorld
 
         void Say(Happening what, string text, bool good = true)
         {
-            Notes.Add(new Note { Text = text, Good = good, Time = UnityEngine.Time.realtimeSinceStartup });
+            Notes.Add(new Note { Text = text, Good = good, Time = UnityEngine.Time.realtimeSinceStartup, What = what });
             OnEvent?.Invoke(what, text);
         }
 

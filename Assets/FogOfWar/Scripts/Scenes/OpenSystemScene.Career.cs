@@ -141,7 +141,18 @@ namespace FogOfWar
                 if (dry && !fuelDry) sound.Warning();
                 fuelLow = low; fuelDry = dry;
             }
-            foreach (var n in career.Notes) if (n.Time > heardNote) { heardNote = n.Time; sound.Notice(n.Good); }
+            // one sound for a frame's new notes, the most important: a payday over a scan over a plain chime
+            int rank = -1; bool good = true; float since = heardNote;
+            foreach (var n in career.Notes)
+            {
+                if (n.Time <= since) continue;
+                heardNote = Mathf.Max(heardNote, n.Time);
+                int r = Career.IsPay(n.What) ? 3 : n.What == Career.Happening.Scanned || n.What == Career.Happening.Visited ? 2 : !n.Good ? 1 : 0;
+                if (r > rank) { rank = r; good = n.Good; }
+            }
+            if (rank == 3) sound.Payday();
+            else if (rank == 2) sound.ScanDone();
+            else if (rank >= 0) sound.Notice(good);
         }
 
         // in the dominant body's shadow (a cylinder; the penumbra is ignored)
