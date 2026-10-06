@@ -48,8 +48,8 @@ namespace FogOfWar.OpenWorld
         internal double SpanStart => jd0;
         internal double SpanEnd => end;
 
-        // The player's step from (p0, v0) at jd to velocity v1 at jd + h/86400.
-        public void Span(SolarSystem sys, double jd, double h, D3 p0, D3 v0, D3 v1)
+        // The player's step from (p0, v0) at jd to velocity v1 at jd + h/86400. h > 0: Advance checks it for the scene.
+        internal void Span(SolarSystem sys, double jd, double h, D3 p0, D3 v0, D3 v1)
         {
             jd0 = jd; end = jd + h / 86400; this.p0 = p0; this.v0 = v0; a = (v1 - v0) / h;
             // SolarSystem.Pos keeps one date's positions by Body, and the stand-in keeps its Body from span to span: move

@@ -7,7 +7,7 @@ namespace FogOfWar
 {
     // 13. Pursuit (Pursuit.cs, Ship Plan.Pursue, docs/design-world.md W4): the fast subset of the pursuit check
     // (OpenWorld/PursuitCheck.cs) at h = 5 s on a system of its own: a pirate catches and holds a coasting ship and one
-    // parked at Pallas, a 2 g pirate catches a 1 g burn without flying through it, one of the same g closes only on the
+    // parked at Pallas, a 2 g pirate catches a steady 1 g burn without flying through it, one of the same g closes only on the
     // autopilot's Budget reserve and not at all on a hand burn at its g, and the stand-in's velocity is exact. No scene
     // and no waits; a throw is a failed check, since Start() has no guard.
     public partial class CareerQA
@@ -28,7 +28,7 @@ namespace FogOfWar
                     $"pursuit: a 2 g pirate 50,000 km behind a 1 g burn holds alongside from {s2b.Capture:F0} s (closed form {s2b.ClosedForm:F0} s, gate {PursuitCheck.GateCatch} x) for {s2b.Longest:F0} s and is never nearer than {s2b.MinRange:F2} km (>= {s2b.Rs} km)");
                 var s2a = PursuitCheck.Fly(qs, "S2a", 5);
                 Check(s2a.RangeChange < PursuitCheck.GateRange,
-                    $"pursuit: a 1 g pirate behind a 1 g autopilot burn closes only on Budget's reserve (about 4e-4 g): {s2a.Range0:N0} -> {s2a.EndRange:N0} km in 6 h ({s2a.RangeChange * 100:F2} %, < {PursuitCheck.GateRange * 100:F0} %)");
+                    $"pursuit: a 1 g pirate behind a 1 g autopilot burn closes only on Budget's reserve (about 4e-4 g on this leg): {s2a.Range0:N0} -> {s2a.EndRange:N0} km in 6 h ({s2a.RangeChange * 100:F2} %, < {PursuitCheck.GateRange * 100:F0} %)");
                 var s2h = PursuitCheck.Fly(qs, "S2h", 5);
                 Check(s2h.RangeChange < PursuitCheck.GateHand,
                     $"pursuit: a 1 g pirate behind a 1 g hand burn has no spare and cannot close: {s2h.Range0:N1} -> {s2h.EndRange:N1} km in 6 h ({s2h.RangeChange * 100:F4} %, < {PursuitCheck.GateHand * 100:F1} %)");
