@@ -26,6 +26,7 @@ namespace FogOfWar.OpenWorld
         public readonly D3[] Pos;            // heliocentric km, filled by Update
         public readonly int[] AHistogram = new int[240]; // 1.6–5.6 AU in 240 bins, for the panel
         public const double HistMin = 1.6, HistMax = 5.6;
+        public const double MainInAu = 2.1, MainOutAu = 3.3; // the main belt; dust and raiders use it too
 
         const double J2000 = 2451545.0;
 
@@ -54,7 +55,7 @@ namespace FogOfWar.OpenWorld
             var gaps = new[] { (Res(4, 1), 0.03), (Res(3, 1), 0.025), (Res(5, 2), 0.02), (Res(7, 3), 0.012), (Res(2, 1), 0.04) };
             double MainDensity(double a)
             {
-                if (a < 2.1 || a > 3.3) return 0;
+                if (a < MainInAu || a > MainOutAu) return 0;
                 double d = Math.Exp(-Math.Pow((a - 2.75) / 0.42, 2)); // broad hump
                 foreach (var (ag, w) in gaps) d *= 1 - 0.97 * Math.Exp(-Math.Pow((a - ag) / w, 2));
                 return d;

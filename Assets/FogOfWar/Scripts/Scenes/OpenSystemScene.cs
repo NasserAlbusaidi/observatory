@@ -811,6 +811,7 @@ namespace FogOfWar
                 if (tgt) { targetLine.Clear(); targetLine.AddRange(line); }
             }
             DrawMapLines(own, Mathf.Lerp(0.3f, 1f, fade));
+            AddThreatRings(fade);
             // photo mode and F2 (HUD hidden) take the orbit and course lines out of the picture too
             if (App.HideGui || !App.ShowUI) { pts.Clear(); cols.Clear(); }
             OrbitSegments = pts.Count / 2;

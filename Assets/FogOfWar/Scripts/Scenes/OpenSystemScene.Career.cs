@@ -174,7 +174,7 @@ namespace FogOfWar
             if (ship.Landed != null || career.Docked != null) return 0;
             double rAu = (ship.Pos - sys.Pos(sys.Sun, jd)).Mag / Frame.AU;
             double v = reference != null ? (ship.Vel - sys.Vel(reference, jd)).Mag : 20;
-            double belt = rAu > 2.1 && rAu < 3.3 ? 5 : 1;
+            double belt = rAu > Belt.MainInAu && rAu < Belt.MainOutAu ? 5 : 1;
             return (float)(belt * Math.Clamp(v / 20, 0.3, 3) / 240);
         }
 
@@ -282,8 +282,9 @@ namespace FogOfWar
                             $"   ·   Δv left {Career.DvLeft(ship):N0} km/s", ui.note);
             GUILayout.Label(career.OwnsShip ? "The ship is yours." : $"Ship buyout: {career.ShipPaid:N0} / {Career.ShipPrice:N0} cr paid", ui.note);
             if (!career.OwnsShip && career.Docked != null && career.Credits >= career.ShipStepNow && ui.Button($"Pay {career.ShipStepNow:N0} cr toward the ship")) career.PayTowardShip();
-            var standings = new string[Career.Factions.Length - 1];
-            for (int i = 1; i < Career.Factions.Length; i++) standings[i - 1] = $"{Career.Factions[i].Name} {career.TierName((Faction)i)} ({career.Standing((Faction)i):+0;−0;0})";
+            var standings = new List<string>();
+            for (int i = 1; i < Career.Factions.Length; i++)
+                if (Career.OwnsPort((Faction)i)) standings.Add($"{Career.Factions[i].Name} {career.TierName((Faction)i)} ({career.Standing((Faction)i):+0;−0;0})");
             GUILayout.Label("Standing: " + string.Join("   ·   ", standings), ui.note);
             if (ship.Fuel < 1)
             {
@@ -407,6 +408,7 @@ namespace FogOfWar
             PlanTrip(out double t, out double dv, out double fuel);
             GUILayout.Label($"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", DvShort(dv) ? ui.label : ui.note);
             if (DvShort(dv)) GUILayout.Label("Not enough reaction mass. Coast, lower the g, or refuel.", ui.label);
+            GUILayout.Label(RiskLine(), risk.Serious ? ui.label : ui.note);
             foreach (var c in career.Active)
             {
                 var body = career.TargetOf(c);

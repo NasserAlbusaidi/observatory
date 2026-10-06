@@ -136,6 +136,6 @@ namespace FogOfWar
         public string TestMapReport() =>
             $"own {ownName} {ownSegs} segs | path {(pathOn ? pathSegs + " segs" : "off")} | flip {(flipOn ? "on" : "off")}" +
             $" | meet {(pathOn ? Fmt.Num(meetW.Mag / Frame.AU, 3) + " AU from the Sun" : "-")}" +
-            $" | flip mark {flipShow} | meet mark {meetShow}";
+            $" | flip mark {flipShow} | meet mark {meetShow} | rings {patrolRings} patrol, {havenRings} haven, {beltRings} belt";
     }
 }
