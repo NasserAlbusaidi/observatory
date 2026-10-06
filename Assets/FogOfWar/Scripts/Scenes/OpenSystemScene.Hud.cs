@@ -229,6 +229,7 @@ namespace FogOfWar
             mkEdgeName = Ui.L(mkEdge, "", "t-label", "f-condm", "accent");
             mkEdgeName.style.position = Position.Absolute;
             mkEdgeName.style.whiteSpace = WhiteSpace.NoWrap;
+            BuildTargetMarkers();
         }
 
         // place a marker at a render-space direction; false if it's behind the camera or off screen
@@ -252,6 +253,7 @@ namespace FogOfWar
             if (flying && camMode != CamMode.Cockpit) PlaceDir(mkHead, Frame.U(ship.Heading), out _);
             else if (flying) PlaceDir(mkHead, Frame.U(ship.Heading), out _);
             else Ui.Show(mkHead, false);
+            UpdateTargetMarkers(flying);
 
             if (ship.Target == null) { Ui.Show(mkTgt, false); Ui.Show(mkEdge, false); return; }
             var tw = sys.Pos(ship.Target, jd);
@@ -378,6 +380,7 @@ namespace FogOfWar
             var p = Ui.Panel(parent, null, "Target", true);
             p.style.flexShrink = 0;
             p.style.marginBottom = 10;
+            tcPanel = p;
             tcNoTarget = Ui.L(p, "No target. Press " + UiShell.Keys(A.NextTarget) + " or click a label.", "t-note");
             tcBody = Ui.E(p, "col");
             var head = Ui.E(tcBody, "row");
@@ -390,15 +393,16 @@ namespace FogOfWar
             tcSub.style.marginBottom = 6;
             tcDist = Ui.KV(tcBody, "Distance").value;
             tcRel = Ui.KV(tcBody, "Relative speed").value;
-            tcClose = Ui.KV(tcBody, "Closing").value;
+            (tcCloseRow, tcClose) = Ui.KV(tcBody, "Closing");
             // #27: the approach aid. Sideways drift is what a straight-in brake leaves over; Stop is a flip-and-burn
-            tcDrift = Ui.KV(tcBody, "Sideways drift").value;
-            tcStop = Ui.KV(tcBody, "Stop").value;
+            (tcDriftRow, tcDrift) = Ui.KV(tcBody, "Sideways drift");
+            (tcStopRow, tcStop) = Ui.KV(tcBody, "Stop");
             tcStopNote = Ui.L(tcBody, "", "t-note");
             // the note explains the rows; it is read once, so it shows only while the pointer is on the card
             Ui.Show(tcStopNote, false);
             p.RegisterCallback<PointerEnterEvent>(_ => Ui.Show(tcStopNote, true));
             p.RegisterCallback<PointerLeaveEvent>(_ => Ui.Show(tcStopNote, false));
+            BuildBrake(tcBody);
             Ui.E(tcBody, "rule");
             tcBrach = Ui.L(tcBody, "", "t-note", "f-mono");
             var nrow = Ui.E(tcBody, "row");
@@ -657,6 +661,7 @@ namespace FogOfWar
                 bool late = closing > 0 && dStop > room;
                 Ui.Text(tcStop, vr.Mag < 1e-4 ? "at rest" : aStop > 0 ? Dur(tStop) + "  ·  " + Km(dStop) + (late ? "  TOO FAST" : "") : "can't");
                 Ui.SetClass(tcStop, "warn", late);
+                UpdateApproach(t, r, vr, closing, aStop, tStop, dStop, room);
                 Ui.Text(tcStopNote, $"Relative to {t.Name}. Stop: flip now, {by}, no gravity. Speed and holds measure against {VelRefBody.Name} ({UiShell.Keys(A.VelocityRef)} switches).");
                 double d = Math.Max(r.Mag - Ship.Standoff(t), 0);
                 // QA-062: inside the parking distance there is no trip to plan; short trips read in m/s
@@ -668,6 +673,8 @@ namespace FogOfWar
                 Ui.Text(tcEngage, ship.PlanActive ? "ABORT" : "ENGAGE");
                 Ui.SetClass(tcEngage, "danger", ship.PlanActive);
             }
+            else { flightMode = FlightMode.Cruise; stopCue = ""; brakeState = "no target"; }
+            Ui.Show(tcPanel, cockpit == null || !cockpit.Visible || CardInCockpit);
 
             // flight cluster
             var vRef = (ship.Vel - sys.Vel(VelRefBody, jd)).Mag;

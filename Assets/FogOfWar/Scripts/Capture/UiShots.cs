@@ -100,6 +100,8 @@ namespace FogOfWar
                     setCam.Invoke(os, new object[] { 2 });
                     yield return Wait(0.5f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06f-cockpit");
+                    log.WriteLine("    06f-cockpit: target card " + (os.TestCardShown ? "shown" : "hidden"));
+                    if (os.TestCardShown) { errors++; log.WriteLine("    ERROR 06f-cockpit: the MFDs carry the target in cruise; the card should hide"); }
                     lookPitch.SetValue(os, 22f);
                     yield return Wait(0.3f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06g-cockpit-look-down");
@@ -159,6 +161,37 @@ namespace FogOfWar
                             yield return Wait(0.3f);
                             yield return Shot(app, shell, camRT, uiRT, tag, "06k-travel-5km");
                             log.WriteLine("    travel line, 5 km out: " + os.TestTravelLine());
+                            // the approach HUD: brake gauge early, at the burn point and too late, then docking with the RCS split
+                            foreach (var (aShot, aKm, aKms, aDrift, aWant) in new[] {
+                                ("06n-approach", 200.0, 1.5, 0.05, "Approach early"), ("06o-approach-burn", 130.0, 1.5, 0.0, "Approach now"),
+                                ("06p-approach-late", 80.0, 1.5, 0.0, "Approach late"), ("06q-docking", 3.0, 0.03, 0.005, "Docking") })
+                            {
+                                os.TestApproachTarget(aKm, aKms, aDrift);
+                                os.TestAimTargetAt(0.35f);
+                                yield return Wait(0.3f);
+                                yield return Shot(app, shell, camRT, uiRT, tag, aShot);
+                                string aRep = os.TestApproachReport();
+                                log.WriteLine($"    {aShot}: {aRep}");
+                                if (!aRep.StartsWith(aWant)) { errors++; log.WriteLine($"    ERROR {aShot}: expected '{aWant}'"); }
+                            }
+                            // the stop marker (target-relative retrograde) with its burn cue, looking away from the target
+                            os.TestApproachTarget(130, 1.5);
+                            os.TestLookAwayFromTarget();
+                            yield return Wait(0.3f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06s-stop-marker");
+                            string stopRep = os.TestStopMarkerReport();
+                            log.WriteLine("    06s-stop-marker: " + stopRep);
+                            if (!stopRep.Contains("BURN NOW")) { errors++; log.WriteLine("    ERROR 06s-stop-marker: expected the BURN NOW cue"); }
+                            // cockpit: the card shows while the gauge is up (the MFDs repeat the rest of it)
+                            os.TestApproachTarget(130, 1.5);
+                            var setCamA = typeof(OpenSystemScene).GetMethod("SetCam", F);
+                            setCamA.Invoke(os, new object[] { 2 });
+                            yield return Wait(0.5f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06r-cockpit-approach");
+                            log.WriteLine("    06r-cockpit-approach: " + os.TestApproachReport());
+                            setCamA.Invoke(os, new object[] { 0 });
+                            os.TestOffsetFromTarget(5);
+                            yield return null;
                             // QA-060: toasts stay clear of the target card
                             shell.Toast("Test toast: job posted");
                             shell.Toast("Test toast with a note", "and a second line");
