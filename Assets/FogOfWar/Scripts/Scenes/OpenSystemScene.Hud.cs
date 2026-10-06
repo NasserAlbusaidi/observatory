@@ -230,6 +230,7 @@ namespace FogOfWar
             mkEdgeName.style.position = Position.Absolute;
             mkEdgeName.style.whiteSpace = WhiteSpace.NoWrap;
             BuildTargetMarkers();
+            BuildMapMarkers();
         }
 
         // place a marker at a render-space direction; false if it's behind the camera or off screen
@@ -254,6 +255,7 @@ namespace FogOfWar
             else if (flying) PlaceDir(mkHead, Frame.U(ship.Heading), out _);
             else Ui.Show(mkHead, false);
             UpdateTargetMarkers(flying);
+            UpdateMapMarkers();
 
             if (ship.Target == null) { Ui.Show(mkTgt, false); Ui.Show(mkEdge, false); return; }
             var tw = sys.Pos(ship.Target, jd);

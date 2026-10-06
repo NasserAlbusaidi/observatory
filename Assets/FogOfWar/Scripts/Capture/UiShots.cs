@@ -277,6 +277,26 @@ namespace FogOfWar
                 Controls.Tap(Controls.Action.Map);
                 yield return Wait(1.0f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "08-system-map");
+                if (app.Current is OpenSystemScene mapOs)
+                {
+                    // the map as a trip planner: your orbit and the target's stand out, the planned path with its marks
+                    const BindingFlags MF = BindingFlags.Instance | BindingFlags.NonPublic;
+                    var mapSys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", MF).GetValue(mapOs);
+                    var setTarget = typeof(OpenSystemScene).GetMethod("SetTarget", MF);
+                    foreach (var (mName, mShot) in new[] { ((string)null, "08-system-map"), ("Mars", "08b-map-mars"), ("Jupiter", "08c-map-jupiter") })
+                    {
+                        if (mName != null)
+                        {
+                            setTarget.Invoke(mapOs, new object[] { mapSys[mName] });
+                            yield return Wait(0.5f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, mShot);
+                        }
+                        string mRep = mapOs.TestMapReport();
+                        log.WriteLine($"    {mShot}: {mRep}");
+                        // Jupiter's meet point is off screen at the map's opening zoom; Mars barely moves, so its ring gives way
+                        if (mRep.Contains(" 0 segs") || mRep.Contains("path off") || !mRep.Contains("flip mark on") || mRep.Contains("meet mark none")) { errors++; log.WriteLine($"    ERROR {mShot}: expected your orbit, the planned path and its marks"); }
+                    }
+                }
                 Controls.Tap(Controls.Action.Map);
                 yield return Wait(0.5f);
                 app.ShowMenu(UiShell.MenuMain);
