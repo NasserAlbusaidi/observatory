@@ -195,7 +195,7 @@ namespace FogOfWar
         {
             var sb = new StringBuilder();
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
-              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
+              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell));
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
@@ -254,6 +254,13 @@ namespace FogOfWar
                 Ui.L(c, career.Docked == null ? "The tank is dry. You are adrift." : $"The tank is dry. The port sells up to {Career.EmergencyTonnes:N0} t on credit.", "t-body", "warn").style.marginTop = 6;
                 if (career.Docked == null)
                     Ui.B(c, $"Call an emergency tender ({Career.EmergencyTonnes:N0} t, {Career.EmergencyCost:N0} cr)", () => career.EmergencyDrop(ship), "danger");
+            }
+
+            // the optional hand-flying practice (OpenSystemScene.Tutorial.cs), once the first flight is over
+            if (CanPractise && lesson == Lesson.Done && !career.Active.Exists(x => x.Tutorial))
+            {
+                var practice = Ui.B(c, "Hand-flying practice: turn, burn and fly an approach to a beacon", StartPractice, "small");
+                practice.style.alignSelf = Align.FlexStart; practice.style.marginTop = 6;
             }
 
             if (career.Active.Count > 0)

@@ -293,6 +293,20 @@ namespace FogOfWar
                     yield return Wait(0.3f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06m-lesson-console");
                     log.WriteLine("    flight tab: " + os.TestLessonReport());
+                    // the first flight's payday card, with its two answers, and a step of the hand-flying practice
+                    var lessonFld = typeof(OpenSystemScene).GetField("lesson", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var lessonBefore = lessonFld.GetValue(os);
+                    foreach (var (pName, pShot, pWant) in new[] { ("Payday", "06u-payday-card", "FIRST FLIGHT  ·  PAID | pips 3 | skip False | answers True"),
+                                                                 ("Turn", "06v-practice-card", "HAND-FLYING PRACTICE  ·  STEP 1 OF 8 | pips 8 | skip True | answers False") })
+                    {
+                        lessonFld.SetValue(os, Enum.Parse(lessonFld.FieldType, pName));
+                        yield return Wait(0.4f);
+                        yield return Shot(app, shell, camRT, uiRT, tag, pShot);
+                        string pRep = os.TestLessonCardReport();
+                        log.WriteLine($"    {pShot}: {pRep}");
+                        if (!pRep.StartsWith(pWant)) { errors++; log.WriteLine($"    ERROR {pShot}: expected '{pWant}'"); }
+                    }
+                    lessonFld.SetValue(os, lessonBefore);
                 }
                 if (os != null)
                     foreach (var k in new[] { OpenWorld.JobKind.Intercept, OpenWorld.JobKind.Rescue })

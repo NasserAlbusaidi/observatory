@@ -151,22 +151,14 @@ namespace FogOfWar
             Check(career.Active.Count == 1 && career.Active[0].Tutorial, "first job is the Luna run");
             yield return Shot("c01-start");
 
-            // 0. the first-flight lessons, done the way a player does them. The burn lesson undocks and redocks at Earth:
-            // a new career must not autosave over the old save for that
+            // 0. the first flight is the first job: target, Engage, time compression, payday (audit #7). A throttle blip
+            // at the home port undocks and redocks: a new career must not autosave over the old save for that
             string oldSave = PlayerPrefs.GetString(SaveKey);
-            Check(s.TutorialText != null && s.TutorialText.StartsWith("First flight"), "tutorial starts on a new career");
-            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
-            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
-            Check(s.TutorialText != null && s.TutorialText.StartsWith("(3/11)"), "turn and let go: flight assist lesson passes");
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("First flight (1/3)"), $"tutorial starts on a new career at the target step: {s.TutorialText?.Substring(0, Math.Min(40, s.TutorialText.Length))}");
             yield return Shot("c00-tutorial");
             Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
             Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
-            Call("SetHold", Hold.Prograde); yield return new WaitForSecondsRealtime(0.4f);
-            Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/11)") && ship.Target?.Name == "Practice beacon",
-                "burn and prograde hold lessons pass; the practice beacon is the target");
-            Check(PlayerPrefs.GetString(SaveKey) == oldSave, "the burn lesson at Earth does not autosave over the old save");
-            Call("SetHold", Hold.Off);
-            // #27: the beacon practice is optional, so the Trip below (which targets the Moon) skips it
+            Check(PlayerPrefs.GetString(SaveKey) == oldSave, "a throttle blip at Earth does not autosave over the old save");
 
             // 1. the first job, full burn to the Moon
             double c0 = career.Credits;
@@ -175,10 +167,33 @@ namespace FogOfWar
             State("at Luna");
             Check(career.Docked?.Name == "Luna", "docked at Luna after the autopilot parks");
             Check(PlayerPrefs.GetString(SaveKey) != oldSave && PlayerPrefs.GetString(SaveKey).Length > 0, "reaching Luna autosaves");
-            Check(sys["Practice beacon"] == null, "retargeting ended the practice and removed the beacon");
             Check(career.Credits - c0 >= 3000, $"first job paid ({career.Credits - c0:N0} cr)");
-            Check(s.TutorialText == null, "tutorial ends with the first job");
+            yield return null;
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("First job paid"), "the first flight ends on the payday card, which offers the hand-flying practice");
             yield return Shot("c02-luna-docked");
+
+            // 0b. the hand-flying practice from the payday card, at Luna, done the way a player does it
+            Put("warpIdx", 0);
+            Call("StartPractice");
+            yield return null; yield return null;
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("Hand-flying practice (1/8)") && !ship.PlanActive, "the practice starts from the payday card and turns the parked plan off");
+            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
+            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
+            bool waits = s.TutorialText != null && s.TutorialText.StartsWith("(2/8)");
+            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
+            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
+            Check(waits && s.TutorialText != null && s.TutorialText.StartsWith("(3/8)"), "the flight assist step stays up until the pilot turns and lets go again");
+            Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
+            Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
+            Call("SetHold", Hold.Prograde); yield return new WaitForSecondsRealtime(0.4f);
+            Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/8)") && ship.Target?.Name == "Practice beacon",
+                "burn and prograde hold steps pass; the practice beacon is the target");
+            Call("SetHold", Hold.Off);
+            Call("SetTarget", sys.Moon);
+            yield return null; yield return null;
+            Check(sys["Practice beacon"] == null && s.TutorialText == null && career.TutorialStep == 0, "retargeting ends the practice and removes the beacon");
+            yield return new WaitForSecondsRealtime(1f);
+            Check(career.Docked?.Name == "Luna", $"docked at Luna after the practice ({ship.Phase})");
 
             // 2. refuel and take the best-paying cargo job, flown with a 50 % coast
             career.BuyFuel(ship, 1000);
@@ -802,7 +817,7 @@ namespace FogOfWar
                 yield return new WaitForSecondsRealtime(1f);
                 s = (OpenSystemScene)app.Current;
                 yield return null;
-                string running = JsonUtility.ToJson(career.ToSave(ship));        // lesson 1 of 11 in progress
+                string running = JsonUtility.ToJson(career.ToSave(ship));        // step 1 of 3 in progress
                 Call("SkipTutorial");
                 yield return null;
                 string skipped = JsonUtility.ToJson(career.ToSave(ship));
