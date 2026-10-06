@@ -100,7 +100,7 @@ namespace FogOfWar
                 case Lesson.Hold:
                     return $"{Step(Lesson.Hold)} Press 2 to hold prograde: the nose follows your velocity. Keys 1–9 pick the other holds; 1 turns the hold off, and so does turning by hand.";
                 case Lesson.Target:
-                    return $"{Step(Lesson.Target)} Your first job: medical supplies to Luna. Set the Moon as the target: press {Ctl.Keys(A.NextTarget)} until it shows, click its label, or use Set target in the panel.";
+                    return $"{Step(Lesson.Target)} Your first job: medical supplies to Luna. Set the Moon as the target: press {Ctl.Keys(A.NextTarget)} until it shows, click its label, or use Set target on the Jobs page ({Ctl.Keys(A.Jobs)}).";
                 case Lesson.Engage:
                     return $"{Step(Lesson.Engage)} Check the trip planner for time and reaction mass, then press {Ctl.Keys(A.Engage)}. The autopilot burns, flips at the midpoint and brakes.";
                 case Lesson.Warp:
