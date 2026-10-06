@@ -262,9 +262,24 @@ namespace FogOfWar
                 }
                 // the full-screen Jobs and Codex pages
                 os?.TestHandJob(true);
+                os?.TestShipPaid(350000);
                 os?.OpenPage(0);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06a-jobs-page");
+                os?.TestShipPaid(double.NaN);
                 os?.TestHandJob(false);
+                if (os != null)
+                {
+                    // the long goal reached: the buyout card says the career so far
+                    os.ClosePage();
+                    os.TestBuyout();
+                    yield return Wait(0.6f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06o-ship-owned");
+                    string own = os.TestBuyoutReport();
+                    log.WriteLine($"    06o-ship-owned: {own}");
+                    if (!own.Contains("owned True") || !own.Contains("cr earned")) { errors++; log.WriteLine("    ERROR 06o-ship-owned: expected the ship owned and the record"); }
+                    os.TestBuyoutUndo();
+                    os.OpenPage(0);
+                }
                 os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
                 os?.ShowCodex(1);

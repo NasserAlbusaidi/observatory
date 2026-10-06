@@ -49,6 +49,7 @@ namespace FogOfWar.OpenWorld
         public int tutorial;             // first-flight lesson + 1; 0 = done or skipped (and for saves made before it existed)
         public List<Contract> active = new List<Contract>();
         public int sensors;
+        public double shipPaid, startJd; // the buyout so far; the career's first day (0 for saves made before either existed)
         public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
     }
 
@@ -90,8 +91,16 @@ namespace FogOfWar.OpenWorld
         // outside the destination's dock range, pays this much more. The autopilot parks with its plan still on, so it
         // never earns this; the pilot who brakes into orbit or sets down on the surface does.
         public const double HandBonus = 0.15;
+        // The long goal: the ship is the yard's until the pilot buys it out, in steps at any port, with no interest and no
+        // schedule. Owning it is the career's end state; the game goes on after. Jobs pay 6k–25k (audit table), more with
+        // the express and by-hand bonuses; all upgrades cost 300k and every first scan sells for 417k at most. So the
+        // buyout is about 50 jobs past the upgrades: hours of play, not an evening.
+        public const double ShipPrice = 1000000, ShipStep = 50000;
 
         public double Credits = 25000, Earned;
+        public double ShipPaid, StartJd;
+        public bool OwnsShip => ShipPaid >= ShipPrice;
+        public double ShipStepNow => Math.Min(ShipStep, ShipPrice - ShipPaid);
         public int DriveLevel, TankLevel, Done, Failed;
         public bool Sandbox;
         public int TutorialStep;         // the scene's first-flight lesson + 1, kept so Continue resumes it (or not) — QA-051
@@ -120,7 +129,7 @@ namespace FogOfWar.OpenWorld
 
         // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
         // player action. Docked/Undocked/TankDry carry the port name or an empty string.
-        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall }
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned }
         public event Action<Happening, string> OnEvent;
 
         void Say(Happening what, string text, bool good = true)
@@ -133,6 +142,7 @@ namespace FogOfWar.OpenWorld
         public void StartNew(double jd)
         {
             TutorialStep = 1;
+            StartJd = jd;
             Active.Add(new Contract
             {
                 Id = nextId++, Kind = JobKind.Cargo, Title = "Medical supplies for Shackleton base", From = "Earth orbit", To = "Luna",
@@ -617,6 +627,17 @@ namespace FogOfWar.OpenWorld
             return true;
         }
 
+        // One step toward the buyout, the last one only what is left. Docked, with the credits in hand: no debt for this.
+        public bool PayTowardShip()
+        {
+            double step = ShipStepNow;
+            if (Sandbox || Docked == null || OwnsShip || Credits < step) return false;
+            Credits -= step; ShipPaid += step;
+            if (OwnsShip) Say(Happening.ShipOwned, "The ship is yours: bought out from the yard");
+            else Say(Happening.ShipPayment, $"Paid {step:N0} cr toward the ship: {ShipPaid / ShipPrice * 100:0} % yours");
+            return true;
+        }
+
         // ------------------------------------------------------------ trip estimates
 
         const double ParkSeconds = 3 * 3600;
@@ -651,7 +672,7 @@ namespace FogOfWar.OpenWorld
         {
             credits = Credits, earned = Earned, fuel = ship.Fuel, drive = DriveLevel, tank = TankLevel, nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
-            sensors = Codex.SensorLevel, visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
+            sensors = Codex.SensorLevel, shipPaid = ShipPaid, startJd = StartJd, visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
             achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt),
         };
 
@@ -665,6 +686,7 @@ namespace FogOfWar.OpenWorld
             Board.Clear(); boardPort = null; taken.Clear();
             foreach (var c in Active) taken.Add(c.Key);
             Codex.SensorLevel = s.sensors;
+            ShipPaid = Math.Max(0, Math.Min(ShipPrice, s.shipPaid)); StartJd = s.startJd;
             void Fill(HashSet<string> set, List<string> l) { set.Clear(); if (l != null) set.UnionWith(l); }
             Fill(Codex.Visited, s.visited); Fill(Codex.Scanned, s.scanned); Fill(Codex.Achieved, s.achieved); Fill(Codex.DockedAt, s.dockedAt);
             ship.Fuel = s.fuel;

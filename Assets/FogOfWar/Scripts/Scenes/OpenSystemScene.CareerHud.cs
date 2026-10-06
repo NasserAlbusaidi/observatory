@@ -51,6 +51,7 @@ namespace FogOfWar
                     paid = true;
                     hudShell.Toast(n.Text, $"{career.Credits:N0} cr in the bank  ·  {career.Done} {(career.Done == 1 ? "job" : "jobs")} done", 7f, "pay");
                 }
+                else if (n.What == Career.Happening.ShipOwned) hudShell.Toast(n.Text, CareerRecord(), 12f, "pay");
                 else hudShell.Toast(n.Text, null, 5f, n.Good ? null : "bad");
                 newest = Mathf.Max(newest, n.Time);
             }
@@ -147,6 +148,32 @@ namespace FogOfWar
         }
         public string TestPaydayReport() => creditsLabel == null ? "none" : $"{creditsLabel.text} | counting {creditsLabel.ClassListContains("payday")} | bank {career.Credits:N0}";
 
+        // the career so far: the buyout card and the Jobs page say it (Earned and Failed were saved but never shown)
+        string CareerRecord() => $"{career.Done} {(career.Done == 1 ? "job" : "jobs")} done, {career.Failed} failed  ·  {career.Earned:N0} cr earned" +
+            (career.StartJd > 0 ? $"  ·  day {Math.Floor(jd - career.StartJd) + 1:N0}" : "");
+
+        // review shots: the buyout part paid, so the Jobs page shows the bar; NaN puts back what was there
+        double shotShipPaid = double.NaN;
+        public void TestShipPaid(double paid)
+        {
+            if (double.IsNaN(paid)) { if (!double.IsNaN(shotShipPaid)) career.ShipPaid = shotShipPaid; shotShipPaid = double.NaN; return; }
+            if (double.IsNaN(shotShipPaid)) shotShipPaid = career.ShipPaid;
+            career.ShipPaid = paid;
+        }
+        // review shots: the ship bought out, with the note PayTowardShip makes. Not through PayTowardShip: its event
+        // could autosave the shot state over the player's save. TestBuyoutUndo takes it back.
+        public void TestBuyout()
+        {
+            TestShipPaid(Career.ShipPrice);
+            career.Notes.Add(new Career.Note { Text = "The ship is yours: bought out from the yard", Good = true, Time = Time.realtimeSinceStartup, What = Career.Happening.ShipOwned });
+        }
+        public void TestBuyoutUndo()
+        {
+            TestShipPaid(double.NaN);
+            career.Codex.Achieved.Remove("owner");
+        }
+        public string TestBuyoutReport() => $"owned {career.OwnsShip}, record \"{CareerRecord()}\"";
+
         // drive-limit buttons above what the drive (or the passengers) allow are disabled, not silently clamped
         void UpdateDriveLimit()
         {
@@ -168,7 +195,7 @@ namespace FogOfWar
         {
             var sb = new StringBuilder();
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
-              .Append(career.Docked?.Name).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
+              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell));
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
@@ -204,6 +231,24 @@ namespace FogOfWar
             Ui.KV(c, "Hold", $"{career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t");
             Ui.KV(c, "Drive", $"{career.DriveRating:0} g" + (career.CarryingPassengers ? " (1 g, passengers)" : ""));
             Ui.KV(c, "Speed change left", $"{Career.DvLeft(ship):N0} km/s");
+            Ui.KV(c, "Record", CareerRecord());
+            // the long goal: buy the ship out from the yard
+            if (career.OwnsShip) Ui.KV(c, "Ship", "Yours: bought out from the yard", "ok");
+            else
+            {
+                Ui.KV(c, "Ship buyout", $"{career.ShipPaid:N0} / {Career.ShipPrice:N0} cr");
+                var bar = Ui.E(c, "thr");
+                bar.style.height = 6; bar.style.marginTop = 4;
+                Ui.E(bar, "fill").style.width = Length.Percent((float)(100 * career.ShipPaid / Career.ShipPrice));
+                double step = career.ShipStepNow;
+                if (career.Docked == null) Ui.L(c, $"The yard owns the ship until you buy it out. Pay in steps of {Career.ShipStep:N0} cr at any port.", "t-note").style.marginTop = 4;
+                else
+                {
+                    bool can = career.Credits >= step;
+                    var pay = Ui.B(c, can ? $"Pay {step:N0} cr toward the ship" : $"Pay {step:N0} cr toward the ship: not enough credits", () => career.PayTowardShip(), "small", can ? "primary" : "disabled");
+                    pay.style.alignSelf = Align.FlexStart; pay.style.marginTop = 6;
+                }
+            }
             if (ship.Fuel < 1)
             {
                 Ui.L(c, career.Docked == null ? "The tank is dry. You are adrift." : $"The tank is dry. The port sells up to {Career.EmergencyTonnes:N0} t on credit.", "t-body", "warn").style.marginTop = 6;

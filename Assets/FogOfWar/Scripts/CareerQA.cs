@@ -380,12 +380,40 @@ namespace FogOfWar
                 }
             }
 
+            // the job pay the buyout price is set against (a load clears the board, so before section 6)
+            {
+                double boardPay = 0; foreach (var b in career.Board) boardPay += b.Pay;
+                log.WriteLine($"  buyout price {Career.ShipPrice:N0} cr; the board at {career.Docked?.Name ?? "no port"} posts {career.Board.Count} jobs, mean pay {boardPay / Math.Max(1, career.Board.Count):N0} cr");
+            }
+
             // 6. the career save round-trips (through JSON only: the player's own save slot is left alone)
             double credits = career.Credits, fuel = ship.Fuel; int done = career.Done;
             var json = JsonUtility.ToJson(career.ToSave(ship));
             career.Credits = -1; ship.Fuel = 0;
             career.FromSave(JsonUtility.FromJson<CareerSave>(json), ship);
             Check(Math.Abs(career.Credits - credits) < 1e-6 && Math.Abs(ship.Fuel - fuel) < 1e-6 && career.Done == done, "save and load keep credits, reaction mass and record");
+
+            // 6b. the long goal: the ship bought out from the yard in steps at a port; a save keeps it, an old save has none paid
+            {
+                double bank = career.Credits, paid0 = career.ShipPaid;
+                career.ShipPaid = 0; career.Notes.Clear();
+                career.Credits = Career.ShipStep - 1;
+                bool poor = !career.PayTowardShip();
+                career.Credits = Career.ShipPrice + 1000;
+                int steps = 0; while (steps < 100 && career.PayTowardShip()) steps++;
+                int ownedNotes = career.Notes.FindAll(n => n.What == Career.Happening.ShipOwned).Count;
+                bool feat = career.Codex.CheckFeats(career, ship).Contains("Owner-operator");
+                Check(career.Docked != null && poor && steps == (int)(Career.ShipPrice / Career.ShipStep) && career.OwnsShip && Math.Abs(career.Credits - 1000) < 1e-6
+                      && ownedNotes == 1 && feat && !career.PayTowardShip(),
+                    $"the ship bought out in {steps} steps of {Career.ShipStep:N0} cr at {career.Docked?.Name}: owned {career.OwnsShip}, {career.Credits:N0} cr left, {ownedNotes} owned note, feat {feat}{(poor ? "" : ", paid without the credits")}");
+                var sj = JsonUtility.ToJson(career.ToSave(ship));
+                career.ShipPaid = 0;
+                career.FromSave(JsonUtility.FromJson<CareerSave>(sj), ship);
+                bool kept = career.OwnsShip;
+                career.FromSave(JsonUtility.FromJson<CareerSave>(System.Text.RegularExpressions.Regex.Replace(sj, "\"shipPaid\":[^,]*,", "")), ship);
+                Check(kept && career.ShipPaid == 0 && sj.Contains("\"shipPaid\""), $"a save keeps the buyout; a save from before it loads with {career.ShipPaid:N0} cr paid");
+                career.Credits = bank; career.ShipPaid = paid0; career.Codex.Achieved.Remove("owner"); career.Notes.Clear();
+            }
 
             // 7. autopilot arrivals with the target behind its planet (the climb-away rule must not stop it parking)
             career.Sandbox = true;

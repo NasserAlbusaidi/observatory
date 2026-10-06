@@ -58,6 +58,7 @@ namespace FogOfWar
                         goto case Career.Happening.Upgrade;
                     case Career.Happening.JobAccepted: case Career.Happening.JobPaid: case Career.Happening.RescueDone:
                     case Career.Happening.InterceptDone: case Career.Happening.SurveyDone: case Career.Happening.Upgrade:
+                    case Career.Happening.ShipPayment: case Career.Happening.ShipOwned:
                         autosaveDue |= autosaveArmed; break;
                 }
             };
@@ -147,7 +148,7 @@ namespace FogOfWar
             {
                 if (n.Time <= since) continue;
                 heardNote = Mathf.Max(heardNote, n.Time);
-                int r = Career.IsPay(n.What) ? 3 : n.What == Career.Happening.Scanned || n.What == Career.Happening.Visited ? 2 : !n.Good ? 1 : 0;
+                int r = Career.IsPay(n.What) || n.What == Career.Happening.ShipOwned ? 3 : n.What == Career.Happening.Scanned || n.What == Career.Happening.Visited ? 2 : !n.Good ? 1 : 0;
                 if (r > rank) { rank = r; good = n.Good; }
             }
             if (rank == 3) sound.Payday();
@@ -279,6 +280,8 @@ namespace FogOfWar
             GUILayout.Label($"{career.Credits:N0} cr   ·   reaction mass {ship.Fuel:N1} / {career.TankCapacity:N0} t   ·   hold {career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t", ui.label);
             GUILayout.Label($"Drive rated {career.DriveRating:0} g" + (career.CarryingPassengers ? ": passengers aboard, held to 1 g" : "") +
                             $"   ·   Δv left {Career.DvLeft(ship):N0} km/s", ui.note);
+            GUILayout.Label(career.OwnsShip ? "The ship is yours." : $"Ship buyout: {career.ShipPaid:N0} / {Career.ShipPrice:N0} cr paid", ui.note);
+            if (!career.OwnsShip && career.Docked != null && career.Credits >= career.ShipStepNow && ui.Button($"Pay {career.ShipStepNow:N0} cr toward the ship")) career.PayTowardShip();
             if (ship.Fuel < 1)
             {
                 GUILayout.Label("The tank is dry. You are adrift.", ui.label);

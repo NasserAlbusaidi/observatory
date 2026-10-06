@@ -118,6 +118,7 @@ namespace FogOfWar.OpenWorld
             new Feat { Id = "fumes", Title = "Running on fumes", How = "Dock with less than 5 t of fuel." },
             new Feat { Id = "icarus", Title = "Icarus", How = "Go within 0.3 AU of the Sun." },
             new Feat { Id = "far", Title = "Edge of the map", How = "Go 30 AU from the Sun." },
+            new Feat { Id = "owner", Title = "Owner-operator", How = "Buy out the ship from the yard." },
         };
 
         static readonly string[] Planets = { "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune" };
@@ -146,6 +147,7 @@ namespace FogOfWar.OpenWorld
             Earn("fumes", c.Docked != null && ship.Fuel < 5);
             Earn("icarus", au < 0.3);
             Earn("far", au > 30);
+            Earn("owner", c.OwnsShip);
             return got;
         }
     }
