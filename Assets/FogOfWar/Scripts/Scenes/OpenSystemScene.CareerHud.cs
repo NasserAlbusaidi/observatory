@@ -231,8 +231,12 @@ namespace FogOfWar
                     Ui.L(head, j.Title.ToUpperInvariant(), "t-h3", "f-cond", "job-title");
                     Ui.L(head, $"{j.Pay:N0} cr", "t-val", "f-mono", "accent");
                     string what = j.Kind == JobKind.Rescue ? "Find the derelict and take the crew off" : j.Kind == JobKind.Survey ? $"Survey {j.To}" : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To} (max 1 g)" : $"{j.Tonnes:N0} t to {j.To}";
+                    if (j.Tier != null) what += " · " + j.Tier;
                     Ui.L(card, what, "t-body");
-                    Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {career.DriveRating:0} g: {Dur(t)}, {fuel:N1} t", "t-note", "f-mono");
+                    // a far run can need more than the tank for a full burn: say so here, not after Engage
+                    bool overTank = fuel > career.TankCapacity;
+                    var cost = Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {career.DriveRating:0} g: {Dur(t)}, {fuel:N1} t" + (overTank ? " (more than the tank: coast)" : ""), "t-note", "f-mono");
+                    Ui.SetClass(cost, "warn", overTank);
                     if (j.ExpressDays > 0)
                         Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done within {Days(j.ExpressDays)}", "t-note", "f-mono", "ok");
                     bool ok = career.CanAccept(j, out string why);

@@ -187,6 +187,24 @@ namespace FogOfWar
             cargo.Sort((x, y) => x.Days.CompareTo(y.Days)); // the nearest run
             var job = cargo.Count > 0 ? cargo[0] : null;
             Check(job != null, "the Luna board has cargo work");
+            // the tiered board: one cargo run per tier, and the far run is doable at 1 g with the first tank and a coast
+            {
+                string tiers = string.Join(", ", cargo.ConvertAll(c => $"{c.Tier} {c.To}"));
+                Check(cargo.Exists(c => c.Tier == "local") && cargo.Exists(c => c.Tier == "interplanetary") && cargo.Exists(c => c.Tier == "far"),
+                    $"the Luna board has local, interplanetary and far cargo ({tiers})");
+                var farJob = cargo.Find(c => c.Tier == "far");
+                if (farJob != null)
+                {
+                    var fb = sys[Career.PortAt(farJob.To).Body];
+                    double d = Math.Max((sys.Pos(fb, jd) - ship.Pos).Mag - Ship.Standoff(fb), 0), best = -1, bestT = 0, bestFuel = 0;
+                    for (double f = 1; f > 0.05; f -= 0.05)
+                    {
+                        Career.Trip(d, Ship.G0, f, career.DryMass + career.TankCapacity + farJob.Load, out double s, out _, out double tonnes);
+                        if (s <= farJob.Days * 86400 && tonnes <= career.TankCapacity * 0.95) { best = f; bestT = s; bestFuel = tonnes; break; }
+                    }
+                    Check(best > 0, $"far run to {farJob.To} ({farJob.Days:F1} days allowed) is doable at 1 g: coast {best * 100:F0} %, {bestT / 86400:F1} days, {bestFuel:F0} t");
+                }
+            }
             if (job != null)
             {
                 career.Accept(job, jd);

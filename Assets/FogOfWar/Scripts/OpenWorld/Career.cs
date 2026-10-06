@@ -27,7 +27,8 @@ namespace FogOfWar.OpenWorld
         public double ExpressDays, ExpressJd; // the bonus window from acceptance; 0 = none (intercepts, the tutorial, older saves)
         public double Dwell, DwellNeeded; // survey: seconds spent in scan range with the drive off
         public bool Tutorial;
-        public string Key;               // board slot, so an accepted job doesn't come back the same day
+        [NonSerialized] public string Tier;  // board cargo: local, interplanetary or far, as seen from the posting port
+        public string Key;              // board slot, so an accepted job doesn't come back the same day
         // rescue: the derelict's two-body orbit about Parent (Body element conventions, deg and km, at Epoch)
         public string Parent;
         public double A, E, I, Node, Peri, L, DL, Epoch;
@@ -417,14 +418,33 @@ namespace FogOfWar.OpenWorld
             var rng = new System.Random(Docked.Name.GetHashCode() * 7919 + (int)(day % 100000));
             var here = sys[Docked.Body];
             var others = Array.FindAll(Ports, p => p != Docked && sys[p.Body] != null);
-            // nearer ports get more work: weight by distance^-0.75, so the far ports still show up now and then
+            double Dist(Port p) => (sys.Pos(sys[p.Body], jd) - sys.Pos(here, jd)).Mag;
+            // passengers: nearer ports get more work, weighted by distance^-0.75
             var w = new double[others.Length]; double wsum = 0;
-            for (int i = 0; i < others.Length; i++) { w[i] = 1 / Math.Pow((sys.Pos(sys[others[i].Body], jd) - sys.Pos(here, jd)).Mag, 0.75); wsum += w[i]; }
+            for (int i = 0; i < others.Length; i++) { w[i] = 1 / Math.Pow(Dist(others[i]), 0.75); wsum += w[i]; }
             Port Pick() { double x = rng.NextDouble() * wsum; for (int i = 0; i < others.Length; i++) if ((x -= w[i]) <= 0) return others[i]; return others[others.Length - 1]; }
+
+            // cargo: one run per tier, so a board is never all Earth ↔ Luna shuttles. Local is a port in the same planet's
+            // system; the other ports split by distance into the nearer half (interplanetary) and the farther half (far).
+            var local = Array.FindAll(others, p => SystemOf(sys[p.Body], sys) == SystemOf(here, sys));
+            var rest = Array.FindAll(others, p => Array.IndexOf(local, p) < 0);
+            Array.Sort(rest, (x, y) => Dist(x).CompareTo(Dist(y)));
+            var near = new Port[(rest.Length + 1) / 2];
+            var far = new Port[rest.Length - near.Length];
+            Array.Copy(rest, near, near.Length); Array.Copy(rest, near.Length, far, 0, far.Length);
+            string localName = "local";
+            if (local.Length == 0) { local = near; localName = "interplanetary"; } // Mars, Ceres, Vesta: no neighbour port
+            Contract Tiered(Port[] tier, string name)
+            {
+                if (tier.Length == 0) return null;
+                var c = Haul(rng, tier[rng.Next(tier.Length)], JobKind.Cargo, sys, jd, tier == far);
+                c.Tier = name;
+                return c;
+            }
 
             for (int k = 0; k < 8; k++)
             {
-                var c = k < 3 ? Haul(rng, Pick(), JobKind.Cargo, sys, jd)
+                var c = k == 0 ? Tiered(local, localName) : k == 1 ? Tiered(near, "interplanetary") : k == 2 ? Tiered(far, "far")
                       : k < 5 ? Haul(rng, Pick(), JobKind.Passengers, sys, jd)
                       : k == 6 ? (rng.NextDouble() < 0.6 ? Rescue(rng, sys, jd) : null)
                       : k == 7 ? (rng.NextDouble() < 0.6 ? Intercept(rng, sys, jd) : null)
@@ -455,10 +475,13 @@ namespace FogOfWar.OpenWorld
             return (fuel * RefFuelPrice * 2.5 + 2000 + tonnes * 40) * urgency;
         }
 
-        Contract Haul(System.Random rng, Port to, JobKind kind, SolarSystem sys, double jd)
+        static Body SystemOf(Body b, SolarSystem sys) => b.Parent == sys.Sun || b.Parent == null ? b : b.Parent;
+
+        // far: more slack, so a 1 g ship with the first tank can still make the deadline with a coast
+        Contract Haul(System.Random rng, Port to, JobKind kind, SolarSystem sys, double jd, bool far = false)
         {
             double d = (sys.Pos(sys[to.Body], jd) - sys.Pos(sys[Docked.Body], jd)).Mag;
-            double slack = 1 + rng.NextDouble();
+            double slack = far ? 1.5 + 0.5 * rng.NextDouble() : 1 + rng.NextDouble();
             var c = new Contract { Id = nextId++, Kind = kind, From = Docked.Name, To = to.Name };
             if (kind == JobKind.Cargo)
             {
