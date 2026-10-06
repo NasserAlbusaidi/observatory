@@ -180,6 +180,9 @@ namespace FogOfWar
                         ? $"Survey {j.To}: {Fmt.Num(100 * j.Dwell / j.DwellNeeded, 0)} % scanned. Stay within {Km(career.Codex.ScanRange(sys[j.To]))} with the drive off."
                         : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To}" : $"{j.Tonnes:N0} t to {j.To}";
                     Ui.L(card, what, "t-note");
+                    double expressLeft = j.ExpressJd - jd;
+                    if (j.ExpressJd > 0 && expressLeft >= 0)
+                        Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done in {Days(expressLeft)}", "t-label", "f-mono", "ok");
                     Ui.L(card, left >= 0 ? "Due in " + Days(left) : "LATE by " + Days(-left), "t-label", "f-mono", left >= 0 ? "dim" : "warn");
                     var body = career.TargetOf(j);
                     var row = Ui.E(card, "row");
@@ -230,6 +233,8 @@ namespace FogOfWar
                     string what = j.Kind == JobKind.Rescue ? "Find the derelict and take the crew off" : j.Kind == JobKind.Survey ? $"Survey {j.To}" : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To} (max 1 g)" : $"{j.Tonnes:N0} t to {j.To}";
                     Ui.L(card, what, "t-body");
                     Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {career.DriveRating:0} g: {Dur(t)}, {fuel:N1} t", "t-note", "f-mono");
+                    if (j.ExpressDays > 0)
+                        Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done within {Days(j.ExpressDays)}", "t-note", "f-mono", "ok");
                     bool ok = career.CanAccept(j, out string why);
                     var b = Ui.B(card, ok ? "Accept" : "Can't accept: " + why, () => { if (career.CanAccept(j, out _)) career.Accept(j, jd); }, "small", ok ? "primary" : "disabled");
                     b.style.alignSelf = Align.FlexStart; b.style.marginTop = 6;

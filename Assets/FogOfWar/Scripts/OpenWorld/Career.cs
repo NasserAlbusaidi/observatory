@@ -24,6 +24,7 @@ namespace FogOfWar.OpenWorld
         public int People;
         public double Pay, Days;         // Days: time allowed, from acceptance
         public double IssuedJd, DeadlineJd;
+        public double ExpressDays, ExpressJd; // the bonus window from acceptance; 0 = none (intercepts, the tutorial, older saves)
         public double Dwell, DwellNeeded; // survey: seconds spent in scan range with the drive off
         public bool Tutorial;
         public string Key;               // board slot, so an accepted job doesn't come back the same day
@@ -79,6 +80,10 @@ namespace FogOfWar.OpenWorld
         public const double EmergencyTonnes = 30, EmergencyCost = 20000;
         const double RefG = 0.6;                             // deadlines and pay are set against this acceleration
         const double RefFuelPrice = 30;
+        // Time has a price: a job delivered inside its express window pays this much more. The fuel a coast saves is
+        // 2–14 % of the pay, so the bonus is worth a harder burn, and a bigger drive makes the window with a longer coast.
+        public const double ExpressBonus = 0.25;
+        const double ExpressG = 1, ExpressMargin = 1.15;
 
         public double Credits = 25000, Earned;
         public int DriveLevel, TankLevel, Done, Failed;
@@ -256,14 +261,32 @@ namespace FogOfWar.OpenWorld
         void Complete(Contract c, double jd, string what)
         {
             if (FinallyExpired(c, jd)) return; // Expire fails it; nothing pays after the final cutoff (#24)
-            bool late = jd > c.DeadlineJd;
-            double pay = late ? c.Pay * 0.5 : c.Pay;
+            double pay = PayAt(c, jd, out bool late, out bool express);
             Credits += pay; Earned += pay; Done++;
             Active.Remove(c);
             RemoveDerelict(c);
             if (c.Kind == JobKind.Rescue || c.Kind == JobKind.Intercept) DropWarp = true;
-            Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid, $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : ""));
+            Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid,
+                $"{what}: +{pay:N0} cr" + (late ? " (late, half pay)" : express ? $" (express bonus +{pay - c.Pay:N0} cr)" : ""));
         }
+
+        // What a job pays if it is done at jd: the express bonus inside its window, half pay after the deadline.
+        public static double PayAt(Contract c, double jd, out bool late, out bool express)
+        {
+            late = jd > c.DeadlineJd;
+            express = !late && c.ExpressJd > 0 && jd <= c.ExpressJd;
+            return late ? c.Pay * 0.5 : express ? Math.Round(c.Pay * (1 + ExpressBonus)) : c.Pay;
+        }
+
+        // The express window for a trip of d km: a 1 g full burn's flight time plus a margin, then time to park, never past
+        // the deadline. Parking takes up to 7 h (Trip's note), which a short hop's margin can't cover, so it gets its own
+        // allowance. A 1 g drive makes the window with a light coast; a 3 g drive with a long one.
+        static double ExpressDaysFor(double d, double extraSeconds, double days)
+        {
+            Trip(d, ExpressG * Ship.G0, 1, 1, out double s, out _, out _);
+            return Math.Min(days, ((s - ParkSeconds) * ExpressMargin + ExpressParkSeconds + extraSeconds) / 86400);
+        }
+        const double ExpressParkSeconds = 8 * 3600;
 
         public static double ScanRange(Body b) => Math.Max(Ship.Standoff(b) * 2, b.Radius + 1000);
 
@@ -371,6 +394,7 @@ namespace FogOfWar.OpenWorld
             Board.Remove(c);
             taken.Add(c.Key);
             c.IssuedJd = jd; c.DeadlineJd = jd + c.Days;
+            c.ExpressJd = c.ExpressDays > 0 ? jd + c.ExpressDays : 0;
             Active.Add(c);
             SpawnDerelict(c);
             Say(Happening.JobAccepted, "Accepted: " + c.Title);
@@ -451,6 +475,7 @@ namespace FogOfWar.OpenWorld
                 c.Days = Math.Max(c.Days, (1.15 * 2 * Math.Sqrt(d / (PassengerG * Ship.G0)) + 43200) / 86400);
             }
             c.Pay = Math.Round(c.Pay / 100) * 100;
+            c.ExpressDays = ExpressDaysFor(d, 0, c.Days);
             return c;
         }
 
@@ -476,6 +501,7 @@ namespace FogOfWar.OpenWorld
             };
             c.Pay = Math.Round(RefPay(d, 0, out c.Days, slack) * 1.2 / 100) * 100 + 1000;
             c.Days += DwellSeconds / 86400;
+            c.ExpressDays = ExpressDaysFor(d, DwellSeconds, c.Days);
             return c;
         }
 

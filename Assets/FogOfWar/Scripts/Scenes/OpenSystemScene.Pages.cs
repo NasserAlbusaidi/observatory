@@ -132,9 +132,16 @@ namespace FogOfWar
                 double arrive = t / 86400 + (j.Kind == JobKind.Survey ? j.DwellNeeded / 86400 : 0);
                 bool onTime = jd + arrive <= j.DeadlineJd;
                 Ui.L(tripLines, $"{j.Title}: arrives with {Days(Math.Abs(j.DeadlineJd - jd - arrive))} {(onTime ? "to spare" : "too late")}", "t-body", onTime ? "ok" : "warn");
+                // the time price: say whether this plan makes the express window, and by how much it misses
+                if (j.ExpressJd > jd)
+                {
+                    double margin = j.ExpressJd - jd - arrive;
+                    Ui.L(tripLines, margin >= 0 ? $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr: made with {Days(margin)} to spare"
+                        : $"Misses the express bonus (+{j.Pay * Career.ExpressBonus:N0} cr) by {Days(-margin)}", "t-body", margin >= 0 ? "ok" : "dim");
+                }
             }
             if (ship.PlanActive && ship.CruiseCap > 0) Ui.L(tripLines, $"Cruise speed {ship.CruiseCap:N0} km/s", "t-note");
-            Ui.L(tripLines, "A gentler burn or a coast saves fuel and costs days.", "t-note");
+            Ui.L(tripLines, "A gentler burn or a coast saves fuel, but takes longer and can miss the express bonus.", "t-note");
             Ui.Fontify(tripLines);
         }
 

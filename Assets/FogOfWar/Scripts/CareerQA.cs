@@ -195,10 +195,15 @@ namespace FogOfWar
                 Check(Math.Abs(ship.Cargo - career.CargoTonnes) < 1e-6, "cargo mass is on the ship");
                 yield return Shot("c03-luna-board");
                 var dest = sys[Career.PortAt(job.To).Body];
-                double c1 = career.Credits;
+                double c1 = career.Credits, expressBy = job.ExpressJd;
+                Check(job.ExpressDays > 0 && job.ExpressDays <= job.Days && Math.Abs(job.ExpressJd - (job.IssuedJd + job.ExpressDays)) < 1e-9,
+                    $"cargo has an express window inside the deadline ({job.ExpressDays * 24:F1} h of {job.Days * 24:F1} h)");
                 yield return Trip(dest, 1, $"Luna → {job.To} coast 50 %", () => !career.Active.Contains(job), 6, 150);
                 State("after cargo run");
                 Check(!career.Active.Contains(job) && career.Credits > c1, $"cargo delivered and paid ({career.Credits - c1:N0} cr)");
+                // a 1 g ship with a 50 % coast makes the window on a short hop, and the note names the bonus
+                Check(jd <= expressBy && career.Credits - c1 >= job.Pay * (1 + Career.ExpressBonus) - 1 && career.Notes.Exists(n => n.Text.Contains("express bonus")),
+                    $"1 g with a 50 % coast makes the express window: pay ×{1 + Career.ExpressBonus} ({(expressBy - jd) * 24:F1} h to spare)");
                 yield return Shot("c04-delivered");
             }
 
@@ -224,6 +229,7 @@ namespace FogOfWar
                 yield return Trip(sys[survey.To], 0, "survey of " + survey.To, () => !career.Active.Contains(survey), 6, 150);
                 State("after survey");
                 Check(!career.Active.Contains(survey) && career.Credits > c2, $"survey scanned and paid ({career.Credits - c2:N0} cr)");
+                Check(career.Notes.Exists(n => n.Text.Contains("express bonus")), $"a 1 g full burn makes a survey's express window ({survey.ExpressDays * 24:F0} h)");
                 yield return Shot("c05-survey");
             }
             else log.WriteLine("  (no survey on this board)");
@@ -238,6 +244,21 @@ namespace FogOfWar
             double cr = career.Credits;
             career.EmergencyDrop(ship);
             Check(Math.Abs(ship.Fuel - Career.EmergencyTonnes) < 1e-6 && career.Credits < cr, "emergency tender adds reaction mass for a fee");
+
+            // 5b. the express window: bonus inside it, plain pay after it, half after the deadline; a job from an older
+            // save (no window) pays plain
+            {
+                var x = new Contract { Pay = 10000, IssuedJd = 100, DeadlineJd = 104, ExpressDays = 2, ExpressJd = 102 };
+                double inside = Career.PayAt(x, 101.9, out bool l1, out bool e1), after = Career.PayAt(x, 103, out bool l2, out bool e2);
+                double late = Career.PayAt(x, 105, out bool l3, out bool e3);
+                x.ExpressDays = 0; x.ExpressJd = 0;
+                double old = Career.PayAt(x, 100.5, out _, out bool e4);
+                Check(inside == 12500 && e1 && !l1 && after == 10000 && !e2 && !l2 && late == 5000 && l3 && !e3 && old == 10000 && !e4,
+                    $"express pay: {inside:N0} inside the window, {after:N0} after it, {late:N0} late, {old:N0} with no window");
+                int n = 0, bad = 0;
+                foreach (var b in career.Board) if (b.Kind != JobKind.Intercept) { n++; if (!(b.ExpressDays > 0 && b.ExpressDays <= b.Days)) bad++; }
+                Check(bad == 0, $"every board job but an intercept has an express window inside its deadline ({n - bad} of {n})");
+            }
 
             // 6. the career save round-trips (through JSON only: the player's own save slot is left alone)
             double credits = career.Credits, fuel = ship.Fuel; int done = career.Done;

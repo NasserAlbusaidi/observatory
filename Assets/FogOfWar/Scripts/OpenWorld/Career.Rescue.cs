@@ -72,6 +72,7 @@ namespace FogOfWar.OpenWorld
             double slack = 1.1 + rng.NextDouble() * 0.6; // their air is running out
             c.Pay = Math.Round(RefPay(d, 0, out c.Days, slack) * 2 / 100) * 100 + 4000;
             c.Days += TransferSeconds / 86400;
+            c.ExpressDays = ExpressDaysFor(d, TransferSeconds, c.Days);
             return c;
         }
 
