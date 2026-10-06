@@ -62,6 +62,8 @@ namespace FogOfWar
         public virtual void UpdateHud(UI.UiShell shell) { }
         // false once the key hint bar has said its piece (the setting can still turn it off everywhere)
         public virtual bool WantsKeyHints => true;
+        // Esc closes a page the scene has open (true) before it opens the pause menu
+        public virtual bool CloseOverlay() => false;
 
         // ---- free camera (photo mode, cinematics). By default the rig sits at an offset from the orbit target.
         // Scenes that place the camera themselves every frame apply the rig in LateTick (RigInScene).

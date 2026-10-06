@@ -9,7 +9,7 @@ using A = FogOfWar.Controls.Action;
 
 namespace FogOfWar
 {
-    // The career layer in the UI Toolkit HUD: the Jobs tab of the ship console (business, docked services, contract
+    // The career layer in the UI Toolkit HUD: the Jobs page (business, docked services, contract
     // board, trip planner), credits and reaction mass in the flight cluster, and career notes as toasts.
     // Same rules and calls as the IMGUI CareerPanel in OpenSystemScene.Career.cs.
     public partial class OpenSystemScene
@@ -128,16 +128,6 @@ namespace FogOfWar
                     Ui.B(c, $"Call an emergency tender ({Career.EmergencyTonnes:N0} t, {Career.EmergencyCost:N0} cr)", () => career.EmergencyDrop(ship), "danger");
             }
 
-            var tut = string.IsNullOrEmpty(TutorialText) ? FirstJobHint() : null; // the lesson card covers it while a lesson runs
-            if (tut != null)
-            {
-                var p = Ui.E(c, "panel");
-                p.style.marginTop = 10; p.style.paddingTop = 8; p.style.paddingBottom = 8;
-                p.style.borderLeftColor = new Color(1f, 0.71f, 0.28f); p.style.borderLeftWidth = 2;
-                Ui.L(p, "FIRST JOB", "t-micro", "f-condm", "accent");
-                Ui.L(p, tut, "t-body");
-            }
-
             if (career.Active.Count > 0)
             {
                 Ui.Section(c, "Jobs");
@@ -212,36 +202,14 @@ namespace FogOfWar
                 }
             }
             else Ui.L(c, "Not docked. Park in orbit at a port to dock: " + string.Join(", ", Array.ConvertAll(Career.Ports, p => p.Name)) + ".", "t-note").style.marginTop = 8;
-
-            if (ship.Target != null)
-            {
-                Ui.Section(c, "Trip planner: " + ship.Target.Name);
-                c.Add(new Segmented(CruiseNames, cruiseIdx, i => { cruiseIdx = i; jobsSig = null; }));
-                PlanTrip(out double t, out double dv, out double fuel);
-                bool short_ = DvShort(dv);
-                Ui.L(c, $"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", "t-note", "f-mono", short_ ? "warn" : "dim");
-                if (short_) Ui.L(c, "Not enough reaction mass. Coast, lower the g, or refuel.", "t-body", "warn");
-                foreach (var j in career.Active)
-                {
-                    var body = career.TargetOf(j);
-                    if (body != ship.Target) continue;
-                    double arrive = t / 86400 + (j.Kind == JobKind.Survey ? j.DwellNeeded / 86400 : 0);
-                    bool onTime = jd + arrive <= j.DeadlineJd;
-                    Ui.L(c, $"{j.Title}: arrives with {Days(Math.Abs(j.DeadlineJd - jd - arrive))} {(onTime ? "to spare" : "too late")}", "t-body", onTime ? "ok" : "warn");
-                }
-                if (ship.PlanActive && ship.CruiseCap > 0) Ui.L(c, $"Cruise speed {ship.CruiseCap:N0} km/s", "t-note");
-                var eng = Ui.B(c, (ship.PlanActive ? "ABORT PLAN  " : "ENGAGE  ") + UiShell.Keys(A.Engage), TogglePlan, "primary", "f-cond");
-                eng.style.marginTop = 6; eng.style.alignSelf = Align.FlexStart;
-                Ui.L(c, "Δv grows with √g: a gentler burn or a coast saves reaction mass and costs days.", "t-note");
-            }
         }
 
         string FirstJobHint()
         {
             var c = career.Active.Find(x => x.Tutorial);
             if (c == null) return null;
-            if (ship.Target != sys.Moon) return $"Take the medical supplies to Luna. Set the Moon as the target: press {UiShell.Keys(A.NextTarget)} until it shows, click its label, or use Set target below.";
-            if (!ship.PlanActive) return $"Pick Full burn or a coast in the trip planner, then press {UiShell.Keys(A.Engage)} (Engage). Raise time compression with {UiShell.Keys(A.WarpUp)}.";
+            if (ship.Target != sys.Moon) return $"Take the medical supplies to Luna. Set the Moon as the target: press {UiShell.Keys(A.NextTarget)} until it shows, click its label, or open Jobs ({UiShell.Keys(A.Jobs)}) and use Set target.";
+            if (!ship.PlanActive) return $"Pick Full burn or a coast in the trip planner (console {UiShell.Keys(A.Console)}, Nav tab), then press {UiShell.Keys(A.Engage)} (Engage). Raise time compression with {UiShell.Keys(A.WarpUp)}.";
             return "The autopilot burns, flips at the midpoint and brakes, then parks in orbit. In orbit at a port you are docked, and the job pays.";
         }
     }

@@ -244,6 +244,7 @@ namespace FogOfWar
             {
                 if (Capture.HandleEscape()) { }
                 else if (HelpOpen) HelpOpen = false;
+                else if (!MenuOpen && Current != null && Current.CloseOverlay()) { }
                 else if (menu == Screen.Controls || menu == Screen.Observatory || menu == Screen.Settings) { menu = Screen.Main; rebindNote = null; }
                 else if (MenuOpen) { if (gameStarted && InGame) menu = Screen.None; }
                 else menu = Screen.Main;

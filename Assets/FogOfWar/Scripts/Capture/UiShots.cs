@@ -85,6 +85,11 @@ namespace FogOfWar
                 app.NewGame();
                 yield return Wait(1.5f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "05-flight");
+                if (app.Current is OpenSystemScene first)
+                {
+                    log.WriteLine("    05-flight: console " + (first.TestConsoleOpen ? "open" : "closed"));
+                    if (first.TestConsoleOpen) { errors++; log.WriteLine("    ERROR 05-flight: the console drawer should start closed"); }
+                }
                 Controls.Tap(Controls.Action.ThrottleFull);
                 yield return Wait(1.2f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06-flight-burn");
@@ -206,12 +211,15 @@ namespace FogOfWar
                         }
                     }
                 }
-                os?.ShowConsoleTab(5);
+                // the full-screen Jobs and Codex pages
+                os?.OpenPage(0);
+                yield return Shot(app, shell, camRT, uiRT, tag, "06a-jobs-page");
+                os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
                 os?.ShowCodex(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
-                if (os != null) log.WriteLine("    codex tab: " + os.TestLessonReport());
                 os?.ShowCodex(0);
+                os?.ClosePage();
                 os?.ShowConsoleTab(0);
                 if (os != null)
                 {

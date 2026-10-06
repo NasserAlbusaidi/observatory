@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 
 namespace FogOfWar
 {
-    // The Codex tab of the ship console: the target's entry (data once visited, survey notes once scanned, scan
+    // The Codex page (F4): the target's entry (data once visited, survey notes once scanned, scan
     // progress) and the achievement list. Same rules as CodexPanel in OpenSystemScene.Career.cs.
     public partial class OpenSystemScene
     {

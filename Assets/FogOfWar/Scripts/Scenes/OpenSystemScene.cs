@@ -67,6 +67,8 @@ namespace FogOfWar
             targets = sys.Bodies.FindAll(b => b != sys.Sun && (b.Parent == sys.Sun || b.Radius >= 100 || b == sys.Moon)); // T cycles these
             jd = Frame.JulianDateTdb(DateTime.UtcNow);
             warpIdx = 0;
+            // the scene object lives across New game: a new flight starts with the drawer closed and no page open
+            consoleOpen = false; pageView = -1; lessonSeen = null;
 
             Orbit.enabled = false;
             Cam.nearClipPlane = 0.003f;

@@ -56,9 +56,8 @@ namespace FogOfWar
         Label planEngage, navTarget, navEst, navHohmann, navPhase;
         VisualElement moonsBox, histBox, dataBox;
         Body moonsFor;
-        bool consoleOpen = true;
+        bool consoleOpen; // a drawer: closed at the start of a flight
         Tabs consoleTabs;
-        public void ShowConsoleTab(int i) => consoleTabs?.Select(i); // review shots
         float dataT;
         readonly List<Readout> hudReadouts = new List<Readout>();
         bool hudTargetsDirty = true;
@@ -94,6 +93,7 @@ namespace FogOfWar
             rightCol.style.top = 18; rightCol.style.right = 20; rightCol.style.width = 380;
             rightCol.style.bottom = shell.Portrait ? 350 : 56; // portrait: clear the lesson card and flight cluster
             BuildTargetCard(rightCol);
+            BuildFirstJob(rightCol);
             BuildConsole(rightCol);
 
             // ---- flight cluster, bottom centre
@@ -134,6 +134,7 @@ namespace FogOfWar
             mrow.style.marginTop = 6;
             Ui.B(mrow, "Back to ship  " + UiShell.Keys(A.Map), ToggleMap, "small");
             Ui.B(mrow, "Frame target", () => { if (ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4); }, "small");
+            BuildPage(layer);
             hudTargetsDirty = true;
         }
 
@@ -428,23 +429,19 @@ namespace FogOfWar
         {
             var p = Ui.Panel(parent, null, null, true, "console-body");
             p.style.flexShrink = 1;
-            var head = Ui.E(p, "row");
-            Ui.L(head, "SHIP CONSOLE", "t-h3", "f-cond", "glow-ink").style.flexGrow = 1;
-            consoleToggle = Ui.B(head, "–", () => { consoleOpen = !consoleOpen; Ui.Show(consoleBody, consoleOpen); Ui.Text(consoleToggle, consoleOpen ? "–" : "+"); }, "small", "ghost");
+            ConsoleHead(p);
             consoleBody = Ui.E(p, "col");
             consoleBody.style.flexShrink = 1;
             var tabs = new Tabs(true);
             tabs.style.flexShrink = 1;
             consoleBody.Add(tabs);
             consoleTabs = tabs;
-            tabs.Add("Jobs", Scroll(JobsTab));
             tabs.Add("Flight", Scroll(FlightTab));
             tabs.Add("Nav", Scroll(NavTab));
             tabs.Add("Targets", Scroll(TargetsTab));
             tabs.Add("View", Scroll(ViewTab));
-            tabs.Add("Codex", Scroll(CodexTab));
             tabs.Add("Data", Scroll(DataTab));
-            Ui.Show(consoleBody, consoleOpen); Ui.Text(consoleToggle, consoleOpen ? "–" : "+");
+            SetConsole(consoleOpen);
         }
 
         static VisualElement Scroll(Action<VisualElement> fill) => Ui.Scroll(fill);
@@ -494,6 +491,7 @@ namespace FogOfWar
         {
             navTarget = Ui.L(c, "", "t-h3", "f-cond", "accent");
             navEst = Ui.L(c, "", "t-note", "f-mono");
+            BuildTrip(c);
             navHohmann = Ui.L(c, "", "t-note", "f-mono");
             Ui.Section(c, "Plan");
             var pl = new[] { Plan.Brachistochrone, Plan.MatchVelocity, Plan.HoldStation };
@@ -705,14 +703,14 @@ namespace FogOfWar
             SetPill(pEphem, sys.Approximate(jd) ? "EPHEMERIS APPROXIMATE" : null, "bad");
             SetPill(pJet, ship.Throttle > 0 ? "JET " + Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW (FICTIONAL)" : null, null);
 
+            UpdatePages();
             if (!consoleOpen) return;
             // console: reflect state changed by keys
             if (!thrSlider.Dragging) thrSlider.SetValueWithoutNotify((float)ship.ThrottleCmd);
             Ui.Text(thrLabel, Mathf.RoundToInt((float)ship.ThrottleCmd * 100) + " %");
             segG.Value = Array.FindIndex(Gs, g => Math.Abs(g - ship.MaxG) < 1e-6);
             UpdateDriveLimit();
-            UpdateJobs();
-            UpdateCodex();
+            UpdateTrip();
             swAssist.Value = ship.FlightAssist;
             for (int i = 0; i < holdBtns.Count; i++) Ui.SetClass(holdBtns[i], "on", (int)ship.Hold == i);
             segWarp.Value = warpIdx;
