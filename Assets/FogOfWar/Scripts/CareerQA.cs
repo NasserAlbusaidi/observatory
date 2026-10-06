@@ -986,6 +986,7 @@ namespace FogOfWar
 
             yield return TrafficChecks();
             yield return ThreatChecks();
+            yield return PursuitChecks();
 
             State("end");
             log.WriteLine($"done: {fails} failed checks");
