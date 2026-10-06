@@ -14,6 +14,9 @@ namespace FogOfWar
     public partial class OpenSystemScene
     {
         public override bool HasHud => !GameSettings.ClassicPanel;
+        // in flight the key bar shows for the first seconds and during a lesson; F1 has the full sheet after that
+        public override bool WantsKeyHints => TutorialText != null || Time.unscaledTime - hudBuiltAt < 20;
+        float hudBuiltAt;
 
         // ---- free camera: offsets are km from the pivot (the ship, the target or the Sun)
         public override bool RigInScene => true;
@@ -41,10 +44,11 @@ namespace FogOfWar
         Label stDate, stWarp, stNear, stSun, stLimited;
         VisualElement tcIcon, mkIcon;
         Label tcName, tcSub, tcDist, tcRel, tcClose, tcBrach, tcNav, tcEngage, tcNoTarget;
-        Label tcDrift, tcStop, tcStopNote;
+        Label tcDrift, tcStop, tcStopNote, dvHead;
+        VisualElement statusBox;
         Label spdVal, spdRef, drvVal, drvSub, dvVal, rotVal, mkTgtName, mkTgtDist, mkEdgeName, consoleToggle;
         VisualElement thrFill, thrCmd, pills;
-        Label pAssist, pHold, pNav, pCam, pLimited, pEphem, pJet, pLanded;
+        Label pAssist, pHold, pNav, pLimited, pEphem, pJet, pLanded;
         FowSlider thrSlider;
         Segmented segG, segPlan, segWarp, segCam, segWarpTop;
         Switch swAssist, swBelt, swHist, swRings;
@@ -62,6 +66,7 @@ namespace FogOfWar
         public override void BuildHud(UiShell shell, VisualElement layer)
         {
             hudShell = shell;
+            hudBuiltAt = Time.unscaledTime;
             holdBtns.Clear();
             markers = Ui.E(layer, "layer"); markers.pickingMode = PickingMode.Ignore;
             BuildMarkers();
@@ -81,6 +86,7 @@ namespace FogOfWar
             stNear.style.marginTop = 6;
             stSun = Ui.L(st, "", "t-label", "f-mono");
             var stStatus = st;
+            statusBox = st;
 
             // ---- right column: target card + console
             rightCol = Ui.E(layer, "col");
@@ -108,14 +114,14 @@ namespace FogOfWar
             drvSub = Ui.L(dr, "", "t-label", "f-condm");
             BuildCareerStrip(dr, stStatus);
             var rg = Ui.E(fl, "gauge", "right-g");
-            Ui.L(rg, "Δv SPENT", "t-micro", "f-condm");
+            dvHead = Ui.L(rg, "Δv SPENT", "t-micro", "f-condm");
             dvVal = Ui.L(rg, "", "t-big", "f-mono");
             rotVal = Ui.L(rg, "", "t-label", "f-mono");
 
             BuildLessonCard(layer);
             pills = Ui.E(layer, "pills");
             pills.pickingMode = PickingMode.Ignore;
-            pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV"); pCam = Pill("CAM");
+            pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV");
             pLanded = Pill("LANDED"); pLimited = Pill("WARP LIMITED"); pEphem = Pill("EPHEMERIS"); pJet = Pill("JET POWER");
 
             // ---- system map header
@@ -282,6 +288,12 @@ namespace FogOfWar
                 float hw = free.width / 2, hh = free.height / 2;
                 float k = Mathf.Min(hw / Mathf.Max(Mathf.Abs(d.x), 1e-4f), hh / Mathf.Max(Mathf.Abs(d.y), 1e-4f));
                 var at = OntoDisplay(new Vector2(free.center.x + d.x * k, free.center.y - d.y * k));
+                // nor on the status box top left (the warp buttons): drop the arrow below it
+                if (statusBox != null && !float.IsNaN(statusBox.layout.yMax))
+                {
+                    var sb = statusBox.layout;
+                    if (at.x < sb.xMax + 20 && at.y < sb.yMax + 20) at.y = sb.yMax + 28;
+                }
                 mkEdge.style.translate = new Translate(at.x, at.y);
                 float deg = Mathf.Atan2(-d.y, d.x) * Mathf.Rad2Deg; // screen y grows downward
                 mkEdge.Q("chev").style.rotate = new Rotate(deg + 45);
@@ -383,6 +395,10 @@ namespace FogOfWar
             tcDrift = Ui.KV(tcBody, "Sideways drift").value;
             tcStop = Ui.KV(tcBody, "Stop").value;
             tcStopNote = Ui.L(tcBody, "", "t-note");
+            // the note explains the rows; it is read once, so it shows only while the pointer is on the card
+            Ui.Show(tcStopNote, false);
+            p.RegisterCallback<PointerEnterEvent>(_ => Ui.Show(tcStopNote, true));
+            p.RegisterCallback<PointerLeaveEvent>(_ => Ui.Show(tcStopNote, false));
             Ui.E(tcBody, "rule");
             tcBrach = Ui.L(tcBody, "", "t-note", "f-mono");
             var nrow = Ui.E(tcBody, "row");
@@ -639,7 +655,7 @@ namespace FogOfWar
                 StopEstimate(vr, out var aStop, out var tStop, out var dStop, out var by);
                 double room = r.Mag - t.Radius;
                 bool late = closing > 0 && dStop > room;
-                Ui.Text(tcStop, aStop > 0 ? Dur(tStop) + "  ·  " + Km(dStop) + (late ? "  TOO FAST" : "") : "can't");
+                Ui.Text(tcStop, vr.Mag < 1e-4 ? "at rest" : aStop > 0 ? Dur(tStop) + "  ·  " + Km(dStop) + (late ? "  TOO FAST" : "") : "can't");
                 Ui.SetClass(tcStop, "warn", late);
                 Ui.Text(tcStopNote, $"Relative to {t.Name}. Stop: flip now, {by}, no gravity. Speed and holds measure against {VelRefBody.Name} ({UiShell.Keys(A.VelocityRef)} switches).");
                 double d = Math.Max(r.Mag - Ship.Standoff(t), 0);
@@ -663,20 +679,24 @@ namespace FogOfWar
             thrFill.style.width = Length.Percent((float)ship.Throttle * 100);
             thrCmd.style.left = Length.Percent((float)ship.ThrottleCmd * 100);
             Ui.Text(drvSub, $"THROTTLE {Mathf.RoundToInt((float)ship.ThrottleCmd * 100)} %  ·  LIMIT {Fmt.Num(ship.MaxG, 1)} g");
-            Ui.Text(dvVal, Fmt.Num(ship.DvUsed, ship.DvUsed < 100 ? 2 : 0));
+            // what is left decides the next trip; with an unmetered tank only what was spent means anything
+            bool metered = !ship.UnlimitedFuel;
+            double dvShown = metered ? Career.DvLeft(ship) : ship.DvUsed;
+            Ui.Text(dvHead, metered ? "Δv LEFT" : "Δv SPENT");
+            Ui.Text(dvVal, Fmt.Num(dvShown, dvShown < 100 ? 2 : 0));
             Ui.Text(rotVal, "KM/S  ·  ROT " + Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s");
 
             // pills
             UpdateCareerStrip();
             UpdateLessonCard();
-            SetPill(pAssist, "ASSIST " + (ship.FlightAssist ? "ON" : "OFF"), ship.FlightAssist ? "ok" : "bad");
-            SetPill(pHold, "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant() + (ship.VelRef != null ? " VS " + ship.VelRef.Name.ToUpperInvariant() : ""), ship.Hold != Hold.Off ? "cold" : null);
-            SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : "NAV IDLE", ship.PlanActive ? "hot" : null);
-            SetPill(pCam, "CAM " + (pivot == Pivot.Ship ? camMode.ToString() : pivot == Pivot.Sun ? "MAP" : "TARGET").ToUpperInvariant(), null);
+            // a pill only for a state that is not the normal one: assist off, a hold, a plan flying
+            SetPill(pAssist, ship.FlightAssist ? null : "ASSIST OFF", "bad");
+            SetPill(pHold, ship.Hold == Hold.Off ? null : "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant() + (ship.VelRef != null ? " VS " + ship.VelRef.Name.ToUpperInvariant() : ""), "cold");
+            SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : null, "hot");
             SetPill(pLanded, ship.Landed != null ? "LANDED " + ship.Landed.Name.ToUpperInvariant() : null, "ok");
             SetPill(pLimited, limited ? "WARP LIMITED " + Fmt.Num(effectiveWarp, 0) + "×" : null, "bad");
             SetPill(pEphem, sys.Approximate(jd) ? "EPHEMERIS APPROXIMATE" : null, "bad");
-            SetPill(pJet, ship.Throttle > 0 ? "JET " + Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW (FICTIONAL)" : null, "bad");
+            SetPill(pJet, ship.Throttle > 0 ? "JET " + Fmt.Num(0.5 * 5e5 * ship.Throttle * ship.AMax * 1e3 * 1e7 / 1e12, 3) + " TW (FICTIONAL)" : null, null);
 
             if (!consoleOpen) return;
             // console: reflect state changed by keys

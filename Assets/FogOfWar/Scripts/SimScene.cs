@@ -60,6 +60,8 @@ namespace FogOfWar
         public virtual bool HasHud => false;
         public virtual void BuildHud(UI.UiShell shell, UnityEngine.UIElements.VisualElement layer) { }
         public virtual void UpdateHud(UI.UiShell shell) { }
+        // false once the key hint bar has said its piece (the setting can still turn it off everywhere)
+        public virtual bool WantsKeyHints => true;
 
         // ---- free camera (photo mode, cinematics). By default the rig sits at an offset from the orbit target.
         // Scenes that place the camera themselves every frame apply the rig in LateTick (RigInScene).

@@ -376,7 +376,8 @@ namespace FogOfWar.UI
             Ui.Show(recChip, rec);
             if (rec) Ui.Text(recText, $"REC  {Capture.RecordElapsed:0.0} s   ·   {Capture.RecordKey} stop");
             Ui.Show(fpsLabel, GameSettings.ShowFps && !HideHud);
-            bool hints = GameSettings.ShowHints && !app.MenuOpen && app.ShowUI && !HideHud && !app.HelpOpen;
+            bool hints = GameSettings.ShowHints && !app.MenuOpen && app.ShowUI && !HideHud && !app.HelpOpen
+                && (app.Current == null || app.Current.WantsKeyHints);
             Ui.Show(hintBar, hints);
             if (!hints) return;
             string key = (app.InGame ? "g" : "o") + Keys(A.Help) + Keys(A.Map) + Keys(A.CameraMode) + Capture.PhotoKey + Capture.ShotKey;

@@ -90,7 +90,7 @@ namespace FogOfWar
             d = a > 0 ? v * v / (2 * a) : double.PositiveInfinity;
         }
 
-        static string Spd(double kms) => Math.Abs(kms) < 1 ? Fmt.Num(kms * 1000, Math.Abs(kms) < 0.01 ? 1 : 0) + " m/s" : Fmt.Num(kms, 2) + " km/s";
+        static string Spd(double kms) => Math.Abs(kms) < 1 ? (Math.Abs(kms) < 5e-5 ? "0" : Fmt.Num(kms * 1000, Math.Abs(kms) < 0.01 ? 1 : 0)) + " m/s" : Fmt.Num(kms, 2) + " km/s";
 
         void TogglePlan()
         {
@@ -342,15 +342,22 @@ namespace FogOfWar
             if (ship.PlanActive) list.Add(new Readout("Plan", PlanShort[(int)ship.Plan]));
         }
 
+        // Fmt.Num writes powers of ten from 10^6 up and under 10^-3; a flight readout wants "4,170,345 km" and "0 m"
+        static string Whole(double x)
+        {
+            double r = Math.Round(x);
+            return (r == 0 ? 0 : r).ToString("#,0", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         static string Km(double km)
         {
             double a = Math.Abs(km);
-            return a > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : a >= 1 ? Fmt.Num(km, 0) + " km" : Fmt.Num(km * 1000, 0) + " m";
+            return a > 0.05 * Frame.AU ? Fmt.Num(km / Frame.AU, 3) + " AU" : a >= 1 ? Whole(km) + " km" : Whole(km * 1000) + " m";
         }
 
         static string Dur(double s)
         {
-            if (s < 120) return Fmt.Num(s, 0) + " s";
+            if (s < 120) return Whole(s) + " s";
             if (s < 7200) return Fmt.Num(s / 60, 1) + " min";
             if (s < 172800) return Fmt.Num(s / 3600, 1) + " h";
             return Fmt.Num(s / 86400, 1) + " days";

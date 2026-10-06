@@ -18,6 +18,7 @@ namespace FogOfWar
         string only;
         StreamWriter log;
         int errors;
+        bool classicWas; // the player's "classic panel" setting, off for the run (no HUD to shoot) and put back at the end
 
         public static void StartIfRequested(FogOfWarApp app)
         {
@@ -56,6 +57,8 @@ namespace FogOfWar
             yield return null;
             var shell = UiShell.Instance;
             if (shell == null) { log.WriteLine("no UI shell"); Quit(); yield break; }
+            classicWas = GameSettings.ClassicPanel;
+            if (classicWas) { GameSettings.ClassicPanel = false; log.WriteLine("classic panel setting on: off for this run"); }
 
             foreach (var size in sizes)
             {
@@ -307,6 +310,12 @@ namespace FogOfWar
             }
             cam.SetPixels32(a);
             File.WriteAllBytes(Path.Combine(dir, $"{tag}-{name}.png"), cam.EncodeToPNG());
+            // the target card reads in plain units: no "×10^-4 m/s" at rest, no "4.17 ×10^6 km" stop distance
+            if (app.Current is OpenSystemScene card && card.TestCardReport() is string cr && cr.Contains("×10"))
+            {
+                errors++;
+                log.WriteLine("    target card has a power of ten: " + cr);
+            }
             Destroy(cam); Destroy(ui);
             log.WriteLine($"  {name}");
         }
@@ -333,6 +342,7 @@ namespace FogOfWar
 
         void Quit()
         {
+            if (classicWas) GameSettings.ClassicPanel = true;
             log?.Close(); log = null;
             Application.Quit();
         }
