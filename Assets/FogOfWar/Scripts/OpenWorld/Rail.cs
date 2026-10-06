@@ -12,6 +12,9 @@ namespace FogOfWar.OpenWorld
         // the two it joins. Moons smaller than MinMoonKm are left out: their parking orbit is a few hundred km.
         public const double MinSunAu = 0.3, MinMoonKm = 100;
         const int Samples = 256;
+        // CheckEnds reads a planet's position every Stride samples and joins them with cubics, at an eighth of the cost.
+        // A knot is at most 0.7 day apart (1/32 of the longest trip), where Earth turns 0.7°: the cubic is within a km.
+        const int Stride = 8;
 
         public readonly Body From, To;
         public readonly double T0, T1;
@@ -57,20 +60,33 @@ namespace FogOfWar.OpenWorld
 
         // How close the course comes to the Sun and to the bodies, measured on straight pieces between samples. The
         // samples are even in time, so they are close together near the ports, where the course bends most.
-        public Clearance Check()
+        public Clearance Check() => Check(sys.Bodies, false);
+
+        // The cheap test, for traffic (the full one costs about 21 ms): the Sun, and the planet each end orbits when that
+        // end is a moon. QA runs the full test on scheduled trips to show what this one misses.
+        public Clearance CheckEnds() => Check(From.Parent == To.Parent ? new[] { From.Parent } : new[] { From.Parent, To.Parent }, true);
+
+        Clearance Check(System.Collections.Generic.IEnumerable<Body> bodies, bool smooth)
         {
             var c = new Clearance { SunAu = double.MaxValue, Ratio = double.MaxValue };
             var path = new D3[Samples + 1];
-            for (int i = 0; i <= Samples; i++) path[i] = Pos(T0 + (T1 - T0) * i / Samples);
+            for (int i = 0; i <= Samples; i++) path[i] = Pos(At(i));
             for (int i = 0; i < Samples; i++) c.SunAu = Math.Min(c.SunAu, Closest(path[i], path[i + 1]) / Frame.AU);
-            foreach (var b in sys.Bodies)
+            D3[] knots = null;
+            foreach (var b in bodies)
             {
-                if (b.Parent == null || Career.IsCraft(b) || (b.Parent != sys.Sun && b.Radius < MinMoonKm)) continue;
+                if (b == null || b.Parent == null || Career.IsCraft(b) || (b.Parent != sys.Sun && b.Radius < MinMoonKm)) continue;
+                bool fit = smooth && b.Parent == sys.Sun; // a moon's orbit is too fast for the knots
+                if (fit)
+                {
+                    knots ??= new D3[Samples / Stride + 3];
+                    for (int k = 0; k < knots.Length; k++) knots[k] = sys.PosAt(b, At((k - 1) * Stride));
+                }
                 double min = double.MaxValue;
                 D3 prev = D3.Zero;
                 for (int i = 0; i <= Samples; i++)
                 {
-                    var r = path[i] - sys.PosAt(b, T0 + (T1 - T0) * i / Samples);
+                    var r = path[i] - (fit ? Cubic(knots, i) : sys.PosAt(b, At(i)));
                     if (i > 0) min = Math.Min(min, Closest(prev, r));
                     prev = r;
                 }
@@ -78,6 +94,17 @@ namespace FogOfWar.OpenWorld
                 if (ratio < c.Ratio) { c.Ratio = ratio; c.Nearest = b; }
             }
             return c;
+        }
+
+        double At(int i) => T0 + (T1 - T0) * i / Samples;
+
+        // the cubic through the four knots around sample i; knot k is at sample (k - 1) * Stride
+        static D3 Cubic(D3[] k, int i)
+        {
+            int j = Math.Min(i / Stride, Samples / Stride - 1) + 1; // knots j and j + 1 bracket the sample
+            double u = (i - (j - 1) * Stride) / (double)Stride;
+            return k[j - 1] * (-u * (u - 1) * (u - 2) / 6) + k[j] * ((u + 1) * (u - 1) * (u - 2) / 2)
+                 + k[j + 1] * (-(u + 1) * u * (u - 2) / 2) + k[j + 2] * ((u + 1) * u * (u - 1) / 6);
         }
 
         // distance from the origin to the segment a–b

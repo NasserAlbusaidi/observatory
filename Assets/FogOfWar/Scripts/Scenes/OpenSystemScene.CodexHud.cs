@@ -55,7 +55,7 @@ namespace FogOfWar
             stats.style.marginTop = 4;
             Stat(stats, cx.Visited.Count, "visited");
             Stat(stats, cx.Scanned.Count, "scanned");
-            Stat(stats, sys.Bodies.Count - 1, "bodies");
+            Stat(stats, sys.Bodies.Count - 1 - (traffic?.Flying.Count ?? 0), "bodies");
             var b = ship.Target;
             if (b == null || b.Parent == null || Career.IsCraft(b))
             {

@@ -64,6 +64,7 @@ namespace FogOfWar
         protected override void Build()
         {
             sys = SolarSystem.Build();
+            traffic = null; // its ships were bodies of the old system
             targets = sys.Bodies.FindAll(b => b != sys.Sun && (b.Parent == sys.Sun || b.Radius >= 100 || b == sys.Moon)); // T cycles these
             jd = Frame.JulianDateTdb(DateTime.UtcNow);
             warpIdx = 0;
@@ -402,7 +403,8 @@ namespace FogOfWar
 
         // -fowprof: log where frame time goes, every 2 s
         static readonly bool Prof = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowprof") >= 0;
-        readonly System.Diagnostics.Stopwatch swTick = new System.Diagnostics.Stopwatch(), swLate = new System.Diagnostics.Stopwatch(), swGui = new System.Diagnostics.Stopwatch();
+        readonly System.Diagnostics.Stopwatch swTick = new System.Diagnostics.Stopwatch(), swLate = new System.Diagnostics.Stopwatch(), swGui = new System.Diagnostics.Stopwatch(),
+            swTraffic = new System.Diagnostics.Stopwatch(); // inside tick and gui
         int profFrames, profSteps; float profT;
 
         public override void Tick(float dt)
@@ -411,8 +413,8 @@ namespace FogOfWar
             try { TickInner(dt); } finally { if (Prof) swTick.Stop(); }
             if (Prof && (profT += Time.unscaledDeltaTime) > 2f)
             {
-                Debug.Log($"PROF frames {profFrames} tick {swTick.Elapsed.TotalMilliseconds / profFrames:F2} ms late {swLate.Elapsed.TotalMilliseconds / profFrames:F2} ms gui {swGui.Elapsed.TotalMilliseconds / profFrames:F2} ms substeps/frame {profSteps / (float)profFrames:F0} warp {WarpNames[warpIdx]}");
-                swTick.Reset(); swLate.Reset(); swGui.Reset(); profFrames = profSteps = 0; profT = 0;
+                Debug.Log($"PROF frames {profFrames} tick {swTick.Elapsed.TotalMilliseconds / profFrames:F2} ms late {swLate.Elapsed.TotalMilliseconds / profFrames:F2} ms gui {swGui.Elapsed.TotalMilliseconds / profFrames:F2} ms traffic {swTraffic.Elapsed.TotalMilliseconds / profFrames:F2} ms ({traffic?.Flying.Count ?? 0} ships) substeps/frame {profSteps / (float)profFrames:F0} warp {WarpNames[warpIdx]}");
+                swTick.Reset(); swLate.Reset(); swGui.Reset(); swTraffic.Reset(); profFrames = profSteps = 0; profT = 0;
             }
             profFrames++;
         }
@@ -472,6 +474,7 @@ namespace FogOfWar
             // QA-022: a new warp choice starts fresh, so a stale "limited" note never outlives the setting it was about
             if (warpIdx != lastWarpIdx) { lastWarpIdx = warpIdx; limitedAt = -10; effectiveWarp = Warps[warpIdx]; }
             reference = Ship.Dominant(sys, ship.Pos, jd);
+            TickTraffic();
             TickCareer(achieved);
             RecorderTick(dt, steps);
         }
