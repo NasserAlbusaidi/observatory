@@ -487,22 +487,28 @@ namespace FogOfWar.OpenWorld
 
         D3? Pursue(SolarSystem sys, double jd, D3 r, double dist, D3 vrel, D3 comp, double tau)
         {
-            double standoff = Standoff(Target);
+            // A distinct capture zone leaves a one-kilometre clearance reserve outside the old craft standoff.
+            // The target-thrust braking law is deliberately unchanged; its gameplay tradeoff remains issue #89.
+            double standoff = Standoff(Target) + 1;
             var los = dist > 0 ? r / dist : Heading;
-            bool hold = dist < standoff * 1.25 && vrel.Mag < 0.5;
-            if (!hold && Clearance(sys, jd) is D3 guard) { Phase = "climbing clear of " + guardBody.Name; return guard; }
+            bool hold = dist < 20 && vrel.Mag < 0.2;
+            if (!hold && PursueClearance(sys, jd) is D3 guard) { Phase = "climbing clear of " + guardBody.Name; return guard; }
             if (comp.Sqr >= AMax * AMax) { Phase = "matching its burn"; return comp.Norm * AMax; }
             D3 want, ff = D3.Zero;
             if (hold)
             {
-                // station-keeping beside it, as Brachistochrone's hover: back to the standoff, braking to stop by half of it
-                want = los * ((dist - standoff) * 0.002);
-                double closing = D3.Dot(vrel, los);
-                if (closing > 0) ff = -los * Math.Min(PursueMargin * Spare(comp, -los, AMax), closing * closing / (2 * Math.Max(dist - standoff * 0.5, 0.05)));
+                // Critically damped relative position control, with target acceleration fed forward. Unlike the
+                // player's loose hover this rejects closing bias without crossing the craft's exclusion distance.
+                double omega = Math.Min(0.05, 1 / Math.Max(20, 4 * tau / 3));
                 Phase = "holding station";
-                return Share((want - vrel) / tau + ff, comp);
+                return Share(los * ((dist - standoff) * omega * omega) - vrel * (2 * omega), comp);
             }
-            var dir = Avoid(sys, jd, los, dist);
+            // Short relative-motion lead: capped so an acceleration change cannot put the aim far behind the target.
+            double leadSeconds = Math.Min(600, Math.Sqrt(Math.Max(dist - standoff, 0) / AMax));
+            var transverse = vrel - los * D3.Dot(vrel, los);
+            var lead = r - transverse * leadSeconds;
+            var aim = lead.Sqr > 0 && D3.Dot(lead, r) > 0 ? lead.Norm : los;
+            var dir = Avoid(sys, jd, aim, dist);
             double brake = PursueMargin * Spare(comp, -dir, AMax), vb = Math.Sqrt(2 * brake * Math.Max(dist - standoff, 0));
             want = dir * vb;
             // on or above the braking curve, feed its own deceleration forward (see Brachistochrone)
@@ -511,6 +517,31 @@ namespace FogOfWar.OpenWorld
             // what the drive does, not where the steering points: braking against a target that pulls away can need no thrust
             Phase = cmd.Mag <= RcsAccel ? "trimming (RCS)" : D3.Dot(cmd, los) >= 0 ? "closing" : "braking";
             return cmd;
+        }
+
+        // Pursuit has an active braking curve, so a ballistic periapsis alone does not predict an impact. Its guard
+        // uses the actual stopping distance on that curve plus a bounded turn margin; the player's Climb is unchanged.
+        D3? PursueClearance(SolarSystem sys, double jd)
+        {
+            foreach (var b in Obstacles)
+            {
+                if (b == null || b == sys.Sun || b == Target || b.GM < 1) continue;
+                var r = Pos - sys.Pos(b, jd); double rm = r.Mag;
+                if (rm > 40 * b.Radius) continue;
+                var outward = r / Math.Max(rm, 1e-9); var v = Vel - sys.Vel(b, jd);
+                // Avoid still bends the path outside 1.5 R + 200 km. This last-resort braking guard protects the
+                // physical surface, rather than repeatedly ejecting a safe approach from that wider routing margin.
+                double inward = -D3.Dot(v, outward), safe = b.Radius * 1.1 + 20;
+                double net = Math.Max(AMax - b.GM / (rm * rm), 1e-9);
+                double stop = inward > 0 ? inward * inward / (2 * PursueMargin * net) : 0;
+                double turnMargin = Math.Min(0.05 * safe, Math.Max(0, inward) * 5);
+                if (rm > safe && (inward <= 0 || rm - safe > stop + turnMargin)) continue;
+                guardBody = b;
+                var lateral = v - outward * D3.Dot(v, outward);
+                var tangent = lateral.Sqr > 1e-12 ? lateral.Norm : D3.Cross(b.Pole, outward).Norm;
+                return (outward + tangent * 0.2).Norm * AMax;
+            }
+            return null;
         }
 
         // The most the drive has left along unit vector u once it matches the target: the largest k ≥ 0 with
