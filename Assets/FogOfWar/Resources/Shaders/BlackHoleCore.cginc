@@ -447,7 +447,7 @@ struct Ray
 {
     float3 col; float trans, spotLum, firstHit, firstG;
     float4 s; float ph; int steps; bool escaped, fallbackSky;
-    int reason; // 0 capture, 1 confirmed escape, 2 exhausted budget, 3 opaque hit, 4 numerical failure
+    int reason; // 0 capture, 1 confirmed escape, 2 unresolved (budget exhausted, or a forbidden plunge at the retry floor), 3 opaque hit, 4 numerical failure
     float count; float4 x0, x1, x2; float rmin, rmax;
 };
 
@@ -627,7 +627,7 @@ float3 skyTerm(float3 dir, float w, float EF, float px)
 // away from it, ρ warped logarithmically about the shadow edge ρc(ψ) (computed on the CPU from the photon-orbit
 // family) so cells crowd the critical curve and none straddles capture and escape. One table covers every sign
 // of b and of the initial p_r and p_θ.
-//   T0: reason × 8 + crossings (max 4; 0 capture, 1 escape, 2 budget, 3 opaque, 4 numerical), direction at camera φ = 0
+//   T0: reason × 8 + crossings (max 4; 0 capture, 1 escape, 2 unresolved (budget exhausted, or a forbidden plunge at the retry floor), 3 opaque, 4 numerical), direction at camera φ = 0
 //   T1..T3: the first three equator crossings (r, φ − φ_camera, p_r, dθ/dλ)
 //   T4: xy radial range of the path (for bodies), z steps used, w display-only fallbackSky flag
 Texture2D<float4> _LensT0, _LensT1, _LensT2, _LensT3, _LensT4;

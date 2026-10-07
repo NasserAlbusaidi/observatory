@@ -41,8 +41,8 @@ namespace FogOfWar
             long day0 = (long)Math.Floor(j0);
             var heliocentric = new Rail(qs, qs.Earth, qs["Mars"], j0, j0 + 10).CheckEnds();
             Check(heliocentric.Nearest == null, "traffic: planet endpoints keep the parent-only body set");
-            // Find a real scheduled Titan -> Enceladus course whose full check identifies Rhea. The search is
-            // deterministic and bounded; require the fixture to exist so removing sibling checks cannot pass.
+            // Find a scheduled Titan -> Enceladus course that clears the parent-only check but crosses Rhea.
+            // Requiring both geometries makes this fixture fail if the sibling checks are dropped.
             var siblingSchedule = new Traffic(qs, 1);
             Traffic.Trip rheaTrip = null; Rail.Clearance rheaFull = default;
             for (long d = day0; d < day0 + 5 * 366 && rheaTrip == null; d++)
@@ -51,10 +51,10 @@ namespace FogOfWar
                     if (t.From.Body != "Titan" || t.To.Body != "Enceladus") continue;
                     siblingSchedule.Ready(t);
                     var full = t.Rail.Check();
-                    if (full.Nearest == qs["Rhea"] && full.Ratio < 0.99) { rheaTrip = t; rheaFull = full; break; }
+                    if (full.Nearest == qs["Rhea"] && full.Ratio < 0.99 && t.Rail.CheckParents().Clear) { rheaTrip = t; rheaFull = full; break; }
                 }
             Check(rheaTrip != null && rheaTrip.Refused && !rheaTrip.Rail.CheckEnds().Clear,
-                $"traffic: Titan->Enceladus through Rhea is refused ({rheaTrip?.Name ?? "missing fixture"}; dep {rheaTrip?.Dep:R}, arr {rheaTrip?.Arr:R}; Rhea ratio {rheaFull.Ratio:F4})");
+                $"traffic: Titan->Enceladus through Rhea is refused ({rheaTrip?.Name ?? "missing fixture"}; dep {rheaTrip?.Dep:R}, arr {rheaTrip?.Arr:R}; Rhea ratio {rheaFull.Ratio:F4}; parent-only clear {rheaTrip?.Rail.CheckParents().Clear})");
 
             string Trips(Traffic tr)
             {

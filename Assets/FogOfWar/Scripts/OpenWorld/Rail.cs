@@ -71,6 +71,8 @@ namespace FogOfWar.OpenWorld
              (From.Parent != null && From.Parent != sys.Sun && b.Parent == From.Parent) ||
              (To.Parent != null && To.Parent != sys.Sun && b.Parent == To.Parent))), true);
 
+        internal Clearance CheckParents() => Check(new[] { From.Parent, To.Parent }, true);
+
         Clearance Check(System.Collections.Generic.IEnumerable<Body> bodies, bool smooth)
         {
             var c = new Clearance { SunAu = double.MaxValue, Ratio = double.MaxValue };
