@@ -161,6 +161,47 @@ namespace FogOfWar
             log.Close(); Application.Quit();
         }
 
+        void TouchdownSoundChecks()
+        {
+            var audio = Get<ShipAudio>("sound");
+            var synth = typeof(ShipAudio).GetField("synth", F).GetValue(audio);
+            var kind = synth.GetType();
+            var sync = kind.GetField("inboxLock", F).GetValue(synth);
+            var landed = ship.Landed; var crashed = ship.Crashed; string phase = ship.Phase;
+            bool wasLanded = Get<bool>("wasLanded");
+            // Hold the queue lock while observing the actual one-shot events; the audio thread cannot consume them.
+            lock (sync)
+            {
+                int Touchdowns()
+                {
+                    var inbox = (Array)kind.GetField("inbox", F).GetValue(synth);
+                    int count = (int)kind.GetField("inboxCount", F).GetValue(synth), hits = 0;
+                    for (int i = 0; i < count; i++)
+                    {
+                        object pending = inbox.GetValue(i);
+                        if ((Audio.ShipSound)pending.GetType().GetField("s", F).GetValue(pending) == Audio.ShipSound.Touchdown) hits++;
+                    }
+                    return hits;
+                }
+                try
+                {
+                    foreach (string name in new[] { "Earth", "Venus", "Mars", "Titan", "Jupiter", "Moon" })
+                    {
+                        ship.Landed = sys[name]; ship.Crashed = null; ship.Phase = "contact label without a landed prefix";
+                        Put("wasLanded", false); int before = Touchdowns();
+                        Call("TickSound", 0.0); int after = Touchdowns();
+                        ship.Phase = "game saved"; Call("TickSound", 0.0);
+                        Check(after == before + 1 && Touchdowns() == after,
+                            name + " contact queues one touchdown sound regardless of phase text");
+                    }
+                    ship.Crashed = sys.Moon; Put("wasLanded", false); int clean = Touchdowns();
+                    Call("TickSound", 0.0);
+                    Check(Touchdowns() == clean, "a crash does not queue a successful touchdown sound");
+                }
+                finally { ship.Landed = landed; ship.Crashed = crashed; ship.Phase = phase; Put("wasLanded", wasLanded); }
+            }
+        }
+
         IEnumerator Start()
         {
             Directory.CreateDirectory(dir);
@@ -176,6 +217,7 @@ namespace FogOfWar
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcareertraffic") >= 0)
             { yield return TrafficChecks(); Finish(); yield break; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
+            TouchdownSoundChecks();
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
             Check(!ship.UnlimitedFuel && Math.Abs(ship.Fuel - 200) < 1e-6, "tank full, reaction mass is limited");
