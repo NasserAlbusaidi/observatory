@@ -77,11 +77,23 @@ namespace FogOfWar.OpenWorld
         public Color ColA = Color.gray, ColB = Color.gray, Atmo = Color.clear;
         public string Texture;              // Resources path, optional
         public Cheb Cheb;
-        public bool FitExpected, ElementsCalibrated;
+        public bool FitExpected, ElementsCalibrated, RadiusEquatorial;
         public string ElementSource = "catalogue mean elements", RadiusSource = "catalogue radius", RotationSource = "orientation parameters (source unspecified)";
         public string ShapeSource = "procedural sphere/spheroid; terrain where supplied (not a measured full shape)";
 
         public string PositionModel(double jd)
+        {
+            string local = LocalPositionModel(jd);
+            if (Path == null && Parent?.Parent != null)
+            {
+                string parent = Parent.PositionModel(jd);
+                if (parent != "fitted JPL Horizons ephemeris")
+                    local += "; heliocentric position also follows " + Parent.Name + "'s " + parent;
+            }
+            return local;
+        }
+
+        string LocalPositionModel(double jd)
         {
             if (Path != null) return "scripted craft trajectory";
             if (Parent == null) return "heliocentric origin";
@@ -480,7 +492,8 @@ namespace FogOfWar.OpenWorld
                 b.Parent = sun; b.GM = gm; b.Radius = req; b.Flattening = f; b.J2 = j2; b.Look = look; b.ColA = a; b.ColB = bcol;
                 b.PoleRa = ra; b.PoleDec = dec; b.W0 = w0; b.Wd = wd; b.Texture = tex; b.Atmo = atmo;
                 b.ElementSource = "JPL approximate planet elements (nominal domain 1800–2050)";
-                b.RadiusSource = "NASA planetary fact-sheet radius";
+                b.RadiusEquatorial = true;
+                b.RadiusSource = "NASA planetary fact-sheet equatorial radius" + (Ship.Giant(b) ? " (1 bar)" : "");
                 b.RotationSource = "IAU orientation model";
                 s.Bodies.Add(b);
                 return b;
@@ -499,7 +512,7 @@ namespace FogOfWar.OpenWorld
                 Name = "Moon", Parent = s.Earth, GM = 4902.8, Radius = 1738.1, Flattening = 0.0012, Look = Look.Rocky, ColA = new Color(0.5f, 0.5f, 0.5f), ColB = new Color(0.7f, 0.69f, 0.67f), Texture = "Planets/Moon/Color",
                 A = 384400, E = 0.0549, I = 5.145, Node = 125.0445, dNode = -0.0529538083, Peri = 83.3532, dPeri = 0.1114040803, L = 218.3165, dL = 13.17639648,
                 PoleRa = 269.9949, PoleDec = 66.5392, W0 = 38.3213, Wd = 13.17635815,
-                ElementSource = "precessing mean lunar elements", RadiusSource = "catalogue equatorial radius", RotationSource = "IAU orientation model with selected periodic terms",
+                ElementSource = "precessing mean lunar elements", RadiusEquatorial = true, RadiusSource = "catalogue equatorial radius", RotationSource = "IAU orientation model with selected periodic terms",
             };
             s.Bodies.Add(s.Moon);
             P(Planet("Mars", 1.52371034, 0.00001847, 0.09339410, 0.00007882, 1.84969142, -0.00813131, -4.55343205, 19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343),

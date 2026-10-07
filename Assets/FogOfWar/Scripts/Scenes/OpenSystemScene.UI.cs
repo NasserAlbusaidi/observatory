@@ -335,7 +335,7 @@ namespace FogOfWar
                 if (!Career.IsCraft(ship.Target))
                 {
                     list.Add(new Readout("Position model", ship.Target.PositionModel(jd)));
-                    list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
+                    if (ship.Target.Parent != null) list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
                 }
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
