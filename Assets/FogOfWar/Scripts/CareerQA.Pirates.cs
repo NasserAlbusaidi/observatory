@@ -88,8 +88,9 @@ namespace FogOfWar
                       && Ship.Dominant(sys, sys.Pos(p, jd), jd) != p && Career.IsRaider(p) && Career.IsCraft(p) && p.GM == 0,
                     $"pirates: the proxy {p.Name} is in the system, the pirate's stand-in for the player is not; the proxy is no obstacle, no Near body, no frame and pulls nothing");
                 double lag = (e.Chase.SpanEnd - jd) * 86400, dp = (sys.Pos(p, jd) - e.Pirate.Pos).Mag, dv = (sys.Vel(p, jd) - e.Pirate.Vel).Mag;
-                Check(lag == 0 && dp < 1e-6 && dv < 1e-6 && e.Pirate.DvUsed > 0,
-                    $"pirates: in the scene the pirate flies the player's spans: its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s off it, Δv {e.Pirate.DvUsed:F3} km/s ({e.Pirate.Phase})");
+                // sys.Vel differences the path 30 s either side, on jd's 40 µs grid: the stand-in's gate (pursuit check G4)
+                Check(lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel && e.Pirate.DvUsed > 0,
+                    $"pirates: in the scene the pirate flies the player's spans: its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s (< {PursuitCheck.GateVel:E0}) off it, Δv {e.Pirate.DvUsed:F3} km/s ({e.Pirate.Phase})");
                 Put("warpIdx", 6);
             });
             if (ok) yield return null;
