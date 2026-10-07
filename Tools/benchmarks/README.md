@@ -27,7 +27,7 @@ The fresh Horizons comparison deliberately retains discrepancies rather than mov
 
 The initial GPU reference used a tightly toleranced DOP853 initial-value solve. Near the high-spin prograde critical orbit it still accumulated radial-invariant error. The accepted oracle separates the radial quadrature from analytic Jacobi polar motion, preserving the constants directly. `diagnostic_ivp` is retained for comparison and is not used to decide correctness.
 
-Ray termination codes are capture=0, confirmed outward escape=1, budget exhausted=2, opaque hit=3, numerical failure=4. Full debug view 1 and table geometry view 4 use red/green/blue/white/magenta; unresolved rays offered a display sky sample are cyan. Table T4 also stores step count and fallback flag. An unresolved display sample has unknown sky direction; its uncertainty can span the sky, so its rate is reported separately and its cells are rejected by the image interpolator. It never counts as confirmed escape. The table uses 80 MiB at 1024².
+Ray termination codes are capture=0, confirmed outward escape=1, unresolved=2 (budget exhausted, or a forbidden plunge at the retry floor), opaque hit=3, numerical failure=4. Full debug view 1 and table geometry view 4 use red/green/blue/white/magenta; unresolved rays offered a display sky sample are cyan. Table T4 also stores step count and fallback flag. An unresolved display sample has unknown sky direction; its uncertainty can span the sky, so its rate is reported separately and its cells are rejected by the image interpolator. It never counts as confirmed escape. The table uses 80 MiB at 1024².
 
 ## Rebuild references
 
