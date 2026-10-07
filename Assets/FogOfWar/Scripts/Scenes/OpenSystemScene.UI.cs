@@ -371,6 +371,10 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- panel
 
+        // the planet buttons in both shells: the Sun's own bodies, less the asteroids (their own list), traffic and a
+        // raider's proxy
+        List<Body> PlanetButtons() => sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x) && !Career.IsRaider(x));
+
         public override void Controls(PanelUI ui)
         {
             CareerPanel(ui);
@@ -439,7 +443,7 @@ namespace FogOfWar
 
             // --- targets
             ui.Section("Targets");
-            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x) && !Career.IsRaider(x));
+            var planets = PlanetButtons();
             var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
             int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
             if (si >= 0) SetTarget(planets[si]);
