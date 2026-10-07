@@ -1,0 +1,281 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace FogOfWar.OpenWorld
+{
+    // A raider's chase (docs/design-world.md W4): the pirate Ship of a Pursuit, flying Plan.Pursue at the player, and a
+    // proxy Body that follows it in sys.Bodies, so the target card, SetTarget and Divert see it like any craft. The scene
+    // steps the player first and calls Advance with that step; Career decides the rest (Career.Pirates.cs).
+    public sealed class Encounter
+    {
+        public readonly Contract Job;
+        public readonly Pursuit Chase;
+        public readonly Body Proxy, Lair;   // Lair: the body it waited at, at rest with it (null for a start placed by hand)
+        public readonly double CatchSeconds; // the closed-form catch time at the start (Career.CatchSeconds)
+        public double Dwell;                 // the boarding clock: seconds alongside, reset on any break
+        public double Range, Vrel;           // from the player at the last career update
+        internal readonly SolarSystem Sys;   // the system the proxy is in
+        D3 pos, vel, acc;
+        double at;
+
+        public Ship Pirate => Chase.Pirate;
+
+        internal Encounter(SolarSystem sys, Contract job, Body lair, string name, double jd, D3 p, D3 v, double g, Ship player, double catchSeconds)
+        {
+            Sys = sys; Job = job; Lair = lair; CatchSeconds = catchSeconds;
+            Chase = new Pursuit(sys, jd, p, v, g, player.Pos, player.Vel);
+            pos = p; vel = v; acc = D3.Zero; at = jd;
+            // a craft (Path set) so it is never a dock, a Near body, a frame or a codex entry; GM 0 and a 50 m radius keep it
+            // out of the gravity sum, the substep rule, the obstacles and the eclipse test
+            Proxy = new Body
+            {
+                Name = name, Parent = sys.Sun, GM = 0, Radius = 0.05, Look = Look.Rocky,
+                ColA = new Color(0.75f, 0.3f, 0.26f), ColB = new Color(0.45f, 0.2f, 0.18f), Path = PathAt, PathAccel = _ => acc,
+            };
+            Range = (p - player.Pos).Mag; Vrel = (v - player.Vel).Mag;
+        }
+
+        // The player's step from (p0, v0) at jd to v1, h seconds later: the pirate flies the same span (Pursuit.Advance), then
+        // the proxy takes its state at the span's end and its mean acceleration over the span, gravity included, as Guide
+        // reads PathAccel in place of a target's gravity. A quadratic, so sys.Vel's central difference is its velocity.
+        public void Advance(SolarSystem sys, double jd, double h, D3 p0, D3 v0, D3 v1)
+        {
+            if (!(h > 0)) return;
+            var before = Pirate.Vel;
+            Chase.Advance(sys, jd, h, p0, v0, v1);
+            pos = Pirate.Pos; vel = Pirate.Vel; acc = (vel - before) / h; at = Chase.SpanEnd;
+            sys.Pos(sys.Sun, double.NaN); // the proxy keeps its Body: no read of the old path may survive in the date cache
+        }
+
+        D3 PathAt(double jd) { double t = (jd - at) * 86400; return pos + vel * t + acc * (0.5 * t * t); }
+    }
+
+    // W4: raiders. A route call (RouteKind.Pirate) starts an encounter, kept here and not in the call, so Run can close
+    // the card while the chase goes on. The pilot wins by planning: burn harder (a pirate of the same g closes only on the
+    // autopilot's reserve), dock first (a docked ship is safe), divert into a patrol's reach, or give up part of the job.
+    // Not saved: a load drops it and says so.
+    public partial class Career
+    {
+        // working values [design]; the open ones are decided in GitHub issues (D1 #90)
+        public const double PirateG = 1;                          // D1: the raider's drive, in g
+        public const double RaidsPerHour = 0.2;                   // D3: k, calls per exposed hour (PirateRate)
+        public const double BoardShare = 0.5, GiveUpShare = 0.25; // D5: the part of the job's pay, and of its tonnes for cargo
+        public const double ChaseWarp = 1000, CloseWarp = 100, CloseKm = 10000; // D7: the warp cap, and where it tightens
+        public const double CatchMinS = 2 * 3600, CatchMaxS = 6 * 3600;        // D11: the catch time a raider's start must give
+        const string RaiderPrefix = "Raider ";
+        static readonly string[] RaiderHulls = { "Magpie", "Jackal", "Lamprey", "Skua", "Cutlass", "Remora" };
+
+        public static bool IsRaider(Body b) => b != null && b.Name.StartsWith(RaiderPrefix, StringComparison.Ordinal);
+        static string Raiders => Factions[(int)Faction.Raiders].Name; // decision 2: the faction table names them (D13)
+
+        public Encounter Encounter { get; private set; }
+        // the scene's: set the body as the target and engage the Fast plan; false when the plan does not engage (D6)
+        public Func<Body, bool> Divert;
+        bool contactLost; // a load dropped an encounter: the note waits for a tick, which knows the date and the ship
+
+        // The time compression the scene must hold to while a raider gives chase (0: none)
+        public double WarpCap => Encounter == null ? 0 : Encounter.Range < CloseKm || Encounter.Dwell > 0 ? CloseWarp : ChaseWarp;
+
+        // The body a raider waits at for job c: the job's target on the second half of the trip, the posting port on the first.
+        Body Lair(Contract c, SolarSystem sys, Ship ship, double jd)
+        {
+            var to = TargetOf(c);
+            var from = sys[PortAt(c.From)?.Body ?? ""];
+            if (to == null || from == null) return to;
+            return (ship.Pos - sys.Pos(to, jd)).Mag <= (ship.Pos - sys.Pos(from, jd)).Mag ? to : from;
+        }
+
+        // D3: raider calls per hour on job c: RaidsPerHour × the raiders' presence here × e^(−v / Threat.MatchKms), v the
+        // ship's speed against the job's lair. That is W3's exposure, so the planner's risk line predicts it. None inside a
+        // patrol's reach.
+        internal double PirateRate(SolarSystem sys, Ship ship, Contract c, double jd)
+        {
+            double p = Threat.Presence(sys, ship.Pos, jd);
+            if (p <= 0) return 0;
+            var lair = Lair(c, sys, ship, jd);
+            if (lair == null || Threat.PatrolAt(sys, ship.Pos, jd) != null) return 0;
+            return RaidsPerHour * p * Math.Exp(-(ship.Vel - sys.Vel(lair, jd)).Mag / Threat.MatchKms);
+        }
+
+        // D11's closed form: the time a raider with drive a, at r and moving at v relative to the ship, needs to be alongside
+        // a ship that coasts on. In a frame moving with the ship the meeting point is fixed, so it is a stop at a point, as
+        // Catchable has it: d = |r|, u the raider's closing speed, w its sideways drift; Ship.TripFrom(d, a, u, w).t + w / a.
+        // TripFrom: from rest-ish, vp = √(a·d + u²/2) and t = (2·vp − u) / a; too fast to stop short (u² / 2a > d),
+        // t = (u + 2·√(a·(u² / 2a − d))) / a. Its present thrust is left out: a ship that burns away takes longer.
+        public static double CatchSeconds(D3 r, D3 v, double a)
+        {
+            double d = r.Mag;
+            var los = d > 1e-9 ? r / -d : new D3(1, 0, 0);
+            double u = D3.Dot(v, los), w = (v - los * u).Mag;
+            return Ship.TripFrom(d, a, u, w).t + w / a;
+        }
+
+        // D11: where a raider waits for the ship: at rest with the lair, on the line from the lair's centre through the ship,
+        // the nearest the lair whose catch time is CatchMinS to CatchMaxS. The candidates step out by 5 % from the dock range
+        // to the ship's distance plus a·CatchMaxS², past which no start fits. False when none does.
+        static bool Spawn(Body lair, SolarSystem sys, Ship ship, double jd, out D3 pos, out D3 vel, out double catchS)
+        {
+            var lp = sys.Pos(lair, jd);
+            vel = sys.Vel(lair, jd);
+            var off = ship.Pos - lp;
+            double dist = off.Mag, a = PirateG * Ship.G0, end = dist + a * CatchMaxS * CatchMaxS;
+            var n = dist > 1e-9 ? off / dist : new D3(1, 0, 0);
+            for (double s = DockRange(lair); s < end; s *= 1.05)
+            {
+                pos = lp + n * s;
+                catchS = CatchSeconds(pos - ship.Pos, vel - ship.Vel, a);
+                if (catchS >= CatchMinS && catchS <= CatchMaxS) return true;
+            }
+            pos = D3.Zero; catchS = double.NaN;
+            return false;
+        }
+
+        // MakeCall's raider: an encounter and its card. False for a job it does not work, while one is on, for a docked or
+        // landed ship, inside a patrol's reach, or with no start that gives D11's catch time.
+        bool PirateCall(Contract job, SolarSystem sys, Ship ship, double jd)
+        {
+            if (Encounter != null || Docked != null || ship.Landed != null) return false;
+            if (job.Kind != JobKind.Cargo && job.Kind != JobKind.Passengers && job.Kind != JobKind.Survey) return false;
+            if (Threat.PatrolAt(sys, ship.Pos, jd) != null) return false;
+            var lair = Lair(job, sys, ship, jd);
+            if (lair == null || !Spawn(lair, sys, ship, jd, out var pos, out var vel, out double catchS)) return false;
+            var e = StartContact(job, sys, ship, jd, pos, vel, lair, catchS);
+            var port = NearestPatrol(sys, ship, jd, out double divertS);
+            string hull = e.Proxy.Name.Substring(RaiderPrefix.Length), title = job.Title.ToLowerInvariant();
+            string takes = job.Kind == JobKind.Cargo ? $"{BoardShare * 100:0} % of the {title} and of its pay" : $"{BoardShare * 100:0} % of the pay for the {title}";
+            string giveUp = $"Give up {GiveUpShare * 100:0} %";
+            var answers = new List<(RouteAnswer, string)> { (RouteAnswer.Run, "Run") };
+            if (port != null) answers.Add((RouteAnswer.Divert, "Divert to " + port.Name));
+            answers.Add((RouteAnswer.GiveUp, giveUp));
+            Call = new RouteCall
+            {
+                Kind = RouteKind.Pirate, Job = job, DivertTo = port, Answers = answers.ToArray(),
+                Title = $"{Raiders} in pursuit",
+                Text = $"A {Raiders} ship, the {hull}, was waiting {(pos - sys.Pos(lair, jd)).Mag:N0} km off {lair.Name}. At {PirateG:0} g it can be alongside in " +
+                       $"about {Span(catchS / 86400)}, and {Span(Threat.BoardingSeconds / 86400)} alongside is a boarding: it takes {takes}. " +
+                       "Run: burn hard, or dock first. " +
+                       (port != null ? $"Divert: {port.Name} is {Span(divertS / 86400)} away at full burn, and the {Factions[(int)port.Owner].Name} patrols around it. " : "") +
+                       $"Or give up {GiveUpShare * 100:0} % now and it leaves.",
+                Yes = giveUp, No = "Run",
+            };
+            return true;
+        }
+
+        // An encounter with the pirate at (pos, vel) on date jd, about job (also the QA hook: a start placed by hand). Its
+        // proxy body joins sys.Bodies; the pirate's stand-in for the player stays out.
+        internal Encounter StartContact(Contract job, SolarSystem sys, Ship ship, double jd, D3 pos, D3 vel, Body lair = null, double catchS = double.NaN)
+        {
+            DropContact();
+            Encounter = new Encounter(sys, job, lair, RaiderPrefix + RaiderHulls[Math.Abs(job.Id) % RaiderHulls.Length], jd, pos, vel, PirateG, ship, catchS);
+            sys.Bodies.Add(Encounter.Proxy);
+            return Encounter;
+        }
+
+        // Each update: a docked or landed ship is safe, a patrol in reach drives the raider off, and one alongside boards at
+        // Threat.BoardingSeconds. Alongside is Career.Intercept's rule (InterceptKm and InterceptKms, any throttle, at most
+        // 30 s a frame), and any break resets the clock.
+        void Contacts(SolarSystem sys, Ship ship, double jd, double simDt)
+        {
+            // D8: a load dropped a chase (FromSave)
+            if (contactLost) { contactLost = false; Say(Happening.RaiderGone, $"The {Raiders}' chase was not saved: the raider is gone, back to {HavenNear(sys, ship.Pos, jd)}", false); }
+            var e = Encounter;
+            if (e == null) return;
+            string back = $"heads back to {HavenNear(sys, e.Pirate.Pos, jd)}";
+            if (Docked != null) { EndContact(Happening.RaiderGone, $"Docked at {Docked.Name}: the {Raiders} break off. The raider {back}", true, jd); return; }
+            if (ship.Landed != null) { EndContact(Happening.RaiderGone, $"Landed on {ship.Landed.Name}: the {Raiders} break off. The raider {back}", true, jd); return; }
+            if (!Active.Contains(e.Job)) { EndContact(Happening.RaiderGone, $"The job it wanted is over: the {Raiders} break off. The raider {back}", true, jd); return; }
+            var patrol = Threat.PatrolAt(sys, ship.Pos, jd);
+            if (patrol != null)
+            {
+                EndContact(Happening.RaiderGone, $"In reach of the {Factions[(int)patrol.Owner].Name} patrol at {patrol.Name}: the {Raiders} break off. The raider {back}", true, jd);
+                return;
+            }
+            e.Range = (e.Pirate.Pos - ship.Pos).Mag;
+            e.Vrel = (e.Pirate.Vel - ship.Vel).Mag;
+            if (e.Range >= InterceptKm || e.Vrel >= InterceptKms) { e.Dwell = 0; return; }
+            e.Dwell += Math.Min(simDt, 30);
+            if (e.Dwell < Threat.BoardingSeconds) return;
+            var (t, pay) = Take(e.Job, BoardShare);
+            DropWarp = true;
+            EndContact(Happening.Boarded, $"Boarded by the {Raiders}: they took " + (t > 0 ? $"{t:N1} t of the {e.Job.Title.ToLowerInvariant()} and " : "") +
+                                          $"{pay:N0} cr of its pay. The raider {back}", false, jd);
+        }
+
+        // Run closes the card; Divert flies to the patrolled port on the card (or the nearest now, once the card is gone);
+        // GiveUp hands over GiveUpShare and the raider leaves.
+        void AnswerRaider(RouteAnswer a, double jd)
+        {
+            var e = Encounter;
+            bool card = Call?.Kind == RouteKind.Pirate;
+            if (e == null) { if (card) Drop(); return; }
+            if (a == RouteAnswer.GiveUp)
+            {
+                var (t, pay) = Take(e.Job, GiveUpShare);
+                EndContact(Happening.RaiderGone, $"Gave the {Raiders} " + (t > 0 ? $"{t:N1} t of the {e.Job.Title.ToLowerInvariant()} and " : "") +
+                                                 $"{pay:N0} cr of its pay. The raider heads back to {HavenNear(e.Sys, e.Pirate.Pos, jd)}", false, jd);
+                return;
+            }
+            if (a == RouteAnswer.Divert)
+            {
+                var port = (card ? Call.DivertTo : null) ?? (ship != null ? NearestPatrol(e.Sys, ship, jd, out _) : null);
+                var b = port != null ? e.Sys[port.Body] : null;
+                if (b == null || Divert == null || !Divert(b)) { Say(Happening.RouteCall, "Can't divert: the nav computer would not engage", false); return; }
+                if (card) Drop();
+                Say(Happening.RouteCall, $"Diverting to {port.Name}: in the {Factions[(int)port.Owner].Name} patrol's reach the {Raiders} break off");
+                return;
+            }
+            if (card) Drop();
+            Say(Happening.RouteCall, $"Running from the {Raiders}, {e.Range:N0} km back: burn hard, or dock first", false);
+        }
+
+        // D6: the patrolled port the ship reaches soonest at full burn from its state now (Ship.TripFrom), and that time.
+        internal static Port NearestPatrol(SolarSystem sys, Ship ship, double jd, out double seconds)
+        {
+            Port best = null;
+            seconds = double.PositiveInfinity;
+            foreach (var p in Ports)
+            {
+                var b = sys[p.Body];
+                if (p.PatrolG <= 0 || b == null) continue;
+                var to = sys.Pos(b, jd) - ship.Pos;
+                var r = to.Norm;
+                var v = sys.Vel(b, jd) - ship.Vel;
+                double u = -D3.Dot(v, r), w = (v + r * u).Mag;
+                double t = Ship.TripFrom(Math.Max(to.Mag - Ship.Standoff(b), 0), ship.AMax, u, w).t;
+                if (t < seconds) { seconds = t; best = p; }
+            }
+            return best;
+        }
+
+        // The raider's share of job c: that part of its pay, and of its load for cargo. The job stays on (no Abandon, no
+        // standing change), and Apply takes the ship's cargo mass from Tonnes on the next update.
+        static (double tonnes, double pay) Take(Contract c, double share)
+        {
+            double pay = c.Pay * share, t = c.Kind == JobKind.Cargo ? c.Tonnes * share : 0;
+            c.Pay -= pay; c.Tonnes -= t;
+            return (t, pay);
+        }
+
+        static string HavenNear(SolarSystem sys, D3 x, double jd) => Threat.NearestHaven(sys, x, jd)?.Name ?? "its haven";
+
+        // The raider goes at once (no course home in W4), with a note; the next call waits RouteGapDays from now.
+        void EndContact(Happening what, string text, bool good, double jd)
+        {
+            DropContact();
+            lastCallJd = jd;
+            Say(what, text, good);
+        }
+
+        // The raider and its proxy body leave the system now, with no note: a load, a new career. True if there was one.
+        public bool DropContact()
+        {
+            var e = Encounter;
+            if (e == null) return false;
+            e.Sys.Bodies.Remove(e.Proxy);
+            Encounter = null;
+            if (Call?.Kind == RouteKind.Pirate) Drop();
+            return true;
+        }
+    }
+}

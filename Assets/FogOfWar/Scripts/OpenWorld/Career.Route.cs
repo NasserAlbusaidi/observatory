@@ -3,20 +3,26 @@ using System;
 namespace FogOfWar.OpenWorld
 {
     // Route events: calls that come in during a trip, so the time between Engage and payday has decisions in it. A
-    // distress call offers a rescue near where you are going; cargo trouble asks you to trade fuel for the load. Rolled
-    // in game time while the autopilot flies a job, one call at a time. The scene turns them off for the unattended
-    // suites, whose trips would stall when a call drops the warp. A pending call is not saved.
+    // distress call offers a rescue near where you are going; cargo trouble asks you to trade fuel for the load; a raider
+    // (Career.Pirates.cs) gives chase. Rolled in game time while the autopilot flies a job, one call at a time. The scene
+    // turns them off for the unattended suites, whose trips would stall when a call drops the warp. A pending call is not
+    // saved.
     public partial class Career
     {
-        public enum RouteKind { Distress, CargoTrouble }
+        public enum RouteKind { Distress, CargoTrouble, Pirate }
+
+        // Yes and No answer a distress call or cargo trouble; Run, Divert and GiveUp a raider
+        public enum RouteAnswer { Yes, No, Run, Divert, GiveUp }
 
         public class RouteCall
         {
             public RouteKind Kind;
             public string Title, Text, Yes, No;
-            public Contract Job;            // the job the call is about (cargo trouble) or comes in on (distress)
+            public (RouteAnswer What, string Label)[] Answers; // every answer the card offers, in order
+            public Contract Job;            // the job the call is about (cargo trouble, a raider) or comes in on (distress)
             public Contract Offer;          // distress: the rescue on offer
             public double VentTonnes, SpoilDays, ExpiresJd;
+            public Port DivertTo;           // a raider: the patrolled port the Divert answer flies to
         }
 
         public bool RouteEvents = true;
@@ -33,10 +39,17 @@ namespace FogOfWar.OpenWorld
                 if (!Active.Contains(Call.Job) || (Call.Kind == RouteKind.Distress && jd > Call.ExpiresJd)) Drop();
                 return;
             }
+            if (Encounter != null) return; // one encounter at a time, and no other call while a raider gives chase
             if (!RouteEvents || Sandbox || Docked != null || ship.Landed != null || !ship.PlanActive || simDt <= 0) return;
             if (jd - lastCallJd < RouteGapDays) return;
             var job = Active.Find(c => !c.Tutorial && TargetOf(c) == ship.Target && (c.Kind == JobKind.Cargo || c.Kind == JobKind.Passengers || c.Kind == JobKind.Survey));
             if (job == null) return;
+            // raiders strike on the approach too (no cut-off): their rate is where the ship is slow, out of patrol reach
+            if (routeRng.NextDouble() < 1 - Math.Exp(-PirateRate(sys, ship, job, jd) * simDt / 3600) && MakeCall(RouteKind.Pirate, job, sys, ship, jd))
+            {
+                lastCallJd = jd;
+                return;
+            }
             var t = ship.Target;
             if ((ship.Pos - sys.Pos(t, jd)).Mag < 10 * DockRange(t)) return; // nothing on the approach
             if (routeRng.NextDouble() >= 1 - Math.Exp(-simDt / 86400 / RouteMeanDays)) return;
@@ -45,7 +58,8 @@ namespace FogOfWar.OpenWorld
             MakeCall(trouble ? RouteKind.CargoTrouble : RouteKind.Distress, job, sys, ship, jd);
         }
 
-        // A call about `job` now (also the QA hook). False when it does not fit: trouble needs cargo, a distress call a free slot.
+        // A call about `job` now (also the QA hook). False when it does not fit: trouble needs cargo, a distress call a free
+        // slot, a raider a place to wait (PirateCall).
         public bool MakeCall(RouteKind kind, Contract job, SolarSystem sys, Ship ship, double jd)
         {
             var dest = TargetOf(job);
@@ -54,7 +68,11 @@ namespace FogOfWar.OpenWorld
             var (u, w) = ship.Target == dest ? ship.RelToTarget(sys, jd) : (0.0, 0.0);
             Trip(Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0), ship.MaxG * Ship.G0, 1, ship.Mass, out double burn, out _, out _, u, w);
 
-            if (kind == RouteKind.CargoTrouble)
+            if (kind == RouteKind.Pirate)
+            {
+                if (!PirateCall(job, sys, ship, jd)) return false;
+            }
+            else if (kind == RouteKind.CargoTrouble)
             {
                 if (job.Kind != JobKind.Cargo || ship.Fuel <= 0) return false;
                 double vent = Math.Round(Math.Min(ship.Fuel * 0.08, 12), 1);
@@ -68,7 +86,7 @@ namespace FogOfWar.OpenWorld
                     Yes = $"Vent {vent:N1} t of fuel", No = $"Push on ({Span(spoil)})",
                 };
             }
-            else
+            else if (kind == RouteKind.Distress)
             {
                 if (Active.Count >= MaxActive) return false;
                 var here = job.Kind == JobKind.Survey ? sys[job.To] : sys[PortAt(job.To)?.Body ?? ""];
@@ -86,17 +104,35 @@ namespace FogOfWar.OpenWorld
                     Yes = "Answer the call", No = "Ignore",
                 };
             }
+            else return false;
+            Call.Answers ??= new[] { (RouteAnswer.Yes, Call.Yes), (RouteAnswer.No, Call.No) };
             DropWarp = true;
             Say(Happening.RouteCall, "Incoming: " + Call.Title.ToLowerInvariant());
             return true;
         }
 
+        // An answer from the card (RouteCall.Answers). Yes and No go to a distress call or cargo trouble; Run, Divert and
+        // GiveUp to a raider, also once Run has closed its card, while the chase goes on.
+        public void Answer(RouteAnswer a, double jd)
+        {
+            var call = Call;
+            if (call != null && call.Kind != RouteKind.Pirate)
+            {
+                if (a == RouteAnswer.Yes || a == RouteAnswer.No) Answer(a == RouteAnswer.Yes, jd);
+                return;
+            }
+            if (a == RouteAnswer.Run || a == RouteAnswer.Divert || a == RouteAnswer.GiveUp) AnswerRaider(a, jd);
+        }
+
         // The pilot's answer. Distress: yes takes the rescue on (if there is a slot and the fuel for it). Cargo trouble:
-        // yes vents the fuel now, no starts the spoil clock on the job.
+        // yes vents the fuel now, no starts the spoil clock on the job. A raider's two-button card: yes gives up the share
+        // its Yes label names, no runs.
         public void Answer(bool yes, double jd)
         {
             var call = Call;
             if (call == null) return;
+            if (call.Kind == RouteKind.Pirate) { AnswerRaider(yes ? RouteAnswer.GiveUp : RouteAnswer.Run, jd); return; }
+            if (call.Kind != RouteKind.Distress && call.Kind != RouteKind.CargoTrouble) return;
             Drop();
             if (call.Kind == RouteKind.Distress)
             {
