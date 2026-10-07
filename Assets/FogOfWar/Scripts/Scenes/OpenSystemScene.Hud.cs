@@ -623,7 +623,7 @@ namespace FogOfWar
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : null, "hot");
             SetPill(pLanded, ship.Landed != null ? (ship.AssistedArrival ? "ASSISTED ARRIVAL " : "LANDED ") + ship.Landed.Name.ToUpperInvariant() : null, "ok");
             SetPill(pModel, Coasting() ? "TWO-BODY COAST · APPROXIMATE" : null, "cold");
-            SetPill(pArrival, ArrivalNotice != null ? (Ship.Giant(reference) ? "CLOUD-TOP ASSIST · NO SOLID SURFACE" : "ARRIVAL ASSIST · NO ATMOSPHERIC FLIGHT") : null, "bad");
+            SetPill(pArrival, ship.Landed == null && ArrivalNotice != null ? (Ship.Giant(reference) ? "CLOUD-TOP ASSIST · NO SOLID SURFACE" : "ARRIVAL ASSIST · NO ATMOSPHERIC FLIGHT") : null, "bad");
             SetPill(pLimited, limited ? "WARP LIMITED " + Fmt.Num(effectiveWarp, 0) + "×" : null, "bad");
 
             UpdatePages();
