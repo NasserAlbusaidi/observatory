@@ -139,8 +139,9 @@ Shader "FogOfWar/BlackHole"
                 Ray R = march(b, q, EF, s0, a, M, false);
                 float3 col = R.col;
                 col += skyTerm(skyDir(R.s, R.ph, b, q, a, M), (R.escaped || R.fallbackSky) && R.trans > 0.01 ? R.trans : 0.0, EF, px);
-                // debug views for the review harness: 1 = fate (red captured, green escaped, blue out of steps,
-                // white = opaque disc), 2 = first disc hit radius / ISCO and its brightness
+                // Review views: 1 = reason (red capture, green escape, blue unresolved, cyan display-only sky
+                // fallback, white opaque, magenta numerical failure); 2 = first disc hit radius / ISCO and brightness.
+                // View 4 shows the lens table's reason/fallback mask (the tracing pass uses the same reason colours).
                 if (_DebugFate > 1.5 && _DebugFate < 2.5) return float4(R.firstHit / (_Isco * 4.0), saturate(R.firstG), 0, 1);
                 if (_DebugFate > 0.5)
                     return traceReasonColour(R.reason, R.fallbackSky);

@@ -8,7 +8,7 @@ namespace FogOfWar.OpenWorld
     // stand-in from it and steps the pirate over the same span. Scene-free, so the pursuit check flies it headless.
     public sealed class Pursuit
     {
-        // working values [design]: the stand-in's radius (the pirate holds Radius + 1 km off it, Ship.Standoff); the
+        // working values [design]: the stand-in's radius (the pirate seeks Radius + 2 km off it, Ship.Pursue); the
         // pirate's longest and shortest step inside a span; how often it looks up the gravity well it is in
         public const double Radius = 0.05, MaxStepS = 30, MinStepS = 0.5, RefreshS = 60;
 
