@@ -40,7 +40,7 @@ namespace FogOfWar
             codexT = 0.4f;
             var cx = career.Codex;
             string sig = codexView + "|" + ship.Target?.Name + "|" + cx.Visited.Count + "|" + cx.Scanned.Count + "|" + cx.Achieved.Count + "|" +
-                         cx.ScanTarget + Math.Round(cx.ScanProgress / Math.Max(cx.ScanSeconds, 1) * 100) + "|" + cx.SensorLevel + "|" + career.Sandbox;
+                         cx.ScanTarget + Math.Round(cx.ScanProgress / Math.Max(cx.ScanSeconds, 1) * 100) + "|" + cx.SensorLevel + "|" + career.Sandbox + "|" + ship.Target?.PositionModel(jd);
             if (sig == codexSig) return;
             codexSig = sig;
             codexBox.Clear();

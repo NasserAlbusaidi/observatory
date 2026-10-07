@@ -342,6 +342,64 @@ namespace FogOfWar
                 }
                 os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
+                if (os != null)
+                {
+                    const BindingFlags f = BindingFlags.Instance | BindingFlags.NonPublic;
+                    var system = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", f).GetValue(os);
+                    var craft = (OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", f).GetValue(os);
+                    var career = (OpenWorld.Career)typeof(OpenSystemScene).GetField("career", f).GetValue(os);
+                    var epoch = typeof(OpenSystemScene).GetField("jd", f);
+                    double oldJd = (double)epoch.GetValue(os);
+                    var oldTarget = craft.Target; var oldPlan = craft.Plan; string oldPhase = craft.Phase;
+                    var targetIndex = typeof(OpenSystemScene).GetField("targetIdx", f);
+                    var cameraDistance = typeof(OpenSystemScene).GetField("camDist", f);
+                    object oldIndex = targetIndex.GetValue(os), oldDistance = cameraDistance.GetValue(os);
+                    var setTarget = typeof(OpenSystemScene).GetMethod("SetTarget", f);
+                    bool oldFreeze = os.QaFreeze;
+                    string oldCareer = JsonUtility.ToJson(career.ToSave(craft));
+                    var visited = new System.Collections.Generic.HashSet<string>(career.Codex.Visited);
+                    var toastLayer = (UnityEngine.UIElements.VisualElement)typeof(UiShell).GetField("toastLayer", f).GetValue(shell);
+                    bool toastsVisible = toastLayer.visible;
+                    toastLayer.visible = false;
+                    os.QaFreeze = true;
+                    var mean = system.Bodies.Find(b => b.ElementsCalibrated && b.Cheb == null) ?? system.Bodies.Find(b => b.Synchronous && b.Cheb == null);
+                    var estimated = system.Bodies.Find(b => b.SizeEstimated);
+                    var targets = new[] { system.Earth, mean, estimated, system.Earth, system["Jupiter"], system["Psyche"], system["Phobos"], system["Titan"] };
+                    var names = new[] { "fitted", "mean-moon", "estimated", "fallback", "giant", "procedural-mesh", "shape-asset", "parent-fallback" };
+                    try
+                    {
+                        for (int q = 0; q < targets.Length; q++)
+                        {
+                            var body = targets[q]; if (body == null) continue;
+                            bool added = career.Codex.Visited.Add(body.Name);
+                            setTarget.Invoke(os, new object[] { body });
+                            epoch.SetValue(os, names[q] == "fallback" ? system.Earth.Cheb.JdEnd + 1 :
+                                names[q] == "parent-fallback" ? body.Parent.Cheb.JdEnd + 1 : CareerQA.Epoch);
+                            os.ShowCodex(0);
+                            yield return Wait(0.5f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06b-provenance-" + names[q]);
+                            log.WriteLine($"    provenance {names[q]}: {body.Name}; {body.PositionModel((double)epoch.GetValue(os))}; radius {body.RadiusSource}; shape {body.ShapeSource}; rotation {body.RotationSource}");
+                            bool honest = names[q] != "procedural-mesh" || (body.ShapeSource.StartsWith("procedural") && body.RadiusSource == "catalogue triaxial-diameter radius");
+                            honest &= names[q] != "shape-asset" || body.ShapeSource.StartsWith("shape model");
+                            honest &= names[q] != "parent-fallback" || body.PositionModel((double)epoch.GetValue(os)).Contains("Saturn's mean-element fallback");
+                            if (!honest) { errors++; log.WriteLine("    ERROR provenance " + names[q] + ": wrong model label"); }
+                            if (added) career.Codex.Visited.Remove(body.Name);
+                        }
+                    }
+                    finally
+                    {
+                        if (oldTarget != null) setTarget.Invoke(os, new object[] { oldTarget });
+                        else craft.Target = null;
+                        craft.Plan = oldPlan; craft.Phase = oldPhase;
+                        targetIndex.SetValue(os, oldIndex); cameraDistance.SetValue(os, oldDistance);
+                        epoch.SetValue(os, oldJd);
+                        career.Codex.Visited.Clear(); career.Codex.Visited.UnionWith(visited);
+                        os.QaFreeze = oldFreeze; toastLayer.visible = toastsVisible;
+                    }
+                    bool restored = (double)epoch.GetValue(os) == oldJd && JsonUtility.ToJson(career.ToSave(craft)) == oldCareer;
+                    log.WriteLine("    " + (restored ? "PASS" : "ERROR") + " provenance restores the scene date and career state");
+                    if (!restored) errors++;
+                }
                 os?.ShowCodex(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
                 os?.ShowCodex(0);
