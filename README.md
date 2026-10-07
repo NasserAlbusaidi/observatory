@@ -42,7 +42,7 @@ Fly with astronomical data and physics-based trajectories. The fictional torch d
 
 Nine ports from Earth orbit to Enceladus, held by **three factions**. Carry freight, ferry passengers (they're fragile: the drive holds at 1 g while they're aboard), survey far moons, rescue crews from dead ships, and **catch runners who won't stop for you**: match a ship under thrust, mid-burn, and hold alongside while the cargo crosses.
 
-Boards post runs near and far. Make the **express window** for 25 % more. And the trip isn't quiet: a distress call can come in mid-trip, or the hold cooling can fail: vent fuel to keep the cargo cold, or burn hard to beat the spoil. Out past the patrols, **raiders come for your hold**: outrun them, divert to a patrolled port, or give up a quarter of the job.
+Boards post runs near and far. Make the **express window** for 25 % more. And a run on the autopilot isn't quiet: a distress call can come in mid-trip, or the hold cooling can fail: vent fuel to keep the cargo cold, or burn hard to beat the spoil. Out past the patrols, **raiders come for your hold**: outrun them, divert to a patrolled port, or give up a quarter of the job.
 
 </td>
 </tr>
@@ -133,7 +133,7 @@ Step out of the cockpit and into **eight interactive physics models**, each with
 - **A living system**: about 110 ships on scheduled runs, patrol reach and raider havens on the map, a raider-risk line in the trip planner, and raiders that chase and board you
 - **A long goal**: buy your ship out from the yard, one payment at a time
 - **A first flight** that takes you from the dock to your first payday in three steps, with optional hand-flying practice
-- **Autosave** at ports and on every job taken or paid, upgrade and ship payment, once you've left your first port
+- **Autosave** at ports and on every job taken or paid, upgrade and ship payment, once you've docked at a second port
 - **Flight recorder** that is always on, with an F8 bookmark for the moment you want to find again
 - **Cockpit, chase and orbit views**, plus a system map and hull floodlights for the night side
 - **Every sound synthesised live**: drive rumble, RCS pops, hull creaks under g. No samples.
@@ -180,7 +180,7 @@ Step out of the cockpit and into **eight interactive physics models**, each with
 <tr><td><b>All controls</b></td><td>F1</td></tr>
 </table>
 
-Rebind keys in **Esc → Settings → Controls**. 1–9, Esc, F2 and F11 are fixed.
+Rebind keys in **Esc → Settings → Controls**. 1–9, Esc, F2, F11 and the photo-mode camera keys are fixed.
 
 </details>
 
@@ -188,7 +188,7 @@ Rebind keys in **Esc → Settings → Controls**. 1–9, Esc, F2 and F11 are fix
 
 ## PLAY IT
 
-There's no store build yet. Build it from source in Unity 6: open the project, then **Fog of War → 2. Build Windows game**. The repository is about 1.4 GB, most of it planet maps.
+There's no store build yet. Build it from source in Unity 6: open the project, then **Fog of War → 2. Build Windows game**. The repository is about 1.4 GB, most of it maps and models of the planets, moons and asteroids.
 
 Full steps, the game rules in numbers, test tools and the project layout are in the **[developer guide](docs/DEVELOPING.md)**.
 
