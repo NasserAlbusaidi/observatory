@@ -7,6 +7,7 @@
   <img alt="Engine: Unity 6" src="https://img.shields.io/badge/ENGINE-UNITY%206-FFB547?style=for-the-badge&labelColor=0b0d14">
   <img alt="Scale: 1:1" src="https://img.shields.io/badge/SCALE-1%3A1-FFB547?style=for-the-badge&labelColor=0b0d14">
   <img alt="Status: in development" src="https://img.shields.io/badge/STATUS-IN%20DEVELOPMENT-FFB547?style=for-the-badge&labelColor=0b0d14">
+  <img alt="Code licence: GPL-3.0" src="https://img.shields.io/badge/CODE-GPL--3.0-FFB547?style=for-the-badge&labelColor=0b0d14">
 </p>
 
 <p align="center"><i>
@@ -39,7 +40,9 @@ Fly with astronomical data and physics-based trajectories. The fictional torch d
 
 ### 🚀 HAUL ANYTHING, ANYWHERE
 
-Nine ports from Earth orbit to Enceladus. Carry freight, ferry passengers (keep it under 1 g, they're fragile), survey far moons, rescue crews from dead ships, and **catch runners who won't stop for you**: match a ship under thrust, mid-burn, and hold alongside while the cargo crosses.
+Nine ports from Earth orbit to Enceladus, held by **three factions**. Carry freight, ferry passengers (they're fragile: the drive holds at 1 g while they're aboard), survey far moons, rescue crews from dead ships, and **catch runners who won't stop for you**: match a ship under thrust, mid-burn, and hold alongside while the cargo crosses.
+
+Boards post runs near and far. Make the **express window** for 25 % more. And the trip isn't quiet: a distress call can come in mid-trip, or the hold cooling can fail: vent fuel to keep the cargo cold, or burn hard to beat the spoil. Out past the patrols, **raiders come for your hold**: outrun them, divert to a patrolled port, or give up a quarter of the job.
 
 </td>
 </tr>
@@ -48,7 +51,9 @@ Nine ports from Earth orbit to Enceladus. Carry freight, ferry passengers (keep 
 
 ### 🌍 THE WHOLE SOLAR SYSTEM, FOR REAL
 
-8 planets. **453 moons.** 21 named asteroids and a belt with its real gaps, Hildas and Trojans. Explore fitted and mean-element orbits based on NASA JPL data at today's date. Crank time compression to **1,000,000×** and watch the system turn.
+8 planets. **454 moons.** 21 named asteroids and a belt with its real gaps, Hildas and Trojans. Explore fitted and mean-element orbits based on NASA JPL data at today's date. Crank time compression to **1,000,000×** and watch the system turn.
+
+You're not alone out there: **about 110 ships** fly the lanes between the ports on their own schedules, and the map shows how far each patrol reaches and where the raiders hunt.
 
 </td>
 <td width="50%"><img src="docs/media/shot-map.jpg" alt="System map"></td>
@@ -59,7 +64,7 @@ Nine ports from Earth orbit to Enceladus. Carry freight, ferry passengers (keep 
 
 ### 🧑‍🚀 FLY IT YOURSELF
 
-Chase cam, orbit cam, or **strap into the cockpit** and read it off the MFDs while the couch warns you about 3 g. Fly by hand with RCS and reaction wheels, or hand the burn to the autopilot and let it flip and brake for you.
+Chase cam, orbit cam, or **strap into the cockpit** and read it off the MFDs while the couch warns you about 3 g. Hand the burn to the autopilot and let it flip and brake for you, or take the helm for the approach: the HUD switches to approach and docking modes with a brake gauge, and **cargo or passengers flown in by hand pay 15 % more**. Set down on a planet, a moon or an asteroid, under 20 m/s or you won't walk away. On the giants, you hold at the cloud tops.
 
 </td>
 </tr>
@@ -68,7 +73,7 @@ Chase cam, orbit cam, or **strap into the cockpit** and read it off the MFDs whi
 
 ### 💰 BUILD YOUR SHIP, BUILD YOUR NAME
 
-Start with 25,000 credits and a 1 g drive. Earn your way to the **3 g and 5 g drives**, bigger tanks and better sensors. Run dry out there and you're adrift: the tender will come, but it won't be cheap.
+Start with 25,000 credits, a 1 g drive and a ship that belongs to the yard. Earn your way to the **3 g and 5 g drives**, bigger tanks and better sensors, then **buy the ship out: a million credits**, paid off at any port. Deliver on time and each faction pays you more on its boards. Drop the work and it pays you less. Run dry out there and you're adrift: the tender will come, but it won't be cheap.
 
 </td>
 <td width="50%"><img src="docs/media/shot-eclipse.jpg" alt="Ship in silhouette against Saturn"></td>
@@ -79,7 +84,7 @@ Start with 25,000 credits and a 1 g drive. Earn your way to the **3 g and 5 g dr
 
 ### 🔭 FIND WHAT'S OUT THERE
 
-Pass close and your codex logs the body. Scan it and real facts unlock. First scans of far moons **sell for more**, so the long trip out pays for itself. Chase 16 achievements, from your first paycheck to the edge of the map.
+Pass close and your codex logs the body. Scan it and real facts unlock. First scans of far moons **sell for more**, so the long trip out pays for itself. Each system's buyers pay less for every scan they already have, so keep moving. Chase 17 achievements, from your first paycheck to the edge of the map.
 
 </td>
 </tr>
@@ -90,7 +95,7 @@ Pass close and your codex logs the body. Scan it and real facts unlock. First sc
   <img src="docs/media/moon-titan.jpg" width="32%" alt="Titan">
   <img src="docs/media/moon-enceladus.jpg" width="32%" alt="Enceladus">
 </p>
-<p align="center"><sub>Saturn, Titan and Enceladus, built from Cassini data.</sub></p>
+<p align="center"><sub>Titan and Enceladus from Cassini mosaics. Saturn modelled from Cassini imagery.</sub></p>
 
 ---
 
@@ -114,7 +119,7 @@ Step out of the cockpit and into **eight interactive physics models**, each with
 <td align="center"><img src="docs/media/obs-5-negmass.jpg"><br><b>NEGATIVE MASS</b><br><sub>Free acceleration forever</sub></td>
 <td align="center"><img src="docs/media/obs-6-tides.jpg"><br><b>MOON 1,000 KM CLOSER</b><br><sub>Tides, month length, Roche limit</sub></td>
 <td align="center"><img src="docs/media/obs-7-mars.jpg"><br><b>TERRAFORM MARS</b><br><sub>The average is a liar</sub></td>
-<td align="center"><img src="docs/media/obs-8-meteors.jpg"><br><b>RADIO METEORS</b><br><sub>Hear meteors with an SDR from Muscat</sub></td>
+<td align="center"><img src="docs/media/obs-8-meteors.jpg"><br><b>RADIO METEORS</b><br><sub>Catch meteor echoes with an SDR from Muscat</sub></td>
 </tr>
 </table>
 
@@ -123,11 +128,16 @@ Step out of the cockpit and into **eight interactive physics models**, each with
 ## FEATURES
 
 - **True-scale solar system** on today's date, from NASA JPL ephemerides
-- **Physics-based flight**: feedback-guided flip-and-burn trajectories, coast plans, the rocket equation, patched conics
-- **Trucker career** with cargo, passenger, survey, rescue and intercept jobs across 9 ports
+- **Physics-based flight**: feedback-guided flip-and-burn trajectories, coast plans and the rocket equation, with integrated gravity at low time compression and conic coasts at high
+- **Trucker career** with cargo, passenger, survey, rescue and intercept jobs across 9 ports and 3 factions
+- **A living system**: about 110 ships on scheduled runs, patrol reach and raider havens on the map, a raider-risk line in the trip planner, and raiders that chase and board you
+- **A long goal**: buy your ship out from the yard, one payment at a time
+- **A first flight** that takes you from the dock to your first payday in three steps, with optional hand-flying practice
+- **Autosave** at ports and on every job taken or paid, upgrade and ship payment, once you've left your first port
+- **Flight recorder** that is always on, with an F8 bookmark for the moment you want to find again
 - **Cockpit, chase and orbit views**, plus a system map and hull floodlights for the night side
 - **Every sound synthesised live**: drive rumble, RCS pops, hull creaks under g. No samples.
-- **Photo mode** with a free camera, lens and colour controls, cinematic flybys and MP4 clip capture
+- **Photo mode** with a free camera, lens and colour controls, cinematic flybys and MP4 clip capture (MP4 needs ffmpeg; without it you get PNG frames)
 - **Planet maps from real missions**: Viking, MESSENGER, Galileo, Cassini, Dawn, LRO
 - **The Observatory**: eight interactive physics models, from wormholes to radio meteors, each with its limits explained
 - **Any screen**: tested from 1280×720 to 5120×1440 ultrawide and 1440×2560 portrait
@@ -137,8 +147,8 @@ Step out of the cockpit and into **eight interactive physics models**, each with
 ## SYSTEM REQUIREMENTS
 
 <table>
-<tr><td><b>OS</b></td><td>Windows 10 or 11, 64-bit</td></tr>
-<tr><td><b>Storage</b></td><td>About 1.5 GB</td></tr>
+<tr><td><b>OS</b></td><td>Windows 10 (21H1 or newer) or 11, 64-bit</td></tr>
+<tr><td><b>Storage</b></td><td>About 2.2 GB</td></tr>
 <tr><td><b>Tested on</b></td><td>AMD Ryzen 9 7900X · 32 GB RAM · NVIDIA GeForce RTX 4080</td></tr>
 <tr><td><b>Minimum</b></td><td>Not measured yet. The ray-traced Observatory scenes have Fast, Balanced and Sharp quality.</td></tr>
 </table>
@@ -155,16 +165,22 @@ Step out of the cockpit and into **eight interactive physics models**, each with
 <tr><td><b>RCS translate</b></td><td>H N · I K · J L</td></tr>
 <tr><td><b>Flip 180°</b></td><td>F</td></tr>
 <tr><td><b>Engage autopilot</b></td><td>P</td></tr>
+<tr><td><b>Flight assist</b></td><td>V</td></tr>
 <tr><td><b>Next target</b></td><td>Tab</td></tr>
+<tr><td><b>Velocity reference</b></td><td>B</td></tr>
 <tr><td><b>Time compression</b></td><td>. and ,</td></tr>
 <tr><td><b>Attitude holds</b></td><td>1–9</td></tr>
 <tr><td><b>Camera</b></td><td>C</td></tr>
 <tr><td><b>System map</b></td><td>M</td></tr>
+<tr><td><b>Jobs · Codex · Console</b></td><td>F3 · F4 · &#96;</td></tr>
+<tr><td><b>Floodlights</b></td><td>G</td></tr>
+<tr><td><b>Quick save · Flight-log mark</b></td><td>F5 · F8</td></tr>
 <tr><td><b>Photo mode · Clip · Screenshot</b></td><td>F10 · F9 · F12</td></tr>
+<tr><td><b>Hide HUD · Full screen</b></td><td>F2 · F11</td></tr>
 <tr><td><b>All controls</b></td><td>F1</td></tr>
 </table>
 
-Rebind anything in **Esc → Settings → Controls**.
+Rebind keys in **Esc → Settings → Controls**. 1–9, Esc, F2 and F11 are fixed.
 
 </details>
 
@@ -172,7 +188,7 @@ Rebind anything in **Esc → Settings → Controls**.
 
 ## PLAY IT
 
-There's no store build yet. Build it from source in Unity 6: open the project, then **Fog of War → 2. Build Windows game**.
+There's no store build yet. Build it from source in Unity 6: open the project, then **Fog of War → 2. Build Windows game**. The repository is about 1.4 GB, most of it planet maps.
 
 Full steps, the game rules in numbers, test tools and the project layout are in the **[developer guide](docs/DEVELOPING.md)**.
 
@@ -180,5 +196,5 @@ Full steps, the game rules in numbers, test tools and the project layout are in 
 
 <sub>
 Orbits: NASA JPL Horizons and JPL SSD. Maps: NASA, USGS Astrogeology and PDS. Moon: NASA's Scientific Visualization Studio. Shape model of Ryugu: ISAS/JAXA (modified). Jupiter: NASA/JPL/Space Science Institute. Stars: Gaia DR2 (ESA/Gaia/DPAC) and the Yale Bright Star Catalogue. Fonts: Barlow and JetBrains Mono (SIL OFL). Full credits are in the <a href="docs/DEVELOPING.md#credits-and-licence">developer guide</a>.<br><br>
-© 2026 Nasser Albusaidi. All rights reserved. See <a href="LICENSE">LICENSE</a>.
+Code © 2026 Nasser Albusaidi, licensed under the <a href="LICENSE">GNU General Public License v3.0</a>. The project's own art, models and text: © 2026 Nasser Albusaidi, all rights reserved. Third-party maps, data and fonts keep their own licences, and the Gaia-based sky is for non-commercial use only. Details are in the <a href="docs/DEVELOPING.md#credits-and-licence">developer guide</a>.
 </sub>
