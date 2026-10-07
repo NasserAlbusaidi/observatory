@@ -53,6 +53,7 @@ namespace FogOfWar.OpenWorld
         public int sensors;
         public double shipPaid, startJd; // the buyout so far; the career's first day (0 for saves made before either existed)
         public int[] standing;           // by Faction; null for saves made before factions: neutral with all
+        public List<string> taken = new List<string>(); // board slots already taken; older saves have none: only the active jobs' slots
         public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
     }
 
@@ -475,6 +476,8 @@ namespace FogOfWar.OpenWorld
             long day = (long)Math.Floor(jd);
             if (boardPort == Docked.Name && boardDay == day) return;
             boardPort = Docked.Name; boardDay = day;
+            // a slot from a past day is never posted again: drop it, so the saved list stays short
+            taken.RemoveWhere(key => { var p = key?.Split('/'); return p == null || p.Length != 3 || !long.TryParse(p[1], out long d) || d < day; });
             Board.Clear();
             var rng = new System.Random(Docked.Name.GetHashCode() * 7919 + (int)(day % 100000));
             var here = sys[Docked.Body];
@@ -685,6 +688,7 @@ namespace FogOfWar.OpenWorld
             credits = Credits, earned = Earned, fuel = ship.Fuel, drive = DriveLevel, tank = TankLevel, nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
             sensors = Codex.SensorLevel, shipPaid = ShipPaid, startJd = StartJd, standing = (int[])this.standing.Clone(),
+            taken = new List<string>(this.taken),
             visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
             achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt),
         };
@@ -696,7 +700,9 @@ namespace FogOfWar.OpenWorld
             foreach (var c in Active) RemoveDerelict(c);
             Active.Clear(); if (s.active != null) Active.AddRange(s.active);
             foreach (var c in Active) SpawnDerelict(c);
+            // a job abandoned, done or failed today keeps its slot, or the rebuilt board offers it again
             Board.Clear(); boardPort = null; taken.Clear();
+            if (s.taken != null) taken.UnionWith(s.taken);
             foreach (var c in Active) taken.Add(c.Key);
             Codex.SensorLevel = s.sensors;
             ShipPaid = Math.Max(0, Math.Min(ShipPrice, s.shipPaid)); StartJd = s.startJd;
