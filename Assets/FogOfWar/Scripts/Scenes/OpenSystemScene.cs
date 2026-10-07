@@ -19,7 +19,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Every planet and moon is where it really is today, on its real orbit. Your ship has a fusion drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b>, and it flies a brachistochrone, burning toward the target, flipping at the midpoint and braking the rest of the way, then parks in orbit.\n\n" +
             "Crank time compression to cross the system. At 1 g, Mars is a few days away; Neptune is a few weeks.";
-        public override string Note => "Positions: JPL Horizons fits, 2000–2100 (TDB). Drive efficiency and high-g endurance are fictional; trajectories and Δv are real. Coasting follows two-body conics around the dominant body (patched conics). F1 lists the controls; Esc → Controls rebinds them.";
+        public override string Note => "Positions mix JPL fits and mean elements; fitted coverage and fallback vary by body. The drive regulates acceleration with assumed thrust reserve; cargo raises fuel cost. Translational RCS shares its fictional exhaust efficiency. Electric reaction wheels use no reaction mass; saturation, power and waste-heat limits are omitted. High-g endurance is fictionalized. Through 100×, burns and coasts share multi-body gravity and J2; at 1k× and above, eligible coasts use a labelled two-body approximation. Atmospheric arrivals are assisted; drag, pressure and entry heating are omitted. F1 lists the controls; Esc → Controls rebinds them.";
 
         const double LinearLimit = 1e5;     // km rendered 1:1 around the camera
         static readonly double[] Warps = { 1, 10, 100, 1e3, 1e4, 1e5, 1e6 };
