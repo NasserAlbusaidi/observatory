@@ -523,7 +523,7 @@ namespace FogOfWar
         // Each runner checks at report creation, independently of registration in UnattendedSuites.
         internal static void CheckUnattendedSaveKey(System.IO.TextWriter report)
         {
-            if (SaveKey == "fow-save-v1" || CareerKey == "fow-career-v1")
+            if (SaveKey == "fow-save-v1" || SaveKey == "fow-career-v1")
                 report.WriteLine("ERROR unattended suite is using the player's save key");
         }
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
