@@ -354,6 +354,7 @@ namespace FogOfWar
                 career.Active.Remove(run);
                 yield return null;
                 Check(career.Call == null, "with the job gone, no call is left");
+                Check(career.Encounter == null, "no raider gives chase after the real roll: raiders do not work between Luna and Mars");
                 ship.Fuel = fuelWas;
             }
 
@@ -987,6 +988,7 @@ namespace FogOfWar
             yield return TrafficChecks();
             yield return ThreatChecks();
             yield return PursuitChecks();
+            yield return PirateChecks();
 
             State("end");
             log.WriteLine($"done: {fails} failed checks");
