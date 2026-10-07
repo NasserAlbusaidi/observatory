@@ -40,7 +40,7 @@ Deadlines are in game days, so time compression saves your patience but not the 
 
 If the tank runs dry, you are adrift. An emergency tender brings 30 t for 20,000 cr. Debt is allowed.
 
-On screen, the drive's efficiency and endurance above 3 g are labelled as fictional. The trajectories and Δv are real.
+The drive is acceleration-regulated with assumed thrust reserve; cargo increases fuel cost without reducing commanded g. Translational RCS shares the drive's effective exhaust velocity. Reaction wheels use no reaction mass and omit momentum saturation and cargo-dependent inertia. Reactor power, heat rejection and high-g endurance are assumed technology, not solved engineering. The [spacecraft decisions](MODEL-FIDELITY.md#spacecraft-decisions) specify the retained model.
 
 ### Ports
 
