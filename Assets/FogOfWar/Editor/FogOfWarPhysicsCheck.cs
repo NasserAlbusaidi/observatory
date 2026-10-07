@@ -137,7 +137,7 @@ namespace FogOfWar.EditorTools
                 }
                 bool ok = Rails.Propagate(new D3(rp, 0, 0), new D3(0, vperi, 0), mu, dt, out var p, out var v);
                 string id = $"conic/e={e}/anomaly={anomaly}";
-                report.Check(id + "/solve", ok ? 0 : 1, 0, "failures", "elliptic eccentric anomaly / hyperbolic anomaly closed forms", category: "independent-reference");
+                report.Check(id + "/solve", ok ? 0 : 1, 0, "failures", "elliptic eccentric anomaly / hyperbolic anomaly closed forms", category: "invariant-or-coverage");
                 report.Check(id + "/position", (p - expectedP).Mag, 0.001, "km", "Kepler ellipse/hyperbola parameterisation, no universal variables", category: "independent-reference");
                 report.Check(id + "/velocity", (v - expectedV).Mag, 1e-6, "km/s", "time derivative of anomaly parameterisation", category: "independent-reference");
             }
@@ -291,7 +291,7 @@ namespace FogOfWar.EditorTools
                 }
                 report.Check($"Kerr/a={spin}/r={r}/frequency", Math.Abs(orbit.phi/orbit.t-1/(Math.Pow(r,1.5)+spin)), 1e-10, "1/M", "exact equatorial circular geodesic Omega=1/(r^(3/2)+a)", category: "independent-reference");
                 report.Check($"Kerr/a={spin}/r={r}/radius", Math.Abs(orbit.r-r), 1e-7, "M", "constant-radius analytic solution", category: "independent-reference");
-                report.Check($"Kerr/a={spin}/r={r}/radial-invariant", invariant, 1e-9, "dimensionless", "normalised Carter radial first integral", category: "independent-reference");
+                report.Check($"Kerr/a={spin}/r={r}/radial-invariant", invariant, 1e-9, "dimensionless", "normalised Carter radial first integral", category: "invariant-or-coverage");
             }
             foreach (var ends in new[] { new[] { 20.0,80.0 }, new[] { 8.0,20.0 } })
             {
