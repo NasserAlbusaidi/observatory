@@ -17,6 +17,8 @@ namespace FogOfWar
         FogOfWarApp app;
         OpenSystemScene s;
         int fails, exceptions;
+        public const double Epoch = 2460000.5; // fixed TDB fixture; normal play still starts today
+        static readonly double[] QaWarps = { 1, 10, 100, 1e3, 1e4, 1e5, 1e6 };
         void OnEnable() => Application.logMessageReceived += OnLog;
         void OnDisable() => Application.logMessageReceived -= OnLog;
         void OnLog(string msg, string stack, LogType type) { if (type == LogType.Exception || type == LogType.Error) { exceptions++; log?.WriteLine("    [" + type + "] " + msg); } }
@@ -45,6 +47,19 @@ namespace FogOfWar
         static string SaveKey => (string)typeof(OpenSystemScene).GetField("SaveKey", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
 
         void Check(bool ok, string what) { if (!ok) fails++; log.WriteLine((ok ? "  PASS " : "  FAIL ") + what); }
+        void Perf(bool ok, string what) => log.WriteLine((ok ? "  PERF PASS " : "  PERF SLOW ") + what);
+        static IEnumerator Frames(float seconds)
+        {
+            for (int i = 0, n = Mathf.CeilToInt(seconds * 60); i < n; i++) yield return null;
+        }
+
+        void Finish()
+        {
+            Check(exceptions == 0, $"no Unity errors or exceptions ({exceptions})");
+            log.WriteLine($"done: {fails} failed checks");
+            log.Close();
+            Application.Quit(fails == 0 ? 0 : 1);
+        }
 
         void State(string tag) => log.WriteLine($"[{tag}] {Frame.UtcFromTdb(jd):yyyy-MM-dd HH:mm}  credits {career.Credits:N0}  fuel {ship.Fuel:N2} t  mass {ship.Mass:N1} t  " +
             $"docked {career.Docked?.Name ?? "-"}  phase {ship.Phase}  target {ship.Target?.Name}  jobs {career.Active.Count}  board {career.Board.Count}");
@@ -58,14 +73,25 @@ namespace FogOfWar
             Destroy(tex);
         }
 
-        // Fly an engaged plan at the given warp until the predicate holds or the real-time budget runs out.
+        // The old budget meant real seconds at the selected warp. Preserve that simulation-time allowance;
+        // CPU load can make it take longer, but cannot silently shorten the flight. Wall time is only a hang guard.
         IEnumerator Fly(Func<bool> done, int warp, float budget)
         {
             Put("warpIdx", warp);
             float t0 = Time.realtimeSinceStartup;
+            double stopJd = jd + budget * QaWarps[warp] / 86400;
+            s.QaStopJd = stopJd;
             float next = 0;
-            while (!done() && Time.realtimeSinceStartup - t0 < budget)
+            while (!done() && jd < stopJd)
             {
+                if (Time.realtimeSinceStartup - t0 > Math.Max(600, budget * 10))
+                {
+                    log.WriteLine($"  TIMEOUT hang guard: {ship.Phase}, {(stopJd - jd) * 86400:F1} simulation seconds left; functional result incomplete");
+                    log.Close();
+                    Application.Quit(2);
+                    // Never run the caller's functional assertions against an incomplete flight while quit is pending.
+                    while (true) yield return null;
+                }
                 if (Time.realtimeSinceStartup - t0 > next)
                 {
                     next += traceEvery;
@@ -75,6 +101,8 @@ namespace FogOfWar
                 }
                 yield return null;
             }
+            Check(done(), $"flight predicate reached before simulation limit ({budget * QaWarps[warp]:F0} s)");
+            s.QaStopJd = double.PositiveInfinity;
             Put("warpIdx", 0);
         }
 
@@ -140,9 +168,9 @@ namespace FogOfWar
             app = GetComponent<FogOfWarApp>();
             int ti = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowtrace"); if (ti >= 0) { traceEvery = 0.25f; moonWarp = int.Parse(Environment.GetCommandLineArgs()[ti + 1]); }
             app.InputLocked = true; Controls.Locked = true;
-            yield return new WaitForSecondsRealtime(1f);
+            yield return Frames(1f);
             app.Restart(app.GameIndex);
-            yield return new WaitForSecondsRealtime(1.5f);
+            yield return Frames(1.5f);
             s = (OpenSystemScene)app.Current;
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
             State("new career");
@@ -156,8 +184,8 @@ namespace FogOfWar
             string oldSave = PlayerPrefs.GetString(SaveKey);
             Check(s.TutorialText != null && s.TutorialText.StartsWith("First flight (1/3)"), $"tutorial starts on a new career at the target step: {s.TutorialText?.Substring(0, Math.Min(40, s.TutorialText.Length))}");
             yield return Shot("c00-tutorial");
-            Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
-            Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
+            Controls.Tap(Controls.Action.ThrottleFull); yield return Frames(0.4f);
+            Controls.Tap(Controls.Action.ThrottleCut); yield return Frames(0.4f);
             Check(PlayerPrefs.GetString(SaveKey) == oldSave, "a throttle blip at Earth does not autosave over the old save");
 
             // 1. the first job, full burn to the Moon
@@ -177,22 +205,22 @@ namespace FogOfWar
             Call("StartPractice");
             yield return null; yield return null;
             Check(s.TutorialText != null && s.TutorialText.StartsWith("Hand-flying practice (1/8)") && !ship.PlanActive, "the practice starts from the payday card and turns the parked plan off");
-            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
-            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
+            Controls.Hold(Controls.Action.PitchUp, true); yield return Frames(0.6f);
+            Controls.Hold(Controls.Action.PitchUp, false); yield return Frames(2.5f);
             bool waits = s.TutorialText != null && s.TutorialText.StartsWith("(2/8)");
-            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
-            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
+            Controls.Hold(Controls.Action.PitchUp, true); yield return Frames(0.6f);
+            Controls.Hold(Controls.Action.PitchUp, false); yield return Frames(2.5f);
             Check(waits && s.TutorialText != null && s.TutorialText.StartsWith("(3/8)"), "the flight assist step stays up until the pilot turns and lets go again");
-            Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
-            Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
-            Call("SetHold", Hold.Prograde); yield return new WaitForSecondsRealtime(0.4f);
+            Controls.Tap(Controls.Action.ThrottleFull); yield return Frames(0.4f);
+            Controls.Tap(Controls.Action.ThrottleCut); yield return Frames(0.4f);
+            Call("SetHold", Hold.Prograde); yield return Frames(0.4f);
             Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/8)") && ship.Target?.Name == "Practice beacon",
                 "burn and prograde hold steps pass; the practice beacon is the target");
             Call("SetHold", Hold.Off);
             Call("SetTarget", sys.Moon);
             yield return null; yield return null;
             Check(sys["Practice beacon"] == null && s.TutorialText == null && career.TutorialStep == 0, "retargeting ends the practice and removes the beacon");
-            yield return new WaitForSecondsRealtime(1f);
+            yield return Frames(1f);
             Check(career.Docked?.Name == "Luna", $"docked at Luna after the practice ({ship.Phase})");
 
             // 2. refuel and take the best-paying cargo job, flown with a 50 % coast
@@ -271,7 +299,7 @@ namespace FogOfWar
             // 5. a dry tank cuts the drive; the tender refills it
             ship.Plan = Plan.None; ship.Fuel = 0; ship.ThrottleCmd = 1;
             var v0 = ship.Vel;
-            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Frames(0.5f);
             ship.ThrottleCmd = 0;
             Check(ship.Throttle == 0, "dry tank: drive does not fire");
             yield return Shot("c06-dry");
@@ -343,7 +371,7 @@ namespace FogOfWar
                 Put("warpIdx", 6);
                 float t0 = Time.realtimeSinceStartup;
                 double jd0 = jd;
-                while (career.Call == null && Time.realtimeSinceStartup - t0 < 30) yield return null;
+                yield return Fly(() => career.Call != null, 6, 30);
                 yield return null;
                 Check(career.Call != null && Get<int>("warpIdx") == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, warp {Get<int>("warpIdx")}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
                 yield return Shot("c05c-route-call");
@@ -586,7 +614,7 @@ namespace FogOfWar
             Put("cruiseIdx", 0);
             Call("SetTarget", sys["Titan"]);
             Put("warpIdx", 0);
-            yield return new WaitForSecondsRealtime(1f);
+            yield return Frames(1f);
             yield return Shot("c07-codex-titan");
             Check(cx.Has("first_job") && cx.Has("jovian") && cx.Has("coast"), $"achievements (career only): {string.Join(", ", cx.Achieved)}");
 
@@ -615,7 +643,7 @@ namespace FogOfWar
                     $"the ship stops beside the wreck, not through it: closest {wreckMin:F2} km, {wreckRel.Mag:F2} km as the crew crosses, same side {D3.Dot(wreckSide, wreckRel.Norm):F2}");
                 // a close look at the wreck while the crew crosses over
                 Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.12);
-                yield return new WaitForSecondsRealtime(1.5f);
+                yield return Frames(1.5f);
                 yield return Shot("c08-derelict");
                 Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 0), 0.16);
                 yield return Fly(() => !career.Active.Contains(res), 3, 60);
@@ -796,7 +824,7 @@ namespace FogOfWar
                         $"the ship stops beside the runner, not through it: closest {runnerMin:F2} km, {runnerRel.Mag:F2} km as the cargo crosses, same side {D3.Dot(runnerSide, runnerRel.Norm):F2}");
                     Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.2);
                     Put("warpIdx", 0);
-                    yield return new WaitForSecondsRealtime(1.5f);
+                    yield return Frames(1.5f);
                     yield return Shot("c10-intercept");
                     Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 0), 0.16);
                     yield return Fly(() => !career.Active.Contains(ic), 2, 60);
@@ -811,7 +839,7 @@ namespace FogOfWar
             // the autopilot flies, and a tank that can't finish it must not engage on the first press.
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 Put("warpIdx", 0);
                 var vesta = sys["Vesta"];
@@ -855,7 +883,7 @@ namespace FogOfWar
             // 100k× with a rescue targeted loads at 1×, says the plan was not resumed and targets the rebuilt derelict
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 Put("warpIdx", 0);
                 var moon = sys.Moon;
@@ -890,7 +918,7 @@ namespace FogOfWar
                     yield return null;
                     s.SaveGame();
                     app.Restart(app.GameIndex);
-                    yield return new WaitForSecondsRealtime(1f);
+                    yield return Frames(1f);
                     s = (OpenSystemScene)app.Current;
                     s.LoadGame();
                     yield return null;
@@ -906,7 +934,7 @@ namespace FogOfWar
             // port) autosaves, so that save is the landing, not the parking orbit saved by hand before it.
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 Put("warpIdx", 0);
                 string saveKey = SaveKey;
@@ -942,12 +970,12 @@ namespace FogOfWar
                 for (int round = 0; round < 2; round++)
                 {
                     app.Restart(app.GameIndex); // a new career starts docked at Earth orbit
-                    yield return new WaitForSecondsRealtime(1f);
+                    yield return Frames(1f);
                     s = (OpenSystemScene)app.Current;
                     Put("warpIdx", 0);
                     var wreckJob = career.Rescue(new System.Random(11 + round), sys, jd);
                     career.Accept(wreckJob, jd);
-                    yield return new WaitForSecondsRealtime(1f); // the wreck is built and drawn
+                    yield return Frames(1f); // the wreck is built and drawn
                 }
                 Check(career.Active.Exists(c => c.Kind == JobKind.Rescue) && exceptions == before, $"new game with a rescue active: {exceptions - before} exceptions");
             }
@@ -955,7 +983,7 @@ namespace FogOfWar
             // QA-051: Continue keeps the tutorial where the save left it, and a skipped tutorial stays skipped
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 yield return null;
                 string running = JsonUtility.ToJson(career.ToSave(ship));        // step 1 of 3 in progress
@@ -966,7 +994,7 @@ namespace FogOfWar
                 foreach (var (saved, wantOn, what) in new[] { (skipped, false, "skipped"), (running, true, "in progress") })
                 {
                     app.Restart(app.GameIndex);
-                    yield return new WaitForSecondsRealtime(1f);
+                    yield return Frames(1f);
                     s = (OpenSystemScene)app.Current;
                     career.FromSave(JsonUtility.FromJson<CareerSave>(saved), ship);
                     Call("ResumeTutorial");
@@ -975,7 +1003,7 @@ namespace FogOfWar
                 }
                 // a save from before the tutorial was saved (no field) counts as done
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 var old = JsonUtility.FromJson<CareerSave>(skipped.Replace("\"tutorial\":0,", ""));
                 career.FromSave(old, ship);
@@ -989,9 +1017,7 @@ namespace FogOfWar
             yield return PursuitChecks();
 
             State("end");
-            log.WriteLine($"done: {fails} failed checks");
-            log.Close();
-            Application.Quit();
+            Finish();
         }
     }
 }

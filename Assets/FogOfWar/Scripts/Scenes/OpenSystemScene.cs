@@ -406,9 +406,13 @@ namespace FogOfWar
         readonly System.Diagnostics.Stopwatch swTick = new System.Diagnostics.Stopwatch(), swLate = new System.Diagnostics.Stopwatch(), swGui = new System.Diagnostics.Stopwatch(),
             swTraffic = new System.Diagnostics.Stopwatch(); // inside tick and gui
         int profFrames, profSteps; float profT;
+        static readonly bool CareerTesting = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcareer") >= 0;
+        // QA stops on an exact simulation epoch, regardless of how many real frames the machine needs.
+        public double QaStopJd = double.PositiveInfinity;
 
         public override void Tick(float dt)
         {
+            if (CareerTesting) dt = 1f / 60;
             if (Prof) swTick.Start();
             try { TickInner(dt); } finally { if (Prof) swTick.Stop(); }
             if (Prof && (profT += Time.unscaledDeltaTime) > 2f)
@@ -425,7 +429,8 @@ namespace FogOfWar
             SpawnRunnerTick();
             ReadInput(dt);
             if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
-            double simDt = dt * Warps[warpIdx];
+            double simDt = Math.Min(dt * Warps[warpIdx], Math.Max(0, (QaStopJd - jd) * 86400));
+            double requested = simDt;
             warpLimited = false;
             // only bodies the ship could reach this frame get per-substep collision checks; craft (a derelict, the practice
             // beacon) have no surface to land on or crash into
@@ -438,7 +443,7 @@ namespace FogOfWar
             var budget = System.Diagnostics.Stopwatch.StartNew();
             while (simDt > 1e-9)
             {
-                if (++steps > MaxSubsteps || budget.Elapsed.TotalMilliseconds > 10) { warpLimited = true; break; }
+                if (++steps > MaxSubsteps || (!CareerTesting && budget.Elapsed.TotalMilliseconds > 10)) { warpLimited = true; break; }
                 if (ship.Landed != null && ship.ThrottleCmd == 0 && !ship.PlanActive && !ship.ManualInput)
                 {
                     ship.Step(sys, jd, simDt, reference); // riding the surface: no dynamics to resolve
@@ -468,7 +473,7 @@ namespace FogOfWar
                 if (simDt < 1e-4) simDt = 0; // finer than jd can resolve
             }
             // the player's warp stays selected; when the frame budget runs out, report the rate actually achieved
-            double achieved = dt * Warps[warpIdx] - Math.Max(simDt, 0);
+            double achieved = requested - Math.Max(simDt, 0);
             effectiveWarp = effectiveWarp * 0.9 + 0.1 * (dt > 0 ? achieved / dt : 0);
             if (warpLimited) limitedAt = Time.realtimeSinceStartup;
             // QA-022: a new warp choice starts fresh, so a stale "limited" note never outlives the setting it was about

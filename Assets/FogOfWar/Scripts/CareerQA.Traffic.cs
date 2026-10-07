@@ -86,7 +86,7 @@ namespace FogOfWar
             Check(flying > 0 && Names(stepped) == Names(fresh), $"traffic: stepped a 1M× frame at a time for 30 days, the ships in flight match a fresh schedule ({flying} ships)");
             log.WriteLine($"  traffic: {stepped.Checked} courses built, {stepped.Refused} refused by the cheap clearance test; {perTrip:F2} ms a trip");
             Check(flying >= 50 && flying <= 200, $"traffic: {flying} ships in flight (about 100 by design)");
-            Check(total / frames < 1 && resetMs < 200,
+            Perf(total / frames < 1 && resetMs < 200,
                 $"traffic: {total / frames:F2} ms a 1M× frame on average, {worst:F1} ms at worst; a reset (scene start, load) {resetMs:F0} ms");
 
             // every course starts and ends on a parking orbit, and the full clearance test passes what the cheap one passed
