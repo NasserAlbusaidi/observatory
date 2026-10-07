@@ -483,7 +483,7 @@ namespace FogOfWar
 
             // --- targets
             ui.Section("Targets");
-            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x));
+            var planets = PlanetButtons();
             var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
             int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
             if (si >= 0) SetTarget(planets[si]);
@@ -515,6 +515,9 @@ namespace FogOfWar
 
         // `-fowsavekey <name>` points Save, Continue and F5 at another PlayerPrefs key, so live QA never touches the
         // player's own save (the career goes under <name>-career)
+        // Both shells use the same natural-body list; contract runners and other craft have their own targeting UI.
+        List<Body> PlanetButtons() => sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Career.IsCraft(x));
+
         static readonly string SaveKey = SaveKeyFromArgs();
         static string SaveKeyFromArgs() => SaveKeyFor(Environment.GetCommandLineArgs(), Application.dataPath);
         // Pure policy entry point so QA can exercise every unattended flag without changing process arguments.
