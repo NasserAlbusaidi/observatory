@@ -133,6 +133,31 @@ namespace FogOfWar
             log.Close(); Application.Quit();
         }
 
+        void CoastStateChecks()
+        {
+            var sun = new Body { Name = "Sun", Look = Look.Sun };
+            var testSys = new SolarSystem { Sun = sun }; testSys.Bodies.Add(sun);
+            var target = new Body { Name = "Derelict aim probe", Parent = sun, Radius = 0.05,
+                Path = _ => new D3(10000, 0, 0), PathAccel = _ => D3.Zero };
+            var probe = new Ship { Pos = new D3(11000, 0, 0), Vel = new D3(1, 0, 0), Target = target,
+                Plan = Plan.MatchVelocity, UnlimitedFuel = true, Att = Quaternion.LookRotation(Frame.U(new D3(1, 0, 0))) };
+            probe.RecheckPlan(testSys, jd, sun);
+            Check(probe.Throttle == 0 && probe.Phase == "turning", "coast wake-up waits for the 3 degree drive aim gate");
+            probe.Att = Quaternion.LookRotation(Frame.U(new D3(-1, 0, 0)));
+            probe.RecheckPlan(testSys, jd, sun);
+            Check(probe.Throttle > 0, "coast wake-up permits an aligned drive command");
+            probe.BurnSeconds = 12; probe.CruiseSeconds = 34;
+            var saved = JsonUtility.FromJson<Ship.SaveData>(JsonUtility.ToJson(probe.ToSave(jd, 0)));
+            probe.BurnSeconds = 100; probe.CruiseSeconds = 200;
+            probe.FromSave(saved, testSys);
+            Check(probe.BurnSeconds == 12 && probe.CruiseSeconds == 34, "save round-trip restores burn and cruise time");
+            saved.burnSeconds = saved.cruiseSeconds = 0;
+            probe.FromSave(saved, testSys); probe.Phase = "game loaded";
+            var codex = new Codex(); codex.CheckFeats(new Career(), probe);
+            Check(probe.BurnSeconds == 0 && probe.CruiseSeconds == 0 && !codex.Has("coast"),
+                "loading a pre-cruise save cannot grant the coast feat from a later timeline");
+        }
+
         IEnumerator Start()
         {
             Directory.CreateDirectory(dir);
@@ -146,6 +171,7 @@ namespace FogOfWar
             yield return new WaitForSecondsRealtime(1.5f);
             s = (OpenSystemScene)app.Current;
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
+            CoastStateChecks();
             var keyPolicy = typeof(OpenSystemScene).GetMethod("SaveKeyFor", BindingFlags.Static | BindingFlags.NonPublic);
             string Key(string[] args, string path) => (string)keyPolicy.Invoke(null, new object[] { args, path });
             Check(SaveKey != "fow-save-v1" && SaveKey != "fow-career-v1", "unattended career never uses the player's save key");

@@ -35,6 +35,7 @@ namespace FogOfWar.OpenWorld
         public D3 StationOffset;
         public double DvUsed;
         public double BurnSeconds;               // sim seconds with the drive firing (career scan time leaves these out)
+        public double CruiseSeconds;             // accumulated plan coast, even when a whole coast fits in one frame
         // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
         // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
         public const double Ve = 10000;          // km/s
@@ -155,8 +156,24 @@ namespace FogOfWar.OpenWorld
             Vel += (g + gEnd) * (0.5 * h) + thrust * (f * h);
             DvUsed += dv * f;
             if (Throttle > 0) BurnSeconds += h * f;
+            if (PlanActive && Phase == "cruising" && Throttle == 0 && !RcsActive) CruiseSeconds += h;
             if (!UnlimitedFuel) Fuel = f < 1 ? 0 : Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
             CheckTouchdown(sys, jd1);
+        }
+
+        // Re-evaluate a parked/cruising plan at the current epoch without integrating an uncounted physics step.
+        public void RecheckPlan(SolarSystem sys, double jd, Body reference)
+        {
+            if (!PlanActive) return;
+            dominant = reference;
+            var cmd = Guide(sys, jd, 0, sys.Gravity(Pos, jd));
+            Throttle = !Dry && cmd.HasValue && cmd.Value.Mag > RcsAccel ? Math.Min(cmd.Value.Mag / AMax, 1) : 0;
+            // Same aim gate as Step: waking from a coast must not light the drive before the flip finishes.
+            if (Throttle > 0 && D3.Dot(Heading, cmd.Value.Norm) < Math.Cos(3 * Math.PI / 180))
+            { Throttle = 0; Phase = "turning"; }
+            RcsActive = !Dry && cmd.HasValue && cmd.Value.Sqr > 0 && cmd.Value.Mag <= RcsAccel;
+            RcsLevel = RcsActive ? (float)(cmd.Value.Mag / RcsAccel) : 0;
+            if (Dry) Phase = "out of fuel";
         }
 
         // Attitude only (coasting on rails): holds and manual rotation still move the nose.
@@ -612,6 +629,7 @@ namespace FogOfWar.OpenWorld
         [Serializable] public class SaveData
         {
             public double jd, px, py, pz, vx, vy, vz, maxG, dv;
+            public double burnSeconds, cruiseSeconds; // older saves default to zero; counters belong to the saved timeline
             public float qx, qy, qz, qw;
             public string target;
             public int warp;
@@ -627,6 +645,7 @@ namespace FogOfWar.OpenWorld
         public SaveData ToSave(double jd, int warp) => new SaveData
         {
             jd = jd, px = Pos.x, py = Pos.y, pz = Pos.z, vx = Vel.x, vy = Vel.y, vz = Vel.z, maxG = MaxG, dv = DvUsed,
+            burnSeconds = BurnSeconds, cruiseSeconds = CruiseSeconds,
             qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Target?.Name, warp = warp, assist = FlightAssist,
             plan = (int)(PlanActive ? Plan : Plan.None), hold = (int)Hold, throttle = ThrottleCmd,
             wx = AngVel.x, wy = AngVel.y, wz = AngVel.z, landed = Landed?.Name,
@@ -635,6 +654,7 @@ namespace FogOfWar.OpenWorld
         public void FromSave(SaveData s, SolarSystem sys)
         {
             Pos = new D3(s.px, s.py, s.pz); Vel = new D3(s.vx, s.vy, s.vz); MaxG = s.maxG; DvUsed = s.dv;
+            BurnSeconds = s.burnSeconds; CruiseSeconds = s.cruiseSeconds;
             Att = Quaternion.Normalize(new Quaternion(s.qx, s.qy, s.qz, s.qw));
             // with flight assist off nothing damps a spin: keep it (assist on would have stopped it anyway)
             AngVel = s.assist ? Vector3.zero : Vector3.ClampMagnitude(new Vector3(s.wx, s.wy, s.wz), MaxRate);

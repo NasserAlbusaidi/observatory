@@ -515,14 +515,21 @@ namespace FogOfWar
             chunk = Math.Max(chunk, Math.Min(maxDt, 1));
             // #5: never adopt an unconverged conic; shorter arcs are easier, and failing that the integrator takes over
             D3 r1, v1;
-            for (int tries = 0; !Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1); tries++)
-                if (tries == 20) return 0; else chunk *= 0.5;
+            for (int tries = 0; ; tries++)
+            {
+                chunk = (jd + chunk / 86400 - jd) * 86400;
+                if (chunk <= 0) return 0;
+                if (Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1)) break;
+                if (tries == 20) return 0;
+                chunk *= 0.5;
+            }
             // #6: stop at the first surface the arc passes through, even if it is outside again by the arc's end
             double hit = FirstSurfaceHit(dom, r0, v0, chunk);
             if (hit >= 0)
             {
                 chunk = Math.Max(hit, 1e-3);
-                Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1);
+                chunk = (jd + chunk / 86400 - jd) * 86400;
+                if (!Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1)) return 0;
             }
             double jd1 = jd + chunk / 86400;
             ship.Pos = sys.Pos(dom, jd1) + r1;
@@ -531,8 +538,9 @@ namespace FogOfWar
             if (!ship.PlanActive) ship.Phase = "coasting";
             ship.Turn(sys, jd1, chunk, dom);
             ship.CheckTouchdown(sys, jd1);
+            if (ship.PlanActive && ship.Phase == "cruising") ship.CruiseSeconds += chunk;
             // the autopilot re-checks its plan after each arc and burns again if it has drifted
-            if (ship.PlanActive) ship.Step(sys, jd1, 0.001, dom);
+            if (ship.PlanActive) ship.RecheckPlan(sys, jd1, dom);
             return chunk;
         }
 
