@@ -107,7 +107,7 @@ namespace FogOfWar
             if (career != null && !career.Sandbox && career.TankCapacity > 0)
                 mfdLines.Add(new Readout("Fuel", $"{ship.Fuel:N0} / {career.TankCapacity:N0} t", ship.Fuel < 0.15 * career.TankCapacity ? Tone.Bad : Tone.Normal));
             else mfdLines.Add(new Readout("Fuel", ship.UnlimitedFuel ? "unmetered" : Fmt.Num(ship.Fuel, 1) + " t", ship.Dry ? Tone.Bad : Tone.Normal));
-            mfdLines.Add(new Readout("Speed", MfdSpeed((ship.Vel - sys.Vel(reference, jd)).Mag) + " vs " + reference.Name));
+            mfdLines.Add(new Readout("Speed", MfdSpeed((ship.Vel - RefVel(reference)).Mag) + " vs " + RefName(reference)));
             if (g >= 2.5) mfdLines.Add(new Readout("High g", "stay in your couch", Tone.Bad));
             m.Page(0, "DRIVE", mfdLines);
 
@@ -116,7 +116,7 @@ namespace FogOfWar
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             mfdLines.Add(new Readout(reference.Name, Km(alt) + (reference == sys.Sun ? " out" : " up")));
-            mfdLines.Add(new Readout("Speed", MfdSpeed((ship.Vel - sys.Vel(reference, jd)).Mag)));
+            mfdLines.Add(new Readout("Speed", MfdSpeed((ship.Vel - RefVel(reference)).Mag) + " vs " + RefName(reference)));
             mfdLines.Add(new Readout("Nav", ship.PlanActive || ship.Landed != null ? ship.Phase : "idle", ship.PlanActive ? Tone.Hot : Tone.Normal));
             m.Page(1, "NAV", mfdLines);
 

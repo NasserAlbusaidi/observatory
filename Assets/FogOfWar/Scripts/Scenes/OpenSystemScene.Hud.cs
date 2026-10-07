@@ -598,9 +598,9 @@ namespace FogOfWar
             UpdateTargetCard();
 
             // flight cluster
-            var vRef = (ship.Vel - sys.Vel(VelRefBody, jd)).Mag;
+            var vRef = (ship.Vel - RefVel(VelRefBody)).Mag;
             Ui.Text(spdVal, SpeedNum(vRef, out string spdUnit));
-            Ui.Text(spdRef, spdUnit.ToUpperInvariant() + " VS " + VelRefBody.Name.ToUpperInvariant());
+            Ui.Text(spdRef, spdUnit.ToUpperInvariant() + " VS " + RefName(VelRefBody).ToUpperInvariant());
             Ui.Text(drvVal, Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g");
             Ui.SetClass(drvVal, "accent", ship.Throttle > 0);
             Ui.SetClass(drvVal, "glow", ship.Throttle > 0);
