@@ -83,6 +83,35 @@ namespace FogOfWar
         // #27: velocity holds, the speed readout and the approach aid measure against the orbit (the dominant body) or
         // the target. Switching needs a target; losing the target falls back to the orbit.
         void ToggleVelRef() => ship.VelRef = ship.VelRef == null && ship.Target != null ? ship.Target : null;
+        // Atmospheric arrival boundary; the readout also uses this altitude band on airless bodies.
+        bool InArrivalBoundary(Body b) => b != null && Ship.HasAtmosphere(b) &&
+            (ship.Pos - sys.Pos(b, jd)).Mag - b.Radius < Math.Max(300, b.Radius * 0.1);
+        // Craft proxies have paths (including traffic and raiders), never a turning surface.
+        bool NearSurface(Body b) => b != null && b != sys.Sun && !Career.IsCraft(b) && !Traffic.Is(b) &&
+            (ship.Pos - sys.Pos(b, jd)).Mag - b.Radius < Math.Max(300, b.Radius * 0.1);
+        bool SurfaceRef(Body b) => b != null && (ship.Landed == b || (ship.Landed == null && NearSurface(b)));
+        internal D3 RefVel(Body b) => b != null && ship.Landed == b ? ship.Vel :
+            SurfaceRef(b) ? Ship.SurfaceVelocity(sys, b, ship.Pos - sys.Pos(b, jd), jd) : sys.Vel(b, jd);
+        internal string RefName(Body b) => b.Name + (SurfaceRef(b) ? (Ship.Giant(b) ? " cloud tops" : " surface") : "");
+
+        // Deterministic equatorial fixture shared by the career checks and UI captures.
+        internal void TestSurfaceReadout(double altitude, bool landed, string bodyName = "Earth")
+        {
+            var body = sys[bodyName];
+            reference = body; ship.VelRef = null; ship.Target = sys.Moon;
+            ship.Landed = landed ? body : null; ship.Crashed = null;
+            var rel = body.FromFixed(new D3(body.Radius + altitude, 0, 0), jd);
+            ship.Pos = sys.Pos(body, jd) + rel;
+            ship.Vel = Ship.SurfaceVelocity(sys, body, rel, jd);
+            ship.Plan = Plan.None; ship.Throttle = ship.ThrottleCmd = 0;
+        }
+
+        internal Readout TestSpeedReadout()
+        {
+            var rows = new List<Readout>(); Readouts(rows);
+            return rows.Find(row => row.label.StartsWith("Speed vs ", StringComparison.Ordinal));
+        }
+
         Body VelRefBody => ship.VelRef ?? reference;
 
         // Stopping against the target at full drive (or RCS, if that is all there is) after a flip: no gravity, the mass
@@ -220,6 +249,15 @@ namespace FogOfWar
             GUI.color = Color.white;
         }
 
+        internal string ClassicSpeedLine => $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} g of {Fmt.Num(ship.MaxG, 1)} g   ·   {SpeedText((ship.Vel - RefVel(reference)).Mag)} vs {RefName(reference)}   ·   {WarpNames[warpIdx]}";
+        internal bool TestClassicSpeedFits(out float text, out float available)
+        {
+            Styles();
+            text = hudStyle.CalcSize(new GUIContent(ClassicSpeedLine)).x;
+            available = Mathf.Min(520, UnityEngine.Screen.width / App.UiScale - App.PanelWidth - 56);
+            return text <= available;
+        }
+
         void DrawHud()
         {
             Styles();
@@ -249,8 +287,7 @@ namespace FogOfWar
             GUI.color = new Color(1, 1, 1, 0.15f); GUI.DrawTexture(bar, Texture2D.whiteTexture);
             GUI.color = new Color(1f, 0.71f, 0.28f, 0.9f); GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * (float)ship.Throttle, bar.height), Texture2D.whiteTexture);
             GUI.color = Color.white; GUI.DrawTexture(new Rect(bar.x + bar.width * (float)ship.ThrottleCmd - 1, bar.y - 3, 2, bar.height + 6), Texture2D.whiteTexture);
-            var vRef = (ship.Vel - sys.Vel(reference, jd)).Mag;
-            string l1 = $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} g of {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num(vRef, 3)} km/s vs {reference.Name}   ·   {WarpNames[warpIdx]}";
+            string l1 = ClassicSpeedLine;
             string l2 = $"ASSIST {(ship.FlightAssist ? "ON" : "OFF")}   ·   HOLD {HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)]}   ·   " +
                         (ship.PlanActive ? $"NAV {PlanNames[(int)ship.Plan]}: {ship.Phase}" : $"NAV idle ({ship.Phase})") + $"   ·   CAM {(pivot == Pivot.Ship ? camMode.ToString() : pivot.ToString())}";
             GUI.Label(new Rect(x, y + 22, w, 18), l1, hudStyle);
@@ -318,7 +355,7 @@ namespace FogOfWar
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
-            list.Add(new Readout("Speed vs " + reference.Name, Fmt.Num((ship.Vel - sys.Vel(reference, jd)).Mag, 3) + " km/s"));
+            list.Add(new Readout("Speed vs " + RefName(reference), SpeedText((ship.Vel - RefVel(reference)).Mag)));
             list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
@@ -535,6 +572,7 @@ namespace FogOfWar
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the save: " + e.Message); return; }
             jd = s.jd;
             ship.FromSave(s, sys);
+            wasLanded = ship.Landed != null && ship.Crashed == null;
             // #18: the save keeps no plan to fly on, so Continue starts at 1× with the drive off and says what it dropped
             warpIdx = 0;
             reference = Ship.Dominant(sys, ship.Pos, jd);

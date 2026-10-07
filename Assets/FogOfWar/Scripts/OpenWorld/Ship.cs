@@ -47,6 +47,14 @@ namespace FogOfWar.OpenWorld
         bool cruising;
         public string Phase = "coasting";
         public Body Landed;
+        Body contactBody;
+        D3 contactFixed;
+        public static bool Giant(Body b) => b != null && (b.Look == Look.Gas || b.Look == Look.Ice);
+        public static bool HasAtmosphere(Body b) => Giant(b) || (b != null && (b.Name == "Earth" || b.Name == "Venus" || b.Name == "Mars" || b.Name == "Titan"));
+        public bool AssistedArrival => Landed != null && HasAtmosphere(Landed);
+        public static string ArrivalPolicy(Body b) => Giant(b) ? "Assisted cloud-top hold; no solid surface or atmospheric flight" :
+            HasAtmosphere(b) ? "Assisted surface arrival; drag, heating and pressure are not simulated" : "Airless contact; local surface speed determines safe touchdown";
+        string ContactPhase => AssistedArrival ? (Giant(Landed) ? "assisted cloud-top hold at " : "assisted surface arrival at ") + Landed.Name : "landed on " + Landed.Name;
         bool parked;
         public bool RcsActive;  // RCS fired this step (pilot or autopilot trim)
         public float RcsLevel;  // the same, as a fraction of full RCS thrust (ship sound)
@@ -118,17 +126,19 @@ namespace FogOfWar.OpenWorld
             RcsLevel = (float)Math.Min(1, Math.Sqrt(rcs.Sqr) / RcsAccel);
             if (Landed != null)
             {
+                EnsureContact(sys, jd);
+                Pos = sys.Pos(Landed, jd) + Landed.FromFixed(contactFixed, jd);
+                Vel = sys.Vel(Landed, jd) + Landed.FixedVelocity(contactFixed, jd);
                 var up = (Pos - sys.Pos(Landed, jd)).Norm;
                 bool liftoff = D3.Dot(Heading * (Throttle * AMax) + rcs, up) > 0;
                 if (!liftoff)
                 {
-                    // sitting on the surface: ride along with the body
-                    Pos = sys.Pos(Landed, jd + h / 86400) + up * SurfaceRadius(Landed, up) * 1.0001;
-                    Vel = sys.Vel(Landed, jd);
-                    Phase = "landed on " + Landed.Name;
+                    RideSurface(sys, jd, jd + h / 86400);
+                    Phase = ContactPhase;
                     return;
                 }
                 Landed = null;
+                contactBody = null;
             }
 
             // Velocity Verlet, with gravity sampled at both ends of the step and the drive's thrust (constant across the
@@ -307,6 +317,26 @@ namespace FogOfWar.OpenWorld
         public Body Crashed;
         public double ImpactSpeed;
 
+        void EnsureContact(SolarSystem sys, double jd)
+        {
+            if (contactBody == Landed && contactFixed.Sqr > 0) return;
+            contactBody = Landed;
+            contactFixed = Landed.ToFixed(Pos - sys.Pos(Landed, jd), jd);
+        }
+
+        void RideSurface(SolarSystem sys, double jd0, double jd1)
+        {
+            var fwd = Landed.ToFixed(Heading, jd0);
+            var up = Landed.ToFixed(Frame.FromU(Att * Vector3.up), jd0);
+            Pos = sys.Pos(Landed, jd1) + Landed.FromFixed(contactFixed, jd1);
+            Vel = sys.Vel(Landed, jd1) + Landed.FixedVelocity(contactFixed, jd1);
+            // Supported ships keep their attitude relative to the rotating body; commanded turning still works.
+            Att = Quaternion.LookRotation(Frame.U(Landed.FromFixed(fwd, jd1)), Frame.U(Landed.FromFixed(up, jd1)));
+        }
+
+        public static D3 SurfaceVelocity(SolarSystem sys, Body b, D3 relative, double jd) =>
+            sys.Vel(b, jd) + b.FixedVelocity(b.ToFixed(relative, jd), jd);
+
         public void CheckTouchdown(SolarSystem sys, double jd)
         {
             foreach (var b in Near)
@@ -319,13 +349,13 @@ namespace FogOfWar.OpenWorld
                 {
                     // a step or coast arc can end below the surface; take the speed back up to it, since the fall from
                     // the surface to here (μ(1/r − 1/R)) would otherwise turn a gentle touchdown into a crash
-                    double v = (Vel - sys.Vel(b, jd)).Mag;
+                    double v = (Vel - SurfaceVelocity(sys, b, r.Norm * R, jd)).Mag;
                     ImpactSpeed = Math.Sqrt(Math.Max(0, v * v - 2 * b.GM * (1 / r.Mag - 1 / R)));
                     Pos = bp + r.Norm * R * 1.0001;
-                    Vel = sys.Vel(b, jd);
+                    Vel = SurfaceVelocity(sys, b, Pos - bp, jd);
                     Landed = b; Plan = Plan.None; ThrottleCmd = 0; Throttle = 0; AngVel = Vector3.zero;
-                    bool giant = b.Look == Look.Gas || b.Look == Look.Ice;
-                    Phase = giant ? "in " + b.Name + "'s cloud tops (no surface): climb out" : "landed on " + b.Name;
+                    contactBody = null; EnsureContact(sys, jd);
+                    Phase = ContactPhase;
                     if (ImpactSpeed > SafeTouchdown)
                     {
                         if (Forgiving) Phase += $" (impact {ImpactSpeed * 1000:F0} m/s: sandbox, no damage)";
@@ -640,6 +670,8 @@ namespace FogOfWar.OpenWorld
             public double throttle;
             public float wx, wy, wz;
             public string landed;
+            public bool fixedContact;
+            public double contactX, contactY, contactZ;
         }
 
         public SaveData ToSave(double jd, int warp) => new SaveData
@@ -649,6 +681,8 @@ namespace FogOfWar.OpenWorld
             qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Target?.Name, warp = warp, assist = FlightAssist,
             plan = (int)(PlanActive ? Plan : Plan.None), hold = (int)Hold, throttle = ThrottleCmd,
             wx = AngVel.x, wy = AngVel.y, wz = AngVel.z, landed = Landed?.Name,
+            fixedContact = Landed != null && contactBody == Landed && contactFixed.Sqr > 0,
+            contactX = contactFixed.x, contactY = contactFixed.y, contactZ = contactFixed.z,
         };
 
         public void FromSave(SaveData s, SolarSystem sys)
@@ -662,6 +696,20 @@ namespace FogOfWar.OpenWorld
             Target = string.IsNullOrEmpty(s.target) ? null : sys[s.target];
             FlightAssist = s.assist; Plan = Plan.None; Hold = Hold.Off; ThrottleCmd = 0; Throttle = 0;
             Landed = string.IsNullOrEmpty(s.landed) ? null : sys[s.landed];
+            contactBody = null;
+            if (Landed != null)
+            {
+                // Older saves migrate their saved world position at their saved epoch to a body-fixed point.
+                // Their centre-only velocity is replaced by the supported surface velocity, not reused at liftoff.
+                if (s.fixedContact)
+                {
+                    contactBody = Landed;
+                    contactFixed = new D3(s.contactX, s.contactY, s.contactZ);
+                }
+                EnsureContact(sys, s.jd);
+                RideSurface(sys, s.jd, s.jd);
+                Phase = ContactPhase;
+            }
         }
     }
 }
