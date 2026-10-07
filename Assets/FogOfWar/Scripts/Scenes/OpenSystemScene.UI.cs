@@ -166,7 +166,18 @@ namespace FogOfWar
             camDist = Math.Max(dist, MinCamDist());
         }
 
-        void NextTarget() => SetTarget(targets[(targetIdx + 1) % targets.Count]);
+        void NextTarget() => SetTarget(CycleTarget(1));
+
+        // The body `step` along the cycle from the target: the list made at Build, then a raider while one gives chase (its
+        // proxy joins the system later, and the view's tag is the only other way to it)
+        Body CycleTarget(int step)
+        {
+            var raider = career?.Encounter?.Proxy;
+            int n = targets.Count + (raider != null ? 1 : 0);
+            int i = raider != null && ship.Target == raider ? targets.Count : targetIdx;
+            i = ((i + step) % n + n) % n;
+            return i == targets.Count ? raider : targets[i];
+        }
 
         void SetTarget(Body b)
         {

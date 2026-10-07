@@ -473,7 +473,8 @@ namespace FogOfWar
             }
             // the player's warp stays selected; when the frame budget runs out, report the rate actually achieved
             double achieved = dt * Warps[warpIdx] - Math.Max(simDt, 0);
-            effectiveWarp = effectiveWarp * 0.9 + 0.1 * (dt > 0 ? achieved / dt : 0);
+            frameWarp = dt > 0 ? achieved / dt : 0;
+            effectiveWarp = effectiveWarp * 0.9 + 0.1 * frameWarp;
             if (warpLimited) limitedAt = Time.realtimeSinceStartup;
             // QA-022: a new warp choice starts fresh, so a stale "limited" note never outlives the setting it was about
             if (warpIdx != lastWarpIdx) { lastWarpIdx = warpIdx; limitedAt = -10; effectiveWarp = Warps[warpIdx]; }

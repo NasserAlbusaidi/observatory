@@ -1,5 +1,6 @@
 using System;
 using FogOfWar.OpenWorld;
+using FogOfWar.UI;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -53,6 +54,13 @@ namespace FogOfWar
                 : new[] { (Career.RouteAnswer.GiveUp, Career.GiveUpLabel) };
         }
 
+        // What a chase can be answered with now: the raider call's answers while its card is up (call set), else ChaseAnswers
+        (Career.RouteAnswer What, string Label)[] RaiderAnswers(out Career.RouteCall call)
+        {
+            call = career.Call?.Kind == Career.RouteKind.Pirate ? career.Call : null;
+            return call?.Answers ?? ChaseAnswers();
+        }
+
         // ---------------------------------------------------------------- classic and -fowlegacyui panel
 
         int classicClick = -1;    // review checks: answer i as its button would, at the next repaint
@@ -84,8 +92,9 @@ namespace FogOfWar
         string raiderShown = "none"; // review checks: what DrawRaider did last
         GUIStyle raiderStyle;
 
-        // After DrawTraffic, the same way, in the Raiders' colour and a little larger. The tag is a button that targets it:
-        // the proxy is in none of the scene's target lists.
+        // After DrawTraffic, the same way, in the Raiders' colour and a little larger. The tag is a button that targets it,
+        // as a body's label is (T also cycles to it, CycleTarget); a button only as wide as its text and only where it is
+        // clear of the panels, so a click or a drag-to-look there is not taken from a control under it.
         void DrawRaider()
         {
             var e = career?.Encounter;
@@ -101,11 +110,15 @@ namespace FogOfWar
             foreach (var (c, cr, cd) in occluders) if (cd < dist * 0.999f && (c - g).magnitude < cr) { raiderShown = "behind a body"; return; }
             var col = FactionColours[(int)Faction.Raiders];
             if (raiderStyle == null) raiderStyle = new GUIStyle(labelStyle) { normal = { textColor = col } };
-            string tag = $"{e.Proxy.Name} · {Raiders} · {Km((w - ship.Pos).Mag)}";
+            string tag = $"{e.Proxy.Name} · {Km((w - ship.Pos).Mag)}";
             GUI.color = col;
             GUI.DrawTexture(new Rect(g.x - 2.5f, g.y - 2.5f, 5, 5), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            if (GUI.Button(new Rect(g.x + 6, g.y - 8, 260, 16), tag, raiderStyle)) SetTarget(e.Proxy);
+            var r = new Rect(g.x + 6, g.y - 8, raiderStyle.CalcSize(new GUIContent(tag)).x, 16);
+            bool clear = !App.UnderPanel(new Vector2(r.xMax, r.yMin)) && !App.UnderPanel(new Vector2(r.xMax, r.yMax))
+                         && !(App.ShellActive && UiShell.Instance.PointerOverMouse);
+            if (!clear) GUI.Label(r, tag, raiderStyle);
+            else if (GUI.Button(r, tag, raiderStyle)) SetTarget(e.Proxy);
             raiderShown = "on: " + tag;
         }
 

@@ -215,8 +215,9 @@ namespace FogOfWar
               .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             for (int i = 1; i < Career.Factions.Length; i++) sb.Append('s').Append(career.Standing((Faction)i));
-            foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell));
-            if (career.Encounter != null && career.Call == null) foreach (var a in ChaseAnswers()) sb.Append('r').Append(a.Label);
+            // pay and tonnes too: a raider's boarding or give-up changes them on a job that stays on
+            foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell)).Append(':').Append(Math.Round(a.Pay)).Append(':').Append(Math.Round(a.Tonnes, 1));
+            if (career.Encounter != null) foreach (var a in RaiderAnswers(out _)) sb.Append('r').Append(a.Label);
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
             return sb.ToString();
         }
@@ -323,13 +324,18 @@ namespace FogOfWar
                             "t-label", "f-mono", career.HandArrival(j) ? "ok" : "dim");
                     }
                     Ui.L(card, left >= 0 ? "Due in " + Days(left) : "LATE by " + Days(-left), "t-label", "f-mono", left >= 0 ? "dim" : "warn");
-                    if (career.Encounter?.Job == j && career.Call == null)
+                    if (career.Encounter?.Job == j)
                     {
-                        // Run closed the call card; the chase goes on, and so do its other answers
-                        Ui.L(card, $"{career.Encounter.Proxy.Name} of the {Raiders} gives chase: divert into a patrol's reach, or give up part of the job.", "t-label", "warn").style.marginTop = 4;
+                        // the call's answers while its card is up (this page covers the card), then the ones a chase keeps
+                        var answers = RaiderAnswers(out var call);
+                        Ui.L(card, $"The {career.Encounter.Hull} of the {Raiders} gives chase: " + (call != null ? "run, divert into a patrol's reach, or give up part of the job." : "divert into a patrol's reach, or give up part of the job."), "t-label", "warn").style.marginTop = 4;
                         var chase = Ui.E(card, "row", "wrap");
                         chase.style.marginTop = 4;
-                        foreach (var (answer, label) in ChaseAnswers()) { var a = answer; Ui.B(chase, label, () => career.Answer(a, jd), "small"); }
+                        for (int i = 0; i < answers.Length; i++)
+                        {
+                            int k = i; var a = answers[i].What;
+                            Ui.B(chase, answers[i].Label, () => { if (call != null) AnswerCall(call, k); else career.Answer(a, jd); }, "small");
+                        }
                     }
                     var row = Ui.E(card, "row");
                     row.style.marginTop = 6;

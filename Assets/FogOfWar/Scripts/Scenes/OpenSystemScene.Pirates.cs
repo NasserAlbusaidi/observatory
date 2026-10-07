@@ -7,6 +7,8 @@ namespace FogOfWar
     // encounter lives in the Career, so a new game (a new Career and system) or a load (LoadCareer) leaves none behind.
     public partial class OpenSystemScene
     {
+        double frameWarp; // review checks: the warp the last frame ran at, after the cap and the frame budget
+
         // The player just stepped from (p0, v0) at jd0 to now: the pirate flies the same span. Every branch but the
         // landed one calls this; a landing ends the chase at the career tick, so a long surface ride is never flown.
         void Chase(double jd0, D3 p0, D3 v0) => career.Encounter?.Advance(sys, jd0, (jd - jd0) * 86400, p0, v0, ship.Vel);
