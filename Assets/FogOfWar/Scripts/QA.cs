@@ -349,6 +349,7 @@ namespace FogOfWar
             {
                 Directory.CreateDirectory(dir);
                 log = new StreamWriter(Path.Combine(dir, "qa.txt")) { AutoFlush = true };
+                OpenSystemScene.CheckUnattendedSaveKey(log);
                 app = GetComponent<FogOfWarApp>();
                 app.InputLocked = true; Controls.Locked = true;
                 yield return UiPass();
@@ -359,6 +360,7 @@ namespace FogOfWar
                 // just the terrain low passes (the full run includes them too)
                 Directory.CreateDirectory(dir);
                 log = new StreamWriter(Path.Combine(dir, "qa.txt")) { AutoFlush = true };
+                OpenSystemScene.CheckUnattendedSaveKey(log);
                 app = GetComponent<FogOfWarApp>();
                 app.InputLocked = true; Controls.Locked = true;
                 log.WriteLine($"screen {UnityEngine.Screen.width}x{UnityEngine.Screen.height}");
@@ -370,6 +372,7 @@ namespace FogOfWar
             }
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "qa.txt")) { AutoFlush = true };
+            OpenSystemScene.CheckUnattendedSaveKey(log);
             app = GetComponent<FogOfWarApp>();
             app.InputLocked = true;
             Controls.Locked = true;
