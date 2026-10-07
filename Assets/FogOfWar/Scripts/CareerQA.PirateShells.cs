@@ -40,12 +40,13 @@ namespace FogOfWar
 
         IEnumerator PirateShellChecks()
         {
-            if (!app.ShellActive)
+            if (UI.UiShell.Disabled)
             {
                 log.WriteLine("  SKIP shells: no UI Toolkit shell (-fowlegacyui): the toolkit card, pill, target card, Jobs page and HUD rebuild; the panel's part runs alone");
                 yield return PirateLegacyChecks();
                 yield break;
             }
+            if (!app.ShellActive) { Check(false, "shells: no UI Toolkit shell, and -fowlegacyui is not on"); yield break; }
             bool classicWas = GameSettings.ClassicPanel, labelsWas = GameSettings.ShowLabels;
             Contract job = null;
             Encounter e = null;
@@ -220,6 +221,10 @@ namespace FogOfWar
                 Check(drawn.StartsWith($"{want} | {e.Proxy.Name} ") && call.Answers.Length == 3,
                     $"shells: the classic panel draws the raider call's three answers and the live line: {drawn}");
                 Put("classicClick", Array.FindIndex(call.Answers, a => a.What == Career.RouteAnswer.Run));
+                // the raider 2 km off as the target: this shell's target bracket has no name, so the tag stays
+                e.Pirate.Pos = ship.Pos - (ship.Pos - sys.Pos(sys["Vesta"], jd)).Norm * 2; e.Pirate.Vel = ship.Vel;
+                Call("SetTarget", e.Proxy);
+                s.TestAimTargetAt(0.5f);
             });
             for (int i = 0; go && i < 3; i++) yield return null;
             if (go) go = Guard("shells classic run", () =>
@@ -228,6 +233,9 @@ namespace FogOfWar
                 string drawn = Get<string>("classicDrawn");
                 Check(career.Call == null && career.Encounter == e && drawn.StartsWith(string.Join(" / ", Array.ConvertAll(chase, a => a.Label)) + " | "),
                     $"shells: Run from the classic panel closes the call and the chase goes on: {drawn}");
+                string dot = Get<string>("raiderShown");
+                Check(ship.Target == e.Proxy && dot == $"on: {e.Proxy.Name} · 2 km", $"shells: in the classic panel the raider as the target keeps its tag: {dot}");
+                Call("SetTarget", sys["Vesta"]);
                 career.DropContact();
                 GameSettings.ClassicPanel = false;
             });
@@ -305,7 +313,7 @@ namespace FogOfWar
             Encounter e = null;
             Career.RouteCall call = null;
             double pay = 0;
-            bool called = false;
+            bool called = false, labelsWas = GameSettings.ShowLabels;
             bool go = Guard("legacy setup", () =>
             {
                 career.DropContact();
@@ -331,6 +339,11 @@ namespace FogOfWar
                 string drawn = Get<string>("classicDrawn"), want = string.Join(" / ", Array.ConvertAll(call.Answers, a => a.Label));
                 Check(drawn.StartsWith($"{want} | {e.Proxy.Name} "), $"shells: -fowlegacyui's panel draws the raider call's three answers and the live line: {drawn}");
                 Put("classicClick", Array.FindIndex(call.Answers, a => a.What == Career.RouteAnswer.Run));
+                // the raider 2 km off as the target: this shell's target bracket has no name, so the tag stays
+                if (!labelsWas) GameSettings.ShowLabels = true;
+                e.Pirate.Pos = ship.Pos - (ship.Pos - sys.Pos(sys["Vesta"], jd)).Norm * 2; e.Pirate.Vel = ship.Vel;
+                Call("SetTarget", e.Proxy);
+                s.TestAimTargetAt(0.5f);
             });
             for (int i = 0; go && i < 3; i++) yield return null;
             if (go) go = Guard("legacy run", () =>
@@ -339,6 +352,9 @@ namespace FogOfWar
                 string drawn = Get<string>("classicDrawn");
                 Check(career.Call == null && career.Encounter == e && Get<int>("classicClick") == -1 && drawn.StartsWith(string.Join(" / ", Array.ConvertAll(chase, a => a.Label)) + " | "),
                     $"shells: Run from -fowlegacyui's panel closes the call and the chase goes on: {drawn}");
+                string dot = Get<string>("raiderShown");
+                Check(ship.Target == e.Proxy && dot == $"on: {e.Proxy.Name} · 2 km", $"shells: under -fowlegacyui the raider as the target keeps its tag: {dot}");
+                Call("SetTarget", sys["Vesta"]);
                 pay = job.Pay;
                 Put("classicClick", ClassicIndex(Career.RouteAnswer.GiveUp));
             });
@@ -357,6 +373,7 @@ namespace FogOfWar
                 ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
                 Put("warpIdx", 0);
                 Put("classicClick", -1);
+                if (GameSettings.ShowLabels != labelsWas) GameSettings.ShowLabels = labelsWas;
             });
         }
 
