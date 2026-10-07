@@ -28,10 +28,23 @@ namespace FogOfWar.EditorTools
                     report.Check(id+"/h="+h+"/clearance",Math.Max(0,result.Rs+1-result.MinRange),0,"km inside exclusion","craft radius +1 km exclusion; minimum sampled within every step");
                     if(id!="S1ahead")
                     {
-                        report.Check(id+"/h="+h+"/catch",result.Capture < 0 ? double.PositiveInfinity : result.Capture/result.ClosedForm,id=="S4r" ? 1.2 : 1.05,"ratio","rest-to-rest relative acceleration closed form");
+                        report.Check(id+"/h="+h+"/catch",result.Capture < 0 ? double.PositiveInfinity : result.Capture/result.ClosedForm,id=="S4r" ? 1.2 : 1.05,"ratio","rest-to-rest relative acceleration closed form", category: "independent-reference");
                         report.Check(id+"/h="+h+"/climb",result.ClimbIn,10,"entries","bounded mode switching");
                     }
                 }
+                // G9 was preregistered with S4guard on #115 before its first run.
+                foreach (double h in new[] { 1.0, 5.0 })
+                {
+                    var result = OpenWorld.PursuitCheck.Fly(sys, "S4guard", h);
+                    double floor = 0.1 * sys["Pallas"].Radius + 20;
+                    report.Check("S4guard/h=" + h + "/altitude", Math.Max(0, floor - result.MinAlt), 0, "km below safe altitude",
+                        "guard safe radius minus body radius", $"min altitude {result.MinAlt:F3} km, floor {floor:F3} km");
+                    report.Check("S4guard/h=" + h + "/activation", result.ClimbIn >= 1 ? 0 : 1, 0, "missing climb entries",
+                        "an unguarded braking segment crosses Pallas", $"climb entries {result.ClimbIn}");
+                }
+                using var calls = new StringWriter();
+                report.Check("guard/call-geometry", OpenWorld.PursuitCheck.ClearanceCalls(sys, calls) ? 0 : 1, 0, "failures",
+                    "far-side crossing activates; S4 pole approach stays clear", calls.ToString());
             }
             catch(Exception e){report.Check("exception",1,0,"exceptions","suite completes",e.ToString());}
             report.Save("pursuit-focused");
