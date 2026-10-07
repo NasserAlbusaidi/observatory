@@ -132,7 +132,7 @@ namespace FogOfWar.OpenWorld
             void Earn(string id, bool cond) { if (cond && Achieved.Add(id)) got.Add(Array.Find(Feats, f => f.Id == id).Title); }
             double au = ship.Pos.Mag / Frame.AU;
             Earn("first_job", c.Done >= 1);
-            Earn("coast", ship.Phase == "cruising");
+            Earn("coast", ship.CruiseSeconds > 0 || ship.Phase == "cruising");
             Earn("belter", DockedAt.Contains("Ceres") || DockedAt.Contains("Vesta"));
             Earn("jovian", Visited.Contains("Jupiter"));
             Earn("ringed", Visited.Contains("Saturn"));

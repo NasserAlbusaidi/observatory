@@ -35,6 +35,7 @@ namespace FogOfWar.OpenWorld
         public D3 StationOffset;
         public double DvUsed;
         public double BurnSeconds;               // sim seconds with the drive firing (career scan time leaves these out)
+        public double CruiseSeconds;             // accumulated plan coast, even when a whole coast fits in one frame
         // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
         // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
         public const double Ve = 10000;          // km/s
@@ -155,8 +156,21 @@ namespace FogOfWar.OpenWorld
             Vel += (g + gEnd) * (0.5 * h) + thrust * (f * h);
             DvUsed += dv * f;
             if (Throttle > 0) BurnSeconds += h * f;
+            if (PlanActive && Phase == "cruising" && Throttle == 0 && !RcsActive) CruiseSeconds += h;
             if (!UnlimitedFuel) Fuel = f < 1 ? 0 : Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
             CheckTouchdown(sys, jd1);
+        }
+
+        // Re-evaluate a parked/cruising plan at the current epoch without integrating an uncounted physics step.
+        public void RecheckPlan(SolarSystem sys, double jd, Body reference)
+        {
+            if (!PlanActive) return;
+            dominant = reference;
+            var cmd = Guide(sys, jd, 0, sys.Gravity(Pos, jd));
+            Throttle = !Dry && cmd.HasValue && cmd.Value.Mag > RcsAccel ? Math.Min(cmd.Value.Mag / AMax, 1) : 0;
+            RcsActive = !Dry && cmd.HasValue && cmd.Value.Sqr > 0 && cmd.Value.Mag <= RcsAccel;
+            RcsLevel = RcsActive ? (float)(cmd.Value.Mag / RcsAccel) : 0;
+            if (Dry) Phase = "out of fuel";
         }
 
         // Attitude only (coasting on rails): holds and manual rotation still move the nose.

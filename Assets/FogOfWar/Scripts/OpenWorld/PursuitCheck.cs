@@ -73,7 +73,7 @@ namespace FogOfWar.OpenWorld
             "the stand-in at the span's start through sys.Pos (a read of the old path, as a HUD might make), Pursuit.Span sets the quadratic from the step,",
             "and the pirate steps over the span by Pursuit.Step: h_p = min(span left, 30 s, max(0.05 d/v, 0.5 s)), its Dominant body every 60 s.",
             "Coast() is a private instance method of OpenSystemScene and needs the scene, so it cannot be called here. The copy keeps its chunk rule,",
-            "Rails.Propagate with halving, Pos/Vel from the dominant body at the chunk's end, Turn, and a planned ship's 1 ms re-check Step. It leaves out",
+            "Rails.Propagate with halving and represented-time rounding, Pos/Vel at the chunk's end, Turn, and a plan-only RecheckPlan. It leaves out",
             "FirstSurfaceHit and CheckTouchdown (Near is empty) and looks the dominant body up every 60 s, not every chunk.",
             "The integrate branch steps the whole frame and leaves out OpenSystemScene.SubstepSize. No run here would split differently: above 0.25 s",
             "the attitude slews by MaxRate h and leaves AngVel 0, so the 0.05 s rotation cap never applies; the plan term 0.05 d/v is over 21 s on every",
@@ -231,15 +231,21 @@ namespace FogOfWar.OpenWorld
                 chunk = Math.Min(chunk, 0.01 * (sys.Pos(pl.Target, jd) - pl.Pos).Mag / Math.Max((pl.Vel - sys.Vel(pl.Target, jd)).Mag, 1e-3));
             chunk = Math.Max(chunk, Math.Min(maxDt, 1));
             D3 r1, v1;
-            for (int tries = 0; !Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1); tries++)
-                if (tries == 20) return 0; else chunk *= 0.5;
+            for (int tries = 0; ; tries++)
+            {
+                chunk = (jd + chunk / 86400 - jd) * 86400;
+                if (chunk <= 0) return 0;
+                if (Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1)) break;
+                if (tries == 20) return 0;
+                chunk *= 0.5;
+            }
             double jd1 = jd + chunk / 86400;
             pl.Pos = sys.Pos(dom, jd1) + r1;
             pl.Vel = sys.Vel(dom, jd1) + v1;
             pl.Throttle = 0;
             if (!pl.PlanActive) pl.Phase = "coasting";
             pl.Turn(sys, jd1, chunk, dom);
-            if (pl.PlanActive) pl.Step(sys, jd1, 0.001, dom);
+            if (pl.PlanActive) pl.RecheckPlan(sys, jd1, dom);
             return chunk;
         }
 
