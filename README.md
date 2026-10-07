@@ -129,7 +129,7 @@ Step out of the cockpit and into **eight interactive physics models**, each with
 - **Every sound synthesised live**: drive rumble, RCS pops, hull creaks under g. No samples.
 - **Photo mode** with a free camera, lens and colour controls, cinematic flybys and MP4 clip capture
 - **Planet maps from real missions**: Viking, MESSENGER, Galileo, Cassini, Dawn, LRO
-- **The Observatory**: eight standalone scenes of real physics, from wormholes to radio meteors
+- **The Observatory**: eight interactive physics models, from wormholes to radio meteors, each with its limits explained
 - **Any screen**: tested from 1280×720 to 5120×1440 ultrawide and 1440×2560 portrait
 
 ---

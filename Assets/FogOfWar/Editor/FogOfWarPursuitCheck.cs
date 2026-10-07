@@ -21,14 +21,14 @@ namespace FogOfWar.EditorTools
             try
             {
                 var sys=OpenWorld.SolarSystem.Build();
-                foreach(string id in new[]{"S4r","S1ahead"}) foreach(double h in new[]{1.0,5.0})
+                foreach(string id in new[]{"S4r","S4","S4v","S1ahead"}) foreach(double h in new[]{1.0,5.0})
                 {
                     var result=OpenWorld.PursuitCheck.Fly(sys,id,h);
                     report.Check(id+"/h="+h+"/hold",result.Holds ? 0:1,0,"failures","existing 7200 s alongside criterion");
                     report.Check(id+"/h="+h+"/clearance",Math.Max(0,result.Rs+1-result.MinRange),0,"km inside exclusion","craft radius +1 km exclusion; minimum sampled within every step");
-                    if(id=="S4r")
+                    if(id!="S1ahead")
                     {
-                        report.Check(id+"/h="+h+"/catch",result.Capture/result.ClosedForm,1.2,"ratio","rest-to-rest relative acceleration closed form");
+                        report.Check(id+"/h="+h+"/catch",result.Capture < 0 ? double.PositiveInfinity : result.Capture/result.ClosedForm,id=="S4r" ? 1.2 : 1.05,"ratio","rest-to-rest relative acceleration closed form");
                         report.Check(id+"/h="+h+"/climb",result.ClimbIn,10,"entries","bounded mode switching");
                     }
                 }

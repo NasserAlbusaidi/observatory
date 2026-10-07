@@ -33,7 +33,7 @@ namespace FogOfWar
         static readonly double FluxPeak0 = Kerr.FluxPeak(0).f;
         (double r, double f) FluxPeak() { if (peakSpin != spin) { peakSpin = spin; peak = Kerr.FluxPeak(spin); } return peak; }
         Material mat;
-        float debugFate;   // review harness only: 1 ray fates, 2 first disc hit
+        float debugFate;   // review only: 1 ray reasons (cyan fallback, magenta numerical), 2 first disc hit, 4 lens-table reasons
         BHPost post;
         float rawHdr;      // review harness only: linear radiance straight out of the ray tracer, no post pass
         float exposureEV;  // the player's exposure, EV relative to BHPost.DefaultExposure
