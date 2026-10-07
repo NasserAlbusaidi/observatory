@@ -199,6 +199,9 @@ namespace FogOfWar
                     Check(Touchdowns() == clean, "a crash does not queue a successful touchdown sound");
                     // Exercise LoadGame itself with a temporary career and isolated QA save, without abandoning the live jobs.
                     var player = ship; var currentCareer = career; var reference = Get<Body>("reference");
+                    var state = new System.Collections.Generic.Dictionary<string, object>();
+                    foreach (string field in new[] { "autosaveArmed", "autosaveDue", "autosaveNote", "homePort", "careerTicks", "warpIdx", "pivot", "camMode", "targetIdx", "wasDocked" })
+                        state[field] = s.GetType().GetField(field, F).GetValue(s);
                     string careerKey = SaveKey + "-career";
                     bool hadSave = PlayerPrefs.HasKey(SaveKey), hadCareer = PlayerPrefs.HasKey(careerKey);
                     string saveText = PlayerPrefs.GetString(SaveKey), careerText = PlayerPrefs.GetString(careerKey);
@@ -217,6 +220,7 @@ namespace FogOfWar
                     finally
                     {
                         Put("ship", player); Put("career", currentCareer); Put("reference", reference);
+                        foreach (var saved in state) Put(saved.Key, saved.Value);
                         if (hadSave) PlayerPrefs.SetString(SaveKey, saveText); else PlayerPrefs.DeleteKey(SaveKey);
                         if (hadCareer) PlayerPrefs.SetString(careerKey, careerText); else PlayerPrefs.DeleteKey(careerKey);
                     }
