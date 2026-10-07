@@ -10,12 +10,12 @@ namespace FogOfWar
 {
     // 14b. The raider in both shells (OpenSystemScene.RaiderHud.cs): a raider call made in the scene 1,000,000 km out from
     // Vesta. The card's three answers and its live line, read again a frame after the raider moves; the pill; the hostile
-    // target kind; the planet lists, the codex count, the flight log and the red dot; Give up, Run and Divert clicked on the
-    // card; the Jobs page with the card up and after Run; T and the target card's arrows reaching the raider; the classic
-    // panel's Divert, Give up and Run, taken through the hook that stands in for its button (classicClick), not by a mouse;
-    // a card shown in the UI Toolkit HUD that is shown again after the classic panel goes on and off; and a two-answer call
-    // that hides the third button. -fowlegacyui draws the same classic panel, but no run here starts in it. A throw is a
-    // failed check.
+    // target kind; the planet lists, the codex count, the flight log, and the red dot with its tag (no tag while the raider
+    // is the target); Give up, Run and Divert clicked on the card; the Jobs page with the card up and after Run; T and the
+    // target card's arrows reaching the raider; the classic panel's Divert, Give up and Run, taken through the hook that
+    // stands in for its button (classicClick), not by a mouse; a card shown in the UI Toolkit HUD that is shown again after
+    // the classic panel goes on and off; and a two-answer call that hides the third button. -fowlegacyui draws the same
+    // classic panel, but no run here starts in it. A throw is a failed check.
     public partial class CareerQA
     {
         T R<T>(string method, params object[] a)
@@ -99,9 +99,16 @@ namespace FogOfWar
                 var now = Get<string[]>("recNow");
                 string rec = now.Length == fields.Length ? now[Array.IndexOf(fields, "raider")] : "length " + now.Length;
                 string dot = Get<string>("raiderShown");
-                Check(rec == e.Proxy.Name + " alongside" && dot.StartsWith($"on: {e.Proxy.Name} · 2 km"),
-                    $"shells: the flight log's raider field reads \"{rec}\"; the red dot: {dot}");
-
+                Check(rec == e.Proxy.Name + " alongside" && dot == $"dot only, the target: {e.Proxy.Name} · 2 km",
+                    $"shells: the flight log's raider field reads \"{rec}\"; as the target the raider is a red dot with no tag, as the bracket names it: {dot}");
+                Call("SetTarget", sys["Vesta"]);
+            });
+            for (int i = 0; go && i < 2; i++) yield return null;
+            if (go) go = Guard("shells tag", () =>
+            {
+                string dot = Get<string>("raiderShown");
+                Check(ship.Target == sys["Vesta"] && dot == $"on: {e.Proxy.Name} · 2 km", $"shells: with Vesta the target, the raider's dot has its tag: {dot}");
+                Call("SetTarget", e.Proxy);
                 pay = job.Pay;
                 clicked = s.TestClickCallButton(Array.FindIndex(call.Answers, a => a.What == Career.RouteAnswer.GiveUp));
             });
