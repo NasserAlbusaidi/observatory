@@ -23,7 +23,7 @@ namespace FogOfWar
 
         void InitCareer()
         {
-            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys, RouteEvents = !Unattended() };
+            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys, RouteEvents = !Unattended(), Divert = DivertTo };
             career.StartNew(jd);
             ship.Fuel = career.TankCapacity;
             career.Apply(ship);
@@ -241,6 +241,7 @@ namespace FogOfWar
             // QA-041: a job ending out there, or a dry tank, drops time compression; a crossing caps it at 100×
             if (career.DropWarp) { warpIdx = 0; career.DropWarp = false; }
             if (career.TransferInProgress && warpIdx > 2) warpIdx = 2;
+            CapWarp(); // a call this update starts a chase
             // a finished job's ship is gone from the system: stop flying toward it
             if (ship.Target != null && Career.IsCraft(ship.Target) && !sys.Bodies.Contains(ship.Target))
             {
@@ -589,10 +590,16 @@ namespace FogOfWar
 
         void LoadCareer()
         {
+            bool chased = career.DropContact(); // D8: the raider and its proxy body leave the system; the loaded career says so
             foreach (var old in career.Active.ToArray()) career.Abandon(old); // drop this session's derelicts from the system
-            career = new Career { Sys = sys, RouteEvents = !Unattended() };
+            career = new Career { Sys = sys, RouteEvents = !Unattended(), Divert = DivertTo };
             if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); ResumeTutorial(); return; }
-            try { career.FromSave(JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey)), ship); }
+            try
+            {
+                var cs = JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey));
+                cs.contact |= chased;
+                career.FromSave(cs, ship);
+            }
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the career save: " + e.Message); career.StartNew(jd); ship.Fuel = career.TankCapacity; }
             ResumeTutorial();
         }

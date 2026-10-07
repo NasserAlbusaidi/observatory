@@ -439,7 +439,7 @@ namespace FogOfWar
 
             // --- targets
             ui.Section("Targets");
-            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x));
+            var planets = sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x) && !Career.IsRaider(x));
             var sel = ship.Target == null ? null : ship.Target.Parent == sys.Sun ? ship.Target : ship.Target.Parent;
             int si = ui.Buttons(planets.ConvertAll(p => (p == sel ? "● " : "") + p.Name).ToArray());
             if (si >= 0) SetTarget(planets[si]);

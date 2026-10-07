@@ -425,6 +425,7 @@ namespace FogOfWar
             SpawnRunnerTick();
             ReadInput(dt);
             if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
+            CapWarp();
             double simDt = dt * Warps[warpIdx];
             warpLimited = false;
             // only bodies the ship could reach this frame get per-substep collision checks; craft (a derelict, the practice
@@ -441,10 +442,11 @@ namespace FogOfWar
                 if (++steps > MaxSubsteps || budget.Elapsed.TotalMilliseconds > 10) { warpLimited = true; break; }
                 if (ship.Landed != null && ship.ThrottleCmd == 0 && !ship.PlanActive && !ship.ManualInput)
                 {
-                    ship.Step(sys, jd, simDt, reference); // riding the surface: no dynamics to resolve
+                    ship.Step(sys, jd, simDt, reference); // riding the surface: no dynamics to resolve (a raider's chase ends at the career tick)
                     jd += simDt / 86400; simDt = 0;
                     break;
                 }
+                D3 p0 = ship.Pos, v0 = ship.Vel; double jd0 = jd; // the player's step, for a raider to fly the same span
                 if (Coasting())
                 {
                     double used = Coast(simDt);
@@ -452,6 +454,7 @@ namespace FogOfWar
                     {
                         jd += used / 86400; simDt -= used;
                         profSteps++;
+                        Chase(jd0, p0, v0);
                         continue;
                     }
                     // the conic would not converge: integrate this substep instead
@@ -464,6 +467,7 @@ namespace FogOfWar
                 ship.Step(sys, jd, h, reference);
                 profSteps++;
                 jd += h / 86400;
+                Chase(jd0, p0, v0);
                 simDt -= h;
                 if (simDt < 1e-4) simDt = 0; // finer than jd can resolve
             }
