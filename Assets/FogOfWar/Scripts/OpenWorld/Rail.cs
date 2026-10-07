@@ -13,7 +13,7 @@ namespace FogOfWar.OpenWorld
         public const double MinSunAu = 0.3, MinMoonKm = 100;
         const int Samples = 256;
         // CheckEnds reads a planet's position every Stride samples and joins them with cubics, at an eighth of the cost.
-        // A knot is at most 0.7 day apart (1/32 of the longest trip), where Earth turns 0.7Â°: the cubic is within a km.
+        // A knot is at most 0.7 day apart (1/32 of the longest trip), where Earth turns 0.7°: the cubic is within a km.
         const int Stride = 8;
 
         public readonly Body From, To;
@@ -145,7 +145,7 @@ namespace FogOfWar.OpenWorld
                  + k[j + 1] * (-(u + 1) * u * (u - 2) / 2) + k[j + 2] * ((u + 1) * u * (u - 1) / 6);
         }
 
-        // distance from the origin to the segment aâ€“b
+        // distance from the origin to the segment a–b
         static double Closest(D3 a, D3 b)
         {
             var d = b - a;
