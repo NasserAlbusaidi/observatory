@@ -83,6 +83,24 @@ namespace FogOfWar
         // #27: velocity holds, the speed readout and the approach aid measure against the orbit (the dominant body) or
         // the target. Switching needs a target; losing the target falls back to the orbit.
         void ToggleVelRef() => ship.VelRef = ship.VelRef == null && ship.Target != null ? ship.Target : null;
+        // Shared with the arrival notice: this is the existing atmospheric arrival boundary.
+        bool InArrivalBoundary(Body b) => b != null && Ship.HasAtmosphere(b) &&
+            (ship.Pos - sys.Pos(b, jd)).Mag - b.Radius < Math.Max(300, b.Radius * 0.1);
+        bool SurfaceRef(Body b) => b != null && (ship.Landed == b || (ship.Landed == null && InArrivalBoundary(b)));
+        internal D3 RefVel(Body b) => SurfaceRef(b) ? Ship.SurfaceVelocity(sys, b, ship.Pos - sys.Pos(b, jd), jd) : sys.Vel(b, jd);
+        internal string RefName(Body b) => b.Name + (SurfaceRef(b) ? " surface" : "");
+
+        // Deterministic equatorial fixture shared by the career checks and UI captures.
+        internal void TestSurfaceReadout(double altitude, bool landed)
+        {
+            reference = sys.Earth; ship.VelRef = null; ship.Target = sys.Moon;
+            ship.Landed = landed ? sys.Earth : null; ship.Crashed = null;
+            var rel = sys.Earth.FromFixed(new D3(sys.Earth.Radius + altitude, 0, 0), jd);
+            ship.Pos = sys.Pos(sys.Earth, jd) + rel;
+            ship.Vel = Ship.SurfaceVelocity(sys, sys.Earth, rel, jd);
+            ship.Plan = Plan.None; ship.Throttle = ship.ThrottleCmd = 0;
+        }
+
         Body VelRefBody => ship.VelRef ?? reference;
 
         // Stopping against the target at full drive (or RCS, if that is all there is) after a flip: no gravity, the mass
@@ -249,8 +267,8 @@ namespace FogOfWar
             GUI.color = new Color(1, 1, 1, 0.15f); GUI.DrawTexture(bar, Texture2D.whiteTexture);
             GUI.color = new Color(1f, 0.71f, 0.28f, 0.9f); GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * (float)ship.Throttle, bar.height), Texture2D.whiteTexture);
             GUI.color = Color.white; GUI.DrawTexture(new Rect(bar.x + bar.width * (float)ship.ThrottleCmd - 1, bar.y - 3, 2, bar.height + 6), Texture2D.whiteTexture);
-            var vRef = (ship.Vel - sys.Vel(reference, jd)).Mag;
-            string l1 = $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} g of {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num(vRef, 3)} km/s vs {reference.Name}   ·   {WarpNames[warpIdx]}";
+            var vRef = (ship.Vel - RefVel(reference)).Mag;
+            string l1 = $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} / {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num(vRef, 3)} km/s VS {RefName(reference).ToUpperInvariant()}   ·   {WarpNames[warpIdx]}";
             string l2 = $"ASSIST {(ship.FlightAssist ? "ON" : "OFF")}   ·   HOLD {HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)]}   ·   " +
                         (ship.PlanActive ? $"NAV {PlanNames[(int)ship.Plan]}: {ship.Phase}" : $"NAV idle ({ship.Phase})") + $"   ·   CAM {(pivot == Pivot.Ship ? camMode.ToString() : pivot.ToString())}";
             GUI.Label(new Rect(x, y + 22, w, 18), l1, hudStyle);
@@ -316,11 +334,11 @@ namespace FogOfWar
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
             list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Flight model", FlightModel, Tone.Normal));
-            if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, Tone.Bad));
+            if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, ship.Landed != null ? Tone.Normal : Tone.Bad));
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
-            list.Add(new Readout("Speed vs " + reference.Name, Fmt.Num((ship.Vel - sys.Vel(reference, jd)).Mag, 3) + " km/s"));
+            list.Add(new Readout("Speed vs " + RefName(reference), Fmt.Num((ship.Vel - RefVel(reference)).Mag, 3) + " km/s"));
             list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
@@ -493,8 +511,15 @@ namespace FogOfWar
         // static field, so SaveKey's initialiser never sees it unset). -fowfidelity and -fowbhshots are unattended too:
         // this also turns route events off for both of those suites.
         static bool Unattended() => UnattendedSuite(Environment.GetCommandLineArgs()) != null;
-        static string UnattendedSuite(string[] args) => Array.Find(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" },
+        internal static string[] UnattendedSuites() => new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" };
+        static string UnattendedSuite(string[] args) => Array.Find(UnattendedSuites(),
             a => Array.IndexOf(args, a) >= 0);
+        // Each runner checks at report creation, independently of registration in UnattendedSuites.
+        internal static void CheckUnattendedSaveKey(System.IO.TextWriter report)
+        {
+            if (SaveKey == "fow-save-v1" || CareerKey == "fow-career-v1")
+                report.WriteLine("ERROR unattended suite is using the player's save key");
+        }
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
         public static string SaveSummary
         {
@@ -530,6 +555,7 @@ namespace FogOfWar
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the save: " + e.Message); return; }
             jd = s.jd;
             ship.FromSave(s, sys);
+            wasLanded = ship.Landed != null && ship.Crashed == null;
             // #18: the save keeps no plan to fly on, so Continue starts at 1× with the drive off and says what it dropped
             warpIdx = 0;
             reference = Ship.Dominant(sys, ship.Pos, jd);

@@ -509,8 +509,7 @@ namespace FogOfWar
         string FlightModel => ship.Landed != null ? (ship.AssistedArrival ? "assisted arrival" : "body-fixed contact") :
             Coasting() ? "two-body coast (approximation, 1k×+)" : "integrated multi-body gravity + J2";
 
-        string ArrivalNotice => reference != null && Ship.HasAtmosphere(reference) &&
-            (ship.Pos - sys.Pos(reference, jd)).Mag - reference.Radius < Math.Max(300, reference.Radius * 0.1) ?
+        string ArrivalNotice => InArrivalBoundary(reference) ?
             Ship.ArrivalPolicy(reference) : null;
 
         double Coast(double maxDt)
