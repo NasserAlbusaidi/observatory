@@ -179,7 +179,8 @@ namespace FogOfWar.OpenWorld
             var answers = new List<(RouteAnswer, string)> { (RouteAnswer.Run, "Run") };
             if (port != null) answers.Add((RouteAnswer.Divert, DivertLabel(port)));
             answers.Add((RouteAnswer.GiveUp, giveUp));
-            // D13: a faction's name takes no possessive, no article and no verb that agrees with it, so a singular name reads
+            // D13: a faction's name takes no possessive, no indefinite article and no verb that agrees with it, so a singular
+            // name reads
             Call = new RouteCall
             {
                 Kind = RouteKind.Pirate, Job = job, DivertTo = port, Answers = answers.ToArray(),
@@ -262,8 +263,8 @@ namespace FogOfWar.OpenWorld
 
         // W4's notes, built here so CareerQA can measure every one: the classic and -fowlegacyui note strip draws one line
         // of a fixed width with no wrap (OpenSystemScene.DrawCareerNotes). So they leave out what the card and the pill say
-        // (the range, the job's title), and a faction's name takes no possessive, no article and no verb that agrees with
-        // it (D13).
+        // (the range, the job's title), and a faction's name takes no possessive, no indefinite article and no verb that
+        // agrees with it (D13).
         internal enum BreakOff { Docked, Landed, JobOver, Patrol }
         internal const string DryNote = "Can't divert: the tank is dry", NavNote = "Can't divert: the nav computer would not engage";
         internal static string RunNote => $"Running: burn hard, or dock first. Time is held to {ChaseWarp:N0}×";

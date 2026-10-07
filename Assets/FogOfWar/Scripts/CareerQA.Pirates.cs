@@ -347,7 +347,7 @@ namespace FogOfWar
 
             b.C.Answer(Career.RouteAnswer.Run, b.Jd);
             Check(e != null && b.C.Call == null && b.C.Encounter == e && qs.Bodies.Contains(e.Proxy) && b.Heard(Career.Happening.RouteCall, $"{Career.ChaseWarp:N0}×"),
-                "pirates: Run closes the card and the chase goes on; its note says the warp cap holds until the chase ends");
+                $"pirates: Run closes the card and the chase goes on; its note says time is held to {Career.ChaseWarp:N0}×");
 
             // Divert, after Run closed the card: the nearest patrolled port by full-burn time from the ship's state
             b.C.Answer(Career.RouteAnswer.Divert, b.Jd);
@@ -610,7 +610,7 @@ namespace FogOfWar
                                          || Regex.IsMatch(t, $@"{name} (break|take|have|are|were|give)\b") || Regex.IsMatch(t, @"\b[Tt]hey\b") || t.Contains(" break off"));
             int named = texts.FindAll(t => t != null && t.Contains(name)).Count;
             Check(bad.Count == 0 && named >= 6 && title?.Contains(name) == true && kind?.Contains(name) == true && warn?.Contains(name) == true && incoming?.Contains(name) == true,
-                $"pirates: D13 with a singular name, \"{name}\": {texts.Count} texts, {named} name it, none with a possessive, an article, a plural verb or in lower case: " +
+                $"pirates: D13 with a singular name, \"{name}\": {texts.Count} texts, {named} name it, none with a possessive, an indefinite article, a plural verb or in lower case: " +
                 $"\"{title}\" / \"{incoming}\" / \"{kind}\" / \"{warn}\"" + (bad.Count > 0 ? "; wrong: " + string.Join(" | ", bad.ConvertAll(t => t ?? "(none)")) : ""));
         }
 
