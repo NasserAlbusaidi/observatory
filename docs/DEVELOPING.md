@@ -78,7 +78,7 @@ A late job pays half. After twice the time allowed, it fails and pays nothing.
 
 - **Codex.** Pass close to a body to log its data from the game's own ephemeris. Scan it to unlock real facts (43 bodies have them).
 - **Survey data.** The first scan of a body sells for 400 cr + 600 cr per AU from the Sun, ×1.5 for bodies under 100 km. The far moons pay for the trip out.
-- **16 achievements**, from "Paid in full" to "Edge of the map" (30 AU from the Sun).
+- **17 achievements**, from "Paid in full" to "Edge of the map" (30 AU from the Sun).
 
 A new career starts docked at Earth with one job: medical supplies to Luna. A short first-flight lesson teaches turning, burning, attitude holds, targeting, the autopilot and time compression. You can skip it.
 
@@ -226,16 +226,49 @@ To add an Observatory scene, write a `SimScene` subclass in `Scripts/Scenes/` an
 
 ## Credits and licence
 
+### Licence
+
+The repository has three parts, each under its own terms.
+
+- **Code: GNU General Public License v3.0 only** ([`LICENSE`](../LICENSE)). This covers the C# scripts (`Assets/FogOfWar/Scripts`, `Assets/FogOfWar/Editor`), the shaders (`Assets/FogOfWar/Resources/Shaders`), the UI style sheets (`*.uss`), the scripts and tools in `Tools/`, and the Unity project files (`ProjectSettings/`, `Packages/`, the scene and the `.meta` files).
+
+  ```
+  Copyright (C) 2026 Nasser Albusaidi
+
+  This program is free software: you can redistribute it and/or modify it under the terms of
+  the GNU General Public License as published by the Free Software Foundation, version 3.
+
+  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+  See the GNU General Public License for more details.
+  ```
+
+- **The project's own art and text: all rights reserved.** © 2026 Nasser Albusaidi. This covers everything else made for the project: the ship, fleet, asteroid and procedural body models and their textures, the procedural planet and ring maps, the codex text, the docs, and the screenshots and videos in `docs/media`. Ask before you reuse them.
+- **Third-party content keeps its own licence.** The sources and their credits are below. Files built from them, such as the ephemeris fits, the moon table and the reprojected maps, keep their source's terms.
+
+The Unity Editor and engine are not in this repository. They are under Unity's own terms.
+
+### Sources
+
 - **Ephemerides**: NASA JPL Horizons and the JPL Solar System Dynamics satellite tables.
-- **Earth**: NASA Visible Earth (Blue Marble Next Generation, Black Marble, MODIS clouds) and GEBCO elevation.
+- **Earth**: NASA Visible Earth (Blue Marble Next Generation, Black Marble, MODIS clouds) and GEBCO elevation (GEBCO Compilation Group, GEBCO_08 Grid).
 - **Moon**: LRO WAC colour from the CGI Moon Kit and LRO LOLA relief. Credit: NASA's Scientific Visualization Studio.
-- **Planets and moons**: USGS Astrogeology and PDS mosaics from Viking, MGS MOLA, MESSENGER, Magellan, Voyager, Galileo, Cassini and Dawn. Jupiter: Cassini PIA07782 (NASA/JPL/Space Science Institute). Saturn, Uranus, Neptune and the Uranian moons that Voyager 2 saw only in part are modelled from published imagery. Each map's source is in its `Planets/<Body>/Body.json`.
+- **Planets and moons**: USGS Astrogeology and PDS mosaics from Viking, MGS MOLA, MESSENGER, Magellan, Voyager, Galileo, Cassini and Dawn. Each map's source is in its `Planets/<Body>/Body.json`. USGS asks users to cite the authors of these maps:
+  - Ceres and Vesta (Dawn FC): NASA/JPL-Caltech/UCLA/MPS/DLR/IDA.
+  - Dione, Tethys and Rhea (Cassini ISS): NASA/JPL/Space Science Institute; mosaics by Roatsch et al., DLR.
+  - Enceladus (Cassini ISS): Cassini Team, NASA/JPL/Space Science Institute.
+  - Mimas (Cassini ISS): NASA/JPL/Space Science Institute; basemap by DLR.
+  - Triton (Voyager 2): NASA/JPL; colour mosaic by Paul Schenk, Lunar and Planetary Institute.
+  - Mercury enhanced colour (MESSENGER MDIS): NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington; mosaic by Applied Coherent Technology Corp.
+  - Jupiter: Cassini PIA07782 (NASA/JPL/Space Science Institute).
+  - Saturn, Uranus, Neptune and the Uranian moons that Voyager 2 saw only in part are modelled from published imagery.
 - **Shape models**: irregular moons and asteroids from NASA PDS Small Bodies Node and NAIF, decimated to three LODs with baked normal maps (sources in `Resources/Models/Bodies/LODS.json`). Shape model of Ryugu: ISAS/JAXA (modified); the game shows this credit on Ryugu's codex card. Bodies without a shape model, and the belt rocks, are procedural.
 - **Rings**: radii and optical depths from the Voyager, Galileo, Cassini and New Horizons ring literature, rounded.
-- **Sky**: NASA SVS Deep Star Maps 2020. Gaia DR2: ESA/Gaia/DPAC. Stars from the Yale Bright Star Catalogue (`bsc5.csv`).
+- **Sky**: NASA/Goddard Space Flight Center Scientific Visualization Studio, Deep Star Maps 2020. Gaia DR2: ESA/Gaia/DPAC. ESA distributes Gaia data under [CC BY-NC 3.0 IGO](https://www.cosmos.esa.int/web/gaia-users/license). So `Sky/SkyOurs.png`, `Sky/MilkyWay.png` and the screenshots that show this sky are for non-commercial use only. Commercial use needs ESA's authorisation first. Stars from the Yale Bright Star Catalogue, 5th revised edition (Hoffleit and Warren) (`bsc5.csv`).
 - **Fonts**: Barlow and JetBrains Mono, under the SIL Open Font License (licence files in `Resources/UI/Fonts`).
 - **Ships, sound and cockpit**: made for this project, in code or by its own Blender scripts. A new outside asset must be CC0 or public domain, and must be credited.
+- **Earlier versions in the git history**:
+  - From 2f3642c until 94b4de0 replaced them, the Earth and Moon textures were the three.js example planet textures (`examples/textures/planets` in mrdoob/three.js).
+  - The Moon map in commits 3bcb67a to 293425b was the SELENE (Kaguya) Terrain Camera morning mosaic, ©JAXA/SELENE, from USGS, resampled and recoloured. We thank the SELENE(KAGUYA) TC team and the SELENE Data Archive for providing the SELENE(KAGUYA) data. SELENE is a Japanese mission developed and operated by JAXA.
 
-The source maps are public domain except where a credit is named above.
-
-All rights reserved. See [`LICENSE`](../LICENSE). Third-party assets keep their own licences.
+NASA, USGS and PDS data are public domain in the United States. The credits above are the ones their sources ask for.
