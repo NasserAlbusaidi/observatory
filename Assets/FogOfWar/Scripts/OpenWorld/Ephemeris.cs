@@ -77,6 +77,25 @@ namespace FogOfWar.OpenWorld
         public Color ColA = Color.gray, ColB = Color.gray, Atmo = Color.clear;
         public string Texture;              // Resources path, optional
         public Cheb Cheb;
+        public D3 ToFixed(D3 relative, double jd)
+        {
+            Axes(jd, out var prime, out var east, out var pole);
+            return new D3(D3.Dot(relative, prime), D3.Dot(relative, east), D3.Dot(relative, pole));
+        }
+
+        public D3 FromFixed(D3 point, double jd)
+        {
+            Axes(jd, out var prime, out var east, out var pole);
+            return prime * point.x + east * point.y + pole * point.z;
+        }
+
+        // Differentiate the orientation actually rendered, including retrograde and synchronous bodies.
+        // Divide by the represented JD span rather than assuming subsecond dates are exact.
+        public D3 FixedVelocity(D3 point, double jd)
+        {
+            double lo = jd - 0.25 / 86400, hi = jd + 0.25 / 86400;
+            return (FromFixed(point, hi) - FromFixed(point, lo)) / ((hi - lo) * 86400);
+        }
 
         // Orientation: IAU pole (RA/Dec J2000) and prime meridian W = W0 + Wd * days (TDB from J2000).
         public double PoleRa = 0, PoleDec = 90, W0, Wd;
