@@ -7,8 +7,8 @@ namespace FogOfWar.OpenWorld
     // Attitude holds (SAS), relative to the dominant body's orbit or to the target.
     public enum Hold { Off, Prograde, Retrograde, Normal, AntiNormal, RadialOut, RadialIn, Target, AntiTarget, Custom }
 
-    // Nav-computer plans flown by the autopilot.
-    public enum Plan { None, Brachistochrone, MatchVelocity, HoldStation }
+    // Nav-computer plans flown by the autopilot. Pursue is a pirate's (Pursuit.cs); the player's plan pickers list theirs by hand.
+    public enum Plan { None, Brachistochrone, MatchVelocity, HoldStation, Pursue }
 
     // The player's torch ship: a point mass under every body's gravity, with a main drive along its nose, RCS
     // translation, and a rigid-body attitude (finite angular acceleration and rate). Positions are heliocentric ecliptic
@@ -331,6 +331,7 @@ namespace FogOfWar.OpenWorld
             double aMax = AMax, tau = Math.Max(20, 4 * h);
             // a target under thrust accelerates by its drive, not by gravity
             var gRel = gShip - (T.PathAccel != null ? T.PathAccel(jd) : sys.Gravity(tp, jd, T));
+            if (Plan == Plan.Pursue) return Pursue(sys, jd, r, dist, vrel, -gRel, tau);
 
             if (Plan == Plan.MatchVelocity)
             {
@@ -427,6 +428,60 @@ namespace FogOfWar.OpenWorld
             if (left <= 0) return comp.Norm * AMax;
             double s = steer.Mag;
             return s > left ? comp + steer * (left / s) : comp + steer;
+        }
+
+        // Plan.Pursue, a pirate on the player (Pursuit.cs). The target thrusts, so comp (what matches its acceleration)
+        // can take most of the drive. Budget leaves AMax − |comp| for steering in every direction, but the drive has more
+        // when the steering opposes comp: a 2 g pirate behind a 1 g ship burning away could brake at only 1 g against a
+        // curve that assumed 1.7 g, and flew past it at 16 km/s (pirate spike, S2b). Here steering gets all the drive has
+        // left along it, and the braking curve all it has left along the braking line. With nothing left (|comp| ≥ AMax)
+        // the pirate only matches: a hand burn at exactly its g leaves it no spare, and one of the same g behind the
+        // autopilot's full burn closes only on Budget's reserve (about 4e-4 g on a Vesta–Mars leg), so
+        // burning harder escapes. The curve counts on the target's present thrust: a target that cuts its drive or flips
+        // under it, by hand or as the autopilot does at turnover and at a coast trip's brake start, takes that spare away.
+        public const double PursueMargin = 0.85; // [design] the braking curve's share of that spare, as Brachistochrone's
+
+        D3? Pursue(SolarSystem sys, double jd, D3 r, double dist, D3 vrel, D3 comp, double tau)
+        {
+            double standoff = Standoff(Target);
+            var los = dist > 0 ? r / dist : Heading;
+            bool hold = dist < standoff * 1.25 && vrel.Mag < 0.5;
+            if (!hold && Clearance(sys, jd) is D3 guard) { Phase = "climbing clear of " + guardBody.Name; return guard; }
+            if (comp.Sqr >= AMax * AMax) { Phase = "matching its burn"; return comp.Norm * AMax; }
+            D3 want, ff = D3.Zero;
+            if (hold)
+            {
+                // station-keeping beside it, as Brachistochrone's hover: back to the standoff, braking to stop by half of it
+                want = los * ((dist - standoff) * 0.002);
+                double closing = D3.Dot(vrel, los);
+                if (closing > 0) ff = -los * Math.Min(PursueMargin * Spare(comp, -los, AMax), closing * closing / (2 * Math.Max(dist - standoff * 0.5, 0.05)));
+                Phase = "holding station";
+                return Share((want - vrel) / tau + ff, comp);
+            }
+            var dir = Avoid(sys, jd, los, dist);
+            double brake = PursueMargin * Spare(comp, -dir, AMax), vb = Math.Sqrt(2 * brake * Math.Max(dist - standoff, 0));
+            want = dir * vb;
+            // on or above the braking curve, feed its own deceleration forward (see Brachistochrone)
+            if (vb > 0 && D3.Dot(vrel, dir) >= vb) ff = -dir * brake;
+            var cmd = Share((want - vrel) / tau + ff, comp);
+            // what the drive does, not where the steering points: braking against a target that pulls away can need no thrust
+            Phase = cmd.Mag <= RcsAccel ? "trimming (RCS)" : D3.Dot(cmd, los) >= 0 ? "closing" : "braking";
+            return cmd;
+        }
+
+        // The most the drive has left along unit vector u once it matches the target: the largest k ≥ 0 with
+        // |comp + k·u| ≤ aMax, k = −(comp·u) + sqrt((comp·u)² − |comp|² + aMax²). 0 when it cannot match at all.
+        public static double Spare(D3 comp, D3 u, double aMax)
+        {
+            double cu = D3.Dot(comp, u), disc = cu * cu - comp.Sqr + aMax * aMax;
+            return comp.Sqr >= aMax * aMax || disc <= 0 ? 0 : -cu + Math.Sqrt(disc);
+        }
+
+        // Pursue's Budget: comp first, then the steering, cut to what the drive has left along it.
+        D3 Share(D3 steer, D3 comp)
+        {
+            double s = steer.Mag;
+            return s > 0 ? comp + steer * (Math.Min(s, Spare(comp, steer / s, AMax)) / s) : comp;
         }
 
         Body guardBody;
