@@ -2,6 +2,8 @@
 
 The full reference behind the [store page](../README.md): game rules and numbers, controls, how to build and test, the repository layout and every data credit.
 
+The [models and limits guide](MODEL-FIDELITY.md) records each subsystem's assumptions, supported domain and validation limits, including the retained drive/RCS/wheel model and snapshot-time black-hole emission.
+
 ## Contents
 
 - [Game rules](#game-rules)
