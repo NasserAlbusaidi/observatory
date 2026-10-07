@@ -14,7 +14,7 @@ namespace FogOfWar
     public partial class OpenSystemScene : SimScene
     {
         public override string Title => "Open System";
-        public override string Eyebrow => "Torch-ship flight, true scale";
+        public override string Eyebrow => "The Expanse, true scale";
         public override string Short => "Fly anywhere from Mercury to Neptune";
         public override string Blurb =>
             "Explore today's solar system using fitted and mean-element orbits based on JPL data. Your ship has a fictional torch drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b> for a feedback-guided transfer. It accelerates, turns to brake, then aims to park in orbit; the ideal flip-and-burn estimate is a planning guide.\n\n" +
