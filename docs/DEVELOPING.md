@@ -269,7 +269,7 @@ The Unity Editor and engine are not in this repository. They are under Unity's o
 - **Fonts**: Barlow and JetBrains Mono, under the SIL Open Font License (licence files in `Resources/UI/Fonts`).
 - **Ships, sound and cockpit**: made for this project, in code or by its own Blender scripts. A new outside asset must be CC0 or public domain, and must be credited.
 - **Earlier versions in the git history**:
-  - From 2f3642c until 94b4de0 removed them, `Resources/Textures` held the first Earth, Moon and Mars textures. The Earth clouds, ocean mask and normal map among them are the three.js example planet textures (`examples/textures/planets` in mrdoob/three.js).
+  - From 2f3642c until 94b4de0 removed them, `Resources/Textures` held the first Earth, Moon and Mars textures. The Earth and Moon files came from the three.js example planet textures (`examples/textures/planets` in mrdoob/three.js).
   - From 3bcb67a until 94b4de0 replaced it, the Moon map was the SELENE (Kaguya) Terrain Camera morning mosaic, ©JAXA/SELENE, from USGS, resampled and recoloured. We thank the SELENE(KAGUYA) TC team and the SELENE Data Archive for providing the SELENE(KAGUYA) data. SELENE is a Japanese mission developed and operated by JAXA.
 
 NASA, USGS and PDS data are public domain in the United States. The credits above are the ones their sources ask for.
