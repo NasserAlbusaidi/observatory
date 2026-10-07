@@ -141,7 +141,9 @@ namespace FogOfWar.OpenWorld
         // where no patrol gets there in time). No start more than a·CatchMaxS² from the ship fits, so the candidates run
         // from there (or the dock range) to as far past the ship, in steps of 5 % but never over a·CatchMinS²/8: from
         // relative rest the window is a ring a·CatchMinS²/4 to a·CatchMaxS²/4 from the ship, about 1e6 km wide at 1 g,
-        // which 5 % steps jump over past 2e7 km from the lair. False when none fits.
+        // which 5 % steps jump over past 2e7 km from the lair. False when none fits. A start closer than InterceptKm is
+        // passed over: past ~160 km/s across the line the sideways drift alone (w / a) nearly fills the window, so the
+        // ship's own point fits, and far is exactly 72 steps, so the grid lands on it.
         static bool Spawn(Body lair, SolarSystem sys, Ship ship, double jd, out D3 pos, out D3 vel, out double catchS)
         {
             var lp = sys.Pos(lair, jd);
@@ -152,6 +154,7 @@ namespace FogOfWar.OpenWorld
             for (double s = Math.Max(DockRange(lair), dist - far); s < dist + far; s += Math.Min(0.05 * s, step))
             {
                 pos = lp + n * s;
+                if ((pos - ship.Pos).Mag < InterceptKm) continue;
                 catchS = CatchSeconds(pos - ship.Pos, vel - ship.Vel, a);
                 if (catchS >= CatchMinS && catchS <= CatchMaxS && Threat.PatrolAt(sys, pos, jd) == null) return true;
             }

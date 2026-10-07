@@ -278,6 +278,19 @@ namespace FogOfWar
                   && Threat.PatrolAt(qs, f.Ship.Pos, f.Jd) == null,
                 $"pirates: 1e8 km from Vesta at rest with it a raider still finds a start: {d0:N0} km from the ship, catch {(e?.CatchSeconds ?? double.NaN) / 3600:F2} h (2√(d/a) = {fromRest / 3600:F2} h)");
 
+            // 10,000,000 km out from Vesta, at rest with it along the line but 190 km/s across it: the drift alone (w / a,
+            // 5.4 h) nearly fills the window, so the D11 starts lie within ~12,000 km of the ship and the ship's own point
+            // fits. The grid lands on that point (72 steps from dist − far); a start there would be a raider on the hull
+            var side = D3.Cross(pV.Norm, vesta.Pole).Norm;
+            var k = MakeBench(qs, pV + pV.Norm * 1e7, vel + side * 190, from: "Vesta", to: "Vesta");
+            double onHull = Career.CatchSeconds(pV.Norm * -1e-3, vel - k.Ship.Vel, PirateA);
+            made = k.C.MakeCall(Career.RouteKind.Pirate, k.Job, qs, k.Ship, k.Jd);
+            e = k.C.Encounter;
+            double dk = e != null ? (e.Pirate.Pos - k.Ship.Pos).Mag : double.NaN;
+            Check(onHull >= Career.CatchMinS && onHull <= Career.CatchMaxS && (made ? e != null && dk >= Career.InterceptKm : e == null),
+                $"pirates: 190 km/s across the line, a start on the ship itself would fit (catch {onHull / 3600:F2} h), but none is closer than {Career.InterceptKm:N0} km: " +
+                (made ? $"a start {dk:N0} km off, catch {e.CatchSeconds / 3600:F2} h" : "no call"));
+
             // the departure half, a patrolled lair: 300,000 km out from Ceres, just outside its patrol's reach, on a job
             // from Ceres. The raider waits at rest with Ceres where no patrol reaches it, not off the port
             var ceres = qs["Ceres"];
