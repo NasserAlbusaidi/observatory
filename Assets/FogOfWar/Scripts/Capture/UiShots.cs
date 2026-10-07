@@ -51,6 +51,7 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "uishots.txt")) { AutoFlush = true };
+            OpenSystemScene.CheckUnattendedSaveKey(log);
             var app = GetComponent<FogOfWarApp>();
             Controls.Locked = true;
             app.InputLocked = true;
