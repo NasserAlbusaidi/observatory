@@ -31,7 +31,7 @@ Ray termination codes are capture=0, confirmed outward escape=1, budget exhauste
 
 ## Rebuild references
 
-Python 3, numpy and scipy are required only to regenerate fixtures. Normal Unity checks are offline.
+Python 3 with the versions in `requirements.txt` regenerates fixtures; Pillow also supports the image comparisons. Install with `python -m pip install -r Tools/benchmarks/requirements.txt`. Normal Unity checks are offline.
 
 ```powershell
 python Tools/benchmarks/references.py geometry
@@ -40,7 +40,7 @@ python Tools/benchmarks/references.py horizons
 python Tools/benchmarks/references.py fit-source --cache Tools/horizons/cache
 ```
 
-The last command requires the original `fit.mjs` response cache. It preserves response headers and SHA256 hashes, plus nearest original samples. Missing inputs fail instead of inventing replacements. Horizons requests are serial, cached and retried on temporary failure. Raw fresh responses and exact query URLs are retained.
+`fit-inputs.json` was made with `references.py fit-source --cache Tools/horizons/cache` against the original responses saved by `Tools/horizons/fit.mjs`. For each shipped fit it retains the nearest original samples to the selected interior and boundary dates, each full response header and source SHA256, and the fitted `.bytes` SHA256 (180 vectors across 30 bodies). That original cache is gitignored: **the fixture cannot be regenerated from a clean checkout**. The committed fixture is the retained source of record; a fresh Horizons request is a different comparison, not a replacement for those original fitting inputs. Missing original inputs raise an error. The separately retained fresh Horizons responses and query URLs support the `horizons` comparison; requests are serial, cached and retried on temporary failure.
 
 References: [JPL Horizons API](https://ssd-api.jpl.nasa.gov/doc/horizons.html), [Teo, spherical photon orbits, equations 5–6 and 11](https://www.physics.nus.edu.sg/wp-content/uploads/sites/5/2019/10/paper.pdf), [Darwin-anomaly Schwarzschild formulation](https://link.aps.org/accepted/10.1103/PhysRevD.92.044048).
 
@@ -52,4 +52,12 @@ Run `python Tools/benchmarks/compare_images.py Logs/bh-images` to assert the ima
 
 Use `-fowuishots Logs/ui -fowuionly 06b-provenance -fowuires 1920x1080` for fitted, calibrated mean-moon, estimated-radius and outside-fit codex cases. Inspect the PNGs: successful capture alone does not establish readability.
 
-`-fowcareer` uses fixed epoch/frame steps, process-unique save keys, simulation-time flight limits and separate performance reports. Compare two concurrent `career.txt` files, including the complete traffic fixture list. For the lookback negative control, temporarily change `Traffic.LookbackDays` from 30 to 25, build, run `-fowcareer <dir> -fowcareertraffic`, retain the failing output, restore 30 and rebuild. Never ship the mutation.
+`-fowcareer` uses fixed epoch/frame steps, bounded build-path/suite save keys (distinct explicit keys for concurrent copies of one build/suite), simulation-time flight limits and separate performance reports. Compare two concurrent `career.txt` files, including the complete traffic fixture list. For the lookback negative control, temporarily change `Traffic.LookbackDays` from 30 to 25, build, run `-fowcareer <dir> -fowcareertraffic`, retain the failing output, restore 30 and rebuild. Never ship the mutation.
+
+## What the counts mean
+
+The GPU report separates `independent-reference` gates (quartic classification and quadrature/Jacobi directions), `self-convergence` gates (the same production shader at a finer step/budget), `consistency` gates (full trace versus table generation), and invariant/coverage gates. The 192 direction/intersection refinement checks are self-convergence, not independent references. The 96 fallback-direction measurements are diagnostics with no pass/fail tolerance; unresolved-rate gates remain assertions. Counts and categories are written into the JSON and final log line.
+
+The gravity suite compares models and step refinement; the old zero-duration `mode-switch-jump` check was removed because it did not exercise a scene mode switch. Blend checks separately gate position (1 m) and velocity (0.1 m/s over a 2 ms interval). The separated ray oracle accepts inbound fixture rays only and raises for any other radial sign.
+
+Historical combined-branch evidence is retained on [`codex/resolve-open-issues`](https://github.com/NasserAlbusaidi/fog-of-war-observatory/tree/codex/resolve-open-issues/docs/validation/2026-10-07). Generated captures and logs are not part of this PR's tree; fixtures and the tools that consume them remain here. Those historical counts do not describe a later stack head.

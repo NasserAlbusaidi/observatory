@@ -115,10 +115,14 @@ namespace FogOfWar
                     // one that suits the body's size on screen is shown.
                     var holder = new GameObject(b.Name).transform;
                     holder.SetParent(Root, false);
-                    if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0)
-                    { b.Radius = info.meanRadiusKm; b.RadiusSource = "shape asset volume-equivalent radius"; b.SizeEstimated = false; }
+                    art.TryGetValue(b.Name, out var info);
+                    bool measuredShape = info?.source?.StartsWith("shape model", StringComparison.Ordinal) == true;
+                    if (info != null && info.meanRadiusKm > 0)
+                    { b.Radius = info.meanRadiusKm; b.RadiusSource = measuredShape ? "shape asset volume-equivalent radius" : "catalogue triaxial-diameter radius"; }
                     b.ShapeSource = modelPath.StartsWith("Asteroids/", StringComparison.Ordinal) ?
-                        "borrowed procedural asteroid mesh (unmeasured shape)" : "body shape asset: Models/" + modelPath + " (source in Models/Bodies/LODS.json)";
+                        "borrowed procedural asteroid mesh (unmeasured shape)" : measuredShape ? info.source :
+                        info?.source?.StartsWith("procedural", StringComparison.Ordinal) == true ?
+                        "procedural mesh seeded by name (unmeasured shape)" : "body mesh (source unavailable)";
                     v.t = holder; v.model = true;
                     bool lods = Resources.Load<GameObject>($"Models/Bodies/{b.Name}_LOD0") != null;
                     var paths = lods ? new[] { $"Bodies/{b.Name}_LOD0", $"Bodies/{b.Name}_LOD1", $"Bodies/{b.Name}_LOD2" } : new[] { modelPath };
@@ -302,7 +306,7 @@ namespace FogOfWar
         }
 
         [Serializable] class BodyJson { public float geometricAlbedo; public bool mapIsAbsolute; }
-        [Serializable] class ArtBody { public string name; public float meanRadiusKm; public float geometricAlbedo; }
+        [Serializable] class ArtBody { public string name, source; public float meanRadiusKm; public float geometricAlbedo; }
         [Serializable] class ArtBodies { public ArtBody[] items; }
         readonly Dictionary<string, ArtBody> art = new Dictionary<string, ArtBody>();
 
@@ -412,9 +416,11 @@ namespace FogOfWar
         static readonly bool CareerTesting = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcareer") >= 0;
         // QA stops on an exact simulation epoch, regardless of how many real frames the machine needs.
         public double QaStopJd = double.PositiveInfinity;
+        public bool QaFreeze; // provenance captures may change the displayed epoch without ticking ship or career state
 
         public override void Tick(float dt)
         {
+            if (QaFreeze) return;
             if (CareerTesting) dt = 1f / 60;
             if (Prof) swTick.Start();
             try { TickInner(dt); } finally { if (Prof) swTick.Stop(); }
