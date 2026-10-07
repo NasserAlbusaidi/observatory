@@ -22,16 +22,28 @@ fi
 run() {
   dir="$1"; shift
   mkdir -p "$dir"
-  ./Builds/BlackHole/FogOfWarBH.exe -batchmode -fowbhshots "$dir" -logFile "$(pwd -W)/Logs/bhshots.log" "$@"
-  grep -v ICU "$dir/bhshots.txt" | grep -v "^$"
+  rc=0
+  ./Builds/BlackHole/FogOfWarBH.exe -batchmode -fowbhshots "$dir" -logFile "$(pwd -W)/Logs/bhshots.log" "$@" || rc=$?
+  if [ -f "$dir/bhshots.txt" ]; then
+    grep -v ICU "$dir/bhshots.txt" | grep -v "^$" || :
+  else
+    echo "ERROR: missing $dir/bhshots.txt"
+    [ "$rc" -ne 0 ] || rc=1
+  fi
+  echo "player exit $rc"
+  return "$rc"
 }
 if [ -n "$BH_RUNS" ]; then
-  echo "$BH_RUNS" | tr ';' '\n' | while IFS=: read -r name args; do
+  status=0
+  while IFS=: read -r name args; do
     [ -z "$name" ] && continue
     echo "== $name"
     # shellcheck disable=SC2086
-    run "$OUT/$name" $args
-  done
+    run "$OUT/$name" $args || status=$?
+  done <<EOF
+$(printf '%s\n' "$BH_RUNS" | tr ';' '\n')
+EOF
+  exit "$status"
 else
   run "$OUT" "$@"
 fi
