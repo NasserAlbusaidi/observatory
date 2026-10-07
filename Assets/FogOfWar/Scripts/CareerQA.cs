@@ -352,7 +352,7 @@ namespace FogOfWar
                 Check(career.Call != null && Get<int>("warpIdx") == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, warp {Get<int>("warpIdx")}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
                 // Q3, before the answer and the job's removal, either of which would end a chase: the leg gives raiders nothing
                 Check(career.Call?.Kind != Career.RouteKind.Pirate && career.Encounter == null && rateMax == 0 && presenceMax == 0,
-                    $"no raider on the real roll: the call is {career.Call?.Kind.ToString() ?? "none"}, no chase; between Luna and Mars raider presence {presenceMax:0.###} and rate {rateMax:0.###} an hour at most");
+                    $"no raider on the real roll: the call is {career.Call?.Kind.ToString() ?? "none"}, no chase; over the first {(jd - jd0) * 24:F1} h of the trip to Mars, sampled each frame up to the call, raider presence {presenceMax:0.###} and rate {rateMax:0.###} an hour at most");
                 yield return Shot("c05c-route-call");
                 career.RouteEvents = false;
                 career.Answer(false, jd);

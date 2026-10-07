@@ -124,16 +124,20 @@ namespace FogOfWar
                 career.Answer(Career.RouteAnswer.Divert, jd);
                 Check(port != null && ship.Target == sys[port.Body] && ship.PlanActive && ship.Plan == Plan.Brachistochrone && Get<int>("cruiseIdx") == 0 && career.Encounter == e,
                     $"pirates: Divert targets {port?.Name ?? "-"}, the nearest patrolled port by trip time, and engages the Fast plan ({ship.Phase}); the chase goes on");
-                dv0 = e.Pirate.DvUsed;
+                // the plan's first frames only turn the ship (throttle 0): take the helm at full throttle, so the drive fires
+                ship.Plan = Plan.None; ship.ThrottleCmd = 1;
+                dv0 = e.Pirate.DvUsed; shipDv0 = ship.DvUsed;
             });
-            // the Fast plan flying: the substep loop integrates, and the pirate must fly those spans too
+            // the drive firing: the substep loop integrates, and the pirate must fly those spans too
             for (int i = 0; ok && i < 3; i++) yield return null;
             if (ok) ok = Guard("scene lockstep under thrust", () =>
             {
                 var p = e.Proxy;
                 double lag = (e.Chase.SpanEnd - jd) * 86400, dp = (sys.Pos(p, jd) - e.Pirate.Pos).Mag, dv = (sys.Vel(p, jd) - e.Pirate.Vel).Mag;
-                Check(!R<bool>("Coasting") && ship.PlanActive && lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel && e.Pirate.DvUsed > dv0,
-                    $"pirates: with the Fast plan flying ({ship.Phase}, not coasting) the pirate flies the integrated spans: its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s off it, Δv {dv0:F3} → {e.Pirate.DvUsed:F3} km/s");
+                // the pirate's own Δv is not asked for: its guidance may burn nothing in three frames, and that is not the lockstep
+                Check(!R<bool>("Coasting") && ship.Throttle > 0 && ship.DvUsed > shipDv0 && lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel,
+                    $"pirates: under thrust by hand ({ship.Phase}, throttle {ship.Throttle:F2}, the ship's Δv +{(ship.DvUsed - shipDv0) * 1000:G4} m/s) the pirate flies the integrated spans: " +
+                    $"its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s off it (pirate '{e.Pirate.Phase}', its Δv +{(e.Pirate.DvUsed - dv0) * 1000:G4} m/s)");
                 ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
                 s.SaveGame();
                 s.LoadGame();

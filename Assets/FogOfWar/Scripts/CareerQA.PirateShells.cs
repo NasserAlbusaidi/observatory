@@ -11,11 +11,12 @@ namespace FogOfWar
     // 14b. The raider in both shells (OpenSystemScene.RaiderHud.cs): a raider call made in the scene 1,000,000 km out from
     // Vesta. The card's three answers and its live line, read again a frame after the raider moves; the pill; the hostile
     // target kind; the planet lists, the codex count, the flight log, and the red dot with its tag (no tag while the raider
-    // is the target); Give up, Run and Divert clicked on the card; the Jobs page with the card up and after Run; T and the
-    // target card's arrows reaching the raider; the classic panel's Divert, Give up and Run, taken through the hook that
-    // stands in for its button (classicClick), not by a mouse; a card shown in the UI Toolkit HUD that is shown again after
-    // the classic panel goes on and off; and a two-answer call that hides the third button. -fowlegacyui draws the same
-    // classic panel, but no run here starts in it. A throw is a failed check.
+    // is the target); Give up, Run and Divert as a ClickEvent sent straight to the card's buttons (their click handlers;
+    // no pointer picking); the Jobs page with the card up and after Run; T and the target card's arrows reaching the
+    // raider; the classic panel's Divert, Give up and Run, taken through the hook that stands in for its button
+    // (classicClick), not by a mouse; a card shown in the UI Toolkit HUD that is shown again after the classic panel goes on
+    // and off; and a two-answer call that hides the third button. Under -fowlegacyui there is no UI Toolkit shell, so only
+    // the panel's part runs (PirateLegacyChecks). A throw is a failed check.
     public partial class CareerQA
     {
         T R<T>(string method, params object[] a)
@@ -28,15 +29,30 @@ namespace FogOfWar
 
         int ClassicIndex(Career.RouteAnswer what) => Array.FindIndex(R<(Career.RouteAnswer What, string Label)[]>("ChaseAnswers"), a => a.What == what);
 
+        // A call of that kind in the scene for the steps after it, or a failed check: a precondition that fails must not
+        // just skip the checks it gates
+        bool SceneCall(Career.RouteKind kind, Contract job, string what)
+        {
+            bool made = career.MakeCall(kind, job, sys, ship, jd) && career.Call?.Kind == kind && (kind != Career.RouteKind.Pirate || career.Encounter != null && career.Call.Answers?.Length == 3);
+            if (!made) Check(false, $"shells: {what}: no {kind} call ({career.Call?.Title ?? "none"}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"})");
+            return made;
+        }
+
         IEnumerator PirateShellChecks()
         {
+            if (!app.ShellActive)
+            {
+                log.WriteLine("  SKIP shells: no UI Toolkit shell (-fowlegacyui): the toolkit card, pill, target card, Jobs page and HUD rebuild; the panel's part runs alone");
+                yield return PirateLegacyChecks();
+                yield break;
+            }
             bool classicWas = GameSettings.ClassicPanel, labelsWas = GameSettings.ShowLabels;
             Contract job = null;
             Encounter e = null;
             Career.RouteCall call = null;
             int codex0 = 0;
             double pay = 0;
-            bool clicked = false;
+            bool clicked = false, called = false;
             bool go = Guard("shells setup", () =>
             {
                 // the UI Toolkit HUD is built only with the classic panel off, and the dot is drawn only with labels on
@@ -118,13 +134,13 @@ namespace FogOfWar
                 string rep = s.TestCallCardReport(), pill = s.TestRaiderPill();
                 Check(clicked && career.Encounter == null && career.Call == null && job.Pay == pay * (1 - Career.GiveUpShare) && rep.StartsWith("card None") && pill == "-"
                       && ship.Target == null && !sys.Bodies.Contains(e.Proxy),
-                    $"shells: Give up clicked on the card: pay {pay:N0} → {job.Pay:N0} cr, the card and the pill gone, the raider target released ({rep})");
+                    $"shells: Give up through the card's button: pay {pay:N0} → {job.Pay:N0} cr, the card and the pill gone, the raider target released ({rep})");
 
                 // a second call: the Jobs page, which covers the card, shows the chase and the card's own answers
                 e = null; call = null;
-                bool made = career.MakeCall(Career.RouteKind.Pirate, job, sys, ship, jd);
+                called = SceneCall(Career.RouteKind.Pirate, job, "a second raider call, for the Jobs page");
                 e = career.Encounter; call = career.Call;
-                if (!made || e == null || call == null) { Check(false, "shells: a second raider call in the scene"); return; }
+                if (!called) return;
                 var box = new VisualElement();
                 Call("BuildJobs", box);
                 var labels = box.Query<Label>(className: "btn").ToList().ConvertAll(l => l.text);
@@ -135,7 +151,7 @@ namespace FogOfWar
                 job.Pay += 1;
                 Check(warned && Array.TrueForAll(call.Answers, a => labels.Contains(a.Label)) && sig0 != sig1,
                     $"shells: with the call card up, the Jobs page's card for the job warns of the chase and offers {string.Join(" / ", Array.ConvertAll(call.Answers, a => a.Label))}; a change of pay rebuilds the page");
-            }) && e != null && call != null;
+            }) && called;
             for (int i = 0; go && i < 2; i++) yield return null;
             if (go) go = Guard("shells run", () => clicked = s.TestClickCallButton(Array.FindIndex(call.Answers, a => a.What == Career.RouteAnswer.Run)));
             for (int i = 0; go && i < 2; i++) yield return null;
@@ -143,7 +159,7 @@ namespace FogOfWar
             {
                 string rep = s.TestCallCardReport(), pill = s.TestRaiderPill();
                 Check(clicked && career.Call == null && career.Encounter == e && rep.StartsWith("card None") && pill.StartsWith(e.Proxy.Name.ToUpperInvariant()),
-                    $"shells: Run clicked on the card closes it; the pill stays: {pill}");
+                    $"shells: Run through the card's button closes it; the pill stays: {pill}");
                 // the Jobs page's card for the job, built into a box of its own as the page builds it
                 var box = new VisualElement();
                 Call("BuildJobs", box);
@@ -193,9 +209,9 @@ namespace FogOfWar
                 Check(career.Encounter == null && job.Pay == pay * (1 - Career.GiveUpShare) && drawn == "" && Get<int>("classicClick") == -1,
                     $"shells: Give up from the classic panel: pay {pay:N0} → {job.Pay:N0} cr, the block gone (\"{drawn}\")");
                 e = null; call = null;
-                career.MakeCall(Career.RouteKind.Pirate, job, sys, ship, jd);
+                called = SceneCall(Career.RouteKind.Pirate, job, "a third raider call, for the classic panel");
                 e = career.Encounter; call = career.Call;
-            }) && e != null && call != null;
+            }) && called;
             for (int i = 0; go && i < 2; i++) yield return null;
             if (go) yield return Shot("c14b-classic-call");
             if (go) go = Guard("shells classic call", () =>
@@ -221,9 +237,9 @@ namespace FogOfWar
             if (go) go = Guard("shells toolkit call", () =>
             {
                 e = null; call = null;
-                career.MakeCall(Career.RouteKind.Pirate, job, sys, ship, jd);
+                called = SceneCall(Career.RouteKind.Pirate, job, "a fourth raider call, for the UI Toolkit card");
                 e = career.Encounter; call = career.Call;
-            }) && e != null && call != null;
+            }) && called;
             for (int i = 0; go && i < 2; i++) yield return null;
             if (go) go = Guard("shells toolkit shown", () =>
             {
@@ -249,13 +265,13 @@ namespace FogOfWar
             {
                 var port = call.DivertTo;
                 Check(clicked && career.Call == null && career.Encounter == e && port != null && ship.Target == sys[port.Body] && ship.PlanActive && ship.Plan == Plan.Brachistochrone,
-                    $"shells: Divert clicked on the card flies to {port?.Name ?? "-"} on the Fast plan ({ship.Phase}); the chase goes on");
+                    $"shells: Divert through the card's button flies to {port?.Name ?? "-"} on the Fast plan ({ship.Phase}); the chase goes on");
                 career.DropContact();
                 ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
                 // a call with two answers: the third button hides
-                career.MakeCall(Career.RouteKind.CargoTrouble, job, sys, ship, jd);
+                called = SceneCall(Career.RouteKind.CargoTrouble, job, "cargo trouble, a call with two answers");
                 call = career.Call;
-            }) && call?.Kind == Career.RouteKind.CargoTrouble;
+            }) && called;
             for (int i = 0; go && i < 2; i++) yield return null;
             if (go) go = Guard("shells two answers", () =>
             {
@@ -278,6 +294,69 @@ namespace FogOfWar
                 Put("classicClick", -1);
                 if (GameSettings.ClassicPanel != classicWas) GameSettings.ClassicPanel = classicWas;
                 if (GameSettings.ShowLabels != labelsWas) GameSettings.ShowLabels = labelsWas;
+            });
+        }
+
+        // -fowlegacyui: the IMGUI panel is the only shell. It draws a raider call with its three answers and the live line;
+        // Run through its hook closes the call and leaves the chase's answers; Give up through it ends the chase.
+        IEnumerator PirateLegacyChecks()
+        {
+            Contract job = null;
+            Encounter e = null;
+            Career.RouteCall call = null;
+            double pay = 0;
+            bool called = false;
+            bool go = Guard("legacy setup", () =>
+            {
+                career.DropContact();
+                Put("warpIdx", 0);
+                var vesta = sys["Vesta"];
+                D3 pV = sys.Pos(vesta, jd);
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0; ship.Landed = null; ship.Hold = Hold.Off;
+                ship.Pos = pV + pV.Norm * 1e6; ship.Vel = sys.Vel(vesta, jd);
+                Call("SetTarget", vesta);
+                job = new Contract { Id = 900304, Kind = JobKind.Cargo, Title = "QA ice", From = "Ceres", To = "Vesta", Tonnes = 20, Pay = 20000, Days = 100, IssuedJd = jd, DeadlineJd = jd + 100, Key = "qa/pirate-legacy" };
+                career.Active.Add(job);
+            });
+            for (int i = 0; go && i < 3; i++) yield return null;
+            if (go) go = Guard("legacy call", () =>
+            {
+                called = SceneCall(Career.RouteKind.Pirate, job, "a raider call under -fowlegacyui");
+                e = career.Encounter; call = career.Call;
+            }) && called;
+            for (int i = 0; go && i < 3; i++) yield return null;
+            if (go) yield return Shot("c14b-legacy-call");
+            if (go) go = Guard("legacy drawn", () =>
+            {
+                string drawn = Get<string>("classicDrawn"), want = string.Join(" / ", Array.ConvertAll(call.Answers, a => a.Label));
+                Check(drawn.StartsWith($"{want} | {e.Proxy.Name} "), $"shells: -fowlegacyui's panel draws the raider call's three answers and the live line: {drawn}");
+                Put("classicClick", Array.FindIndex(call.Answers, a => a.What == Career.RouteAnswer.Run));
+            });
+            for (int i = 0; go && i < 3; i++) yield return null;
+            if (go) go = Guard("legacy run", () =>
+            {
+                var chase = R<(Career.RouteAnswer What, string Label)[]>("ChaseAnswers");
+                string drawn = Get<string>("classicDrawn");
+                Check(career.Call == null && career.Encounter == e && Get<int>("classicClick") == -1 && drawn.StartsWith(string.Join(" / ", Array.ConvertAll(chase, a => a.Label)) + " | "),
+                    $"shells: Run from -fowlegacyui's panel closes the call and the chase goes on: {drawn}");
+                pay = job.Pay;
+                Put("classicClick", ClassicIndex(Career.RouteAnswer.GiveUp));
+            });
+            for (int i = 0; go && i < 3; i++) yield return null;
+            if (go) Guard("legacy give up", () =>
+            {
+                string drawn = Get<string>("classicDrawn");
+                Check(career.Encounter == null && job.Pay == pay * (1 - Career.GiveUpShare) && drawn == "" && Get<int>("classicClick") == -1,
+                    $"shells: Give up from -fowlegacyui's panel: pay {pay:N0} → {job.Pay:N0} cr, the block gone (\"{drawn}\")");
+            });
+            Guard("legacy cleanup", () =>
+            {
+                career.DropContact();
+                if (career.Call != null) career.Answer(false, jd);
+                career.Active.RemoveAll(c => c.Key == "qa/pirate-legacy");
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
+                Put("warpIdx", 0);
+                Put("classicClick", -1);
             });
         }
 

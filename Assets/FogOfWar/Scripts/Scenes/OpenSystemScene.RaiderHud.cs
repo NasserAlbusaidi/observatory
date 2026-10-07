@@ -140,7 +140,8 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- review checks
 
-        // a click on the call card's button i, as the pointer sends it; false if that button is hidden
+        // a ClickEvent sent straight to the call card's button i, so its click handler runs; no pointer picking, so a layer
+        // over the card would not stop it. False if that button is hidden
         public bool TestClickCallButton(int i)
         {
             var b = callBtns[i];
