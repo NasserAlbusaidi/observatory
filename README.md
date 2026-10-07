@@ -8,7 +8,17 @@
   <img alt="Scale: 1:1" src="https://img.shields.io/badge/SCALE-1%3A1-FFB547?style=for-the-badge&labelColor=0b0d14">
   <img alt="Status: in development" src="https://img.shields.io/badge/STATUS-IN%20DEVELOPMENT-FFB547?style=for-the-badge&labelColor=0b0d14">
   <img alt="Code licence: GPL-3.0" src="https://img.shields.io/badge/CODE-GPL--3.0-FFB547?style=for-the-badge&labelColor=0b0d14">
+  <img alt="Built with AI" src="https://img.shields.io/badge/BUILT%20WITH-AI-FF5C5C?style=for-the-badge&labelColor=0b0d14">
 </p>
+
+## ⚠️ BUILT WITH AI, NOT BY HAND
+
+> [!WARNING]
+> **I did not write this by hand.** I made this project with heavy use of AI coding assistants, including Claude Code and OpenAI Codex. Read the code and the docs with that in mind.
+>
+> This is a hobby project. I built it to play with physics, learn more of it, and satisfy the curiosity *The Expanse* books gave me. It's not for sale and I don't distribute builds. I share the source for anyone with the same interest: clone it, build it, fly it.
+>
+> This project is not affiliated with *The Expanse*, its authors or its publishers.
 
 <p align="center"><i>
 You're an independent torch-ship pilot in a true-scale solar system: today's date, astronomical data, and a whole system to explore.<br>
@@ -188,7 +198,7 @@ Rebind keys in **Esc → Settings → Controls**. 1–9, Esc, F2, F11 and the ph
 
 ## PLAY IT
 
-There's no store build yet. Build it from source in Unity 6: open the project, then **Fog of War → 2. Build Windows game**. The repository is about 1.4 GB, most of it maps and models of the planets, moons and asteroids.
+There's no download and no store build. Build it from source in Unity 6: open the project, then **Fog of War → 2. Build Windows game**. The repository is about 1.4 GB, most of it maps and models of the planets, moons and asteroids.
 
 Full steps, the game rules in numbers, test tools and the project layout are in the **[developer guide](docs/DEVELOPING.md)**.
 
