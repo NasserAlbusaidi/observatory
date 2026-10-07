@@ -83,10 +83,11 @@ namespace FogOfWar
             }
         }
 
-        // a route call (Career.Route.cs): a card with the two answers, in the lesson card's place
+        // a route call (Career.Route.cs): a card with its answers (RouteCall.Answers: two, or a raider's three), in the
+        // lesson card's place
         VisualElement callCard;
-        Label callTitle, callText;
-        Label callYes, callNo;
+        Label callTitle, callText, callLive;
+        readonly Label[] callBtns = new Label[3];
         Career.RouteCall callShown;
 
         void BuildCallCard(VisualElement layer)
@@ -95,10 +96,16 @@ namespace FogOfWar
             Ui.Corners(callCard);
             callTitle = Ui.L(callCard, "", "t-micro", "f-condm", "warn");
             callText = Ui.L(callCard, "", "t-body", "lesson-text");
-            var row = Ui.E(callCard, "row");
+            callLive = Ui.L(callCard, "", "t-label", "f-mono", "warn");
+            callLive.style.marginTop = 6;
+            var row = Ui.E(callCard, "row", "wrap");
             row.style.marginTop = 8;
-            callYes = Ui.B(row, "", () => career?.Answer(true, jd), "small", "primary");
-            callNo = Ui.B(row, "", () => career?.Answer(false, jd), "small");
+            for (int i = 0; i < callBtns.Length; i++)
+            {
+                int k = i;
+                callBtns[i] = Ui.B(row, "", () => AnswerCall(callShown, k), i == 0 ? new[] { "small", "primary" } : new[] { "small" });
+            }
+            callShown = null; // a HUD built again (the classic panel turned off) shows a call that is already on
             Ui.Show(callCard, false);
         }
 
@@ -108,6 +115,10 @@ namespace FogOfWar
             // a lesson on screen keeps its place: the call sits above it
             bool lessonUp = lessonCard != null && lessonCard.parent != null && lessonCard.resolvedStyle.display == DisplayStyle.Flex && !float.IsNaN(lessonCard.layout.y);
             callCard.style.bottom = lessonUp ? new StyleLength(lessonCard.parent.layout.height - lessonCard.layout.y + 10) : new StyleLength(StyleKeyword.Null);
+            // a raider's range, closing speed and boarding clock change every frame; the rest only with the call
+            string live = call?.Kind == Career.RouteKind.Pirate ? RaiderLine() : null;
+            Ui.Show(callLive, live != null);
+            if (live != null) Ui.Text(callLive, live);
             if (call == callShown) return;
             callShown = call;
             Ui.Show(callCard, call != null);
@@ -115,7 +126,13 @@ namespace FogOfWar
             if (call == null) return;
             Ui.Text(callTitle, call.Title.ToUpperInvariant());
             Ui.Text(callText, call.Text);
-            Ui.Text(callYes, call.Yes); Ui.Text(callNo, call.No);
+            // a button shows only with a label: a raider's Divert drops out when no patrolled port is in the system
+            for (int i = 0; i < callBtns.Length; i++)
+            {
+                string label = call.Answers != null && i < call.Answers.Length ? call.Answers[i].Label : null;
+                Ui.Show(callBtns[i], !string.IsNullOrEmpty(label));
+                Ui.Text(callBtns[i], label ?? "");
+            }
         }
 
         // review shots: a route call of the given kind about the first active job, made the way a trip makes one
@@ -199,6 +216,7 @@ namespace FogOfWar
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             for (int i = 1; i < Career.Factions.Length; i++) sb.Append('s').Append(career.Standing((Faction)i));
             foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell));
+            if (career.Encounter != null && career.Call == null) foreach (var a in ChaseAnswers()) sb.Append('r').Append(a.Label);
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
             return sb.ToString();
         }
@@ -305,6 +323,14 @@ namespace FogOfWar
                             "t-label", "f-mono", career.HandArrival(j) ? "ok" : "dim");
                     }
                     Ui.L(card, left >= 0 ? "Due in " + Days(left) : "LATE by " + Days(-left), "t-label", "f-mono", left >= 0 ? "dim" : "warn");
+                    if (career.Encounter?.Job == j && career.Call == null)
+                    {
+                        // Run closed the call card; the chase goes on, and so do its other answers
+                        Ui.L(card, $"{career.Encounter.Proxy.Name} of the {Raiders} gives chase: divert into a patrol's reach, or give up part of the job.", "t-label", "warn").style.marginTop = 4;
+                        var chase = Ui.E(card, "row", "wrap");
+                        chase.style.marginTop = 4;
+                        foreach (var (answer, label) in ChaseAnswers()) { var a = answer; Ui.B(chase, label, () => career.Answer(a, jd), "small"); }
+                    }
                     var row = Ui.E(card, "row");
                     row.style.marginTop = 6;
                     var st = Ui.B(row, "Set target", () => { if (body != null) SetTarget(body); }, "small");

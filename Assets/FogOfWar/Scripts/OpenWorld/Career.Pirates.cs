@@ -68,6 +68,9 @@ namespace FogOfWar.OpenWorld
 
         public static bool IsRaider(Body b) => b != null && b.Name.StartsWith(RaiderPrefix, StringComparison.Ordinal);
         static string Raiders => Factions[(int)Faction.Raiders].Name; // decision 2: the faction table names them (D13)
+        // the answers' labels, on the card and, once Run has closed it, in the scene's job card and classic panel
+        public static string GiveUpLabel => $"Give up {GiveUpShare * 100:0} %";
+        public static string DivertLabel(Port p) => "Divert to " + p.Name;
 
         public Encounter Encounter { get; private set; }
         // the scene's: set the body as the target and engage the Fast plan; false when the plan does not engage (D6)
@@ -144,9 +147,9 @@ namespace FogOfWar.OpenWorld
             var port = NearestPatrol(sys, ship, jd, out double divertS);
             string hull = e.Proxy.Name.Substring(RaiderPrefix.Length), title = job.Title.ToLowerInvariant();
             string takes = job.Kind == JobKind.Cargo ? $"{BoardShare * 100:0} % of the {title} and of its pay" : $"{BoardShare * 100:0} % of the pay for the {title}";
-            string giveUp = $"Give up {GiveUpShare * 100:0} %";
+            string giveUp = GiveUpLabel;
             var answers = new List<(RouteAnswer, string)> { (RouteAnswer.Run, "Run") };
-            if (port != null) answers.Add((RouteAnswer.Divert, "Divert to " + port.Name));
+            if (port != null) answers.Add((RouteAnswer.Divert, DivertLabel(port)));
             answers.Add((RouteAnswer.GiveUp, giveUp));
             Call = new RouteCall
             {

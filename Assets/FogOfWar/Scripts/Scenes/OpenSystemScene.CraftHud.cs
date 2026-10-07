@@ -5,20 +5,23 @@ using UnityEngine.UIElements;
 
 namespace FogOfWar
 {
-    // Ships as targets: intercept runners (Body.Path, under thrust) and rescue derelicts (drive dead) get their own
-    // kind line and a small icon in the target card and the target bracket, instead of reading as planets or moons.
+    // Ships as targets: intercept runners (Body.Path, under thrust), rescue derelicts (drive dead) and a raider giving chase
+    // get their own kind line and a small icon in the target card and the target bracket, instead of reading as planets,
+    // moons or beacons.
     public partial class OpenSystemScene
     {
-        enum TargetKind { Body, Ship, Wreck, Beacon }
+        enum TargetKind { Body, Ship, Wreck, Beacon, Hostile }
 
         static TargetKind KindOf(Body b) =>
             b == null ? TargetKind.Body : Career.IsDerelict(b) ? TargetKind.Wreck
+            : Career.IsRaider(b) ? TargetKind.Hostile // before Beacon: its proxy is a path body with no mass
             : b.Path != null && b.PathAccel != null && b.Name.StartsWith("Runner ") ? TargetKind.Ship
             : b.Path != null && b.GM == 0 ? TargetKind.Beacon : TargetKind.Body;
 
         static readonly Color ShipCol = new Color(0.41f, 0.82f, 1f), WreckCol = new Color(1f, 0.42f, 0.37f);
 
-        // 18 px icon: a ship is an arrowhead, a wreck is a broken (crossed) hull. Hidden for natural bodies.
+        // 18 px icon: a ship is an arrowhead (red for a hostile one), a wreck is a broken (crossed) hull. Hidden for natural
+        // bodies.
         static VisualElement KindIcon(VisualElement parent)
         {
             var box = Ui.E(parent, "kind-icon");
@@ -50,8 +53,12 @@ namespace FogOfWar
 
         static void SetKindIcon(VisualElement box, TargetKind k)
         {
-            Ui.Show(box, k == TargetKind.Ship || k == TargetKind.Wreck);
-            Ui.Show(box.Q(className: "ship"), k == TargetKind.Ship);
+            bool ship = k == TargetKind.Ship || k == TargetKind.Hostile;
+            Ui.Show(box, ship || k == TargetKind.Wreck);
+            var arrow = box.Q(className: "ship");
+            Ui.Show(arrow, ship);
+            var c = k == TargetKind.Hostile ? FactionColours[(int)Faction.Raiders] : ShipCol;
+            arrow.style.borderTopColor = c; arrow.style.borderRightColor = c;
             Ui.Show(box.Q(className: "wreck"), k == TargetKind.Wreck);
         }
 
@@ -125,6 +132,7 @@ namespace FogOfWar
             {
                 case TargetKind.Wreck: return "Derelict ship · drive dead · orbiting " + (b.Parent?.Name ?? "the Sun");
                 case TargetKind.Ship: return "Ship under thrust";
+                case TargetKind.Hostile: return $"Hostile · a {Raiders} ship giving chase";
                 case TargetKind.Beacon: return "Beacon · coasting near " + (b.Parent?.Name ?? "the Sun");
                 default: return null;
             }

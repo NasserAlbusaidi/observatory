@@ -34,7 +34,7 @@ namespace FogOfWar
         readonly StringBuilder recSb = new StringBuilder(512);
         readonly Dictionary<string, float> recWarned = new Dictionary<string, float>();
         // discrete states: the value last written and when, so a flickering state can't flood the file
-        static readonly string[] RecFields = { "hold", "plan", "phase", "warp", "limited", "cam", "target", "velref", "assist", "landed", "ref", "thr", "drive", "rot", "rcs", "dry", "menu" };
+        static readonly string[] RecFields = { "hold", "plan", "phase", "warp", "limited", "cam", "target", "velref", "assist", "landed", "ref", "thr", "drive", "rot", "rcs", "dry", "menu", "raider" };
         readonly string[] recNow = new string[RecFields.Length], recLogged = new string[RecFields.Length];
         readonly float[] recLoggedAt = new float[RecFields.Length];
 
@@ -55,7 +55,7 @@ namespace FogOfWar
                 rec.WriteLine($"# Fog of War flight log, {DateTime.Now:yyyy-MM-dd HH:mm:ss}, game {Application.version}, Unity {Application.unityVersion}, {Screen.width}x{Screen.height}");
                 rec.WriteLine("# args: " + string.Join(" ", Environment.GetCommandLineArgs()));
                 rec.WriteLine("# S: state each second. EVT: a state changed (keys = actions fired that frame). WARN: a sanity rule. ERR: Unity error. MARK: bookmark, then the last 10 s at 10 Hz (R).");
-                rec.WriteLine("# units: km, km/s, deg/s. closing > 0: approaching the target. nose_tgt / nose_vel: cosine of the angle from the nose to the target / to the velocity vs ref. g_drive: local gravity over the drive's limit.");
+                rec.WriteLine("# units: km, km/s, deg/s. closing > 0: approaching the target. raider_closing > 0: a raider approaching; boarding: its clock's part of the boarding time. nose_tgt / nose_vel: cosine of the angle from the nose to the target / to the velocity vs ref. g_drive: local gravity over the drive's limit.");
                 Application.logMessageReceived += RecOnLog;
                 Application.quitting += () => { RecLine("EVT", "game quit"); rec?.Dispose(); rec = null; recFailed = true; };
             }
@@ -135,6 +135,8 @@ namespace FogOfWar
               .Append(" rot=").Append(V(ship.RotInput)).Append(" rcs=").Append(V(ship.RcsInput)).Append(" angvel=").Append(V(ship.AngVel * Mathf.Rad2Deg))
               .Append(" assist=").Append(ship.FlightAssist ? 1 : 0).Append(" cam=").Append(RecCam)
               .Append(" fuel=").Append(ship.UnlimitedFuel ? "unmetered" : F(ship.Fuel, "0.#"));
+            if (RaiderStatus(out double raiderKm, out double raiderClosing, out double boarding))
+                sb.Append(" raider_km=").Append(F(raiderKm, "0.#")).Append(" raider_closing=").Append(F(raiderClosing, "0.####")).Append(" boarding=").Append(F(boarding, "0.###"));
             return sb.ToString();
         }
 
@@ -163,6 +165,7 @@ namespace FogOfWar
             recNow[n++] = ship.RcsInput.sqrMagnitude > 0 ? V(ship.RcsInput) : "0";
             recNow[n++] = ship.Dry ? "1" : "0";
             recNow[n++] = App.MenuOpen || App.HelpOpen ? "1" : "0";
+            recNow[n++] = RecRaider();
             string changes = null;
             for (int i = 0; i < RecFields.Length; i++)
             {

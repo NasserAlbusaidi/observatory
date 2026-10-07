@@ -245,7 +245,8 @@ namespace FogOfWar
             // a finished job's ship is gone from the system: stop flying toward it
             if (ship.Target != null && Career.IsCraft(ship.Target) && !sys.Bodies.Contains(ship.Target))
             {
-                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Target = null; ship.Phase = "job done: target released";
+                ship.Phase = Career.IsRaider(ship.Target) ? "raider gone: target released" : "job done: target released";
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Target = null;
             }
             if (ship.Dry && ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "out of reaction mass"; }
             TickSound(achievedDt: simDt);
@@ -266,6 +267,7 @@ namespace FogOfWar
 
         void CareerPanel(PanelUI ui)
         {
+            if (!career.Sandbox) CallPanel(ui); // first: a call waits for an answer (OpenSystemScene.RaiderHud.cs)
             ui.Section("Ship's business");
             bool on = ui.Toggle("Sound (in the cockpit view: the ship as heard through its hull)", !muted);
             if (on == muted) muted = !on;

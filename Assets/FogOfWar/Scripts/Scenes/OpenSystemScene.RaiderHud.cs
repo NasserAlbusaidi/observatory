@@ -1,0 +1,149 @@
+using System;
+using FogOfWar.OpenWorld;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace FogOfWar
+{
+    // A raider's chase on screen (Career.Pirates.cs, docs/design-world.md W4): the live figures for the call card, the HUD
+    // pill and the classic panel; a red dot and tag in the view, as traffic has; and the answers in the classic and
+    // -fowlegacyui panel, and on the job's card once Run has closed the call card.
+    public partial class OpenSystemScene
+    {
+        static string Raiders => Career.Factions[(int)Faction.Raiders].Name; // decision 2: never a literal name (D13)
+
+        // The raider seen from the ship now (it flies each span with the player, so its state is the scene's date):
+        // range in km, closing speed in km/s (positive: coming nearer, as the target card reads it), and the boarding
+        // clock as a part of Threat.BoardingSeconds. False with no chase.
+        bool RaiderStatus(out double range, out double closing, out double boarding)
+        {
+            var e = career?.Encounter;
+            range = closing = boarding = 0;
+            if (e == null) return false;
+            var r = e.Pirate.Pos - ship.Pos;
+            range = r.Mag;
+            closing = range > 1e-9 ? D3.Dot(ship.Vel - e.Pirate.Vel, r / range) : 0;
+            boarding = Math.Min(1, e.Dwell / Threat.BoardingSeconds);
+            return true;
+        }
+
+        // the live line: the card, the pill (in capitals) and the classic panel; null with no chase
+        string RaiderLine()
+        {
+            if (!RaiderStatus(out double range, out double closing, out double boarding)) return null;
+            return $"{career.Encounter.Proxy.Name} {Km(range)} · " + (closing >= 0 ? "closing " + SpeedText(closing) : "opening " + SpeedText(-closing)) +
+                   $" · boarding {Math.Floor(boarding * 100):0} %";
+        }
+
+        // An answer from a card on screen, the call read when it is clicked: a call that changed under the pointer is not
+        // answered with another call's choice
+        void AnswerCall(Career.RouteCall call, int i)
+        {
+            if (career == null || call == null || call != career.Call || call.Answers == null || i < 0 || i >= call.Answers.Length) return;
+            career.Answer(call.Answers[i].What, jd);
+        }
+
+        // Once Run has closed the card the chase goes on, and Divert and Give up stay on offer: Divert to the patrolled port
+        // the ship reaches soonest now, as Career.Answer picks it with no card
+        (Career.RouteAnswer What, string Label)[] ChaseAnswers()
+        {
+            var port = Career.NearestPatrol(sys, ship, jd, out _);
+            return port != null
+                ? new[] { (Career.RouteAnswer.Divert, Career.DivertLabel(port)), (Career.RouteAnswer.GiveUp, Career.GiveUpLabel) }
+                : new[] { (Career.RouteAnswer.GiveUp, Career.GiveUpLabel) };
+        }
+
+        // ---------------------------------------------------------------- classic and -fowlegacyui panel
+
+        int classicClick = -1;    // review checks: answer i as its button would, at the next repaint
+        string classicDrawn = ""; // review checks: the answers and the live line the panel drew last
+
+        // At the top of the career panel: a call with its answers, every kind; with no card, a chase's line and the answers
+        // it still has
+        void CallPanel(PanelUI ui)
+        {
+            var call = career.Call;
+            string live = RaiderLine();
+            if (call == null && live == null) { classicDrawn = ""; return; }
+            ui.Section(call?.Title ?? Raiders + " in pursuit");
+            if (call != null) GUILayout.Label(call.Text, ui.note);
+            if (live != null) GUILayout.Label(live, ui.label);
+            (Career.RouteAnswer What, string Label)[] answers = call != null ? call.Answers ?? Array.Empty<(Career.RouteAnswer, string)>() : ChaseAnswers();
+            var labels = Array.ConvertAll(answers, a => a.Label);
+            int hit = ui.Buttons(labels);
+            // a repaint comes after the layout, so a change here does not unbalance this event's controls
+            if (classicClick >= 0 && Event.current.type == EventType.Repaint) { hit = classicClick; classicClick = -1; }
+            classicDrawn = string.Join(" / ", labels) + (live != null ? " | " + live : "");
+            if (hit < 0 || hit >= answers.Length) return;
+            if (call != null) AnswerCall(call, hit);
+            else career.Answer(answers[hit].What, jd);
+        }
+
+        // ---------------------------------------------------------------- the view and the map
+
+        string raiderShown = "none"; // review checks: what DrawRaider did last
+        GUIStyle raiderStyle;
+
+        // After DrawTraffic, the same way, in the Raiders' colour and a little larger. The tag is a button that targets it:
+        // the proxy is in none of the scene's target lists.
+        void DrawRaider()
+        {
+            var e = career?.Encounter;
+            if (e == null) { raiderShown = "none"; return; }
+            float ui = App.UiScale;
+            var w = sys.Pos(e.Proxy, jd);
+            var p = Map(w, out _);
+            float dist = p.magnitude;
+            var sp = Cam.WorldToScreenPoint(p);
+            if (dist < 1e-6f || sp.z <= 0 || !CockpitShows(sp)) { raiderShown = "out of view"; return; }
+            var g = new Vector2(sp.x / ui, (UnityEngine.Screen.height - sp.y) / ui);
+            if (App.UnderPanel(g)) { raiderShown = "under a panel"; return; }
+            foreach (var (c, cr, cd) in occluders) if (cd < dist * 0.999f && (c - g).magnitude < cr) { raiderShown = "behind a body"; return; }
+            var col = FactionColours[(int)Faction.Raiders];
+            if (raiderStyle == null) raiderStyle = new GUIStyle(labelStyle) { normal = { textColor = col } };
+            string tag = $"{e.Proxy.Name} · {Raiders} · {Km((w - ship.Pos).Mag)}";
+            GUI.color = col;
+            GUI.DrawTexture(new Rect(g.x - 2.5f, g.y - 2.5f, 5, 5), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            if (GUI.Button(new Rect(g.x + 6, g.y - 8, 260, 16), tag, raiderStyle)) SetTarget(e.Proxy);
+            raiderShown = "on: " + tag;
+        }
+
+        // ---------------------------------------------------------------- the flight log
+
+        // the recorder's discrete field: which raider, and how near (the warp cap follows the same line)
+        string RecRaider()
+        {
+            var e = career?.Encounter;
+            if (e == null) return "-";
+            return e.Proxy.Name + (e.Dwell > 0 ? " alongside" : e.Range < Career.CloseKm ? " close" : " chasing");
+        }
+
+        // ---------------------------------------------------------------- review checks
+
+        // a click on the call card's button i, as the pointer sends it; false if that button is hidden
+        public bool TestClickCallButton(int i)
+        {
+            var b = callBtns[i];
+            if (b == null || b.style.display.value != DisplayStyle.Flex) return false;
+            using (var ev = ClickEvent.GetPooled())
+            {
+                ev.target = b;
+                b.SendEvent(ev);
+            }
+            return true;
+        }
+
+        // the call card in one line: shown or not, each button's label (- when hidden), the live line (- when hidden)
+        public string TestCallCardReport()
+        {
+            if (callCard == null) return "no card";
+            string Btn(Label b) => b.style.display.value == DisplayStyle.Flex ? b.text : "-";
+            return $"card {callCard.style.display.value} | {Btn(callBtns[0])} / {Btn(callBtns[1])} / {Btn(callBtns[2])} | live " +
+                   (callLive.style.display.value == DisplayStyle.Flex ? callLive.text : "-");
+        }
+
+        // the raider's pill: its text, or - when hidden
+        public string TestRaiderPill() => pRaider == null ? "no pill" : pRaider.style.display.value == DisplayStyle.Flex ? pRaider.text : "-";
+    }
+}
