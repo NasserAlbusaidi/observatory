@@ -145,6 +145,21 @@ namespace FogOfWar
             yield return new WaitForSecondsRealtime(1.5f);
             s = (OpenSystemScene)app.Current;
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
+            var keyPolicy = typeof(OpenSystemScene).GetMethod("SaveKeyFor", BindingFlags.Static | BindingFlags.NonPublic);
+            string Key(string[] args, string path) => (string)keyPolicy.Invoke(null, new object[] { args, path });
+            Check(SaveKey != "fow-save-v1" && SaveKey != "fow-career-v1", "unattended career never uses the player's save key");
+            var suiteKeys = new System.Collections.Generic.HashSet<string>();
+            foreach (string flag in new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" })
+            {
+                string key = Key(new[] { flag }, Application.dataPath);
+                Check(key.StartsWith("fow-save-qa-", StringComparison.Ordinal) && suiteKeys.Add(key)
+                    && key == Key(new[] { flag }, Application.dataPath)
+                    && key != Key(new[] { flag }, Application.dataPath + "-other"),
+                    flag + " reuses a bounded isolated save key per build and suite");
+            }
+            Check(Key(Array.Empty<string>(), Application.dataPath) == "fow-save-v1"
+                && Key(new[] { "-fowcareer", "-fowsavekey", "fow-save-job3" }, Application.dataPath) == "fow-save-job3",
+                "normal play keeps its key and an explicit save key wins");
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
             Check(!ship.UnlimitedFuel && Math.Abs(ship.Fuel - 200) < 1e-6, "tank full, reaction mass is limited");
