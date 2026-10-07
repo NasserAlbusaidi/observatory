@@ -254,6 +254,19 @@ namespace FogOfWar
                             log.WriteLine($"    06t-route-call: {callRep}");
                             if (!callRep.Contains("card Flex opacity 1.00") || !callRep.Contains("on screen True") || callRep.Contains("above the lesson False")) { errors++; log.WriteLine("    ERROR 06t-route-call: expected the call card on screen"); }
                             os.TestRouteCallClear();
+                            // a raider's call: three answers and the live line, in the belt where raiders work
+                            os.TestRaiderPlace(true);
+                            yield return Wait(0.2f); // an update undocks the career before the call
+                            bool raided = os.TestRouteCall(OpenWorld.Career.RouteKind.Pirate);
+                            yield return Wait(0.4f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06t-raider-call");
+                            string raidRep = os.TestRouteCallReport(), raidCard = os.TestCallCardReport();
+                            log.WriteLine($"    06t-raider-call: {raidRep}");
+                            log.WriteLine($"    06t-raider-call: {raidCard}");
+                            if (!raided) { errors++; log.WriteLine("    ERROR 06t-raider-call: expected a raider call"); }
+                            if (!raidRep.Contains("card Flex opacity 1.00") || !raidRep.Contains("on screen True") || raidRep.Contains("above the lesson False")) { errors++; log.WriteLine("    ERROR 06t-raider-call: expected the call card on screen"); }
+                            if (!raidCard.StartsWith("card Flex | Run / Divert to ") || raidCard.Contains(" / - |") || raidCard.EndsWith("| live -")) { errors++; log.WriteLine("    ERROR 06t-raider-call: expected three answers and the live line"); }
+                            os.TestRaiderPlace(false);
                             os.TestPaydayUndo(12345, wasSandbox);
                             ship.VelRef = null;
                             typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);

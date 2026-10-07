@@ -165,5 +165,26 @@ namespace FogOfWar
 
         // the raider's pill: its text, or - when hidden
         public string TestRaiderPill() => pRaider == null ? "no pill" : pRaider.style.display.value == DisplayStyle.Flex ? pRaider.text : "-";
+
+        // review shots: on puts the ship 1,000,000 km out from Vesta at rest with it, out of every patrol's reach, with a
+        // cargo job first in the list, so TestRouteCall(Pirate) makes a raider call as a trip would; off ends the chase,
+        // takes the job out and puts the ship back
+        (D3 Pos, D3 Vel, Body Target) raiderShotWas;
+        public void TestRaiderPlace(bool on)
+        {
+            if (!on)
+            {
+                career.DropContact();
+                career.Active.RemoveAll(c => c.Key == "qa/raider-shot");
+                (ship.Pos, ship.Vel, ship.Target) = raiderShotWas;
+                return;
+            }
+            raiderShotWas = (ship.Pos, ship.Vel, ship.Target);
+            var vesta = sys["Vesta"];
+            var pV = sys.Pos(vesta, jd);
+            ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
+            ship.Pos = pV + pV.Norm * 1e6; ship.Vel = sys.Vel(vesta, jd);
+            career.Active.Insert(0, new Contract { Id = 900005, Kind = JobKind.Cargo, Title = "Water reclamation parts", From = "Ceres", To = "Vesta", Tonnes = 40, Pay = 24000, IssuedJd = jd, DeadlineJd = jd + 30, Days = 30, Key = "qa/raider-shot" });
+        }
     }
 }
