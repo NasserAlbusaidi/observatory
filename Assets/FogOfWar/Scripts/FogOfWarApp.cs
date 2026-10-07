@@ -300,7 +300,7 @@ namespace FogOfWar
 
         void ObservatoryMenu()
         {
-            GUILayout.Label("Eight physics scenes, each on the real equations.", ui.body);
+            GUILayout.Label("Eight physics models, with their limits explained.", ui.body);
             for (int i = 0; i < GameIndex; i++)
             {
                 if (GUILayout.Button($"{i + 1}. {scenes[i].Title}", ui.choice)) Activate(i);

@@ -17,7 +17,7 @@ namespace FogOfWar
         public override string Eyebrow => "The Expanse, true scale";
         public override string Short => "Fly anywhere from Mercury to Neptune";
         public override string Blurb =>
-            "Every planet and moon is where it really is today, on its real orbit. Your ship has a fusion drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b>, and it flies a brachistochrone, burning toward the target, flipping at the midpoint and braking the rest of the way, then parks in orbit.\n\n" +
+            "Explore today's solar system using fitted and mean-element orbits based on JPL data. Your ship has a fictional torch drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b> for a feedback-guided transfer. It accelerates, turns to brake, then aims to park in orbit; the ideal flip-and-burn estimate is a planning guide.\n\n" +
             "Crank time compression to cross the system. At 1 g, Mars is a few days away; Neptune is a few weeks.";
         public override string Note => "Positions mix JPL fits and mean elements; fitted coverage and fallback vary by body. The drive regulates acceleration with assumed thrust reserve; cargo raises fuel cost. Translational RCS shares its fictional exhaust efficiency. Electric reaction wheels use no reaction mass; saturation, power and waste-heat limits are omitted. High-g endurance is fictionalized. Through 100×, burns and coasts share multi-body gravity and J2; at 1k× and above, eligible coasts use a labelled two-body approximation. Atmospheric arrivals are assisted; drag, pressure and entry heating are omitted. F1 lists the controls; Esc → Controls rebinds them.";
 

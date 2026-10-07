@@ -98,7 +98,7 @@ namespace FogOfWar.UI
 
         void BuildObservatory(VisualElement host)
         {
-            var card = Ui.Panel(host, "Observatory", "Eight physics scenes on the real equations", true, "menu-card");
+            var card = Ui.Panel(host, "Observatory", "Eight physics models, with their limits explained", true, "menu-card");
             var sv = Ui.NewScroll();
             card.Add(sv);
             for (int i = 0; i < app.GameIndex; i++)
