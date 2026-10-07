@@ -126,7 +126,7 @@ namespace FogOfWar
 
             sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, Mathf.Max(ship.RcsLevel, attJets), Mathf.Min(rate, 1f), thermal, DustHitRate());
 
-            bool landed = ship.Landed != null && ship.Phase.StartsWith("landed");
+            bool landed = ship.Landed != null && ship.Crashed == null;
             if (landed && !wasLanded) sound.Touchdown(1);
             wasLanded = landed;
             if (career.Docked != wasDocked)
