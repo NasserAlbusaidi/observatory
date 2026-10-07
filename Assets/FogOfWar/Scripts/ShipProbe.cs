@@ -36,6 +36,7 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "ship.txt")) { AutoFlush = true };
+            OpenSystemScene.CheckUnattendedSaveKey(log);
             app = GetComponent<FogOfWarApp>();
             app.InputLocked = true;
             Controls.Locked = true;
