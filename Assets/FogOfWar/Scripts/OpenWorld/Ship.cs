@@ -627,7 +627,8 @@ namespace FogOfWar.OpenWorld
         public SaveData ToSave(double jd, int warp) => new SaveData
         {
             jd = jd, px = Pos.x, py = Pos.y, pz = Pos.z, vx = Vel.x, vy = Vel.y, vz = Vel.z, maxG = MaxG, dv = DvUsed,
-            qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Target?.Name, warp = warp, assist = FlightAssist,
+            // a raider is not saved (D8), so neither is it as the target: the Continue line would name a ship that is gone
+            qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Career.IsRaider(Target) ? null : Target?.Name, warp = warp, assist = FlightAssist,
             plan = (int)(PlanActive ? Plan : Plan.None), hold = (int)Hold, throttle = ThrottleCmd,
             wx = AngVel.x, wy = AngVel.y, wz = AngVel.z, landed = Landed?.Name,
         };

@@ -693,7 +693,7 @@ namespace FogOfWar.OpenWorld
 
         public void FromSave(CareerSave s, Ship ship)
         {
-            contactLost = DropContact() || s.contact; // D8: an encounter is never resumed
+            if (DropContact() || s.contact) contactLost = true; // D8: an encounter is never resumed (LostContact may have said so)
             Credits = s.credits; Earned = s.earned; DriveLevel = Mathf.Clamp(s.drive, 0, DriveG.Length - 1); TankLevel = Mathf.Clamp(s.tank, 0, MaxTankLevel);
             nextId = s.nextId; Done = s.done; Failed = s.failed; Sandbox = s.sandbox; TutorialStep = s.tutorial;
             foreach (var c in Active) RemoveDerelict(c);

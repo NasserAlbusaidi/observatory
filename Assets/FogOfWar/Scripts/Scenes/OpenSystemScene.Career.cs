@@ -595,13 +595,9 @@ namespace FogOfWar
             bool chased = career.DropContact(); // D8: the raider and its proxy body leave the system; the loaded career says so
             foreach (var old in career.Active.ToArray()) career.Abandon(old); // drop this session's derelicts from the system
             career = new Career { Sys = sys, RouteEvents = !Unattended(), Divert = DivertTo };
+            if (chased) career.LostContact(); // on every path below: a save read, no save, or one that will not read
             if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); ResumeTutorial(); return; }
-            try
-            {
-                var cs = JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey));
-                cs.contact |= chased;
-                career.FromSave(cs, ship);
-            }
+            try { career.FromSave(JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey)), ship); }
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the career save: " + e.Message); career.StartNew(jd); ship.Fuel = career.TankCapacity; }
             ResumeTutorial();
         }

@@ -12,6 +12,7 @@ namespace FogOfWar.OpenWorld
         public readonly Contract Job;
         public readonly Pursuit Chase;
         public readonly Body Proxy, Lair;   // Lair: the body it waited at, at rest with it (null for a start placed by hand)
+        public readonly string Hull;         // the raider's own name; the proxy's adds the faction's from the table
         public readonly double CatchSeconds; // the closed-form catch time at the start (Career.CatchSeconds)
         public double Dwell;                 // the boarding clock: seconds alongside, reset on any break
         public double Range, Vrel;           // from the player at the last career update
@@ -21,14 +22,17 @@ namespace FogOfWar.OpenWorld
 
         public Ship Pirate => Chase.Pirate;
 
-        internal Encounter(SolarSystem sys, Contract job, Body lair, string name, double jd, D3 p, D3 v, double g, Ship player, double catchSeconds)
+        // the proxy's type is what marks it (Career.IsRaider), so its name is free to follow the faction table (D13)
+        internal sealed class RaiderBody : Body { }
+
+        internal Encounter(SolarSystem sys, Contract job, Body lair, string hull, string name, double jd, D3 p, D3 v, double g, Ship player, double catchSeconds)
         {
-            Sys = sys; Job = job; Lair = lair; CatchSeconds = catchSeconds;
+            Sys = sys; Job = job; Lair = lair; Hull = hull; CatchSeconds = catchSeconds;
             Chase = new Pursuit(sys, jd, p, v, g, player.Pos, player.Vel);
             pos = p; vel = v; acc = D3.Zero; at = jd;
             // a craft (Path set) so it is never a dock, a Near body, a frame or a codex entry; GM 0 and a 50 m radius keep it
             // out of the gravity sum, the substep rule, the obstacles and the eclipse test
-            Proxy = new Body
+            Proxy = new RaiderBody
             {
                 Name = name, Parent = sys.Sun, GM = 0, Radius = 0.05, Look = Look.Rocky,
                 ColA = new Color(0.75f, 0.3f, 0.26f), ColB = new Color(0.45f, 0.2f, 0.18f), Path = PathAt, PathAccel = _ => acc,
@@ -48,7 +52,15 @@ namespace FogOfWar.OpenWorld
             sys.Pos(sys.Sun, double.NaN); // the proxy keeps its Body: no read of the old path may survive in the date cache
         }
 
-        D3 PathAt(double jd) { double t = (jd - at) * 86400; return pos + vel * t + acc * (0.5 * t * t); }
+        // The span's acceleration holds for PathQuadS either side of its end, past sys.Vel's 30 s difference, and the
+        // path goes on straight from there: the raider's thrust after this frame is not known, and a quadratic read hours
+        // ahead (the map's meet point) would be off by a·t²/2, about 1e6 km at 1 g and 4 h.
+        const double PathQuadS = 60;
+        D3 PathAt(double jd)
+        {
+            double t = (jd - at) * 86400, tq = Math.Max(-PathQuadS, Math.Min(PathQuadS, t));
+            return pos + vel * t + acc * (tq * t - 0.5 * tq * tq);
+        }
     }
 
     // W4: raiders. A route call (RouteKind.Pirate) starts an encounter, kept here and not in the call, so Run can close
@@ -63,10 +75,9 @@ namespace FogOfWar.OpenWorld
         public const double BoardShare = 0.5, GiveUpShare = 0.25; // D5: the part of the job's pay, and of its tonnes for cargo
         public const double ChaseWarp = 1000, CloseWarp = 100, CloseKm = 10000; // D7: the warp cap, and where it tightens
         public const double CatchMinS = 2 * 3600, CatchMaxS = 6 * 3600;        // D11: the catch time a raider's start must give
-        const string RaiderPrefix = "Raider ";
         static readonly string[] RaiderHulls = { "Magpie", "Jackal", "Lamprey", "Skua", "Cutlass", "Remora" };
 
-        public static bool IsRaider(Body b) => b != null && b.Name.StartsWith(RaiderPrefix, StringComparison.Ordinal);
+        public static bool IsRaider(Body b) => b is Encounter.RaiderBody;
         static string Raiders => Factions[(int)Faction.Raiders].Name; // decision 2: the faction table names them (D13)
         // the answers' labels, on the card and, once Run has closed it, in the scene's job card and classic panel
         public static string GiveUpLabel => $"Give up {GiveUpShare * 100:0} %";
@@ -77,8 +88,19 @@ namespace FogOfWar.OpenWorld
         public Func<Body, bool> Divert;
         bool contactLost; // a load dropped an encounter: the note waits for a tick, which knows the date and the ship
 
-        // The time compression the scene must hold to while a raider gives chase (0: none)
-        public double WarpCap => Encounter == null ? 0 : Encounter.Range < CloseKm || Encounter.Dwell > 0 ? CloseWarp : ChaseWarp;
+        // The time compression the scene must hold to while a raider gives chase (0: none). The range is taken now, not at
+        // the last update, so the scene's cap before a frame's sim time is set is that frame's. W4 has no escape end: a
+        // chase the raider cannot win holds the cap until the ship docks, lands, reaches a patrol or gives up.
+        public double WarpCap
+        {
+            get
+            {
+                var e = Encounter;
+                if (e == null) return 0;
+                double range = ship != null ? (e.Pirate.Pos - ship.Pos).Mag : e.Range;
+                return range < CloseKm || e.Dwell > 0 ? CloseWarp : ChaseWarp;
+            }
+        }
 
         // The body a raider waits at for job c: the job's target on the second half of the trip, the posting port on the first.
         Body Lair(Contract c, SolarSystem sys, Ship ship, double jd)
@@ -115,27 +137,30 @@ namespace FogOfWar.OpenWorld
         }
 
         // D11: where a raider waits for the ship: at rest with the lair, on the line from the lair's centre through the ship,
-        // the nearest the lair whose catch time is CatchMinS to CatchMaxS. The candidates step out by 5 % from the dock range
-        // to the ship's distance plus a·CatchMaxS², past which no start fits. False when none does.
+        // the nearest the lair whose catch time is CatchMinS to CatchMaxS, out of every patrol's reach (W3: raiders work
+        // where no patrol gets there in time). No start more than a·CatchMaxS² from the ship fits, so the candidates run
+        // from there (or the dock range) to as far past the ship, in steps of 5 % but never over a·CatchMinS²/8: from
+        // relative rest the window is a ring a·CatchMinS²/4 to a·CatchMaxS²/4 from the ship, about 1e6 km wide at 1 g,
+        // which 5 % steps jump over past 2e7 km from the lair. False when none fits.
         static bool Spawn(Body lair, SolarSystem sys, Ship ship, double jd, out D3 pos, out D3 vel, out double catchS)
         {
             var lp = sys.Pos(lair, jd);
             vel = sys.Vel(lair, jd);
             var off = ship.Pos - lp;
-            double dist = off.Mag, a = PirateG * Ship.G0, end = dist + a * CatchMaxS * CatchMaxS;
+            double dist = off.Mag, a = PirateG * Ship.G0, far = a * CatchMaxS * CatchMaxS, step = a * CatchMinS * CatchMinS / 8;
             var n = dist > 1e-9 ? off / dist : new D3(1, 0, 0);
-            for (double s = DockRange(lair); s < end; s *= 1.05)
+            for (double s = Math.Max(DockRange(lair), dist - far); s < dist + far; s += Math.Min(0.05 * s, step))
             {
                 pos = lp + n * s;
                 catchS = CatchSeconds(pos - ship.Pos, vel - ship.Vel, a);
-                if (catchS >= CatchMinS && catchS <= CatchMaxS) return true;
+                if (catchS >= CatchMinS && catchS <= CatchMaxS && Threat.PatrolAt(sys, pos, jd) == null) return true;
             }
             pos = D3.Zero; catchS = double.NaN;
             return false;
         }
 
         // MakeCall's raider: an encounter and its card. False for a job it does not work, while one is on, for a docked or
-        // landed ship, inside a patrol's reach, or with no start that gives D11's catch time.
+        // landed ship, inside a patrol's reach, or with no start out of reach that gives D11's catch time.
         bool PirateCall(Contract job, SolarSystem sys, Ship ship, double jd)
         {
             if (Encounter != null || Docked != null || ship.Landed != null) return false;
@@ -145,7 +170,7 @@ namespace FogOfWar.OpenWorld
             if (lair == null || !Spawn(lair, sys, ship, jd, out var pos, out var vel, out double catchS)) return false;
             var e = StartContact(job, sys, ship, jd, pos, vel, lair, catchS);
             var port = NearestPatrol(sys, ship, jd, out double divertS);
-            string hull = e.Proxy.Name.Substring(RaiderPrefix.Length), title = job.Title.ToLowerInvariant();
+            string hull = e.Hull, title = job.Title.ToLowerInvariant();
             string takes = job.Kind == JobKind.Cargo ? $"{BoardShare * 100:0} % of the {title} and of its pay" : $"{BoardShare * 100:0} % of the pay for the {title}";
             string giveUp = GiveUpLabel;
             var answers = new List<(RouteAnswer, string)> { (RouteAnswer.Run, "Run") };
@@ -170,7 +195,8 @@ namespace FogOfWar.OpenWorld
         internal Encounter StartContact(Contract job, SolarSystem sys, Ship ship, double jd, D3 pos, D3 vel, Body lair = null, double catchS = double.NaN)
         {
             DropContact();
-            Encounter = new Encounter(sys, job, lair, RaiderPrefix + RaiderHulls[Math.Abs(job.Id) % RaiderHulls.Length], jd, pos, vel, PirateG, ship, catchS);
+            string hull = RaiderHulls[Math.Abs(job.Id) % RaiderHulls.Length];
+            Encounter = new Encounter(sys, job, lair, hull, $"{hull} ({Raiders})", jd, pos, vel, PirateG, ship, catchS);
             sys.Bodies.Add(Encounter.Proxy);
             return Encounter;
         }
@@ -180,7 +206,7 @@ namespace FogOfWar.OpenWorld
         // 30 s a frame), and any break resets the clock.
         void Contacts(SolarSystem sys, Ship ship, double jd, double simDt)
         {
-            // D8: a load dropped a chase (FromSave)
+            // D8: a load dropped a chase (FromSave, LostContact)
             if (contactLost) { contactLost = false; Say(Happening.RaiderGone, $"The {Raiders}' chase was not saved: the raider is gone, back to {HavenNear(sys, ship.Pos, jd)}", false); }
             var e = Encounter;
             if (e == null) return;
@@ -196,7 +222,8 @@ namespace FogOfWar.OpenWorld
             }
             e.Range = (e.Pirate.Pos - ship.Pos).Mag;
             e.Vrel = (e.Pirate.Vel - ship.Vel).Mag;
-            if (e.Range >= InterceptKm || e.Vrel >= InterceptKms) { e.Dwell = 0; return; }
+            bool alongside = e.Range < InterceptKm && e.Vrel < InterceptKms; // as Intercepts has it: a NaN is never alongside
+            if (!alongside) { e.Dwell = 0; return; }
             e.Dwell += Math.Min(simDt, 30);
             if (e.Dwell < Threat.BoardingSeconds) return;
             var (t, pay) = Take(e.Job, BoardShare);
@@ -221,6 +248,8 @@ namespace FogOfWar.OpenWorld
             }
             if (a == RouteAnswer.Divert)
             {
+                // a dry tank: the plan would engage and drop at the next update, so the card stays up
+                if (ship != null && ship.Dry) { Say(Happening.RouteCall, "Can't divert: the tank is dry", false); return; }
                 var port = (card ? Call.DivertTo : null) ?? (ship != null ? NearestPatrol(e.Sys, ship, jd, out _) : null);
                 var b = port != null ? e.Sys[port.Body] : null;
                 if (b == null || Divert == null || !Divert(b)) { Say(Happening.RouteCall, "Can't divert: the nav computer would not engage", false); return; }
@@ -229,7 +258,7 @@ namespace FogOfWar.OpenWorld
                 return;
             }
             if (card) Drop();
-            Say(Happening.RouteCall, $"Running from the {Raiders}, {e.Range:N0} km back: burn hard, or dock first", false);
+            Say(Happening.RouteCall, $"Running from the {Raiders}, {e.Range:N0} km back: burn hard, or dock first. Time runs at {ChaseWarp:N0}× at most until the chase ends", false);
         }
 
         // D6: the patrolled port the ship reaches soonest at full burn from its state now (Ship.TripFrom), and that time.
@@ -269,6 +298,10 @@ namespace FogOfWar.OpenWorld
             lastCallJd = jd;
             Say(what, text, good);
         }
+
+        // D8, for the scene's LoadCareer: the career it replaced had a chase. The next update says it was not saved, whether
+        // a save is read after this or not (no save, or one that will not read: a new career).
+        public void LostContact() => contactLost = true;
 
         // The raider and its proxy body leave the system now, with no note: a load, a new career. True if there was one.
         public bool DropContact()
