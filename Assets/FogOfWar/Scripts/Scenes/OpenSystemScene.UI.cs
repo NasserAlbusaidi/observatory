@@ -332,6 +332,11 @@ namespace FogOfWar
             {
                 TargetRel(out var r, out var vr, out double closing);
                 list.Add(new Readout("Target", ship.Target.Name + (ship.Target.SizeEstimated ? " (size unknown, shown 2 km)" : ""), Tone.Hot));
+                if (!Career.IsCraft(ship.Target))
+                {
+                    list.Add(new Readout("Position model", ship.Target.PositionModel(jd)));
+                    list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
+                }
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
                 list.Add(new Readout("Relative speed", Fmt.Num(vr.Mag, 3) + " km/s"));

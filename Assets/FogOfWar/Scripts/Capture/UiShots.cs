@@ -282,6 +282,37 @@ namespace FogOfWar
                 }
                 os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
+                if (os != null)
+                {
+                    const BindingFlags f = BindingFlags.Instance | BindingFlags.NonPublic;
+                    var system = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", f).GetValue(os);
+                    var craft = (OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", f).GetValue(os);
+                    var career = (OpenWorld.Career)typeof(OpenSystemScene).GetField("career", f).GetValue(os);
+                    var epoch = typeof(OpenSystemScene).GetField("jd", f);
+                    double oldJd = (double)epoch.GetValue(os);
+                    var oldTarget = craft.Target;
+                    var toastLayer = (UnityEngine.UIElements.VisualElement)typeof(UiShell).GetField("toastLayer", f).GetValue(shell);
+                    bool toastsVisible = toastLayer.visible;
+                    toastLayer.visible = false;
+                    var mean = system.Bodies.Find(b => b.ElementsCalibrated && b.Cheb == null) ?? system.Bodies.Find(b => b.Synchronous && b.Cheb == null);
+                    var estimated = system.Bodies.Find(b => b.SizeEstimated);
+                    var targets = new[] { system.Earth, mean, estimated, system.Earth, system["Jupiter"] };
+                    var names = new[] { "fitted", "mean-moon", "estimated", "fallback", "giant" };
+                    for (int q = 0; q < targets.Length; q++)
+                    {
+                        var body = targets[q]; if (body == null) continue;
+                        bool added = career.Codex.Visited.Add(body.Name);
+                        craft.Target = body;
+                        epoch.SetValue(os, q == 3 ? system.Earth.Cheb.JdEnd + 1 : CareerQA.Epoch);
+                        os.ShowCodex(0);
+                        yield return Wait(0.5f);
+                        yield return Shot(app, shell, camRT, uiRT, tag, "06b-provenance-" + names[q]);
+                        log.WriteLine($"    provenance {names[q]}: {body.Name}; {body.PositionModel((double)epoch.GetValue(os))}; radius {body.RadiusSource}; rotation {body.RotationSource}");
+                        if (added) career.Codex.Visited.Remove(body.Name);
+                    }
+                    craft.Target = oldTarget; epoch.SetValue(os, oldJd);
+                    toastLayer.visible = toastsVisible;
+                }
                 os?.ShowCodex(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
                 os?.ShowCodex(0);

@@ -115,7 +115,10 @@ namespace FogOfWar
                     // one that suits the body's size on screen is shown.
                     var holder = new GameObject(b.Name).transform;
                     holder.SetParent(Root, false);
-                    if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0) b.Radius = info.meanRadiusKm;
+                    if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0)
+                    { b.Radius = info.meanRadiusKm; b.RadiusSource = "shape asset volume-equivalent radius"; b.SizeEstimated = false; }
+                    b.ShapeSource = modelPath.StartsWith("Asteroids/", StringComparison.Ordinal) ?
+                        "borrowed procedural asteroid mesh (unmeasured shape)" : "body shape asset: Models/" + modelPath + " (source in Models/Bodies/LODS.json)";
                     v.t = holder; v.model = true;
                     bool lods = Resources.Load<GameObject>($"Models/Bodies/{b.Name}_LOD0") != null;
                     var paths = lods ? new[] { $"Bodies/{b.Name}_LOD0", $"Bodies/{b.Name}_LOD1", $"Bodies/{b.Name}_LOD2" } : new[] { modelPath };

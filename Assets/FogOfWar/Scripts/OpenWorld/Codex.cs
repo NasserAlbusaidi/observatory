@@ -80,7 +80,12 @@ namespace FogOfWar.OpenWorld
         public static List<string> Data(SolarSystem sys, Body b, double jd)
         {
             var l = new List<string>();
+            l.Add("Position: " + b.PositionModel(jd));
+            l.Add(b.PositionSource(jd));
             l.Add($"Mean radius {Fmt.Num(b.Radius, b.Radius < 10 ? 2 : 0)} km" + (b.SizeEstimated ? " (estimated)" : ""));
+            l.Add("Radius source: " + b.RadiusSource);
+            l.Add("Shape: " + b.ShapeSource);
+            l.Add("Rotation: " + b.RotationSource);
             l.Add("Arrival: " + Ship.ArrivalPolicy(b));
             if (b.GM > 1e-6)
             {
