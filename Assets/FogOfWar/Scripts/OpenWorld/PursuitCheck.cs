@@ -115,9 +115,12 @@ namespace FogOfWar.OpenWorld
             "     matches ('matching its burn', or Share with a spare near 0). Burning at the pirate's own g escapes. Closed form: under 0.1 km in 6 h.",
             " G6 (#97) S4r at h=1 and 5 s: lasting catch <=1.2 x closed form, hold >=7200 s, at most 10 climb entries (previously 114 at h=1).",
             " G7 (#97) S1ahead at h=1/60,.05,1,5,30,50 s: minimum separation >= Rs+1 km and hold >=7200 s. Added before the new scenario runs.",
-            " VERDICT pass if G1-G7 all hold, else fail. Exit code 0 on pass, 1 on fail. Gameplay choices #89-92 remain open; braking margin stays .85.",
+            " REVIEW AMENDMENT: this paragraph and G8 are committed before the first run of the amended check. It adds a gate; no old gate is loosened.",
+            " G8 S4 (Pallas, all six h/spans) and S4v (Vesta, h=1 and 5 s): lasting catch <=1.05 x closed form, hold >=7200 s, climb entries <=10.",
+            "     The historical #115 table motivates this regression: a pole approach must not repeatedly trip the last-resort surface guard.",
+            " VERDICT pass if G1-G8 all hold, else fail. Exit code 0 on pass, 1 on fail. Gameplay choices #89-92 remain open; braking margin stays .85.",
             " Report only: S2b-cut and S2b-flip (under 10,000 km the player cuts the drive, or flips and burns at the pirate: the pass and the run-out),",
-            " S4v (Vesta), S3 (S3m-2g, 375,000 km out, tests the 2 g boarding band), S5 (S5-1g also at 1/60 s, S5-2g",
+            " S3 (S3m-2g, 375,000 km out, tests the 2 g boarding band), S5 (S5-1g also at 1/60 s, S5-2g",
             " also at 1/60 and 0.05 s), and S1 on Plan.Brachistochrone (first alongside and hold against the spike's).",
         };
 
@@ -623,7 +626,12 @@ namespace FogOfWar.OpenWorld
             var ahead = Of("S1ahead").ToList();
             bool g7 = ahead.Count == 6 && ahead.All(r => r.Holds && r.MinRange >= r.Rs + 1);
             Echo(t, $"  G7 S1ahead: {Each(ahead,r => $"min range {r.MinRange:F4} >= {r.Rs+1:F2} km; hold {r.Longest:F0} s")}: {(g7 ? "PASS" : "FAIL")}");
-            bool pass = g1 && g2 && g3 && g4 && g5 && g6 && g7;
+            var poleRuns = Of("S4").Concat(Of("S4v")).ToList();
+            bool g8 = poleRuns.Count == 8 && poleRuns.All(r => r.Capture >= 0 && r.Capture <= 1.05 * r.ClosedForm && r.Holds && r.ClimbIn <= 10);
+            foreach (var id in new[] { "S4", "S4v" })
+                Echo(t, $"  G8 {id}: {Each(Of(id), r => $"catch {r.Capture:F0}/{1.05*r.ClosedForm:F0} s; climb entries {r.ClimbIn} <= 10; hold {r.Longest:F0} s")}");
+            Echo(t, $"  G8 {(g8 ? "PASS" : "FAIL")}");
+            bool pass = g1 && g2 && g3 && g4 && g5 && g6 && g7 && g8;
             Echo(t, $"  VERDICT: {(pass ? "pass" : "fail")}");
             return pass ? 0 : 1;
         }
