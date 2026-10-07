@@ -260,6 +260,34 @@ namespace FogOfWar
                         }
                     }
                 }
+                // Surface-speed label at arrival and contact, at every capture resolution.
+                if (os != null)
+                {
+                    var f = BindingFlags.Instance | BindingFlags.NonPublic;
+                    var shipField = typeof(OpenSystemScene).GetField("ship", f);
+                    var refField = typeof(OpenSystemScene).GetField("reference", f);
+                    var player = shipField.GetValue(os); var reference = refField.GetValue(os);
+                    double stop = os.QaStopJd;
+                    try
+                    {
+                        shipField.SetValue(os, new OpenWorld.Ship());
+                        os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", f).GetValue(os);
+                        foreach (bool landed in new[] { false, true })
+                        {
+                            os.TestSurfaceReadout(landed ? 0.001 : 50, landed);
+                            string shot = landed ? "06v-surface-landed" : "06u-surface-arrival";
+                            yield return Shot(app, shell, camRT, uiRT, tag, shot);
+                            var label = (UnityEngine.UIElements.Label)typeof(OpenSystemScene).GetField("spdRef", f).GetValue(os);
+                            var measured = label.MeasureTextSize(label.text, 0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined,
+                                0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined);
+                            bool fits = measured.x <= label.contentRect.width + 1;
+                            log.WriteLine($"    {shot}: {label.text}, text {measured.x:F1} px / {label.contentRect.width:F1} px");
+                            if (!fits || !label.text.Contains("EARTH SURFACE")) { errors++; log.WriteLine($"    ERROR {shot}: surface label missing or clipped"); }
+                        }
+                    }
+                    finally { shipField.SetValue(os, player); refField.SetValue(os, reference); os.QaStopJd = stop; }
+                }
+
                 // the full-screen Jobs and Codex pages
                 os?.TestHandJob(true);
                 os?.TestShipPaid(350000);
