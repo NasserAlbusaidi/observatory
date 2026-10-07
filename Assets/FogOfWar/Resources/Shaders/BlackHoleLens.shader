@@ -25,11 +25,11 @@ Shader "Hidden/FogOfWar/BlackHoleLens"
                 float b, q, EF; float4 s0;
                 photon(-d, 1.0, 1.0, b, q, EF, s0);
                 Ray R = march(b, q, EF, s0, _Spin, 1.0, true);
-                float fate = R.escaped ? 1.0 : R.s.x < _RH + 1e-3 ? 0.0 : 2.0;
+                float fate = R.reason;
                 LensOut o;
                 o.t0 = float4(fate * 8.0 + min(R.count, 4.0), skyDir(R.s, R.ph - _CamBL.z, b, q, _Spin, 1.0));
                 o.t1 = R.x0; o.t2 = R.x1; o.t3 = R.x2;
-                o.t4 = float4(R.rmin, R.rmax, 0, 0);
+                o.t4 = float4(R.rmin, R.rmax, R.steps, R.fallbackSky ? 1.0 : 0.0);
                 return o;
             }
             ENDCG

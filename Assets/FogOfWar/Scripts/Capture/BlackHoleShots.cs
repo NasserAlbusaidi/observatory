@@ -174,12 +174,15 @@ namespace FogOfWar
             };
             // step 2 gate: each view with the lens table (its own name), with the full trace everywhere (-full), the map of
             // pixels that fell back to the full trace (-fallback: red) and the ray fates for the critical curve (-fate)
-            foreach (var g in new[] { "bh-edge-on", "bh-inside-disc", "bh-photon-ring-thin", "bh-kerr-0.998-guides", "bh-thick-edge", "bh-hotspot" })
+            l.Add(S("bh-polar",new Vector3(0.419f,23.996f,0),42,With(s => Set(s,"spin",0.998f))));
+            foreach (var g in new[] { "bh-edge-on", "bh-inside-disc", "bh-photon-ring-thin", "bh-kerr-0.998-guides", "bh-thick-edge", "bh-hotspot", "bh-polar" })
             {
                 var b = l.Find(x => x.name == g);
                 var setup = b.setup;
                 Shot V(string suffix, Action<SimScene> extra) { var v = b; v.name = g + suffix; v.setup = s => { setup(s); extra(s); }; return v; }
                 l.Add(V("-full", s => Set(s, "lensTable", false)));
+                l.Add(V("-reference", s => { Set(s,"lensTable",false); Set(s,"stepKOverride",0.025f); Set(s,"stepsOverride",16000); }));
+                l.Add(V("-reasons", s => Set(s,"debugFate",4f)));
                 l.Add(V("-fallback", s => Set(s, "debugFate", 3f)));
                 // the 2 base sample variant (the step 2 alternative: its image and its refine map)
                 l.Add(V("-q2", s => Set(s, "lensSpp", 2f)));
@@ -430,6 +433,7 @@ namespace FogOfWar
                 tex.SetPixels32(outPx);
                 File.WriteAllBytes(Path.Combine(dir, s.name + ".png"), tex.EncodeToPNG());
                 log.WriteLine($"{s.name}  {((BlackHoleScene)app.Current).DebugSummary()}  lens table {(bhs.LensActive ? "on" : "off")}, {bhs.LensBuilds} builds");
+                if (s.name.EndsWith("-reasons")) log.WriteLine("  " + bhs.LensTerminationSummary());
             }
 
             // -fowbhnotests: shots and GPU timing only (the sandbox checks below take several minutes)
@@ -536,7 +540,7 @@ namespace FogOfWar
                 if (shell != null) shell.Surface = null;
                 log.WriteLine($"done, {errors} errors");
                 log.Close(); log = null;
-                Application.Quit();
+                Application.Quit(errors == 0 ? 0 : 1);
                 yield break;
             }
 
@@ -655,7 +659,7 @@ namespace FogOfWar
             if (shell != null) shell.Surface = null;
             log.WriteLine($"done, {errors} errors");
             log.Close(); log = null;
-            Application.Quit();
+            Application.Quit(errors == 0 ? 0 : 1);
         }
 
         // Windowed run (not batchmode): the IMGUI instrument panel only draws on screen, so capture the real window in
@@ -689,7 +693,7 @@ namespace FogOfWar
             }
             log.WriteLine($"done, {errors} errors");
             log.Close(); log = null;
-            Application.Quit();
+            Application.Quit(errors == 0 ? 0 : 1);
         }
 
         static void ReadInto(RenderTexture rt, Texture2D tex)
