@@ -78,7 +78,7 @@ namespace FogOfWar.OpenWorld
             "The integrate branch steps the whole frame and leaves out OpenSystemScene.SubstepSize. No run here would split differently: above 0.25 s",
             "the attitude slews by MaxRate h and leaves AngVel 0, so the 0.05 s rotation cap never applies; the plan term 0.05 d/v is over 21 s on every",
             "powered leg (S2 toward Mars; S3 on the 0.85 g curve, d/v >= 435 s); the orbit term is over 53 s at Vesta; at h <= 0.05 s the step is the frame.",
-            "Stand-in radius Rs = 0.05 km (Pursuit.Radius): the pirate seeks 2.05 km, with a 1.05 km exclusion gate. Its own 20 km/0.2 km/s capture zone",
+            "Stand-in radius Rs = 0.05 km (Pursuit.Radius): the pirate seeks 2.05 km; the 1.05 km exclusion is gated only for S1ahead. Its 20 km/0.2 km/s capture zone",
             "uses critically damped relative position control. Transverse-motion lead is capped at 600 s. Pirate constructor: UnlimitedFuel, CruiseCap 0,",
             "Att facing the player, Obstacles by the scene's rule (Parent != null, Radius >= 100), Near empty.",
             "Measures. alongside = |pirate.Pos - player.Pos| < 500 km AND |pirate.Vel - player.Vel| < 0.1 km/s, from the two Ships at each span end.",

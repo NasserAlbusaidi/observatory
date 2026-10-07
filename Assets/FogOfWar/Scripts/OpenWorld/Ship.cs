@@ -497,9 +497,10 @@ namespace FogOfWar.OpenWorld
             D3 want, ff = D3.Zero;
             if (hold)
             {
-                // Critically damped relative position control, with target acceleration fed forward. Unlike the
-                // player's loose hover this rejects closing bias without crossing the craft's exclusion distance.
-                double omega = Math.Min(0.05, 1 / Math.Max(20, 4 * tau / 3));
+                // Critically damped relative position control, with target acceleration fed forward. It seeks the
+                // 2.05 km standoff; transient approaches can come closer (only S1ahead gates a 1.05 km exclusion).
+                // Guide supplies tau >= 20 s, so omega <= 0.0375 /s without additional clamps.
+                double omega = 3 / (4 * tau);
                 Phase = "holding station";
                 return Share(los * ((dist - standoff) * omega * omega) - vrel * (2 * omega), comp);
             }
@@ -520,7 +521,8 @@ namespace FogOfWar.OpenWorld
         }
 
         // Pursuit has an active braking curve, so a ballistic periapsis alone does not predict an impact. Its guard
-        // uses the actual stopping distance on that curve plus a bounded turn margin; the player's Climb is unchanged.
+        // checks the segment to the stopping point along the velocity, plus a bounded turn margin. Radial stopping
+        // distance alone falsely treats an off-axis moon-orbit approach as a plunge. The player's Climb is unchanged.
         D3? PursueClearance(SolarSystem sys, double jd)
         {
             foreach (var b in Obstacles)
@@ -533,9 +535,14 @@ namespace FogOfWar.OpenWorld
                 // physical surface, rather than repeatedly ejecting a safe approach from that wider routing margin.
                 double inward = -D3.Dot(v, outward), safe = b.Radius * 1.1 + 20;
                 double net = Math.Max(AMax - b.GM / (rm * rm), 1e-9);
-                double stop = inward > 0 ? inward * inward / (2 * PursueMargin * net) : 0;
-                double turnMargin = Math.Min(0.05 * safe, Math.Max(0, inward) * 5);
-                if (rm > safe && (inward <= 0 || rm - safe > stop + turnMargin)) continue;
+                double speed = v.Mag, stop = speed * speed / (2 * PursueMargin * net);
+                double turnMargin = Math.Min(0.05 * safe, speed * 5);
+                // The minimum radius on the whole braking segment, not just the radius of its endpoint: a stop
+                // beyond the far side of the body must still trigger the guard. A safe pole approach misses it.
+                var direction = speed > 0 ? v / speed : D3.Zero;
+                double along = Math.Max(0, Math.Min(stop + turnMargin, -D3.Dot(r, direction)));
+                double closest = (r + direction * along).Mag;
+                if (rm > safe && (inward <= 0 || closest > safe)) continue;
                 guardBody = b;
                 var lateral = v - outward * D3.Dot(v, outward);
                 var tangent = lateral.Sqr > 1e-12 ? lateral.Norm : D3.Cross(b.Pole, outward).Norm;
