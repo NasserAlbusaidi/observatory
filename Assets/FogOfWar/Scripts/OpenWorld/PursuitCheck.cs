@@ -580,7 +580,7 @@ namespace FogOfWar.OpenWorld
             crossing &= stop > 20 * b.Radius + safe; // the endpoint is beyond the far side, not merely inside the body
             var target = rad * Ship.Standoff(b);
             var direction = (target - b.Pole * 50000).Norm;
-            probe.Pos = pc + b.Pole * 5000;
+            probe.Pos = pc + target * 0.9 + b.Pole * 5000; // point on S4's original pole-to-orbit line
             probe.Vel = vc + direction * 12;
             bool pole = guard.Invoke(probe, new object[] { sys, Jd0 }) == null;
             Echo(log, $"  G9 far-side crossing guard non-null: {(crossing ? "PASS" : "FAIL")}");
