@@ -64,6 +64,8 @@ def diagnostic_ivp(ray):
 
 def quadrature(ray):
     """Separated radial quadrature and analytic Jacobi polar motion, avoiding IVP invariant drift."""
+    if ray["radialSign"] != -1:
+        raise ValueError("quadrature supports inbound fixture rays only (radialSign must be -1)")
     if ray["expected"] != 1:
         return ray
     a,b,q,rc,theta=[float(np.float32(ray[k])) for k in ("a","b","q","radius","theta")]
