@@ -50,6 +50,7 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "audioqa.txt")) { AutoFlush = true };
+            OpenSystemScene.CheckUnattendedSaveKey(log);
             app = GetComponent<FogOfWarApp>();
             app.InputLocked = true; Controls.Locked = true;
             GameSettings.SilentOutput = true; AudioListener.volume = 0; // record, but play nothing out loud
