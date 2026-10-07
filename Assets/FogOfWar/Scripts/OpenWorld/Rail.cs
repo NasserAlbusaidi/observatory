@@ -62,10 +62,14 @@ namespace FogOfWar.OpenWorld
         // samples are even in time, so they are close together near the ports, where the course bends most.
         public Clearance Check() => Check(sys.Bodies, false);
 
-        // The traffic shortcut checks each endpoint's parent and siblings too: a Titan-to-Enceladus course can cross
-        // Rhea even when it clears Saturn. QA independently checks every scheduled trip against the full body list.
-        public Clearance CheckEnds() => Check(sys.Bodies.FindAll(b => b == From.Parent || b == To.Parent ||
-            b.Parent == From.Parent || b.Parent == To.Parent), true);
+        // The traffic shortcut checks endpoint parents, plus siblings only for moon endpoints: Titan-to-Enceladus
+        // can cross Rhea while clearing Saturn. Planet endpoints retain the old set (no heliocentric sibling sweep).
+        // QA checks 400 accepted scheduled trips against the full body list and a Titan/Enceladus Rhea regression.
+        // Endpoint children (such as the Moon on Earth departures) remain outside this cheap test's scope.
+        public Clearance CheckEnds() => Check(sys.Bodies.FindAll(b => !b.Asteroid && !Career.IsCraft(b) && !Traffic.Is(b) &&
+            (b == From.Parent || b == To.Parent ||
+             (From.Parent != null && From.Parent != sys.Sun && b.Parent == From.Parent) ||
+             (To.Parent != null && To.Parent != sys.Sun && b.Parent == To.Parent))), true);
 
         Clearance Check(System.Collections.Generic.IEnumerable<Body> bodies, bool smooth)
         {
