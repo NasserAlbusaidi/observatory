@@ -501,10 +501,14 @@ namespace FogOfWar
 
         static string Speed(double kms) => kms < 1 ? $"{kms * 1000:F0} m/s" : $"{kms:F2} km/s";
 
-        // Drive off (or the autopilot parked in orbit): ride a two-body conic around the dominant body. Exact at any
-        // warp; other bodies' pulls are ignored until the next burn (patched conics).
-        bool Coasting() => ship.Landed == null && ship.RcsInput.sqrMagnitude == 0 &&
+        // Through 100×, drive-off flight uses the same multi-body/J2 integrator as powered flight. At 1k× and above,
+        // eligible coasts use a labelled dominant-body approximation; switching preserves world position/velocity.
+        bool Coasting() => warpIdx >= 3 && ship.Landed == null && ship.RcsInput.sqrMagnitude == 0 &&
             (ship.PlanActive ? ship.Throttle == 0 && (ship.Phase == "in orbit" || ship.Phase == "velocity matched" || ship.Phase == "cruising") : ship.ThrottleCmd == 0);
+
+        string FlightModel => ship.Landed != null ? (ship.AssistedArrival ? "assisted arrival" : "body-fixed contact") :
+            Coasting() ? "two-body coast (approximation, 1k×+)" : "integrated multi-body gravity + J2";
+
 
         double Coast(double maxDt)
         {
