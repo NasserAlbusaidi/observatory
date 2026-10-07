@@ -263,7 +263,8 @@ namespace FogOfWar
                         }
                     }
                 }
-                // Isolated surface/cloud-top fixtures must not award feats or docks to the scripted career.
+                // Isolated surface/cloud-top fixtures must not award feats or docks to the scripted career. The scene still
+                // ticks the stand-in career, and its missing first job ends the tutorial: the tutorial and plan state come back too.
                 if (os != null)
                 {
                     var f = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -271,6 +272,11 @@ namespace FogOfWar
                     var refField = typeof(OpenSystemScene).GetField("reference", f);
                     var careerField = typeof(OpenSystemScene).GetField("career", f);
                     var player = shipField.GetValue(os); var reference = refField.GetValue(os); var career = careerField.GetValue(os);
+                    var tickFields = new[] { "lesson", "doneBefore", "turned", "turnedAgain", "burned", "planWasActive", "planTarget", "planCruiseIdx" };
+                    var tickState = new object[tickFields.Length];
+                    for (int i = 0; i < tickFields.Length; i++) tickState[i] = typeof(OpenSystemScene).GetField(tickFields[i], f).GetValue(os);
+                    var tutorialText = typeof(OpenSystemScene).GetProperty("TutorialText");
+                    object oldTutorial = tutorialText.GetValue(os);
                     var sys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", f).GetValue(os);
                     var setCam = typeof(OpenSystemScene).GetMethod("SetCam", f);
                     var pitch = typeof(OpenSystemScene).GetField("lookPitch", f);
@@ -307,6 +313,8 @@ namespace FogOfWar
                     finally
                     {
                         shipField.SetValue(os, player); refField.SetValue(os, reference); careerField.SetValue(os, career); os.QaStopJd = stop;
+                        for (int i = 0; i < tickFields.Length; i++) typeof(OpenSystemScene).GetField(tickFields[i], f).SetValue(os, tickState[i]);
+                        tutorialText.SetValue(os, oldTutorial);
                         setCam.Invoke(os, new[] { oldCam }); pitch.SetValue(os, oldPitch);
                         typeof(OpenSystemScene).GetMethod("SetConsole", f).Invoke(os, new object[] { console });
                     }
@@ -344,7 +352,9 @@ namespace FogOfWar
                     // QA-059: the lesson card above the console, which must clear it
                     yield return Wait(0.3f);
                     yield return Shot(app, shell, camRT, uiRT, tag, "06m-lesson-console");
-                    log.WriteLine("    flight tab: " + os.TestLessonReport());
+                    string lessonRep = os.TestLessonReport();
+                    log.WriteLine("    flight tab: " + lessonRep);
+                    if (!lessonRep.EndsWith(": clear")) { errors++; log.WriteLine("    ERROR 06m-lesson-console: expected the first-flight lesson on screen, clear of the right column"); }
                     // the first flight's payday card, with its two answers, and a step of the hand-flying practice
                     var lessonFld = typeof(OpenSystemScene).GetField("lesson", BindingFlags.Instance | BindingFlags.NonPublic);
                     var lessonBefore = lessonFld.GetValue(os);
