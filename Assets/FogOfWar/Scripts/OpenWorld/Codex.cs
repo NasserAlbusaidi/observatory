@@ -81,6 +81,7 @@ namespace FogOfWar.OpenWorld
         {
             var l = new List<string>();
             l.Add($"Mean radius {Fmt.Num(b.Radius, b.Radius < 10 ? 2 : 0)} km" + (b.SizeEstimated ? " (estimated)" : ""));
+            l.Add("Arrival: " + Ship.ArrivalPolicy(b));
             if (b.GM > 1e-6)
             {
                 double g = b.GM / (b.Radius * b.Radius) * 1000; // m/s²

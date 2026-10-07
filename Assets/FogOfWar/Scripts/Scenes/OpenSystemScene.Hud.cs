@@ -47,7 +47,7 @@ namespace FogOfWar
         VisualElement statusBox;
         Label spdVal, spdRef, drvVal, drvSub, dvVal, rotVal, mkTgtName, mkTgtDist, mkEdgeName, consoleToggle;
         VisualElement thrFill, thrCmd, pills;
-        Label pAssist, pHold, pNav, pLimited, pLanded, pModel;
+        Label pAssist, pHold, pNav, pLimited, pLanded, pModel, pArrival;
         FowSlider thrSlider;
         Segmented segG, segPlan, segWarp, segCam, segWarpTop;
         Switch swAssist, swBelt, swHist, swRings;
@@ -122,7 +122,7 @@ namespace FogOfWar
             pills.pickingMode = PickingMode.Ignore;
             pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV");
             pLanded = Pill("LANDED"); pLimited = Pill("WARP LIMITED");
-            pModel = Pill("TWO-BODY COAST");
+            pModel = Pill("TWO-BODY COAST"); pArrival = Pill("ASSISTED ARRIVAL");
 
             // ---- system map header
             mapHead = Ui.E(layer, "col");
@@ -621,8 +621,9 @@ namespace FogOfWar
             SetPill(pAssist, ship.FlightAssist ? null : "ASSIST OFF", "bad");
             SetPill(pHold, ship.Hold == Hold.Off ? null : "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant() + (ship.VelRef != null ? " VS " + ship.VelRef.Name.ToUpperInvariant() : ""), "cold");
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : null, "hot");
-            SetPill(pLanded, ship.Landed != null ? "LANDED " + ship.Landed.Name.ToUpperInvariant() : null, "ok");
+            SetPill(pLanded, ship.Landed != null ? (ship.AssistedArrival ? "ASSISTED ARRIVAL " : "LANDED ") + ship.Landed.Name.ToUpperInvariant() : null, "ok");
             SetPill(pModel, Coasting() ? "TWO-BODY COAST · APPROXIMATE" : null, "cold");
+            SetPill(pArrival, ship.Landed == null && ArrivalNotice != null ? (Ship.Giant(reference) ? "CLOUD-TOP ASSIST · NO SOLID SURFACE" : "ARRIVAL ASSIST · NO ATMOSPHERIC FLIGHT") : null, "bad");
             SetPill(pLimited, limited ? "WARP LIMITED " + Fmt.Num(effectiveWarp, 0) + "×" : null, "bad");
 
             UpdatePages();

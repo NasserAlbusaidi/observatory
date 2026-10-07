@@ -353,6 +353,7 @@ namespace FogOfWar
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
             list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Flight model", FlightModel, Tone.Normal));
+            if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, ship.Landed != null ? Tone.Normal : Tone.Bad));
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
