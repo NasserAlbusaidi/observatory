@@ -241,27 +241,46 @@ The repository has three parts, each under its own terms.
   This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
   without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
   See the GNU General Public License for more details.
+
+  Additional permission under GNU GPL version 3 section 7
+
+  If you modify this Program, or any covered work, by linking or combining it with the Unity
+  Editor and engine, including its built-in modules and packages (or a modified version of
+  them), containing parts covered by the terms of Unity's licence agreements, the licensors of
+  this Program grant you additional permission to convey the resulting work.
   ```
 
-- **The project's own art and text: all rights reserved.** © 2026 Nasser Albusaidi. This covers everything else made for the project: the ship, fleet, asteroid and procedural body models and their textures, the procedural planet and ring maps, the codex text, the docs, and the screenshots and videos in `docs/media`. Ask before you reuse them.
+  The additional permission lets anyone share a build of the game, which always contains Unity's proprietary engine.
+
+- **The project's own art and text: Creative Commons Attribution 4.0 International ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).** © 2026 Nasser Albusaidi. This covers everything else made for the project: the ship, fleet, asteroid and procedural body models and their textures, the procedural planet and ring maps, the codex text, the docs, and the screenshots and videos in `docs/media`. You may share and change them, if you credit Nasser Albusaidi, link the licence and say what you changed. Third-party content inside them, such as the sky in the screenshots, keeps its own terms.
 - **Third-party content keeps its own licence.** The sources and their credits are below. Files built from them, such as the ephemeris fits, the moon table and the reprojected maps, keep their source's terms.
 
 The Unity Editor and engine are not in this repository. They are under Unity's own terms.
 
 ### Sources
 
-- **Ephemerides**: NASA JPL Horizons and the JPL Solar System Dynamics satellite tables.
+- **Ephemerides and physical data**: NASA JPL Horizons, the JPL Solar System Dynamics satellite tables and physical parameters, and the NASA planetary fact sheets.
 - **Earth**: NASA Visible Earth (Blue Marble Next Generation, Black Marble, MODIS clouds) and GEBCO elevation (GEBCO Compilation Group, GEBCO_08 Grid).
 - **Moon**: LRO WAC colour from the CGI Moon Kit and LRO LOLA relief. Credit: NASA's Scientific Visualization Studio.
-- **Planets and moons**: USGS Astrogeology and PDS mosaics from Viking, MGS MOLA, MESSENGER, Magellan, Voyager, Galileo, Cassini and Dawn. Each map's source is in its `Planets/<Body>/Body.json`. Credits for some of these maps:
+- **Planets and moons**: USGS Astrogeology and PDS mosaics from Viking, MGS MOLA, MESSENGER, Magellan, Voyager, Galileo, Cassini and Dawn. Each map's source is in its `Planets/<Body>/Body.json`. Credits for these maps:
+  - Mercury colour (MESSENGER MDIS, 1000, 750 and 430 nm): mosaic by the MESSENGER Team, Arizona State University.
+  - Mercury relief (MESSENGER global DEM, 665 m, v2): Kris Becker et al.; NASA, Arizona State University, Johns Hopkins Applied Physics Laboratory, Carnegie Institution for Science.
+  - Venus surface (Magellan C3-MDIR radar mosaic): PDS Geosciences Node; data by Peter Ford, Gordon Pettengill, Fang Liu and Joan Quigley (MIT) from the Magellan Project.
+  - Mars colour (Viking MDIM, 925 m): USGS Astrogeology Science Center and PDS (MDIM by Eliason, Batson and Manley); hue from the NASA 3D Resources Mars map (NASA/JPL-Caltech).
+  - Mars relief (MGS MOLA DEM, 463 m): MOLA Team, NASA Goddard Space Flight Center.
   - Ceres and Vesta (Dawn FC): NASA/JPL-Caltech/UCLA/MPS/DLR/IDA.
+  - Jupiter: Cassini PIA07782 (NASA/JPL/Space Science Institute).
+  - Io (Galileo SSI and Voyager colour merge): USGS Astrogeology Science Center and PDS; Becker and Geissler (2005).
+  - Europa (Voyager and Galileo SSI): Tammy Becker; Archinal, Colvin, Davies, Gitlin, Kirk and Weller, USGS Astrogeology Science Center.
+  - Ganymede (Voyager and Galileo SSI colour): USGS Astrogeology Science Center; Becker et al. (2001).
+  - Callisto (Galileo and Voyager): USGS Astrogeology Science Center.
+  - Mimas (Cassini ISS): NASA/JPL/Space Science Institute; basemap by DLR (Roatsch et al., 2018).
+  - Enceladus (Cassini ISS): Cassini Team, NASA/JPL/Space Science Institute.
   - Tethys (Cassini ISS) and Rhea (Cassini ISS, Voyager fill): NASA/JPL/Space Science Institute; mosaics by Roatsch et al., DLR.
   - Dione (Cassini ISS, Voyager fill): NASA/JPL/Space Science Institute.
-  - Enceladus (Cassini ISS): Cassini Team, NASA/JPL/Space Science Institute.
-  - Mimas (Cassini ISS): NASA/JPL/Space Science Institute; basemap by DLR.
+  - Titan (Cassini ISS, 938 nm): Cassini ISS Team; NASA/JPL-Caltech/SSI.
+  - Iapetus (Cassini ISS, Voyager fill): Cassini Team, Jet Propulsion Laboratory and Space Science Institute; cartography by Roatsch et al., DLR.
   - Triton (Voyager 2): NASA/JPL; colour mosaic by Paul Schenk, Lunar and Planetary Institute.
-  - Mercury colour (MESSENGER MDIS, 1000, 750 and 430 nm): mosaic by the MESSENGER Team, Arizona State University.
-  - Jupiter: Cassini PIA07782 (NASA/JPL/Space Science Institute).
   - Saturn, Uranus, Neptune and the Uranian moons that Voyager 2 saw only in part are modelled from published imagery.
 - **Shape models**: irregular moons and asteroids from NASA PDS Small Bodies Node and NAIF, decimated to three LODs with baked normal maps (sources in `Resources/Models/Bodies/LODS.json`). Shape model of Ryugu: ISAS/JAXA (modified); the game shows this credit on Ryugu's codex card. Bodies without a shape model, and the belt rocks, are procedural.
 - **Rings**: radii and optical depths from the Voyager, Galileo, Cassini and New Horizons ring literature, rounded.
