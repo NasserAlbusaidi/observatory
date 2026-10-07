@@ -5,8 +5,8 @@ namespace FogOfWar.OpenWorld
 {
     // Where raiders can take a ship (docs/design-world.md, W3). A raider must match the ship's velocity and stay alongside
     // for the boarding time, and a patrol that can get there within that time stops it. So the danger is where a ship is
-    // slow, outside every patrol's reach, in the space raiders work: the main belt and around their havens. No encounters
-    // yet (W4): the trip planner shows the risk, and the map shows the reach.
+    // slow, outside every patrol's reach, in the space raiders work: the main belt and around their havens. The trip
+    // planner shows the risk, the map shows the reach, and W4's raiders (Career.Pirates.cs) strike at a rate set from both.
     public static class Threat
     {
         // decision 4 in the doc, still open: how long a boarding takes [design]. Every reach and speed here follows from it.
@@ -51,6 +51,14 @@ namespace FogOfWar.OpenWorld
         }
 
         static Body[] HavenBodies(SolarSystem sys) => Array.FindAll(Array.ConvertAll(Havens, h => sys[h]), b => b != null);
+
+        // the haven nearest x, where a raider goes when it gives up a chase (W4); null when the system has none
+        public static Body NearestHaven(SolarSystem sys, D3 x, double jd)
+        {
+            Body best = null; double bd = double.MaxValue;
+            foreach (var h in HavenBodies(sys)) { double d = (x - sys.PosAt(h, jd)).Mag; if (d < bd) { bd = d; best = h; } }
+            return best;
+        }
 
         // the port whose patrol can reach x within the boarding time, or null
         public static Port PatrolAt(SolarSystem sys, D3 x, double jd)

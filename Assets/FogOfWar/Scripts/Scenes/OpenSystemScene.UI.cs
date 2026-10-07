@@ -195,7 +195,18 @@ namespace FogOfWar
             camDist = Math.Max(dist, MinCamDist());
         }
 
-        void NextTarget() => SetTarget(targets[(targetIdx + 1) % targets.Count]);
+        void NextTarget() => SetTarget(CycleTarget(1));
+
+        // The body `step` along the cycle from the target: the list made at Build, then a raider while one gives chase (its
+        // proxy joins the system later, and the view's tag is the only other way to it)
+        Body CycleTarget(int step)
+        {
+            var raider = career?.Encounter?.Proxy;
+            int n = targets.Count + (raider != null ? 1 : 0);
+            int i = raider != null && ship.Target == raider ? targets.Count : targetIdx;
+            i = ((i + step) % n + n) % n;
+            return i == targets.Count ? raider : targets[i];
+        }
 
         void SetTarget(Body b)
         {
@@ -216,7 +227,7 @@ namespace FogOfWar
         public override void OnGUIOverlay()
         {
             if (Prof) swGui.Start();
-            try { if (GameSettings.ShowLabels) { DrawLabels(); DrawTraffic(); } if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
+            try { ProbeNotes(); if (GameSettings.ShowLabels) { DrawLabels(); DrawTraffic(); DrawRaider(); } if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
         }
 
         GUIStyle labelStyle, labelOn, hudStyle, hudBig;
@@ -415,6 +426,10 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- panel
 
+        // the planet buttons in both shells: the Sun's own bodies, less the asteroids (their own list), traffic,
+        // raider proxies and contract craft
+        List<Body> PlanetButtons() => sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x) && !Career.IsRaider(x) && !Career.IsCraft(x));
+
         public override void Controls(PanelUI ui)
         {
             CareerPanel(ui);
@@ -515,9 +530,6 @@ namespace FogOfWar
 
         // `-fowsavekey <name>` points Save, Continue and F5 at another PlayerPrefs key, so live QA never touches the
         // player's own save (the career goes under <name>-career)
-        // Both shells use the same natural-body list; contract runners and other craft have their own targeting UI.
-        List<Body> PlanetButtons() => sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Career.IsCraft(x));
-
         static readonly string SaveKey = SaveKeyFromArgs();
         static string SaveKeyFromArgs() => SaveKeyFor(Environment.GetCommandLineArgs(), Application.dataPath);
         // Pure policy entry point so QA can exercise every unattended flag without changing process arguments.

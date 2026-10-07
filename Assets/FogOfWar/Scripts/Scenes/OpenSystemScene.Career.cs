@@ -23,7 +23,7 @@ namespace FogOfWar
 
         void InitCareer()
         {
-            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys, RouteEvents = !Unattended() };
+            career = new Career { Sandbox = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa") >= 0, Sys = sys, RouteEvents = !Unattended(), Divert = DivertTo };
             career.StartNew(jd);
             ship.Fuel = career.TankCapacity;
             career.Apply(ship);
@@ -241,10 +241,12 @@ namespace FogOfWar
             // QA-041: a job ending out there, or a dry tank, drops time compression; a crossing caps it at 100×
             if (career.DropWarp) { warpIdx = 0; career.DropWarp = false; }
             if (career.TransferInProgress && warpIdx > 2) warpIdx = 2;
+            CapWarp(); // a call this update starts a chase
             // a finished job's ship is gone from the system: stop flying toward it
             if (ship.Target != null && Career.IsCraft(ship.Target) && !sys.Bodies.Contains(ship.Target))
             {
-                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Target = null; ship.Phase = "job done: target released";
+                ship.Phase = Career.IsRaider(ship.Target) ? "raider gone: target released" : "job done: target released";
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Target = null;
             }
             if (ship.Dry && ship.PlanActive) { ship.Plan = Plan.None; ship.Phase = "out of reaction mass"; }
             TickSound(achievedDt: simDt);
@@ -265,6 +267,7 @@ namespace FogOfWar
 
         void CareerPanel(PanelUI ui)
         {
+            if (!career.Sandbox) CallPanel(ui); // first: a call waits for an answer (OpenSystemScene.RaiderHud.cs)
             ui.Section("Ship's business");
             bool on = ui.Toggle("Sound (in the cockpit view: the ship as heard through its hull)", !muted);
             if (on == muted) muted = !on;
@@ -331,7 +334,7 @@ namespace FogOfWar
         void CodexPanel(PanelUI ui)
         {
             var cx = career.Codex;
-            int bodies = sys.Bodies.FindAll(x => x.Parent != null && !Career.IsCraft(x)).Count;
+            int bodies = CodexBodies();
             ui.Section($"Codex: {cx.Visited.Count} visited, {cx.Scanned.Count} scanned of {bodies}");
             var b = ship.Target;
             if (b != null && b.Parent != null && !Career.IsCraft(b))
@@ -437,13 +440,14 @@ namespace FogOfWar
         // ---------------------------------------------------------------- notes (toasts)
 
         GUIStyle noteStyle;
+        const float NoteW = 560; // the strip: each note one line this wide, centred, with no wrap
+        GUIStyle NoteStyle => noteStyle ??= new GUIStyle { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
 
         void DrawCareerNotes()
         {
             if (career == null) return;
             DrawTutorial();
             if (career.Notes.Count == 0) return;
-            if (noteStyle == null) noteStyle = new GUIStyle { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             float ui = App.UiScale;
             float W = UnityEngine.Screen.width / ui;
             float free = W - App.PanelWidth - 32;
@@ -451,13 +455,25 @@ namespace FogOfWar
             for (int i = Math.Max(0, career.Notes.Count - 4); i < career.Notes.Count; i++)
             {
                 var n = career.Notes[i];
-                var r = new Rect((free - 560) / 2 + 8, y, 560, 26);
+                var r = new Rect((free - NoteW) / 2 + 8, y, NoteW, 26);
                 GUI.color = new Color(0, 0, 0, 0.55f); GUI.DrawTexture(r, Texture2D.whiteTexture);
                 GUI.color = n.Good ? PanelUI.Accent : PanelUI.Warn;
-                GUI.Label(r, n.Text, noteStyle);
+                GUI.Label(r, n.Text, NoteStyle);
                 y += 30;
             }
             GUI.color = Color.white;
+        }
+
+        // review checks: texts to measure with the strip's own style, and their widths, filled in at the next OnGUI (a
+        // style with no font of its own measures with the skin's, which is there only inside OnGUI)
+        string[] noteProbe;
+        float[] noteWidths;
+
+        void ProbeNotes()
+        {
+            if (noteProbe == null) return;
+            noteWidths = Array.ConvertAll(noteProbe, t => NoteStyle.CalcSize(new GUIContent(t)).x);
+            noteProbe = null;
         }
 
         static string Days(double d) => d < 2 ? Fmt.Num(d * 24, 1) + " h" : Fmt.Num(d, 1) + " days";
@@ -589,8 +605,10 @@ namespace FogOfWar
 
         void LoadCareer()
         {
+            bool chased = career.DropContact(); // D8: the raider and its proxy body leave the system; the loaded career says so
             foreach (var old in career.Active.ToArray()) career.Abandon(old); // drop this session's derelicts from the system
-            career = new Career { Sys = sys, RouteEvents = !Unattended() };
+            career = new Career { Sys = sys, RouteEvents = !Unattended(), Divert = DivertTo };
+            if (chased) career.LostContact(); // on every path below: a save read, no save, or one that will not read
             if (!PlayerPrefs.HasKey(CareerKey)) { career.StartNew(jd); ship.Fuel = career.TankCapacity; career.Apply(ship); ResumeTutorial(); return; }
             try { career.FromSave(JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey)), ship); }
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the career save: " + e.Message); career.StartNew(jd); ship.Fuel = career.TankCapacity; }

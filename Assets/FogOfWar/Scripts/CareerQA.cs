@@ -814,6 +814,7 @@ namespace FogOfWar
             yield return TrafficChecks();
             yield return ThreatChecks();
             yield return PursuitChecks();
+            yield return PirateChecks();
 
             State("end");
             Finish();

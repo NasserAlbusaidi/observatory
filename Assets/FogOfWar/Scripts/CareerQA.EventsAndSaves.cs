@@ -8,6 +8,13 @@ namespace FogOfWar
     // Career QA sections 5-6: route events, manual delivery, save migration, ownership and standing.
     public partial class CareerQA
     {
+        // A finite trip can legitimately roll no call. Exercise the first eligible production roll, not chance.
+        sealed class RouteCallRoll : System.Random
+        {
+            public int Draws;
+            public override double NextDouble() { Draws++; return 0; }
+        }
+
         IEnumerable<object> EventAndSaveChecks()
         {
             // 5. a dry tank cuts the drive; the tender refills it
@@ -77,6 +84,10 @@ namespace FogOfWar
 
                 // a real roll: flying the job with events on, a call comes in and drops the warp
                 yield return null; // the calls above left DropWarp set: let the scene take it before the warp goes up
+                // The preceding survey can end in raider space. This ordinary-call fixture is an inner-system leg.
+                var earth = sys.Pos(sys.Earth, jd);
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0; ship.Landed = null;
+                ship.Pos = earth + earth.Norm * 1e6; ship.Vel = sys.Vel(sys.Earth, jd);
                 career.RouteEvents = true;
                 Put("cruiseIdx", 1);
                 Put("selectedPlan", Plan.Brachistochrone);
@@ -84,18 +95,30 @@ namespace FogOfWar
                 if (!ship.PlanActive && ship.Phase.StartsWith("fuel short")) Call("TogglePlan");
                 Put("warpIdx", 6);
                 float t0 = Time.realtimeSinceStartup;
-                double jd0 = jd;
+                double jd0 = jd, rateMax = 0, presenceMax = 0;
                 int callWarp = -1;
-                // Capture at arrival, before Fly restores warp. A missing production DropWarp must fail this check.
-                yield return Fly(() =>
+                var rngField = typeof(Career).GetField("routeRng", F);
+                var rng = rngField.GetValue(career); var roll = new RouteCallRoll();
+                rngField.SetValue(career, roll);
+                try
                 {
-                    if (career.Call == null) return false;
-                    callWarp = Get<int>("warpIdx");
-                    return true;
-                }, 6, 30);
-                yield return null;
-                Check(career.Call != null && callWarp == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, arrival warp {callWarp}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
-                yield return Shot("c05c-route-call");
+                    // Capture at arrival, before Fly restores warp. A missing production DropWarp must fail this check.
+                    yield return Fly(() =>
+                    {
+                        rateMax = Math.Max(rateMax, career.PirateRate(sys, ship, run, jd));
+                        presenceMax = Math.Max(presenceMax, Threat.Presence(sys, ship.Pos, jd));
+                        if (career.Call == null) return false;
+                        callWarp = Get<int>("warpIdx");
+                        return true;
+                    }, 6, 30);
+                    yield return null;
+                    Check(career.Call != null && callWarp == 0 && roll.Draws >= 2, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, arrival warp {callWarp}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count}, roll draws {roll.Draws})");
+                    // Q3, before the answer and the job's removal, either of which would end a chase: the leg gives raiders nothing
+                    Check(career.Call?.Kind != Career.RouteKind.Pirate && career.Encounter == null && rateMax == 0 && presenceMax == 0,
+                        $"no raider on the real roll: the call is {career.Call?.Kind.ToString() ?? "none"}, no chase; over the first {(jd - jd0) * 24:F1} h of the trip to Mars, sampled each frame up to the call, raider presence {presenceMax:0.###} and rate {rateMax:0.###} an hour at most");
+                    yield return Shot("c05c-route-call");
+                }
+                finally { rngField.SetValue(career, rng); }
                 career.RouteEvents = false;
                 career.Answer(false, jd);
                 ship.Plan = Plan.None; ship.ThrottleCmd = 0;

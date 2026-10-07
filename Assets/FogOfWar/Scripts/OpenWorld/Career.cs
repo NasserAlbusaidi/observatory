@@ -55,6 +55,7 @@ namespace FogOfWar.OpenWorld
         public int[] standing;           // by Faction; null for saves made before factions: neutral with all
         public List<string> taken = new List<string>(); // board slots already taken; older saves have none: only the active jobs' slots
         public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
+        public bool contact;             // saved during a raider's chase (W4): a load does not resume it, and says so
     }
 
     // The trucker career: credits, reaction mass, ports, contracts and upgrades. Plain data and rules, no UI; the scene
@@ -135,7 +136,7 @@ namespace FogOfWar.OpenWorld
 
         // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
         // player action. Docked/Undocked/TankDry carry the port name or an empty string.
-        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned, Standing }
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned, Standing, Boarded, RaiderGone }
         public event Action<Happening, string> OnEvent;
 
         void Say(Happening what, string text, bool good = true)
@@ -202,6 +203,7 @@ namespace FogOfWar.OpenWorld
             TransferInProgress = false;
             Rescues(sys, ship, jd, simDt);
             Intercepts(sys, ship, jd, simDt);
+            Contacts(sys, ship, jd, simDt);
             RouteTick(sys, ship, jd, simDt);
             foreach (var t in Codex.CheckFeats(this, ship)) Say(Happening.Achievement, "Achievement: " + t);
         }
@@ -690,11 +692,12 @@ namespace FogOfWar.OpenWorld
             sensors = Codex.SensorLevel, shipPaid = ShipPaid, startJd = StartJd, standing = (int[])this.standing.Clone(),
             taken = new List<string>(this.taken),
             visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
-            achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt),
+            achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt), contact = Encounter != null,
         };
 
         public void FromSave(CareerSave s, Ship ship)
         {
+            if (DropContact() || s.contact) contactLost = true; // D8: an encounter is never resumed (LostContact may have said so)
             Credits = s.credits; Earned = s.earned; DriveLevel = Mathf.Clamp(s.drive, 0, DriveG.Length - 1); TankLevel = Mathf.Clamp(s.tank, 0, MaxTankLevel);
             nextId = s.nextId; Done = s.done; Failed = s.failed; Sandbox = s.sandbox; TutorialStep = s.tutorial;
             foreach (var c in Active) RemoveDerelict(c);

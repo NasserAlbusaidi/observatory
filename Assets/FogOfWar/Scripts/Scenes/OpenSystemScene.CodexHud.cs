@@ -25,6 +25,15 @@ namespace FogOfWar
         Segmented codexSeg;
         public void ShowCodex(int view) { codexView = view; if (codexSeg != null) codexSeg.Value = view; codexSig = null; codexT = 0; } // review shots
 
+        // the bodies a codex entry can be for: not the Sun, and no craft (traffic, a job's ship, a raider's proxy), which come
+        // and go and have no entry
+        int CodexBodies()
+        {
+            int n = 0;
+            foreach (var b in sys.Bodies) if (b.Parent != null && !Career.IsCraft(b)) n++;
+            return n;
+        }
+
         void CodexTab(VisualElement c)
         {
             codexSeg = new Segmented(new[] { "Target entry", "Achievements" }, codexView, i => { codexView = i; codexSig = null; codexT = 0; });
@@ -55,7 +64,7 @@ namespace FogOfWar
             stats.style.marginTop = 4;
             Stat(stats, cx.Visited.Count, "visited");
             Stat(stats, cx.Scanned.Count, "scanned");
-            Stat(stats, sys.Bodies.Count - 1 - (traffic?.Flying.Count ?? 0), "bodies");
+            Stat(stats, CodexBodies(), "bodies");
             var b = ship.Target;
             if (b == null || b.Parent == null || Career.IsCraft(b))
             {
