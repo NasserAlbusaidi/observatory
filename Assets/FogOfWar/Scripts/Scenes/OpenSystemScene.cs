@@ -66,7 +66,7 @@ namespace FogOfWar
             sys = SolarSystem.Build();
             traffic = null; // its ships were bodies of the old system
             targets = sys.Bodies.FindAll(b => b != sys.Sun && (b.Parent == sys.Sun || b.Radius >= 100 || b == sys.Moon)); // T cycles these
-            jd = Frame.JulianDateTdb(DateTime.UtcNow);
+            jd = CareerTesting ? CareerQA.Epoch : Frame.JulianDateTdb(DateTime.UtcNow);
             warpIdx = 0;
             // the scene object lives across New game: a new flight starts with the drawer closed, no page open and a
             // compact target card
