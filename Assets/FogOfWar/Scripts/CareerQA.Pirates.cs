@@ -130,6 +130,7 @@ namespace FogOfWar
                 career.Active.RemoveAll(c => c.Key == "qa/pirate-scene");
                 Put("warpIdx", 0);
             });
+            yield return PirateShellChecks(); // 14b: the call card, the pill, the dot and the classic panel
         }
 
         static double WarpOf(int i)
