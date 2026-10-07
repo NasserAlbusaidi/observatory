@@ -273,5 +273,59 @@ namespace FogOfWar
                 if (GameSettings.ShowLabels != labelsWas) GameSettings.ShowLabels = labelsWas;
             });
         }
+
+        // The W4 notes against the note strip of the classic panel and -fowlegacyui, measured in an OnGUI with the strip's
+        // own style: every break-off at every port, patrol, landable body and haven (and with none), the losses at 99.9 t
+        // and 9,999,999 cr, the answers' notes, and the note a real raider call makes. Each is one line with no wrap, so
+        // none may be wider than the strip.
+        IEnumerator PirateNoteChecks(SolarSystem qs)
+        {
+            var texts = new List<string>();
+            bool go = Guard("notes setup", () =>
+            {
+                var havens = new List<string>(Threat.Havens) { null };
+                foreach (var h in havens)
+                {
+                    foreach (var p in Career.Ports)
+                    {
+                        texts.Add(Career.OffNote(Career.BreakOff.Docked, p.Name, h));
+                        if (p.PatrolG > 0) texts.Add(Career.OffNote(Career.BreakOff.Patrol, p.Name, h));
+                    }
+                    foreach (var x in sys.Bodies) if (x.Parent != null && !Career.IsCraft(x)) texts.Add(Career.OffNote(Career.BreakOff.Landed, x.Name, h));
+                    texts.Add(Career.OffNote(Career.BreakOff.JobOver, null, h));
+                    texts.Add(Career.LostNote(h));
+                    foreach (double t in new[] { 0, 99.9 }) { texts.Add(Career.BoardedNote(t, 9999999, h)); texts.Add(Career.GaveUpNote(t, 9999999, h)); }
+                }
+                foreach (var p in Career.Ports) if (p.PatrolG > 0) texts.Add(Career.DivertNote(p));
+                texts.Add(Career.RunNote); texts.Add(Career.DryNote); texts.Add(Career.NavNote);
+                var (vesta, at, vel) = Belt(qs);
+                var b = MakeBench(qs, at, vel);
+                b.C.MakeCall(Career.RouteKind.Pirate, b.Job, qs, b.Ship, b.Jd);
+                b.C.DropContact();
+                var incoming = b.Said.Find(n => n.What == Career.Happening.RouteCall && n.Text.StartsWith("Incoming: ")).Text;
+                if (incoming != null) texts.Add(incoming);
+                else Check(false, "pirates: notes: a raider call on the bench made no incoming note");
+                Put("noteWidths", null);
+                Put("noteProbe", texts.ToArray());
+            });
+            float[] widths = null;
+            for (int i = 0; go && i < 10 && widths == null; i++) { yield return null; widths = Get<float[]>("noteWidths"); }
+            if (go) Guard("notes width", () =>
+            {
+                if (widths == null || widths.Length != texts.Count) { Check(false, $"pirates: notes: the scene measured {widths?.Length.ToString() ?? "nothing"} of {texts.Count} texts in 10 frames"); return; }
+                float strip = (float)typeof(OpenSystemScene).GetField("NoteW", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+                int widest = 0;
+                var over = new List<string>();
+                for (int i = 0; i < widths.Length; i++)
+                {
+                    if (widths[i] > widths[widest]) widest = i;
+                    if (widths[i] > strip) over.Add($"{widths[i]:F0} px \"{texts[i]}\"");
+                }
+                Check(over.Count == 0,
+                    $"pirates: the W4 notes fit the note strip of the classic panel and -fowlegacyui: {texts.Count} texts (every port, patrol, landable body and haven; 99.9 t, 9,999,999 cr) " +
+                    $"measured with its style at UI scale {app.UiScale:F2}, the widest {widths[widest]:F0} of {strip:F0} px: \"{texts[widest]}\"" +
+                    (over.Count > 0 ? $"; {over.Count} too wide: " + string.Join("; ", over.GetRange(0, Math.Min(5, over.Count))) : ""));
+            });
+        }
     }
 }

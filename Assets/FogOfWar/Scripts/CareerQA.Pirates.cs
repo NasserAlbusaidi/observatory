@@ -1,18 +1,20 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using FogOfWar.OpenWorld;
 using UnityEngine;
 
 namespace FogOfWar
 {
     // 14. Pirates (Career.Pirates.cs, docs/design-world.md W4): the raider's call and its start (D11: far from the lair, a
-    // patrolled lair, the departure half), the rate (D3), the jobs it works (D4), the three answers, patrol break-off (Q1),
-    // escape by a full burn against a coasting control (Q2), boarding, its edges and a broken contact (Q4, Q5, D10), give
-    // up (Q6), dock first (Q7), a landing, a save and load (Q9), then in the scene the lockstep on both branches of the
-    // substep loop, the proxy body, the warp cap (Q8), Divert, a load mid-chase, a landing, and a load whose career save
-    // will not read. Headless parts run on a system of their own at the pursuit check's date with calls made directly: no
-    // waits on a roll. A throw is a failed check, since Start() has no guard.
+    // patrolled lair, the departure half, never on the ship), the rate (D3), the jobs it works (D4) and their titles in the
+    // card, the three answers, patrol break-off (Q1), escape by a full burn against a coasting control (Q2), boarding,
+    // its edges and a broken contact (Q4, Q5, D10), give up (Q6), dock first (Q7), a landing, a save and load (Q9), the
+    // texts with a singular faction name (D13), then in the scene the lockstep on both branches of the substep loop, the
+    // proxy body, the warp cap (Q8), Divert, a load mid-chase, a landing, the two shells (14b), the W4 notes against the
+    // note strip, and a load whose career save will not read. Headless parts run on a system of their own at the pursuit
+    // check's date with calls made directly: no waits on a roll. A throw is a failed check, since Start() has no guard.
     public partial class CareerQA
     {
         bool Guard(string what, Action a)
@@ -67,12 +69,13 @@ namespace FogOfWar
                 Guard("boarding", () => PirateBoardingChecks(qs));
                 Guard("ends", () => PirateEndChecks(qs));
                 Guard("escape", () => PirateEscapeChecks(qs));
+                Guard("names", () => PirateNameChecks(qs));
             }
 
             // the scene: a chase started by hand 1,000,000 km out from Vesta, the pirate 50,000 km off at rest with the ship
             Contract job = null;
             Encounter e = null;
-            double dv0 = 0, span0 = 0;
+            double dv0 = 0, shipDv0 = 0, span0 = 0;
             bool ok = Guard("scene setup", () =>
             {
                 Put("warpIdx", 0);
@@ -173,6 +176,7 @@ namespace FogOfWar
                 Put("warpIdx", 0);
             });
             yield return PirateShellChecks(); // 14b: the call card, the pill, the dot and the classic panel
+            yield return PirateNoteChecks(qs);
             yield return PirateNoSaveChecks();
         }
 
@@ -232,15 +236,25 @@ namespace FogOfWar
 
             // D4, on this bench where a cargo call was just made: a survey job gets one, a rescue or an intercept job none
             b.C.DropContact();
-            var survey = new Contract { Id = 900203, Kind = JobKind.Survey, Title = "QA survey", From = "Ceres", To = "Vesta", Key = "qa/pirate-survey" };
+            var survey = new Contract { Id = 900203, Kind = JobKind.Survey, Title = "Gravity survey of Vesta", From = "Ceres", To = "Vesta", Key = "qa/pirate-survey" };
             var rescue = new Contract { Id = 900201, Kind = JobKind.Rescue, Title = "QA wreck", From = "Ceres", To = "Vesta", Key = "qa/pirate-rescue" };
             var intercept = new Contract { Id = 900202, Kind = JobKind.Intercept, Title = "QA runner", From = "Ceres", To = "Vesta", Key = "qa/pirate-intercept" };
             bool onRescue = b.C.MakeCall(Career.RouteKind.Pirate, rescue, qs, b.Ship, b.Jd), onIntercept = b.C.MakeCall(Career.RouteKind.Pirate, intercept, qs, b.Ship, b.Jd);
             bool onSurvey = b.C.MakeCall(Career.RouteKind.Pirate, survey, qs, b.Ship, b.Jd);
             var se = b.C.Encounter;
-            Check(!onRescue && !onIntercept && onSurvey && se?.Job == survey && b.C.Call?.Text.Contains("pay for the qa survey") == true,
+            string surveyText = b.C.Call?.Text ?? "";
+            Check(!onRescue && !onIntercept && onSurvey && se?.Job == survey,
                 $"pirates: raiders work cargo, passengers and surveys: on the same bench a survey job gets a call ({onSurvey}), a rescue ({onRescue}) or an intercept ({onIntercept}) none");
             b.C.DropContact();
+
+            // a job's title keeps its case in the card's sentence, but for a first letter that starts a lower-case word
+            var pellets = new Contract { Id = 900204, Kind = JobKind.Cargo, Title = "D–He³ fuel pellets", From = "Ceres", To = "Vesta", Tonnes = 40, Pay = 20000, Key = "qa/pirate-pellets" };
+            b.C.MakeCall(Career.RouteKind.Pirate, pellets, qs, b.Ship, b.Jd);
+            string pelletText = b.C.Call?.Text ?? "";
+            b.C.DropContact();
+            string Part(string text, string start) { int i = text.IndexOf(start, StringComparison.Ordinal); return i < 0 ? "-" : text.Substring(i, Math.Min(text.Length - i, 60)); }
+            Check(surveyText.Contains("of the pay for the gravity survey of Vesta.") && pelletText.Contains("of the D–He³ fuel pellets and of its pay"),
+                $"pirates: job titles in the card: \"Gravity survey of Vesta\" reads \"{Part(surveyText, "of the pay for")}\", \"D–He³ fuel pellets\" reads \"{Part(pelletText, "of the D")}\"");
 
             // no start fits: closing on Vesta at 1,000 km/s from 10,000,000 km, a 1 g raider needs over a day to match
             var c = MakeBench(qs, qs.Pos(vesta, PursuitCheck.Jd0) + at.Norm * 1e7, vel - at.Norm * 1000);
@@ -364,7 +378,7 @@ namespace FogOfWar
             b.Tick(1);
             Check(b.Job.Pay == pay0 * (1 - Career.GiveUpShare) && b.Job.Tonnes == t0 * (1 - Career.GiveUpShare) && b.C.Active.Contains(b.Job) && b.C.Failed == failed
                   && b.C.Standing(Faction.Compact) == standing && b.C.Encounter == null && !qs.Bodies.Contains(e.Proxy) && b.C.WarpCap == 0 && b.Ship.Cargo == b.Job.Tonnes
-                  && b.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.Contains(Raiders) && HavenNamed(s.Text)),
+                  && b.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.StartsWith($"Gave up {t0 * Career.GiveUpShare:N1} t and {pay0 * Career.GiveUpShare:N0} cr: the raider goes back to") && HavenNamed(s.Text)),
                 $"pirates: give up: pay {pay0:N0} → {b.Job.Pay:N0} cr, {t0:N0} → {b.Job.Tonnes:N0} t ({b.Ship.Cargo:N0} t aboard), the job kept, the proxy gone, no warp cap ({b.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
 
             // the two-button card (its Yes label is the give-up): No runs, Yes gives up
@@ -404,7 +418,7 @@ namespace FogOfWar
             var cp = qs.Pos(ceres, c.Jd);
             c.Ship.Pos = cp + cp.Norm * 1e5; c.Ship.Vel = qs.Vel(ceres, c.Jd);
             c.Tick(1);
-            Check(on && c.C.Encounter == null && !qs.Bodies.Contains(e.Proxy) && c.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.Contains("patrol at Ceres") && HavenNamed(s.Text)),
+            Check(on && c.C.Encounter == null && !qs.Bodies.Contains(e.Proxy) && c.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.StartsWith("Ceres patrol in reach: the raider breaks off") && HavenNamed(s.Text)),
                 $"pirates: a chase that comes in reach of the Ceres patrol breaks off ({c.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
         }
 
@@ -430,7 +444,7 @@ namespace FogOfWar
             b.Tick(1);
             Check(n == (int)(Threat.BoardingSeconds / 30) && capped && b.Job.Pay == pay0 * (1 - Career.BoardShare) && b.Job.Tonnes == t0 * (1 - Career.BoardShare)
                   && b.C.Active.Contains(b.Job) && b.C.Failed == 0 && b.C.Standing(Faction.Compact) == 0 && b.Ship.Cargo == b.Job.Tonnes && b.C.DropWarp
-                  && !qs.Bodies.Contains(e.Proxy) && b.Said.Exists(s => s.What == Career.Happening.Boarded && s.Text.Contains(Raiders) && HavenNamed(s.Text)),
+                  && !qs.Bodies.Contains(e.Proxy) && b.Said.Exists(s => s.What == Career.Happening.Boarded && s.Text.StartsWith($"Boarded: the raider took {t0 * Career.BoardShare:N1} t and {pay0 * Career.BoardShare:N0} cr back to") && HavenNamed(s.Text)),
                 $"pirates: boarded after {n * 30} s alongside (warp cap {Career.CloseWarp:N0}× meanwhile): pay {pay0:N0} → {b.Job.Pay:N0} cr, {t0:N0} → {b.Job.Tonnes:N0} t, the job kept, no standing lost " +
                 $"({b.Said.Find(s => s.What == Career.Happening.Boarded).Text})");
 
@@ -554,6 +568,46 @@ namespace FogOfWar
             Check(burnAhead <= bound, $"pirates: the proxy read 4 h ahead is {burnAhead:N0} km off the straight line from the pirate's state (≤ {bound:N0} km; the span's quadratic would be {0.5 * PirateA * Math.Pow(4 * 3600, 2):N0} km)");
             string coastRun = Fly(false, out bool coastBoarded, out _, out _, out _);
             Check(coastBoarded, $"pirates: the control, the same start coasting, is boarded ({coastRun})");
+        }
+
+        // D13: every text built around the faction's name, made with a singular name in the style of the other factions'.
+        // None may put a possessive, an article or a plural verb on it, or lower its case. The table's own name goes back
+        // in a finally, so no later check sees the test name.
+        void PirateNameChecks(SolarSystem qs)
+        {
+            var info = Career.Factions[(int)Faction.Raiders];
+            string was = info.Name, name = "Black Banner";
+            var texts = new List<string>();
+            string title = null, kind = null, warn = null, incoming = null;
+            try
+            {
+                info.Name = name;
+                var (vesta, at, vel) = Belt(qs);
+                var b = MakeBench(qs, at, vel);
+                b.C.MakeCall(Career.RouteKind.Pirate, b.Job, qs, b.Ship, b.Jd);
+                var e = b.C.Encounter;
+                title = b.C.Call?.Title;
+                texts.Add(title); texts.Add(b.C.Call?.Text); texts.Add(e?.Proxy.Name);
+                if (e != null)
+                {
+                    kind = R<string>("CraftKind", e.Proxy);
+                    warn = (string)typeof(OpenSystemScene).GetMethod("ChaseWarn", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(null, new object[] { e.Hull, true });
+                    texts.Add(kind); texts.Add(warn);
+                }
+                b.C.Divert = _ => true;
+                b.C.Answer(Career.RouteAnswer.Run, b.Jd);
+                b.C.Answer(Career.RouteAnswer.Divert, b.Jd);
+                b.C.Answer(Career.RouteAnswer.GiveUp, b.Jd);
+                foreach (var (_, text) in b.Said) { texts.Add(text); if (text.StartsWith("Incoming: ")) incoming = text; }
+                texts.Add(Career.OffNote(Career.BreakOff.Patrol, "Ceres", "Pallas")); texts.Add(Career.BoardedNote(20, 10000, "Pallas")); texts.Add(Career.LostNote("Pallas"));
+            }
+            finally { info.Name = was; }
+            var bad = texts.FindAll(t => t == null || t.Contains(name + "'") || t.Contains(name.ToLowerInvariant()) || Regex.IsMatch(t, $@"\b[Aa]n? {name}")
+                                         || Regex.IsMatch(t, $@"{name} (break|take|have|are|were|give)\b") || Regex.IsMatch(t, @"\b[Tt]hey\b") || t.Contains(" break off"));
+            int named = texts.FindAll(t => t != null && t.Contains(name)).Count;
+            Check(bad.Count == 0 && named >= 6 && title?.Contains(name) == true && kind?.Contains(name) == true && warn?.Contains(name) == true && incoming?.Contains(name) == true,
+                $"pirates: D13 with a singular name, \"{name}\": {texts.Count} texts, {named} name it, none with a possessive, an article, a plural verb or in lower case: " +
+                $"\"{title}\" / \"{incoming}\" / \"{kind}\" / \"{warn}\"" + (bad.Count > 0 ? "; wrong: " + string.Join(" | ", bad.ConvertAll(t => t ?? "(none)")) : ""));
         }
 
         // D8 on the path with no save that reads: a load whose career save will not read starts a new career, and that one

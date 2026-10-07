@@ -328,7 +328,7 @@ namespace FogOfWar
                     {
                         // the call's answers while its card is up (this page covers the card), then the ones a chase keeps
                         var answers = RaiderAnswers(out var call);
-                        Ui.L(card, $"The {career.Encounter.Hull} of the {Raiders} gives chase: " + (call != null ? "run, divert into a patrol's reach, or give up part of the job." : "divert into a patrol's reach, or give up part of the job."), "t-label", "warn").style.marginTop = 4;
+                        Ui.L(card, ChaseWarn(career.Encounter.Hull, call != null), "t-label", "warn").style.marginTop = 4;
                         var chase = Ui.E(card, "row", "wrap");
                         chase.style.marginTop = 4;
                         for (int i = 0; i < answers.Length; i++)

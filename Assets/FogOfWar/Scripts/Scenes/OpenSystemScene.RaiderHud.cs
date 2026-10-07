@@ -36,6 +36,10 @@ namespace FogOfWar
                    $" · boarding {Math.Floor(boarding * 100):0} %";
         }
 
+        // the Jobs page's line on the chased job: the call's answers while its card is up, then the ones a chase keeps
+        static string ChaseWarn(string hull, bool card) =>
+            $"The {hull} of the {Raiders} gives chase: " + (card ? "run, divert into a patrol's reach, or give up part of the job." : "divert into a patrol's reach, or give up part of the job.");
+
         // An answer from a card on screen, the call read when it is clicked: a call that changed under the pointer is not
         // answered with another call's choice
         void AnswerCall(Career.RouteCall call, int i)

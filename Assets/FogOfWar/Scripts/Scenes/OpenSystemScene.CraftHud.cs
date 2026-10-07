@@ -132,7 +132,7 @@ namespace FogOfWar
             {
                 case TargetKind.Wreck: return "Derelict ship · drive dead · orbiting " + (b.Parent?.Name ?? "the Sun");
                 case TargetKind.Ship: return "Ship under thrust";
-                case TargetKind.Hostile: return $"Hostile · a {Raiders} ship giving chase";
+                case TargetKind.Hostile: return $"Hostile · the {Raiders}, giving chase";
                 case TargetKind.Beacon: return "Beacon · coasting near " + (b.Parent?.Name ?? "the Sun");
                 default: return null;
             }

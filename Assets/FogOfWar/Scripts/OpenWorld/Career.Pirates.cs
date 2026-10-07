@@ -173,12 +173,13 @@ namespace FogOfWar.OpenWorld
             if (lair == null || !Spawn(lair, sys, ship, jd, out var pos, out var vel, out double catchS)) return false;
             var e = StartContact(job, sys, ship, jd, pos, vel, lair, catchS);
             var port = NearestPatrol(sys, ship, jd, out double divertS);
-            string hull = e.Hull, title = job.Title.ToLowerInvariant();
+            string hull = e.Hull, title = InSentence(job.Title);
             string takes = job.Kind == JobKind.Cargo ? $"{BoardShare * 100:0} % of the {title} and of its pay" : $"{BoardShare * 100:0} % of the pay for the {title}";
             string giveUp = GiveUpLabel;
             var answers = new List<(RouteAnswer, string)> { (RouteAnswer.Run, "Run") };
             if (port != null) answers.Add((RouteAnswer.Divert, DivertLabel(port)));
             answers.Add((RouteAnswer.GiveUp, giveUp));
+            // D13: a faction's name takes no possessive, no article and no verb that agrees with it, so a singular name reads
             Call = new RouteCall
             {
                 Kind = RouteKind.Pirate, Job = job, DivertTo = port, Answers = answers.ToArray(),
@@ -186,7 +187,7 @@ namespace FogOfWar.OpenWorld
                 Text = $"The {Raiders} had a ship, the {hull}, waiting {(pos - sys.Pos(lair, jd)).Mag:N0} km off {lair.Name}. At {PirateG:0} g it can be alongside in " +
                        $"about {Span(catchS / 86400)}, and {Span(Threat.BoardingSeconds / 86400)} alongside is a boarding: it takes {takes}. " +
                        "Run: burn hard, or dock first. " +
-                       (port != null ? $"Divert: {port.Name} is {Span(divertS / 86400)} away at full burn, and the {Factions[(int)port.Owner].Name} patrols around it. " : "") +
+                       (port != null ? $"Divert: {port.Name} is {Span(divertS / 86400)} away at full burn, in the {Factions[(int)port.Owner].Name} patrol's reach. " : "") +
                        $"Or give up {GiveUpShare * 100:0} % now and it leaves.",
                 Yes = giveUp, No = "Run",
             };
@@ -210,19 +211,16 @@ namespace FogOfWar.OpenWorld
         void Contacts(SolarSystem sys, Ship ship, double jd, double simDt)
         {
             // D8: a load dropped a chase (FromSave, LostContact)
-            if (contactLost) { contactLost = false; Say(Happening.RaiderGone, $"The {Raiders}' chase was not saved: the raider is gone, back to {HavenNear(sys, ship.Pos, jd)}", false); }
+            if (contactLost) { contactLost = false; Say(Happening.RaiderGone, LostNote(HavenNear(sys, ship.Pos, jd)), false); }
             var e = Encounter;
             if (e == null) return;
-            string back = $"heads back to {HavenNear(sys, e.Pirate.Pos, jd)}";
-            if (Docked != null) { EndContact(Happening.RaiderGone, $"Docked at {Docked.Name}: the {Raiders} break off. The raider {back}", true, jd); return; }
-            if (ship.Landed != null) { EndContact(Happening.RaiderGone, $"Landed on {ship.Landed.Name}: the {Raiders} break off. The raider {back}", true, jd); return; }
-            if (!Active.Contains(e.Job)) { EndContact(Happening.RaiderGone, $"The job it wanted is over: the {Raiders} break off. The raider {back}", true, jd); return; }
+            // looked up only for a note that ends the chase: this runs every update while one is on
+            string Haven() => HavenNear(sys, e.Pirate.Pos, jd);
+            if (Docked != null) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Docked, Docked.Name, Haven()), true, jd); return; }
+            if (ship.Landed != null) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Landed, ship.Landed.Name, Haven()), true, jd); return; }
+            if (!Active.Contains(e.Job)) { EndContact(Happening.RaiderGone, OffNote(BreakOff.JobOver, null, Haven()), true, jd); return; }
             var patrol = Threat.PatrolAt(sys, ship.Pos, jd);
-            if (patrol != null)
-            {
-                EndContact(Happening.RaiderGone, $"In reach of the {Factions[(int)patrol.Owner].Name} patrol at {patrol.Name}: the {Raiders} break off. The raider {back}", true, jd);
-                return;
-            }
+            if (patrol != null) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Patrol, patrol.Name, Haven()), true, jd); return; }
             e.Range = (e.Pirate.Pos - ship.Pos).Mag;
             e.Vrel = (e.Pirate.Vel - ship.Vel).Mag;
             bool alongside = e.Range < InterceptKm && e.Vrel < InterceptKms; // as Intercepts has it: a NaN is never alongside
@@ -231,8 +229,7 @@ namespace FogOfWar.OpenWorld
             if (e.Dwell < Threat.BoardingSeconds) return;
             var (t, pay) = Take(e.Job, BoardShare);
             DropWarp = true;
-            EndContact(Happening.Boarded, $"Boarded by the {Raiders}: they took " + (t > 0 ? $"{t:N1} t of the {e.Job.Title.ToLowerInvariant()} and " : "") +
-                                          $"{pay:N0} cr of its pay. The raider {back}", false, jd);
+            EndContact(Happening.Boarded, BoardedNote(t, pay, Haven()), false, jd);
         }
 
         // Run closes the card; Divert flies to the patrolled port on the card (or the nearest now, once the card is gone);
@@ -245,24 +242,45 @@ namespace FogOfWar.OpenWorld
             if (a == RouteAnswer.GiveUp)
             {
                 var (t, pay) = Take(e.Job, GiveUpShare);
-                EndContact(Happening.RaiderGone, $"Gave the {Raiders} " + (t > 0 ? $"{t:N1} t of the {e.Job.Title.ToLowerInvariant()} and " : "") +
-                                                 $"{pay:N0} cr of its pay. The raider heads back to {HavenNear(e.Sys, e.Pirate.Pos, jd)}", false, jd);
+                EndContact(Happening.RaiderGone, GaveUpNote(t, pay, HavenNear(e.Sys, e.Pirate.Pos, jd)), false, jd);
                 return;
             }
             if (a == RouteAnswer.Divert)
             {
                 // a dry tank: the plan would engage and drop at the next update, so the card stays up
-                if (ship != null && ship.Dry) { Say(Happening.RouteCall, "Can't divert: the tank is dry", false); return; }
+                if (ship != null && ship.Dry) { Say(Happening.RouteCall, DryNote, false); return; }
                 var port = (card ? Call.DivertTo : null) ?? (ship != null ? NearestPatrol(e.Sys, ship, jd, out _) : null);
                 var b = port != null ? e.Sys[port.Body] : null;
-                if (b == null || Divert == null || !Divert(b)) { Say(Happening.RouteCall, "Can't divert: the nav computer would not engage", false); return; }
+                if (b == null || Divert == null || !Divert(b)) { Say(Happening.RouteCall, NavNote, false); return; }
                 if (card) Drop();
-                Say(Happening.RouteCall, $"Diverting to {port.Name}: in the {Factions[(int)port.Owner].Name} patrol's reach the {Raiders} break off");
+                Say(Happening.RouteCall, DivertNote(port));
                 return;
             }
             if (card) Drop();
-            Say(Happening.RouteCall, $"Running from the {Raiders}, {e.Range:N0} km back: burn hard, or dock first. Time runs at {ChaseWarp:N0}× at most until the chase ends", false);
+            Say(Happening.RouteCall, RunNote, false);
         }
+
+        // W4's notes, built here so CareerQA can measure every one: the classic and -fowlegacyui note strip draws one line
+        // of a fixed width with no wrap (OpenSystemScene.DrawCareerNotes). So they leave out what the card and the pill say
+        // (the range, the job's title), and a faction's name takes no possessive, no article and no verb that agrees with
+        // it (D13).
+        internal enum BreakOff { Docked, Landed, JobOver, Patrol }
+        internal const string DryNote = "Can't divert: the tank is dry", NavNote = "Can't divert: the nav computer would not engage";
+        internal static string RunNote => $"Running: burn hard, or dock first. Time is held to {ChaseWarp:N0}×";
+        internal static string DivertNote(Port p) => $"Diverting to {p.Name}, into the {Factions[(int)p.Owner].Name} patrol's reach";
+        internal static string LostNote(string haven) => "The chase was not saved: the raider is gone" + Back(haven);
+        internal static string BoardedNote(double t, double pay, string haven) => "Boarded: the raider took " + Loot(t, pay) + (haven != null ? " back to " + haven : "");
+        internal static string GaveUpNote(double t, double pay, string haven) => $"Gave up {Loot(t, pay)}: the raider " + (haven != null ? "goes back to " + haven : "leaves");
+        internal static string OffNote(BreakOff why, string where, string haven) =>
+            (why == BreakOff.Docked ? $"Docked at {where}" : why == BreakOff.Landed ? $"Landed on {where}" : why == BreakOff.Patrol ? $"{where} patrol in reach" : "The job is over") +
+            ": the raider breaks off" + Back(haven);
+        static string Back(string haven) => haven != null ? ", back to " + haven : "";
+        static string Loot(double t, double pay) => (t > 0 ? $"{t:N1} t and " : "") + $"{pay:N0} cr";
+
+        // A job's title inside a sentence: the first letter lowered only when the next is lower case, so "Gravity survey
+        // of Vesta" reads "gravity survey of Vesta" and "D–He³ fuel pellets" or "QA ice" keep their capitals.
+        internal static string InSentence(string title) =>
+            title != null && title.Length > 1 && char.IsUpper(title[0]) && char.IsLower(title[1]) ? char.ToLowerInvariant(title[0]) + title.Substring(1) : title;
 
         // D6: the patrolled port the ship reaches soonest at full burn from its state now (Ship.TripFrom), and that time.
         internal static Port NearestPatrol(SolarSystem sys, Ship ship, double jd, out double seconds)
@@ -292,7 +310,7 @@ namespace FogOfWar.OpenWorld
             return (t, pay);
         }
 
-        static string HavenNear(SolarSystem sys, D3 x, double jd) => Threat.NearestHaven(sys, x, jd)?.Name ?? "its haven";
+        static string HavenNear(SolarSystem sys, D3 x, double jd) => Threat.NearestHaven(sys, x, jd)?.Name; // null: no haven in the system
 
         // The raider goes at once (no course home in W4), with a note; the next call waits RouteGapDays from now.
         void EndContact(Happening what, string text, bool good, double jd)

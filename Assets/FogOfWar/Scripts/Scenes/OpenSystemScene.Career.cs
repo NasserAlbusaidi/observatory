@@ -440,13 +440,14 @@ namespace FogOfWar
         // ---------------------------------------------------------------- notes (toasts)
 
         GUIStyle noteStyle;
+        const float NoteW = 560; // the strip: each note one line this wide, centred, with no wrap
+        GUIStyle NoteStyle => noteStyle ??= new GUIStyle { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
 
         void DrawCareerNotes()
         {
             if (career == null) return;
             DrawTutorial();
             if (career.Notes.Count == 0) return;
-            if (noteStyle == null) noteStyle = new GUIStyle { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
             float ui = App.UiScale;
             float W = UnityEngine.Screen.width / ui;
             float free = W - App.PanelWidth - 32;
@@ -454,13 +455,25 @@ namespace FogOfWar
             for (int i = Math.Max(0, career.Notes.Count - 4); i < career.Notes.Count; i++)
             {
                 var n = career.Notes[i];
-                var r = new Rect((free - 560) / 2 + 8, y, 560, 26);
+                var r = new Rect((free - NoteW) / 2 + 8, y, NoteW, 26);
                 GUI.color = new Color(0, 0, 0, 0.55f); GUI.DrawTexture(r, Texture2D.whiteTexture);
                 GUI.color = n.Good ? PanelUI.Accent : PanelUI.Warn;
-                GUI.Label(r, n.Text, noteStyle);
+                GUI.Label(r, n.Text, NoteStyle);
                 y += 30;
             }
             GUI.color = Color.white;
+        }
+
+        // review checks: texts to measure with the strip's own style, and their widths, filled in at the next OnGUI (a
+        // style with no font of its own measures with the skin's, which is there only inside OnGUI)
+        string[] noteProbe;
+        float[] noteWidths;
+
+        void ProbeNotes()
+        {
+            if (noteProbe == null) return;
+            noteWidths = Array.ConvertAll(noteProbe, t => NoteStyle.CalcSize(new GUIContent(t)).x);
+            noteProbe = null;
         }
 
         static string Days(double d) => d < 2 ? Fmt.Num(d * 24, 1) + " h" : Fmt.Num(d, 1) + " days";

@@ -107,7 +107,7 @@ namespace FogOfWar.OpenWorld
             else return false;
             Call.Answers ??= new[] { (RouteAnswer.Yes, Call.Yes), (RouteAnswer.No, Call.No) };
             DropWarp = true;
-            Say(Happening.RouteCall, "Incoming: " + Call.Title.ToLowerInvariant());
+            Say(Happening.RouteCall, "Incoming: " + (kind == RouteKind.Pirate ? Call.Title : Call.Title.ToLowerInvariant())); // a raider's title starts with its faction's name
             return true;
         }
 
