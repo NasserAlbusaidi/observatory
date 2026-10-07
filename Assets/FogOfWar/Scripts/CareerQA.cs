@@ -190,6 +190,7 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "career.txt")) { AutoFlush = true };
+            OpenSystemScene.CheckUnattendedSaveKey(log);
             app = GetComponent<FogOfWarApp>();
             int ti = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowtrace"); if (ti >= 0) { traceEvery = 0.25f; moonWarp = int.Parse(Environment.GetCommandLineArgs()[ti + 1]); }
             app.InputLocked = true; Controls.Locked = true;
@@ -206,7 +207,7 @@ namespace FogOfWar
             string Key(string[] args, string path) => (string)keyPolicy.Invoke(null, new object[] { args, path });
             Check(SaveKey != "fow-save-v1" && SaveKey != "fow-career-v1", "unattended career never uses the player's save key");
             var suiteKeys = new System.Collections.Generic.HashSet<string>();
-            foreach (string flag in new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" })
+            foreach (string flag in OpenSystemScene.UnattendedSuites())
             {
                 string key = Key(new[] { flag }, Application.dataPath);
                 Check(key.StartsWith("fow-save-qa-", StringComparison.Ordinal) && suiteKeys.Add(key)

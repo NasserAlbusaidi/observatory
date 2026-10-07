@@ -491,8 +491,15 @@ namespace FogOfWar
         // static field, so SaveKey's initialiser never sees it unset). -fowfidelity and -fowbhshots are unattended too:
         // this also turns route events off for both of those suites.
         static bool Unattended() => UnattendedSuite(Environment.GetCommandLineArgs()) != null;
-        static string UnattendedSuite(string[] args) => Array.Find(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" },
+        internal static string[] UnattendedSuites() => new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" };
+        static string UnattendedSuite(string[] args) => Array.Find(UnattendedSuites(),
             a => Array.IndexOf(args, a) >= 0);
+        // Each runner checks at report creation, independently of registration in UnattendedSuites.
+        internal static void CheckUnattendedSaveKey(System.IO.TextWriter report)
+        {
+            if (SaveKey == "fow-save-v1" || CareerKey == "fow-career-v1")
+                report.WriteLine("ERROR unattended suite is using the player's save key");
+        }
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
         public static string SaveSummary
         {
