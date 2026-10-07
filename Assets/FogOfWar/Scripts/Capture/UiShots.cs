@@ -328,7 +328,8 @@ namespace FogOfWar
                     }
                     finally
                     {
-                        setTarget.Invoke(os, new object[] { oldTarget });
+                        if (oldTarget != null) setTarget.Invoke(os, new object[] { oldTarget });
+                        else craft.Target = null;
                         craft.Plan = oldPlan; craft.Phase = oldPhase;
                         targetIndex.SetValue(os, oldIndex); cameraDistance.SetValue(os, oldDistance);
                         epoch.SetValue(os, oldJd);
