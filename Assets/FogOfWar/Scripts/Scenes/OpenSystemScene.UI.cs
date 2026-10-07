@@ -315,7 +315,7 @@ namespace FogOfWar
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
             list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
-            list.Add(new Readout("Flight model", FlightModel, Coasting() ? Tone.Bad : Tone.Normal));
+            list.Add(new Readout("Flight model", FlightModel, Tone.Normal));
             if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, Tone.Bad));
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
@@ -335,7 +335,7 @@ namespace FogOfWar
                 if (!Career.IsCraft(ship.Target))
                 {
                     list.Add(new Readout("Position model", ship.Target.PositionModel(jd)));
-                    list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
+                    if (ship.Target.Parent != null) list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
                 }
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
@@ -479,20 +479,27 @@ namespace FogOfWar
         // `-fowsavekey <name>` points Save, Continue and F5 at another PlayerPrefs key, so live QA never touches the
         // player's own save (the career goes under <name>-career)
         static readonly string SaveKey = SaveKeyFromArgs();
-        static string SaveKeyFromArgs()
+        static string SaveKeyFromArgs() => SaveKeyFor(Environment.GetCommandLineArgs(), Application.dataPath);
+        // Pure policy entry point so QA can exercise every unattended flag without changing process arguments.
+        static string SaveKeyFor(string[] args, string dataPath)
         {
-            var args = Environment.GetCommandLineArgs();
             int i = Array.IndexOf(args, "-fowsavekey");
             if (i >= 0 && i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
             // the unattended suites save, load and autosave too (the -fowqa "save" step, a dock): keep them off the player's save
-            // A process nonce also isolates two copies of the same suite/build. Keep it for this process's lifetime
-            // so scene restarts and Continue still share their own save. Explicit keys remain reusable across runs.
-            return Unattended() ? "fow-save-qa-" + Guid.NewGuid().ToString("N") : "fow-save-v1";
+            // Reuse a bounded pair per build path and suite; repeated runs must not leave orphan registry values.
+            // Concurrent copies of the same build/suite share this slot; give them distinct explicit keys if needed.
+            string suite = UnattendedSuite(args);
+            if (suite == null) return "fow-save-v1";
+            using var hash = System.Security.Cryptography.SHA256.Create();
+            byte[] digest = hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(dataPath.Replace('\\', '/').TrimEnd('/') + "\n" + suite));
+            return "fow-save-qa-" + BitConverter.ToString(digest, 0, 8).Replace("-", "").ToLowerInvariant();
         }
         // an unattended suite is running: no player save, and no route calls to drop the warp mid-trip (a method, not a
-        // static field, so SaveKey's initialiser never sees it unset)
-        static bool Unattended() => Array.Exists(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" },
-            a => Array.IndexOf(Environment.GetCommandLineArgs(), a) >= 0);
+        // static field, so SaveKey's initialiser never sees it unset). -fowfidelity and -fowbhshots are unattended too:
+        // this also turns route events off for both of those suites.
+        static bool Unattended() => UnattendedSuite(Environment.GetCommandLineArgs()) != null;
+        static string UnattendedSuite(string[] args) => Array.Find(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" },
+            a => Array.IndexOf(args, a) >= 0);
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
         public static string SaveSummary
         {

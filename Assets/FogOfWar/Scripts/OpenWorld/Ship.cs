@@ -178,6 +178,9 @@ namespace FogOfWar.OpenWorld
             dominant = reference;
             var cmd = Guide(sys, jd, 0, sys.Gravity(Pos, jd));
             Throttle = !Dry && cmd.HasValue && cmd.Value.Mag > RcsAccel ? Math.Min(cmd.Value.Mag / AMax, 1) : 0;
+            // Same aim gate as Step: waking from a coast must not light the drive before the flip finishes.
+            if (Throttle > 0 && D3.Dot(Heading, cmd.Value.Norm) < Math.Cos(3 * Math.PI / 180))
+            { Throttle = 0; Phase = "turning"; }
             RcsActive = !Dry && cmd.HasValue && cmd.Value.Sqr > 0 && cmd.Value.Mag <= RcsAccel;
             RcsLevel = RcsActive ? (float)(cmd.Value.Mag / RcsAccel) : 0;
             if (Dry) Phase = "out of fuel";
@@ -694,6 +697,7 @@ namespace FogOfWar.OpenWorld
         [Serializable] public class SaveData
         {
             public double jd, px, py, pz, vx, vy, vz, maxG, dv;
+            public double burnSeconds, cruiseSeconds; // older saves default to zero; counters belong to the saved timeline
             public float qx, qy, qz, qw;
             public string target;
             public int warp;
@@ -711,6 +715,7 @@ namespace FogOfWar.OpenWorld
         public SaveData ToSave(double jd, int warp) => new SaveData
         {
             jd = jd, px = Pos.x, py = Pos.y, pz = Pos.z, vx = Vel.x, vy = Vel.y, vz = Vel.z, maxG = MaxG, dv = DvUsed,
+            burnSeconds = BurnSeconds, cruiseSeconds = CruiseSeconds,
             qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Target?.Name, warp = warp, assist = FlightAssist,
             plan = (int)(PlanActive ? Plan : Plan.None), hold = (int)Hold, throttle = ThrottleCmd,
             wx = AngVel.x, wy = AngVel.y, wz = AngVel.z, landed = Landed?.Name,
@@ -721,6 +726,7 @@ namespace FogOfWar.OpenWorld
         public void FromSave(SaveData s, SolarSystem sys)
         {
             Pos = new D3(s.px, s.py, s.pz); Vel = new D3(s.vx, s.vy, s.vz); MaxG = s.maxG; DvUsed = s.dv;
+            BurnSeconds = s.burnSeconds; CruiseSeconds = s.cruiseSeconds;
             Att = Quaternion.Normalize(new Quaternion(s.qx, s.qy, s.qz, s.qw));
             // with flight assist off nothing damps a spin: keep it (assist on would have stopped it anyway)
             AngVel = s.assist ? Vector3.zero : Vector3.ClampMagnitude(new Vector3(s.wx, s.wy, s.wz), MaxRate);
