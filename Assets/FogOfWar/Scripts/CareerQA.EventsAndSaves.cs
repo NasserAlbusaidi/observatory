@@ -77,6 +77,10 @@ namespace FogOfWar
 
                 // a real roll: flying the job with events on, a call comes in and drops the warp
                 yield return null; // the calls above left DropWarp set: let the scene take it before the warp goes up
+                // The preceding survey can end in raider space. This ordinary-call fixture is an inner-system leg.
+                var earth = sys.Pos(sys.Earth, jd);
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0; ship.Landed = null;
+                ship.Pos = earth + earth.Norm * 1e6; ship.Vel = sys.Vel(sys.Earth, jd);
                 career.RouteEvents = true;
                 Put("cruiseIdx", 1);
                 Put("selectedPlan", Plan.Brachistochrone);
