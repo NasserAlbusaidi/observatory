@@ -14,12 +14,12 @@ namespace FogOfWar
     public partial class OpenSystemScene : SimScene
     {
         public override string Title => "Open System";
-        public override string Eyebrow => "The Expanse, true scale";
+        public override string Eyebrow => "Torch-ship flight, true scale";
         public override string Short => "Fly anywhere from Mercury to Neptune";
         public override string Blurb =>
-            "Every planet and moon is where it really is today, on its real orbit. Your ship has a fusion drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b>, and it flies a brachistochrone, burning toward the target, flipping at the midpoint and braking the rest of the way, then parks in orbit.\n\n" +
+            "Explore today's solar system using fitted and mean-element orbits based on JPL data. Your ship has a fictional torch drive: pick a <color=#FFB547>target</color> and hit <b>Plot & burn</b> for a feedback-guided transfer. It accelerates, turns to brake, then aims to park in orbit; the ideal flip-and-burn estimate is a planning guide.\n\n" +
             "Crank time compression to cross the system. At 1 g, Mars is a few days away; Neptune is a few weeks.";
-        public override string Note => "Positions: JPL Horizons fits, 2000–2100 (TDB). Drive efficiency and high-g endurance are fictional; trajectories and Δv are real. Coasting follows two-body conics around the dominant body (patched conics). F1 lists the controls; Esc → Controls rebinds them.";
+        public override string Note => "Positions mix JPL fits and mean elements; fitted coverage and fallback vary by body. The drive regulates acceleration with assumed thrust reserve; cargo raises fuel cost. Translational RCS shares its fictional exhaust efficiency. Electric reaction wheels use no reaction mass; saturation, power and waste-heat limits are omitted. High-g endurance is fictionalized. Through 100×, burns and coasts share multi-body gravity and J2; at 1k× and above, eligible coasts use a labelled two-body approximation. Atmospheric arrivals are assisted; drag, pressure and entry heating are omitted. F1 lists the controls; Esc → Controls rebinds them.";
 
         const double LinearLimit = 1e5;     // km rendered 1:1 around the camera
         static readonly double[] Warps = { 1, 10, 100, 1e3, 1e4, 1e5, 1e6 };
@@ -66,7 +66,7 @@ namespace FogOfWar
             sys = SolarSystem.Build();
             traffic = null; // its ships were bodies of the old system
             targets = sys.Bodies.FindAll(b => b != sys.Sun && (b.Parent == sys.Sun || b.Radius >= 100 || b == sys.Moon)); // T cycles these
-            jd = Frame.JulianDateTdb(DateTime.UtcNow);
+            jd = CareerTesting ? CareerQA.Epoch : Frame.JulianDateTdb(DateTime.UtcNow);
             warpIdx = 0;
             // the scene object lives across New game: a new flight starts with the drawer closed, no page open and a
             // compact target card
@@ -115,7 +115,10 @@ namespace FogOfWar
                     // one that suits the body's size on screen is shown.
                     var holder = new GameObject(b.Name).transform;
                     holder.SetParent(Root, false);
-                    if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0) b.Radius = info.meanRadiusKm;
+                    if (art.TryGetValue(b.Name, out var info) && info.meanRadiusKm > 0)
+                    { b.Radius = info.meanRadiusKm; b.RadiusSource = "shape asset volume-equivalent radius"; b.SizeEstimated = false; }
+                    b.ShapeSource = modelPath.StartsWith("Asteroids/", StringComparison.Ordinal) ?
+                        "borrowed procedural asteroid mesh (unmeasured shape)" : "body shape asset: Models/" + modelPath + " (source in Models/Bodies/LODS.json)";
                     v.t = holder; v.model = true;
                     bool lods = Resources.Load<GameObject>($"Models/Bodies/{b.Name}_LOD0") != null;
                     var paths = lods ? new[] { $"Bodies/{b.Name}_LOD0", $"Bodies/{b.Name}_LOD1", $"Bodies/{b.Name}_LOD2" } : new[] { modelPath };
@@ -406,9 +409,13 @@ namespace FogOfWar
         readonly System.Diagnostics.Stopwatch swTick = new System.Diagnostics.Stopwatch(), swLate = new System.Diagnostics.Stopwatch(), swGui = new System.Diagnostics.Stopwatch(),
             swTraffic = new System.Diagnostics.Stopwatch(); // inside tick and gui
         int profFrames, profSteps; float profT;
+        static readonly bool CareerTesting = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcareer") >= 0;
+        // QA stops on an exact simulation epoch, regardless of how many real frames the machine needs.
+        public double QaStopJd = double.PositiveInfinity;
 
         public override void Tick(float dt)
         {
+            if (CareerTesting) dt = 1f / 60;
             if (Prof) swTick.Start();
             try { TickInner(dt); } finally { if (Prof) swTick.Stop(); }
             if (Prof && (profT += Time.unscaledDeltaTime) > 2f)
@@ -426,7 +433,8 @@ namespace FogOfWar
             ReadInput(dt);
             if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
             CapWarp();
-            double simDt = dt * Warps[warpIdx];
+            double simDt = Math.Min(dt * Warps[warpIdx], Math.Max(0, (QaStopJd - jd) * 86400));
+            double requested = simDt;
             warpLimited = false;
             // only bodies the ship could reach this frame get per-substep collision checks; craft (a derelict, the practice
             // beacon) have no surface to land on or crash into
@@ -439,7 +447,7 @@ namespace FogOfWar
             var budget = System.Diagnostics.Stopwatch.StartNew();
             while (simDt > 1e-9)
             {
-                if (++steps > MaxSubsteps || budget.Elapsed.TotalMilliseconds > 10) { warpLimited = true; break; }
+                if (++steps > MaxSubsteps || (!CareerTesting && budget.Elapsed.TotalMilliseconds > 10)) { warpLimited = true; break; }
                 if (ship.Landed != null && ship.ThrottleCmd == 0 && !ship.PlanActive && !ship.ManualInput)
                 {
                     ship.Step(sys, jd, simDt, reference); // riding the surface: no dynamics to resolve (a raider's chase ends at the career tick)
@@ -472,7 +480,7 @@ namespace FogOfWar
                 if (simDt < 1e-4) simDt = 0; // finer than jd can resolve
             }
             // the player's warp stays selected; when the frame budget runs out, report the rate actually achieved
-            double achieved = dt * Warps[warpIdx] - Math.Max(simDt, 0);
+            double achieved = requested - Math.Max(simDt, 0);
             frameWarp = dt > 0 ? achieved / dt : 0;
             effectiveWarp = effectiveWarp * 0.9 + 0.1 * frameWarp;
             if (warpLimited) limitedAt = Time.realtimeSinceStartup;
@@ -501,10 +509,17 @@ namespace FogOfWar
 
         static string Speed(double kms) => kms < 1 ? $"{kms * 1000:F0} m/s" : $"{kms:F2} km/s";
 
-        // Drive off (or the autopilot parked in orbit): ride a two-body conic around the dominant body. Exact at any
-        // warp; other bodies' pulls are ignored until the next burn (patched conics).
-        bool Coasting() => ship.Landed == null && ship.RcsInput.sqrMagnitude == 0 &&
+        // Through 100×, drive-off flight uses the same multi-body/J2 integrator as powered flight. At 1k× and above,
+        // eligible coasts use a labelled dominant-body approximation; switching preserves world position/velocity.
+        bool Coasting() => warpIdx >= 3 && ship.Landed == null && ship.RcsInput.sqrMagnitude == 0 &&
             (ship.PlanActive ? ship.Throttle == 0 && (ship.Phase == "in orbit" || ship.Phase == "velocity matched" || ship.Phase == "cruising") : ship.ThrottleCmd == 0);
+
+        string FlightModel => ship.Landed != null ? (ship.AssistedArrival ? "assisted arrival" : "body-fixed contact") :
+            Coasting() ? "two-body coast (approximation, 1k×+)" : "integrated multi-body gravity + J2";
+
+        string ArrivalNotice => reference != null && Ship.HasAtmosphere(reference) &&
+            (ship.Pos - sys.Pos(reference, jd)).Mag - reference.Radius < Math.Max(300, reference.Radius * 0.1) ?
+            Ship.ArrivalPolicy(reference) : null;
 
         double Coast(double maxDt)
         {
@@ -520,14 +535,21 @@ namespace FogOfWar
             chunk = Math.Max(chunk, Math.Min(maxDt, 1));
             // #5: never adopt an unconverged conic; shorter arcs are easier, and failing that the integrator takes over
             D3 r1, v1;
-            for (int tries = 0; !Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1); tries++)
-                if (tries == 20) return 0; else chunk *= 0.5;
+            for (int tries = 0; ; tries++)
+            {
+                chunk = (jd + chunk / 86400 - jd) * 86400;
+                if (chunk <= 0) return 0;
+                if (Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1)) break;
+                if (tries == 20) return 0;
+                chunk *= 0.5;
+            }
             // #6: stop at the first surface the arc passes through, even if it is outside again by the arc's end
             double hit = FirstSurfaceHit(dom, r0, v0, chunk);
             if (hit >= 0)
             {
                 chunk = Math.Max(hit, 1e-3);
-                Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1);
+                chunk = (jd + chunk / 86400 - jd) * 86400;
+                if (!Rails.Propagate(r0, v0, dom.GM, chunk, out r1, out v1)) return 0;
             }
             double jd1 = jd + chunk / 86400;
             ship.Pos = sys.Pos(dom, jd1) + r1;
@@ -536,8 +558,9 @@ namespace FogOfWar
             if (!ship.PlanActive) ship.Phase = "coasting";
             ship.Turn(sys, jd1, chunk, dom);
             ship.CheckTouchdown(sys, jd1);
+            if (ship.PlanActive && ship.Phase == "cruising") ship.CruiseSeconds += chunk;
             // the autopilot re-checks its plan after each arc and burns again if it has drifted
-            if (ship.PlanActive) ship.Step(sys, jd1, 0.001, dom);
+            if (ship.PlanActive) ship.RecheckPlan(sys, jd1, dom);
             return chunk;
         }
 

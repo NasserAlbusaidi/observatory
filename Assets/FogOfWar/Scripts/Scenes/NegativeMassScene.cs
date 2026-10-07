@@ -13,7 +13,7 @@ namespace FogOfWar
         public override string Blurb =>
             "Amber balls have positive mass, cyan ones negative. Push a negative mass and it accelerates <color=#FFB547>toward</color> you. Put one next to a positive mass and the positive one flees while the negative one chases it.\n\n" +
             "The pair speeds up forever with no fuel. Total momentum stays at zero, and so does the pair's kinetic energy: the negative mass's −½mv² cancels the positive one's. Their gap never changes, so the potential energy doesn't either, and total energy is conserved without anything paying for the speed. That free lunch is why most physicists think persistent negative mass can't exist.";
-        public override string Note => "Not antimatter. Antihydrogen falls down; CERN's ALPHA-g measured it in 2023. Negative energy density is real in tiny Casimir-sized doses, and it's the same ingredient the wormhole and warp scenes are begging for.";
+        public override string Note => "A theoretical signed-mass model, not an observed material or engine. Antimatter is not negative mass. Casimir vacuum-energy effects do not demonstrate negative-inertial-mass objects, and are not interchangeable with the particles here or a supply of wormhole/warp support.";
 
         static readonly string[] Presets = { "Bondi runaway pair (+m, −m)", "Mixed swarm", "Only negative masses", "Normal orbit (both positive)" };
         int preset;

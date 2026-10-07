@@ -12,7 +12,7 @@ namespace FogOfWar.OpenWorld
         public const double RescueKm = 500, RescueKms = 0.05, TransferSeconds = 1800;
         const string DerelictPrefix = "Derelict ";
 
-        public static bool IsDerelict(Body b) => b != null && b.Name.StartsWith(DerelictPrefix);
+        public static bool IsDerelict(Body b) => b != null && b.Name.StartsWith(DerelictPrefix, StringComparison.Ordinal);
         // a ship rather than a natural body: a derelict or a ship flying its own course
         public static bool IsCraft(Body b) => IsDerelict(b) || b?.Path != null;
 

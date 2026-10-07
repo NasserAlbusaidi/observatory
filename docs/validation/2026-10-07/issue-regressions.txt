@@ -1,0 +1,98 @@
+Unity 6000.6.4f1; UTC 2026-10-07T05:15:10.4908891Z; double precision km, s, TDB JD
+PASS #88 coast h=0.016666666666666666, N=6000, elapsed=99.939107894897461: analytic circle position 2.027E-006 km < 0.002, velocity 9.592E-014 km/s < 1e-8
+PASS #88 coast h=0.05, N=6000, elapsed=300.05872249603271: analytic circle position 1.127E-005 km < 0.002, velocity 7.851E-013 km/s < 1e-8
+PASS #88 coast h=1, N=6000, elapsed=5999.9674558639526: analytic circle position 1.559E-004 km < 0.002, velocity 1.464E-011 km/s < 1e-8
+PASS #88 coast h=30, N=6000, elapsed=179999.98927116394: analytic circle position 5.078E-005 km < 0.002, velocity 8.907E-013 km/s < 1e-8
+PASS #88 6000 plan re-checks advance no physics or fuel
+PASS #54 spin=360, latitude=0, h=1: quarter-turn position 2.517E-009 km < 1e-6; surface velocity 2.433E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=0, h=1
+PASS #54 legacy contact migration spin=360, latitude=0, h=1
+PASS #54 liftoff keeps surface velocity spin=360, latitude=0, h=1: unexplained delta 3.635E-012 km/s < 1e-6
+PASS #54 spin=360, latitude=0, h=60: quarter-turn position 2.517E-009 km < 1e-6; surface velocity 2.433E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=0, h=60
+PASS #54 legacy contact migration spin=360, latitude=0, h=60
+PASS #54 liftoff keeps surface velocity spin=360, latitude=0, h=60: unexplained delta 3.635E-012 km/s < 1e-6
+PASS #54 spin=360, latitude=0, h=21600: quarter-turn position 2.517E-009 km < 1e-6; surface velocity 2.433E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=0, h=21600
+PASS #54 legacy contact migration spin=360, latitude=0, h=21600
+PASS #54 liftoff keeps surface velocity spin=360, latitude=0, h=21600: unexplained delta 3.635E-012 km/s < 1e-6
+PASS #54 spin=360, latitude=45, h=1: quarter-turn position 1.762E-009 km < 1e-6; surface velocity 1.720E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=45, h=1
+PASS #54 legacy contact migration spin=360, latitude=45, h=1
+PASS #54 liftoff keeps surface velocity spin=360, latitude=45, h=1: unexplained delta 2.570E-012 km/s < 1e-6
+PASS #54 spin=360, latitude=45, h=60: quarter-turn position 1.762E-009 km < 1e-6; surface velocity 1.720E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=45, h=60
+PASS #54 legacy contact migration spin=360, latitude=45, h=60
+PASS #54 liftoff keeps surface velocity spin=360, latitude=45, h=60: unexplained delta 2.570E-012 km/s < 1e-6
+PASS #54 spin=360, latitude=45, h=21600: quarter-turn position 1.762E-009 km < 1e-6; surface velocity 1.720E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=45, h=21600
+PASS #54 legacy contact migration spin=360, latitude=45, h=21600
+PASS #54 liftoff keeps surface velocity spin=360, latitude=45, h=21600: unexplained delta 2.570E-012 km/s < 1e-6
+PASS #54 spin=360, latitude=90, h=1: quarter-turn position 0.000E+000 km < 1e-6; surface velocity 3.041E-015 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=90, h=1
+PASS #54 legacy contact migration spin=360, latitude=90, h=1
+PASS #54 liftoff keeps surface velocity spin=360, latitude=90, h=1: unexplained delta 4.964E-015 km/s < 1e-6
+PASS #54 spin=360, latitude=90, h=60: quarter-turn position 0.000E+000 km < 1e-6; surface velocity 3.041E-015 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=90, h=60
+PASS #54 legacy contact migration spin=360, latitude=90, h=60
+PASS #54 liftoff keeps surface velocity spin=360, latitude=90, h=60: unexplained delta 4.964E-015 km/s < 1e-6
+PASS #54 spin=360, latitude=90, h=21600: quarter-turn position 0.000E+000 km < 1e-6; surface velocity 3.041E-015 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=360, latitude=90, h=21600
+PASS #54 legacy contact migration spin=360, latitude=90, h=21600
+PASS #54 liftoff keeps surface velocity spin=360, latitude=90, h=21600: unexplained delta 4.964E-015 km/s < 1e-6
+PASS #54 spin=-360, latitude=0, h=1: quarter-turn position 2.517E-009 km < 1e-6; surface velocity 2.433E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=0, h=1
+PASS #54 legacy contact migration spin=-360, latitude=0, h=1
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=0, h=1: unexplained delta 3.635E-012 km/s < 1e-6
+PASS #54 spin=-360, latitude=0, h=60: quarter-turn position 2.517E-009 km < 1e-6; surface velocity 2.433E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=0, h=60
+PASS #54 legacy contact migration spin=-360, latitude=0, h=60
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=0, h=60: unexplained delta 3.635E-012 km/s < 1e-6
+PASS #54 spin=-360, latitude=0, h=21600: quarter-turn position 2.517E-009 km < 1e-6; surface velocity 2.433E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=0, h=21600
+PASS #54 legacy contact migration spin=-360, latitude=0, h=21600
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=0, h=21600: unexplained delta 3.635E-012 km/s < 1e-6
+PASS #54 spin=-360, latitude=45, h=1: quarter-turn position 1.791E-009 km < 1e-6; surface velocity 1.720E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=45, h=1
+PASS #54 legacy contact migration spin=-360, latitude=45, h=1
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=45, h=1: unexplained delta 2.570E-012 km/s < 1e-6
+PASS #54 spin=-360, latitude=45, h=60: quarter-turn position 1.791E-009 km < 1e-6; surface velocity 1.720E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=45, h=60
+PASS #54 legacy contact migration spin=-360, latitude=45, h=60
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=45, h=60: unexplained delta 2.570E-012 km/s < 1e-6
+PASS #54 spin=-360, latitude=45, h=21600: quarter-turn position 1.791E-009 km < 1e-6; surface velocity 1.720E-008 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=45, h=21600
+PASS #54 legacy contact migration spin=-360, latitude=45, h=21600
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=45, h=21600: unexplained delta 2.570E-012 km/s < 1e-6
+PASS #54 spin=-360, latitude=90, h=1: quarter-turn position 5.684E-014 km < 1e-6; surface velocity 1.119E-013 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=90, h=1
+PASS #54 legacy contact migration spin=-360, latitude=90, h=1
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=90, h=1: unexplained delta 4.963E-015 km/s < 1e-6
+PASS #54 spin=-360, latitude=90, h=60: quarter-turn position 5.684E-014 km < 1e-6; surface velocity 1.119E-013 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=90, h=60
+PASS #54 legacy contact migration spin=-360, latitude=90, h=60
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=90, h=60: unexplained delta 4.963E-015 km/s < 1e-6
+PASS #54 spin=-360, latitude=90, h=21600: quarter-turn position 5.684E-014 km < 1e-6; surface velocity 1.119E-013 km/s < 1e-6; safe local touchdown True
+PASS #54 body-fixed save/load spin=-360, latitude=90, h=21600
+PASS #54 legacy contact migration spin=-360, latitude=90, h=21600
+PASS #54 liftoff keeps surface velocity spin=-360, latitude=90, h=21600: unexplained delta 4.963E-015 km/s < 1e-6
+PASS #54 synchronous quarter orbit keeps contact: 4.598E-011 km < 1e-6
+PASS #53 Rocky arrival at 0.005 km/s: landed on Sync fixture; no ordinary giant landing
+PASS #53 Rocky arrival at 2 km/s: destroyed: hit Sync fixture at 2000 m/s; no ordinary giant landing
+PASS #53 Gas arrival at 0.005 km/s: assisted cloud-top hold at Sync fixture; no ordinary giant landing
+PASS #53 Gas arrival at 2 km/s: destroyed: hit Sync fixture at 2000 m/s; no ordinary giant landing
+PASS #53 Ice arrival at 0.005 km/s: assisted cloud-top hold at Sync fixture; no ordinary giant landing
+PASS #53 Ice arrival at 2 km/s: destroyed: hit Sync fixture at 2000 m/s; no ordinary giant landing
+PASS #51 Earth uses a fitted ephemeris at the fixture epoch
+PASS #51 per-body boundary blend and fallback labelled
+PASS #51 missing fit asset explicitly labelled
+PASS #51 mean-element moon identifies its assumed rotation
+PASS #51 nominal-size body identifies unmeasured radius
+PASS #50 warp index 0: same integrated gravity at zero thrust
+PASS #50 warp index 1: same integrated gravity at zero thrust
+PASS #50 warp index 2: same integrated gravity at zero thrust
+PASS #50 warp index 3: labelled two-body approximation
+PASS #50 warp index 6: labelled two-body approximation
+PASS #101 active intercept runner is absent from the shared classic/HUD planet list; all eight planets remain
+PASS #101 rebuilt Targets tab renders Earth and no intercept-runner planet button
+done: 0 failed checks

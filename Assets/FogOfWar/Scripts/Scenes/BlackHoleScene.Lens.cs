@@ -33,9 +33,33 @@ namespace FogOfWar
         bool lensValid;
 
         public int LensBuilds { get; private set; }
-        // VRAM of the table: four RGBA float targets and one RG float target
-        public static long LensBytes => (long)LensN * LensN * (4 * 16 + 8);
+        // Five RGBA float targets; T4 also retains native step/fallback counters.
+        public static long LensBytes => (long)LensN * LensN * (5 * 16);
         public bool LensActive { get; private set; }
+
+        // Explicit diagnostic readback only, never part of an interactive frame or its timing.
+        public string LensTerminationSummary()
+        {
+            if (!lensValid || lensRT[0] == null) return "lens table unavailable";
+            var previous=RenderTexture.active;
+            var pixels=new Texture2D(LensN,LensN,TextureFormat.RGBAFloat,false,true);
+            try
+            {
+                RenderTexture.active=lensRT[0]; pixels.ReadPixels(new Rect(0,0,LensN,LensN),0,0); pixels.Apply();
+                var codes=pixels.GetPixels(); var counts=new int[5]; int invalid=0;
+                foreach(var c in codes)
+                {
+                    int code=Mathf.FloorToInt(c.r/8);
+                    if(float.IsNaN(c.r+c.g+c.b+c.a) || float.IsInfinity(c.r+c.g+c.b+c.a) || code<0 || code>4) invalid++;
+                    else counts[code]++;
+                }
+                RenderTexture.active=lensRT[4]; pixels.ReadPixels(new Rect(0,0,LensN,LensN),0,0); pixels.Apply();
+                int fallback=0; float maxSteps=0;
+                foreach(var c in pixels.GetPixels()) { if(c.a>0.5f) fallback++; maxSteps=Mathf.Max(maxSteps,c.b); }
+                return $"lens cells={LensN*LensN}; capture={counts[0]}; escape={counts[1]}; unresolved={counts[2]}; opaque={counts[3]}; numerical={counts[4]}; display fallback={fallback}; invalid={invalid}; max steps={maxSteps}";
+            }
+            finally { RenderTexture.active=previous; Gfx.Destroy(pixels); }
+        }
 
         void UpdateLens(double a)
         {
@@ -62,7 +86,7 @@ namespace FogOfWar
         }
 
         static bool LensSupported => SystemInfo.supportedRenderTargetCount >= 5
-            && SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBFloat) && SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.RGFloat);
+            && SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBFloat);
 
         // Review harness: rebuild now for the current camera (timing).
         public void RebuildLens()
@@ -86,7 +110,7 @@ namespace FogOfWar
                 { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Repeat, name = "BHLensEdge", hideFlags = HideFlags.DontSave };
                 for (int i = 0; i < lensRT.Length; i++)
                 {
-                    lensRT[i] = new RenderTexture(LensN, LensN, 0, i < 4 ? RenderTextureFormat.ARGBFloat : RenderTextureFormat.RGFloat, RenderTextureReadWrite.Linear)
+                    lensRT[i] = new RenderTexture(LensN, LensN, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear)
                     { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "BHLens" + i, hideFlags = HideFlags.DontSave };
                     lensRT[i].Create();
                 }

@@ -1,0 +1,53 @@
+[Warning] ICU Data not available: falling back to minimal text segmentation (basic line breaking rules only, emoji sequences may not render correctly). The data is automatically assigned to the PanelSettings in the editor if the advanced text option is enabled in the project settings. It will not be present on PanelSettings created at runtime, so make sure the build contains at least one PanelSettings asset to get full international text support.
+
+[Warning] No ICU data provided. Falling back to minimal text segmentation (basic line breaking rules only, emoji sequences may not render correctly).
+
+size 1920x1080
+    05-flight: console closed
+    05-flight: card rows Distance Closing Trip Engage
+    05b-card-expanded: card rows Distance Closing Drift Trip Engage Kind Rel Stop Brach Note
+    06f-cockpit: target card hidden
+    cockpit photo start: distance 0.160, roll slider 22
+    cockpit photo after move: distance 0.738, roll slider 52
+    beacon: label hidden
+    travel line, parked: TRIP 3 h  ·  < 0.1 t || 1 g full burn: 40 s / speed change 396 m/s · top speed 198 m/s
+    travel line, 5 km out: TRIP 3 h  ·  < 0.1 t || 1 g full burn: 45 s / speed change 443 m/s · top speed 221 m/s
+    06n-approach: Approach early 58% | Burn in 37 s  ·  stop 115 km of 200 km, 2.6 min | no split
+    06o-approach-burn: Approach now 89% | BURN NOW  ·  stop 115 km of 130 km, 2.5 min | no split
+    06p-approach-late: Approach late 100% | TOO FAST: a full burn now stops 35 km past the target. | no split
+    06q-docking: Docking early 2% | Burn in 98 s  ·  stop 47 m of 3 km, 3 s | FWD +30 m/s  ·  RIGHT -4.7 m/s  ·  UP +1.9 m/s
+    06s-stop-marker: stop marker on: STOP · BURN NOW
+    lesson Brake: card rows Distance Drift Gauge Trip Engage Stop
+    lesson Beacon: card rows Distance Closing Gauge Trip Engage
+    06r-cockpit-approach: Approach now 89% | BURN NOW  ·  stop 115 km of 129 km, 2.5 min | no split
+    toasts: 135x17, 133x18, 210x18 bad, 585x18 bad
+    06p-payday: 29,163 CR  ·  DOCKED EARTH ORBIT | counting True | bank 37,345  ->  37,345 CR  ·  DOCKED EARTH ORBIT | counting False | bank 37,345
+    06t-route-call: call Distress call about Medical supplies for Shackleton base to Luna, docked Earth orbit, card Flex opacity 1.00 at (x:480.00, y:450.83, width:640.00, height:115.83), on screen True, above the lesson True
+    06o-ship-owned: owned True, record "0 jobs done, 0 failed  ·  0 cr earned  ·  day 1"
+  06b-provenance-fitted
+    provenance fitted: Earth; fitted JPL Horizons ephemeris; radius NASA planetary fact-sheet radius; rotation IAU orientation model
+  06b-provenance-mean-moon
+    provenance mean-moon: Phobos; calibrated mean elements; radius shape asset volume-equivalent radius; rotation IAU parameter model; periodic terms omitted
+  06b-provenance-estimated
+    provenance estimated: Sinope; mean elements; radius assumed nominal radius (unmeasured); rotation assumed synchronous orientation; not a measured spin solution
+  06b-provenance-fallback
+    provenance fallback: Earth; mean-element fallback (outside fit coverage); radius NASA planetary fact-sheet radius; rotation IAU orientation model
+  06b-provenance-giant
+    provenance giant: Jupiter; fitted JPL Horizons ephemeris; radius NASA planetary fact-sheet radius; rotation IAU orientation model
+    flight tab: lesson card hidden
+    06u-payday-card: FIRST FLIGHT  ·  PAID | pips 3 | skip False | answers True | First job paid. The board on the Jobs page (F3) has the next one. Cargo and passengers pay 15 % more when you fly the arrival by hand: practise hand flying now, or later from the Jobs page.
+    06v-practice-card: HAND-FLYING PRACTICE  ·  STEP 1 OF 8 | pips 8 | skip True | answers False | Turn the ship: S / W pitch, A / D yaw, Q / E roll.
+    target a Intercept job: yes
+    label x 1013–1168, panels from x 1200: clear
+    label x 967–1122, panels from x 1200: clear
+    label x 1036–1192, panels from x 1200: clear
+    target a Rescue job: yes
+    label x 1015–1212, panels from x 1200: OVERLAP
+    label x 928–1126, panels from x 1200: clear
+    label x 993–1192, panels from x 1200: clear
+    08-system-map: own Earth 180 segs | path 40 segs | flip on | meet 1 AU from the Sun | flip mark on | meet mark at target | rings 4 patrol, 2 haven, 2 belt
+    08b-map-mars: own Earth 180 segs | path 40 segs | flip on | meet 1.571 AU from the Sun | flip mark on | meet mark at target | rings 4 patrol, 2 haven, 2 belt
+    08c-map-jupiter: own Earth 180 segs | path 40 segs | flip on | meet 5.311 AU from the Sun | flip mark on | meet mark at target | rings 4 patrol, 2 haven, 2 belt
+    after move: distance 0.738, roll slider 30
+    after flying at the hull: distance 0.045, roll slider 30
+done, 0 errors

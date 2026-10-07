@@ -61,6 +61,7 @@ namespace FogOfWar
             clip2.Add(curvePlot);
             curveBox.Add(clip2);
             curveLabel = Ui.L(curveBox, "", "t-label", "f-mono");
+            Ui.L(curveBox, "Prescribed fallback; no photon travel delays", "t-label").style.whiteSpace = WhiteSpace.Normal;
 
             spotBox = Ui.Panel(col, "Hot spot", "Light curve");
             spotBox.pickingMode = PickingMode.Ignore;
@@ -74,6 +75,7 @@ namespace FogOfWar
             spotBox.Add(clip3);
             spotLabel = Ui.L(spotBox, "", "t-label", "f-mono");
             spotLabel.style.whiteSpace = WhiteSpace.Normal;
+            Ui.L(spotBox, "Snapshot time; no photon travel delays", "t-label").style.whiteSpace = WhiteSpace.Normal;
         }
 
         VisualElement spotBox, spotPlot;

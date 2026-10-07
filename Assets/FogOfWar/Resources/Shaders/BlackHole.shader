@@ -55,6 +55,8 @@ Shader "FogOfWar/BlackHole"
                 float2 jpx = jit / pixNdc;                     // the frame's jitter in pixels
                 float3 Cr, Cph, Cd, nc; float bc;
                 zamoPhoton(primaryRay(i.ndc + jit, px), nc, bc);
+                // View 4 inspects the table's termination classifications, including cells refused by the image path.
+                if (_DebugFate > 3.5) return lensReasonColour(-nc);
                 lensCentre(-nc, Cr, Cph, Cd);
                 // the sky's filter footprint: the table's escape directions one pixel right and up of the pixel centre
                 // (no hardware derivatives here: the samples run in loops of varying length)
@@ -125,7 +127,7 @@ Shader "FogOfWar/BlackHole"
             // Pass 1, the full trace: one ray through the pixel's jittered centre, for every pixel pass 0 left.
             float4 fragTrace(v2fFS i) : SV_Target
             {
-                if (_DebugFate > 2.5) return _LensOn > 0.5 ? float4(1, 0, 0, 1) : float4(0, 0, 1, 1);
+                if (_DebugFate > 2.5 && _DebugFate < 3.5) return _LensOn > 0.5 ? float4(1, 0, 0, 1) : float4(0, 0, 1, 1);
                 if (_LensOn > 0.5 && _LensNoTrace > 0.5) return 0;
                 float px;
                 float a = _Spin;
@@ -136,12 +138,13 @@ Shader "FogOfWar/BlackHole"
                 photon(n, boost, M, b, q, EF, s0);
                 Ray R = march(b, q, EF, s0, a, M, false);
                 float3 col = R.col;
-                col += skyTerm(skyDir(R.s, R.ph, b, q, a, M), R.escaped && R.trans > 0.01 ? R.trans : 0.0, EF, px);
+                col += skyTerm(skyDir(R.s, R.ph, b, q, a, M), (R.escaped || R.fallbackSky) && R.trans > 0.01 ? R.trans : 0.0, EF, px);
                 // debug views for the review harness: 1 = fate (red captured, green escaped, blue out of steps,
                 // white = opaque disc), 2 = first disc hit radius / ISCO and its brightness
-                if (_DebugFate > 1.5) return float4(R.firstHit / (_Isco * 4.0), saturate(R.firstG), 0, 1);
+                if (_DebugFate > 1.5 && _DebugFate < 2.5) return float4(R.firstHit / (_Isco * 4.0), saturate(R.firstG), 0, 1);
                 if (_DebugFate > 0.5)
-                    return R.trans < 0.01 ? float4(1, 1, 1, 1) : float4(R.s.x < _RH + 1e-3 ? 1 : 0, R.escaped ? 1 : 0, R.steps >= _Steps - 1 ? 1 : 0, 1);
+                    return traceReasonColour(R.reason, R.fallbackSky);
+                if (any(!isfinite(col)) || !isfinite(R.spotLum)) return float4(0, 0, 0, 1);
                 // clamped below the half float limit of the HDR target (a larger value turns to infinity there)
                 if (_HDROut > 0.5) return min(float4(col * _Exposure, R.spotLum * _Exposure), 6e4);
                 return float4(tonemap(col * _Exposure), 1.0);

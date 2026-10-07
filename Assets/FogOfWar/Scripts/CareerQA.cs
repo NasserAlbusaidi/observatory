@@ -17,6 +17,8 @@ namespace FogOfWar
         FogOfWarApp app;
         OpenSystemScene s;
         int fails, exceptions;
+        public const double Epoch = 2460000.5; // fixed TDB fixture; normal play still starts today
+        static readonly double[] QaWarps = { 1, 10, 100, 1e3, 1e4, 1e5, 1e6 };
         void OnEnable() => Application.logMessageReceived += OnLog;
         void OnDisable() => Application.logMessageReceived -= OnLog;
         void OnLog(string msg, string stack, LogType type) { if (type == LogType.Exception || type == LogType.Error) { exceptions++; log?.WriteLine("    [" + type + "] " + msg); } }
@@ -45,6 +47,19 @@ namespace FogOfWar
         static string SaveKey => (string)typeof(OpenSystemScene).GetField("SaveKey", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
 
         void Check(bool ok, string what) { if (!ok) fails++; log.WriteLine((ok ? "  PASS " : "  FAIL ") + what); }
+        void Perf(bool ok, string what) => log.WriteLine((ok ? "  PERF PASS " : "  PERF SLOW ") + what);
+        static IEnumerator Frames(float seconds)
+        {
+            for (int i = 0, n = Mathf.CeilToInt(seconds * 60); i < n; i++) yield return null;
+        }
+
+        void Finish()
+        {
+            Check(exceptions == 0, $"no Unity errors or exceptions ({exceptions})");
+            log.WriteLine($"done: {fails} failed checks");
+            log.Close();
+            Application.Quit(fails == 0 ? 0 : 1);
+        }
 
         void State(string tag) => log.WriteLine($"[{tag}] {Frame.UtcFromTdb(jd):yyyy-MM-dd HH:mm}  credits {career.Credits:N0}  fuel {ship.Fuel:N2} t  mass {ship.Mass:N1} t  " +
             $"docked {career.Docked?.Name ?? "-"}  phase {ship.Phase}  target {ship.Target?.Name}  jobs {career.Active.Count}  board {career.Board.Count}");
@@ -58,14 +73,25 @@ namespace FogOfWar
             Destroy(tex);
         }
 
-        // Fly an engaged plan at the given warp until the predicate holds or the real-time budget runs out.
+        // The old budget meant real seconds at the selected warp. Preserve that simulation-time allowance;
+        // CPU load can make it take longer, but cannot silently shorten the flight. Wall time is only a hang guard.
         IEnumerator Fly(Func<bool> done, int warp, float budget)
         {
             Put("warpIdx", warp);
             float t0 = Time.realtimeSinceStartup;
+            double stopJd = jd + budget * QaWarps[warp] / 86400;
+            s.QaStopJd = stopJd;
             float next = 0;
-            while (!done() && Time.realtimeSinceStartup - t0 < budget)
+            while (!done() && jd < stopJd)
             {
+                if (Time.realtimeSinceStartup - t0 > Math.Max(600, budget * 10))
+                {
+                    log.WriteLine($"  TIMEOUT hang guard: {ship.Phase}, {(stopJd - jd) * 86400:F1} simulation seconds left; functional result incomplete");
+                    log.Close();
+                    Application.Quit(2);
+                    // Never run the caller's functional assertions against an incomplete flight while quit is pending.
+                    while (true) yield return null;
+                }
                 if (Time.realtimeSinceStartup - t0 > next)
                 {
                     next += traceEvery;
@@ -75,6 +101,8 @@ namespace FogOfWar
                 }
                 yield return null;
             }
+            Check(done(), $"flight predicate reached before simulation limit ({budget * QaWarps[warp]:F0} s)");
+            s.QaStopJd = double.PositiveInfinity;
             Put("warpIdx", 0);
         }
 
@@ -140,10 +168,13 @@ namespace FogOfWar
             app = GetComponent<FogOfWarApp>();
             int ti = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowtrace"); if (ti >= 0) { traceEvery = 0.25f; moonWarp = int.Parse(Environment.GetCommandLineArgs()[ti + 1]); }
             app.InputLocked = true; Controls.Locked = true;
-            yield return new WaitForSecondsRealtime(1f);
+            yield return Frames(1f);
             app.Restart(app.GameIndex);
-            yield return new WaitForSecondsRealtime(1.5f);
+            yield return Frames(1.5f);
             s = (OpenSystemScene)app.Current;
+            log.WriteLine($"fixture epoch {Epoch:R} TDB; save key {SaveKey}; Unity {Application.unityVersion}");
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcareertraffic") >= 0)
+            { yield return TrafficChecks(); Finish(); yield break; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
@@ -156,8 +187,8 @@ namespace FogOfWar
             string oldSave = PlayerPrefs.GetString(SaveKey);
             Check(s.TutorialText != null && s.TutorialText.StartsWith("First flight (1/3)"), $"tutorial starts on a new career at the target step: {s.TutorialText?.Substring(0, Math.Min(40, s.TutorialText.Length))}");
             yield return Shot("c00-tutorial");
-            Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
-            Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
+            Controls.Tap(Controls.Action.ThrottleFull); yield return Frames(0.4f);
+            Controls.Tap(Controls.Action.ThrottleCut); yield return Frames(0.4f);
             Check(PlayerPrefs.GetString(SaveKey) == oldSave, "a throttle blip at Earth does not autosave over the old save");
 
             // 1. the first job, full burn to the Moon
@@ -177,22 +208,22 @@ namespace FogOfWar
             Call("StartPractice");
             yield return null; yield return null;
             Check(s.TutorialText != null && s.TutorialText.StartsWith("Hand-flying practice (1/8)") && !ship.PlanActive, "the practice starts from the payday card and turns the parked plan off");
-            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
-            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
+            Controls.Hold(Controls.Action.PitchUp, true); yield return Frames(0.6f);
+            Controls.Hold(Controls.Action.PitchUp, false); yield return Frames(2.5f);
             bool waits = s.TutorialText != null && s.TutorialText.StartsWith("(2/8)");
-            Controls.Hold(Controls.Action.PitchUp, true); yield return new WaitForSecondsRealtime(0.6f);
-            Controls.Hold(Controls.Action.PitchUp, false); yield return new WaitForSecondsRealtime(2.5f);
+            Controls.Hold(Controls.Action.PitchUp, true); yield return Frames(0.6f);
+            Controls.Hold(Controls.Action.PitchUp, false); yield return Frames(2.5f);
             Check(waits && s.TutorialText != null && s.TutorialText.StartsWith("(3/8)"), "the flight assist step stays up until the pilot turns and lets go again");
-            Controls.Tap(Controls.Action.ThrottleFull); yield return new WaitForSecondsRealtime(0.4f);
-            Controls.Tap(Controls.Action.ThrottleCut); yield return new WaitForSecondsRealtime(0.4f);
-            Call("SetHold", Hold.Prograde); yield return new WaitForSecondsRealtime(0.4f);
+            Controls.Tap(Controls.Action.ThrottleFull); yield return Frames(0.4f);
+            Controls.Tap(Controls.Action.ThrottleCut); yield return Frames(0.4f);
+            Call("SetHold", Hold.Prograde); yield return Frames(0.4f);
             Check(s.TutorialText != null && s.TutorialText.StartsWith("(5/8)") && ship.Target?.Name == "Practice beacon",
                 "burn and prograde hold steps pass; the practice beacon is the target");
             Call("SetHold", Hold.Off);
             Call("SetTarget", sys.Moon);
             yield return null; yield return null;
             Check(sys["Practice beacon"] == null && s.TutorialText == null && career.TutorialStep == 0, "retargeting ends the practice and removes the beacon");
-            yield return new WaitForSecondsRealtime(1f);
+            yield return Frames(1f);
             Check(career.Docked?.Name == "Luna", $"docked at Luna after the practice ({ship.Phase})");
 
             // 2. refuel and take the best-paying cargo job, flown with a 50 % coast
@@ -268,264 +299,7 @@ namespace FogOfWar
             }
             else log.WriteLine("  (no survey on this board)");
 
-            // 5. a dry tank cuts the drive; the tender refills it
-            ship.Plan = Plan.None; ship.Fuel = 0; ship.ThrottleCmd = 1;
-            var v0 = ship.Vel;
-            yield return new WaitForSecondsRealtime(0.5f);
-            ship.ThrottleCmd = 0;
-            Check(ship.Throttle == 0, "dry tank: drive does not fire");
-            yield return Shot("c06-dry");
-            double cr = career.Credits;
-            career.EmergencyDrop(ship);
-            Check(Math.Abs(ship.Fuel - Career.EmergencyTonnes) < 1e-6 && career.Credits < cr, "emergency tender adds reaction mass for a fee");
-
-            // 5b. the express window: bonus inside it, plain pay after it, half after the deadline; a job from an older
-            // save (no window) pays plain
-            {
-                var x = new Contract { Pay = 10000, IssuedJd = 100, DeadlineJd = 104, ExpressDays = 2, ExpressJd = 102 };
-                double inside = Career.PayAt(x, 101.9, out bool l1, out bool e1), after = Career.PayAt(x, 103, out bool l2, out bool e2);
-                double late = Career.PayAt(x, 105, out bool l3, out bool e3);
-                x.ExpressDays = 0; x.ExpressJd = 0;
-                double old = Career.PayAt(x, 100.5, out _, out bool e4);
-                Check(inside == 12500 && e1 && !l1 && after == 10000 && !e2 && !l2 && late == 5000 && l3 && !e3 && old == 10000 && !e4,
-                    $"express pay: {inside:N0} inside the window, {after:N0} after it, {late:N0} late, {old:N0} with no window");
-                int n = 0, bad = 0;
-                foreach (var b in career.Board) if (b.Kind != JobKind.Intercept) { n++; if (!(b.ExpressDays > 0 && b.ExpressDays <= b.Days)) bad++; }
-                Check(bad == 0, $"every board job but an intercept has an express window inside its deadline ({n - bad} of {n})");
-            }
-
-            // 5c. route events: calls in flight about a job (a test cargo run to Mars, removed afterwards)
-            {
-                Check(!career.RouteEvents, "route events are off in the unattended suite");
-                double fuelWas = ship.Fuel;
-                ship.Fuel = career.TankCapacity;
-                var mars = sys["Mars"];
-                var run = new Contract { Id = 900001, Kind = JobKind.Cargo, Title = "QA coolant", From = "Luna", To = "Mars orbit", Tonnes = 10, Pay = 10000, Days = 100, Key = "qa/route" };
-                run.IssuedJd = jd; run.DeadlineJd = jd + run.Days;
-                career.Active.Add(run);
-                Call("SetTarget", mars);
-                yield return null;
-
-                // a distress call: a rescue near Mars, with the rest of this trip in its time; yes takes it on
-                Check(career.MakeCall(Career.RouteKind.Distress, run, sys, ship, jd) && career.Call?.Offer != null, "a distress call comes in");
-                var offer = career.Call?.Offer;
-                var (ru, rw) = ship.RelToTarget(sys, jd);
-                Career.Trip(Math.Max((sys.Pos(mars, jd) - ship.Pos).Mag - Ship.Standoff(mars), 0), ship.MaxG * Ship.G0, 1, ship.Mass, out double burn, out _, out _, ru, rw);
-                career.Answer(true, jd);
-                yield return null;
-                Check(offer != null && career.Active.Contains(offer) && sys[offer.To] != null && sys[offer.To].Parent == mars && offer.Days > burn / 86400 && offer.ExpressDays == 0 && career.Call == null,
-                    $"answering takes on the rescue: its wreck orbits Mars, {offer?.Days:F1} days allowed for a {burn / 86400:F1}-day trip");
-                if (offer != null) career.Abandon(offer);
-                career.MakeCall(Career.RouteKind.Distress, run, sys, ship, jd);
-                var ignored = career.Call?.Offer;
-                career.Answer(false, jd);
-                Check(ignored != null && !career.Active.Contains(ignored) && sys[ignored.To] == null && career.Call == null, "ignoring a distress call takes nothing on");
-
-                // cargo trouble: venting costs the fuel shown; pushing on halves the pay after the spoil time
-                career.MakeCall(Career.RouteKind.CargoTrouble, run, sys, ship, jd);
-                double vent = career.Call?.VentTonnes ?? -1, f0 = ship.Fuel;
-                career.Answer(true, jd);
-                Check(vent > 0 && Math.Abs(f0 - ship.Fuel - vent) < 1e-6 && run.SpoilJd == 0, $"venting costs the {vent:N1} t shown and leaves the cargo whole");
-                career.MakeCall(Career.RouteKind.CargoTrouble, run, sys, ship, jd);
-                double spoilDays = career.Call?.SpoilDays ?? -1;
-                career.Answer(false, jd);
-                Check(spoilDays > burn / 86400 && Math.Abs(run.SpoilJd - (jd + spoilDays)) < 1e-9 && Career.PayAt(run, run.SpoilJd - 0.01, out _, out _) == 10000 && Career.PayAt(run, run.SpoilJd + 0.01, out _, out _) == 5000,
-                    $"pushing on: full pay within {spoilDays * 24:F0} h, half after (a full burn takes {burn / 3600:F0} h)");
-                run.SpoilJd = 0;
-
-                // a real roll: flying the job with events on, a call comes in and drops the warp
-                yield return null; // the calls above left DropWarp set: let the scene take it before the warp goes up
-                career.RouteEvents = true;
-                Put("cruiseIdx", 1);
-                Put("selectedPlan", Plan.Brachistochrone);
-                Call("TogglePlan");
-                if (!ship.PlanActive && ship.Phase.StartsWith("fuel short")) Call("TogglePlan");
-                Put("warpIdx", 6);
-                float t0 = Time.realtimeSinceStartup;
-                double jd0 = jd, rateMax = 0, presenceMax = 0;
-                while (career.Call == null && Time.realtimeSinceStartup - t0 < 30)
-                {
-                    rateMax = Math.Max(rateMax, career.PirateRate(sys, ship, run, jd)); presenceMax = Math.Max(presenceMax, Threat.Presence(sys, ship.Pos, jd));
-                    yield return null;
-                }
-                yield return null;
-                Check(career.Call != null && Get<int>("warpIdx") == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, warp {Get<int>("warpIdx")}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
-                // Q3, before the answer and the job's removal, either of which would end a chase: the leg gives raiders nothing
-                Check(career.Call?.Kind != Career.RouteKind.Pirate && career.Encounter == null && rateMax == 0 && presenceMax == 0,
-                    $"no raider on the real roll: the call is {career.Call?.Kind.ToString() ?? "none"}, no chase; over the first {(jd - jd0) * 24:F1} h of the trip to Mars, sampled each frame up to the call, raider presence {presenceMax:0.###} and rate {rateMax:0.###} an hour at most");
-                yield return Shot("c05c-route-call");
-                career.RouteEvents = false;
-                career.Answer(false, jd);
-                ship.Plan = Plan.None; ship.ThrottleCmd = 0;
-                run.SpoilJd = 0;
-                career.Active.Remove(run);
-                yield return null;
-                Check(career.Call == null, "with the job gone, no call is left");
-                ship.Fuel = fuelWas;
-            }
-
-            // 5d. flown in by hand: the helm taken outside the dock range, then a bound orbit with the drive off, pays the
-            // bonus; the helm taken inside the range does not. The ship is put in place, not flown (test cargo runs to Mars)
-            {
-                var mars = sys["Mars"];
-                double range = Career.DockRange(mars);
-                var rdir = (sys.Pos(mars, jd) - sys.Pos(sys.Sun, jd)).Norm;
-                var vdir = D3.Cross(D3.Cross(rdir, sys.Vel(mars, jd).Norm), rdir).Norm;
-                double rOrbit = Ship.Standoff(mars);
-                foreach (var (from, paid) in new[] { (1.5, true), (0.8, false) })
-                {
-                    var run = new Contract { Id = 900002, Kind = JobKind.Cargo, Title = "QA ore", From = "Luna", To = "Mars orbit", Tonnes = 10, Pay = 10000, Days = 100, Key = "qa/hand" };
-                    run.IssuedJd = jd; run.DeadlineJd = jd + run.Days;
-                    // the autopilot flies a frame, then the pilot takes the helm at rest relative to Mars, `from` × the dock range out
-                    // (a fall with no orbit: not docked, so the job, added after, is not paid there)
-                    ship.Landed = null; ship.ThrottleCmd = 0; ship.Throttle = 0;
-                    Call("SetTarget", mars);
-                    ship.Pos = sys.Pos(mars, jd) + rdir * (range * from); ship.Vel = sys.Vel(mars, jd);
-                    ship.Plan = Plan.Brachistochrone;
-                    yield return null;
-                    ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
-                    ship.Pos = sys.Pos(mars, jd) + rdir * (range * from); ship.Vel = sys.Vel(mars, jd);
-                    career.Active.Add(run);
-                    yield return null;
-                    bool shown = career.HandArrival(run) == paid;
-                    // then a circular orbit at the autopilot's parking height, drive off: the port docks it and pays
-                    double handC0 = career.Credits;
-                    ship.Pos = sys.Pos(mars, jd) + rdir * rOrbit; ship.Vel = sys.Vel(mars, jd) + vdir * Math.Sqrt(mars.GM / rOrbit);
-                    yield return null;
-                    yield return null;
-                    double got = career.Credits - handC0, want = paid ? Math.Round(run.Pay * (1 + Career.HandBonus)) : run.Pay;
-                    Check(!career.Active.Contains(run) && career.Docked?.Name == "Mars orbit" && shown && Math.Abs(got - want) < 1e-6
-                          && paid == career.Notes.Exists(n => n.Text.Contains("by hand")),
-                        $"helm taken {from} × the dock range out ({range * from:N0} km), docked in orbit: {got:N0} cr, {(paid ? "flown-in-by-hand bonus" : "no bonus")}{(shown ? "" : ", job card wrong")}");
-                    career.Active.Remove(run);
-                    career.Notes.Clear();
-                }
-            }
-
-            // the job pay the buyout price is set against (a load clears the board, so before section 6)
-            {
-                double boardPay = 0; foreach (var b in career.Board) boardPay += b.Pay;
-                log.WriteLine($"  buyout price {Career.ShipPrice:N0} cr; the board at {career.Docked?.Name ?? "no port"} posts {career.Board.Count} jobs, mean pay {boardPay / Math.Max(1, career.Board.Count):N0} cr");
-            }
-
-            // 6. the career save round-trips (through JSON only: the player's own save slot is left alone)
-            double credits = career.Credits, fuel = ship.Fuel; int done = career.Done;
-            var json = JsonUtility.ToJson(career.ToSave(ship));
-            career.Credits = -1; ship.Fuel = 0;
-            career.FromSave(JsonUtility.FromJson<CareerSave>(json), ship);
-            Check(Math.Abs(career.Credits - credits) < 1e-6 && Math.Abs(ship.Fuel - fuel) < 1e-6 && career.Done == done, "save and load keep credits, reaction mass and record");
-
-            // 6b. the long goal: the ship bought out from the yard in steps at a port; a save keeps it, an old save has none paid
-            {
-                double bank = career.Credits, paid0 = career.ShipPaid;
-                career.ShipPaid = 0; career.Notes.Clear();
-                career.Credits = Career.ShipStep - 1;
-                bool poor = !career.PayTowardShip();
-                career.Credits = Career.ShipPrice + 1000;
-                int steps = 0; while (steps < 100 && career.PayTowardShip()) steps++;
-                int ownedNotes = career.Notes.FindAll(n => n.What == Career.Happening.ShipOwned).Count;
-                bool feat = career.Codex.CheckFeats(career, ship).Contains("Owner-operator");
-                Check(career.Docked != null && poor && steps == (int)(Career.ShipPrice / Career.ShipStep) && career.OwnsShip && Math.Abs(career.Credits - 1000) < 1e-6
-                      && ownedNotes == 1 && feat && !career.PayTowardShip(),
-                    $"the ship bought out in {steps} steps of {Career.ShipStep:N0} cr at {career.Docked?.Name}: owned {career.OwnsShip}, {career.Credits:N0} cr left, {ownedNotes} owned note, feat {feat}{(poor ? "" : ", paid without the credits")}");
-                var sj = JsonUtility.ToJson(career.ToSave(ship));
-                career.ShipPaid = 0;
-                career.FromSave(JsonUtility.FromJson<CareerSave>(sj), ship);
-                bool kept = career.OwnsShip;
-                career.FromSave(JsonUtility.FromJson<CareerSave>(System.Text.RegularExpressions.Regex.Replace(sj, "\"shipPaid\":[^,]*,", "")), ship);
-                Check(kept && career.ShipPaid == 0 && sj.Contains("\"shipPaid\""), $"a save keeps the buyout; a save from before it loads with {career.ShipPaid:N0} cr paid");
-                career.Credits = bank; career.ShipPaid = paid0; career.Codex.Achieved.Remove("owner"); career.Notes.Clear();
-            }
-
-            // 6c. standing (Career.Factions.cs): every port has an owner; the run's own jobs moved it; on time it goes up, late
-            // it stays, an abandon or an expiry takes more off; a new tier says so and reprices the day's board; a save keeps
-            // it and an old save loads neutral. Test jobs to the port the ship is docked at; the career is put back after
-            {
-                var keep = JsonUtility.ToJson(career.ToSave(ship));
-                var here = career.Docked;
-                Check(Career.PortAt("Earth orbit").Owner == Faction.Guard && Career.PortAt("Luna").Owner == Faction.Guard && Career.PortAt("Mars orbit").Owner == Faction.Tharsis
-                      && Career.PortAt("Vesta").Owner == Faction.Tharsis && Array.TrueForAll(new[] { "Ceres", "Ganymede", "Callisto", "Titan", "Enceladus" }, p => Career.PortAt(p).Owner == Faction.Compact),
-                    "every port has its owner: the Guard at Earth and Luna, Tharsis at Mars and Vesta, the Compact at the ice ports");
-                // jobs posted at Earth and Luna were paid (Guard); the distress rescue near Mars was taken on and dropped (Tharsis)
-                Check(career.Standing(Faction.Guard) > 0 && career.Standing(Faction.Tharsis) < 0,
-                    $"the run's jobs moved standing: Guard {career.Standing(Faction.Guard):+0;-0;0}, Tharsis {career.Standing(Faction.Tharsis):+0;-0;0}, Compact {career.Standing(Faction.Compact):+0;-0;0}");
-
-                int n = 0;
-                Contract Job(string from, double issuedAgo, double days) => new Contract
-                {
-                    Id = 900100 + n, Kind = JobKind.Cargo, Title = "QA standing", From = from, To = here?.Name, Tonnes = 1, Pay = 1000,
-                    IssuedJd = jd - issuedAgo, DeadlineJd = jd - issuedAgo + days, Days = days, Key = "qa/standing/" + n++,
-                };
-                int Cx() => career.Standing(Faction.Compact);
-                int s0 = Cx();
-                career.Active.Add(Job("Ceres", 0, 10));
-                yield return null; yield return null;
-                int s1 = Cx();
-                career.Active.Add(Job("Titan", 3, 2));            // 1 day late, not yet failed: half pay
-                yield return null; yield return null;
-                int s2 = Cx();
-                var drop = Job("Ganymede", 0, 10);
-                career.Active.Add(drop); career.Abandon(drop);     // before a tick can deliver it
-                int s3 = Cx();
-                career.Active.Add(Job("Callisto", 10, 2));        // far past twice its time: fails before it can pay
-                yield return null; yield return null;
-                int s4 = Cx();
-                Check(here != null && s1 - s0 == Career.StandingGain && s2 == s1 && s3 - s2 == -Career.StandingLoss && s4 - s3 == -Career.StandingLoss && !career.Active.Exists(x => x.Title == "QA standing"),
-                    $"Compact standing: {s0:+0;-0;0}, on time {s1:+0;-0;0}, late {s2:+0;-0;0}, abandoned {s3:+0;-0;0}, expired {s4:+0;-0;0} (docked at {here?.Name ?? "-"})");
-
-                // one job short of Known with this port's owner: the next delivery here makes the tier and reprices the board
-                if (here != null)
-                {
-                    var owner = here.Owner;
-                    var cs = career.ToSave(ship);
-                    cs.standing[(int)owner] = 4;
-                    career.FromSave(cs, ship);
-                    yield return null;
-                    var before = new System.Collections.Generic.Dictionary<string, double>();
-                    foreach (var b in career.Board) if (b.Kind == JobKind.Cargo || b.Kind == JobKind.Passengers) before[b.Key] = b.Pay;
-                    career.Notes.Clear();
-                    career.Active.Add(Job(here.Name, 0, 10));
-                    yield return null; yield return null;
-                    double was = 0, now = 0; int same = 0;
-                    foreach (var b in career.Board) if (before.TryGetValue(b.Key, out double p)) { was += p; now += b.Pay; same++; }
-                    bool note = career.Notes.Exists(x => x.What == Career.Happening.Standing && x.Good && x.Text.Contains("Known"));
-                    Check(career.TierName(owner) == "Known" && Math.Abs(career.PayFactor(owner) - 1.05) < 1e-9 && note && same > 0 && same == before.Count && now / was > 1.035 && now / was < 1.065,
-                        $"{Career.Factions[(int)owner].Name} at {career.Standing(owner):+0;-0;0}: {career.TierName(owner)}, note {note}; {same} of {before.Count} board jobs repriced ×{now / Math.Max(1, was):F3}");
-                    career.Notes.Clear();
-                    var lose = Job(here.Name, 0, 10);
-                    career.Active.Add(lose); career.Abandon(lose);
-                    note = career.Notes.Exists(x => x.What == Career.Happening.Standing && !x.Good && x.Text.Contains("Neutral"));
-                    Check(career.TierName(owner) == "Neutral" && career.PayFactor(owner) == 1 && note, $"an abandon drops back to {career.TierName(owner)} ({career.Standing(owner):+0;-0;0}), note {note}");
-                }
-
-                // the tier table at its edges, the clamp, a save round trip and a save from before factions
-                {
-                    var cs = career.ToSave(ship);
-                    var tiers = new System.Text.StringBuilder();
-                    bool edges = true;
-                    foreach (var (v, name, pay) in new[] { (-5, "Distrusted", 0.90), (-4, "Neutral", 1.0), (4, "Neutral", 1.0), (5, "Known", 1.05), (14, "Known", 1.05),
-                                                          (15, "Trusted", 1.10), (29, "Trusted", 1.10), (30, "Valued", 1.15), (99, "Valued", 1.15) })
-                    {
-                        cs.standing[(int)Faction.Guard] = v;
-                        career.FromSave(cs, ship);
-                        edges &= career.TierName(Faction.Guard) == name && Math.Abs(career.PayFactor(Faction.Guard) - pay) < 1e-9;
-                        tiers.Append($"{v}:{career.TierName(Faction.Guard)} ×{career.PayFactor(Faction.Guard):F2}  ");
-                    }
-                    Check(edges && career.Standing(Faction.Guard) == Career.StandingMax, $"tiers {tiers}(99 kept as {career.Standing(Faction.Guard)})");
-                    cs.standing[(int)Faction.Guard] = 7; cs.standing[(int)Faction.Tharsis] = -3; cs.standing[(int)Faction.Compact] = 12;
-                    career.FromSave(cs, ship);
-                    var sj = JsonUtility.ToJson(career.ToSave(ship));
-                    career.FromSave(JsonUtility.FromJson<CareerSave>(sj), ship);
-                    bool kept = career.Standing(Faction.Guard) == 7 && career.Standing(Faction.Tharsis) == -3 && career.Standing(Faction.Compact) == 12;
-                    var old = System.Text.RegularExpressions.Regex.Replace(sj, "\"standing\":\\[[^\\]]*\\],", "");
-                    career.FromSave(JsonUtility.FromJson<CareerSave>(old), ship);
-                    bool neutral = career.Standing(Faction.Guard) == 0 && career.Standing(Faction.Tharsis) == 0 && career.Standing(Faction.Compact) == 0 && career.PayFactor(Faction.Tharsis) == 1;
-                    Check(kept && neutral && sj.Contains("\"standing\"") && !old.Contains("\"standing\""), $"a save keeps standing ({kept}); a save from before factions loads neutral ({neutral})");
-                }
-                career.FromSave(JsonUtility.FromJson<CareerSave>(keep), ship);
-                career.Notes.Clear();
-                yield return null;
-            }
+            foreach (var step in EventAndSaveChecks()) yield return step;
 
             // 7. autopilot arrivals with the target behind its planet (the climb-away rule must not stop it parking)
             career.Sandbox = true;
@@ -593,7 +367,7 @@ namespace FogOfWar
             Put("cruiseIdx", 0);
             Call("SetTarget", sys["Titan"]);
             Put("warpIdx", 0);
-            yield return new WaitForSecondsRealtime(1f);
+            yield return Frames(1f);
             yield return Shot("c07-codex-titan");
             Check(cx.Has("first_job") && cx.Has("jovian") && cx.Has("coast"), $"achievements (career only): {string.Join(", ", cx.Achieved)}");
 
@@ -622,7 +396,7 @@ namespace FogOfWar
                     $"the ship stops beside the wreck, not through it: closest {wreckMin:F2} km, {wreckRel.Mag:F2} km as the crew crosses, same side {D3.Dot(wreckSide, wreckRel.Norm):F2}");
                 // a close look at the wreck while the crew crosses over
                 Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.12);
-                yield return new WaitForSecondsRealtime(1.5f);
+                yield return Frames(1.5f);
                 yield return Shot("c08-derelict");
                 Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 0), 0.16);
                 yield return Fly(() => !career.Active.Contains(res), 3, 60);
@@ -803,7 +577,7 @@ namespace FogOfWar
                         $"the ship stops beside the runner, not through it: closest {runnerMin:F2} km, {runnerRel.Mag:F2} km as the cargo crosses, same side {D3.Dot(runnerSide, runnerRel.Norm):F2}");
                     Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 1), 0.2);
                     Put("warpIdx", 0);
-                    yield return new WaitForSecondsRealtime(1.5f);
+                    yield return Frames(1.5f);
                     yield return Shot("c10-intercept");
                     Call("SetPivot", Enum.ToObject(s.GetType().GetNestedType("Pivot", F), 0), 0.16);
                     yield return Fly(() => !career.Active.Contains(ic), 2, 60);
@@ -818,7 +592,7 @@ namespace FogOfWar
             // the autopilot flies, and a tank that can't finish it must not engage on the first press.
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 Put("warpIdx", 0);
                 var vesta = sys["Vesta"];
@@ -862,7 +636,7 @@ namespace FogOfWar
             // 100k× with a rescue targeted loads at 1×, says the plan was not resumed and targets the rebuilt derelict
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 Put("warpIdx", 0);
                 var moon = sys.Moon;
@@ -897,7 +671,7 @@ namespace FogOfWar
                     yield return null;
                     s.SaveGame();
                     app.Restart(app.GameIndex);
-                    yield return new WaitForSecondsRealtime(1f);
+                    yield return Frames(1f);
                     s = (OpenSystemScene)app.Current;
                     s.LoadGame();
                     yield return null;
@@ -913,7 +687,7 @@ namespace FogOfWar
             // port) autosaves, so that save is the landing, not the parking orbit saved by hand before it.
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 Put("warpIdx", 0);
                 string saveKey = SaveKey;
@@ -949,12 +723,12 @@ namespace FogOfWar
                 for (int round = 0; round < 2; round++)
                 {
                     app.Restart(app.GameIndex); // a new career starts docked at Earth orbit
-                    yield return new WaitForSecondsRealtime(1f);
+                    yield return Frames(1f);
                     s = (OpenSystemScene)app.Current;
                     Put("warpIdx", 0);
                     var wreckJob = career.Rescue(new System.Random(11 + round), sys, jd);
                     career.Accept(wreckJob, jd);
-                    yield return new WaitForSecondsRealtime(1f); // the wreck is built and drawn
+                    yield return Frames(1f); // the wreck is built and drawn
                 }
                 Check(career.Active.Exists(c => c.Kind == JobKind.Rescue) && exceptions == before, $"new game with a rescue active: {exceptions - before} exceptions");
             }
@@ -962,7 +736,7 @@ namespace FogOfWar
             // QA-051: Continue keeps the tutorial where the save left it, and a skipped tutorial stays skipped
             {
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 yield return null;
                 string running = JsonUtility.ToJson(career.ToSave(ship));        // step 1 of 3 in progress
@@ -973,7 +747,7 @@ namespace FogOfWar
                 foreach (var (saved, wantOn, what) in new[] { (skipped, false, "skipped"), (running, true, "in progress") })
                 {
                     app.Restart(app.GameIndex);
-                    yield return new WaitForSecondsRealtime(1f);
+                    yield return Frames(1f);
                     s = (OpenSystemScene)app.Current;
                     career.FromSave(JsonUtility.FromJson<CareerSave>(saved), ship);
                     Call("ResumeTutorial");
@@ -982,7 +756,7 @@ namespace FogOfWar
                 }
                 // a save from before the tutorial was saved (no field) counts as done
                 app.Restart(app.GameIndex);
-                yield return new WaitForSecondsRealtime(1f);
+                yield return Frames(1f);
                 s = (OpenSystemScene)app.Current;
                 var old = JsonUtility.FromJson<CareerSave>(skipped.Replace("\"tutorial\":0,", ""));
                 career.FromSave(old, ship);
@@ -997,9 +771,7 @@ namespace FogOfWar
             yield return PirateChecks();
 
             State("end");
-            log.WriteLine($"done: {fails} failed checks");
-            log.Close();
-            Application.Quit();
+            Finish();
         }
     }
 }

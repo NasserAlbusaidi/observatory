@@ -57,6 +57,9 @@ namespace FogOfWar.EditorTools
             if (!File.Exists(ScenePath)) CreateScene();
             ApplyPlayerSettings();
             string dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Windows"));
+            var args = System.Environment.GetCommandLineArgs();
+            int outputArg = System.Array.IndexOf(args,"-fowbuilddir");
+            if(outputArg >= 0 && outputArg+1 < args.Length) dir=Path.GetFullPath(args[outputArg+1]);
             Directory.CreateDirectory(dir);
             var opts = new BuildPlayerOptions
             {
@@ -71,7 +74,11 @@ namespace FogOfWar.EditorTools
                 Debug.Log($"Fog of War: built {opts.locationPathName} ({report.summary.totalSize / (1024 * 1024)} MB)");
                 if (!Application.isBatchMode) EditorUtility.RevealInFinder(opts.locationPathName);
             }
-            else Debug.LogError("Fog of War: build failed, see the Console for the first error.");
+            else
+            {
+                Debug.LogError("Fog of War: build failed, see the Console for the first error.");
+                if(Application.isBatchMode) EditorApplication.Exit(1);
+            }
         }
     }
 }

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center"><i>
-You're an independent torch-ship pilot in the real solar system: true scale, today's date, every planet and moon exactly where it is right now.<br>
+You're an independent torch-ship pilot in a true-scale solar system: today's date, astronomical data, and a whole system to explore.<br>
 Take the job. Plot the burn. Watch the tank.
 </i></p>
 
@@ -28,7 +28,7 @@ Take the job. Plot the burn. Watch the tank.
 
 Every trip is a trade between **time and reaction mass**. Burn hard the whole way, flip at the midpoint and brake, and you arrive early with a dry tank. Burn, coast and burn, and you save water but cut it close on the deadline. Cargo is heavy, and heavy costs fuel. And the planets don't wait: the run that's cheap today can cost several times as much a few months from now.
 
-The torch drive is the one piece of science fiction. Everything else is the real thing: no fake distances, no shortcuts. The orbits come from NASA JPL. The rocket equation is the rocket equation. The game finds its choices *inside* the physics.
+Fly with astronomical data and physics-based trajectories. The fictional torch drive and idealized spacecraft systems make the journey possible; fitted ephemerides, mean-element orbits and numerical approximations make the system playable. The game finds its choices *inside* those models. Read the [models and limits](docs/MODEL-FIDELITY.md) for what each one assumes.
 
 ---
 
@@ -48,7 +48,7 @@ Nine ports from Earth orbit to Enceladus. Carry freight, ferry passengers (keep 
 
 ### 🌍 THE WHOLE SOLAR SYSTEM, FOR REAL
 
-8 planets. **453 moons.** 21 named asteroids and a belt with its real gaps, Hildas and Trojans. Every body sits on its real orbit, today, from NASA JPL data. Crank time compression to **1,000,000×** and watch the system turn.
+8 planets. **453 moons.** 21 named asteroids and a belt with its real gaps, Hildas and Trojans. Explore fitted and mean-element orbits based on NASA JPL data at today's date. Crank time compression to **1,000,000×** and watch the system turn.
 
 </td>
 <td width="50%"><img src="docs/media/shot-map.jpg" alt="System map"></td>
@@ -96,12 +96,12 @@ Pass close and your codex logs the body. Scan it and real facts unlock. First sc
 
 ## THE OBSERVATORY
 
-Step out of the cockpit and into **eight physics scenes that run on the real equations**.
+Step out of the cockpit and into **eight interactive physics models**, each with its assumptions explained.
 
 <p align="center">
   <img src="docs/media/blackhole.webp" width="100%" alt="Skimming the accretion disc of a ray-traced black hole">
 </p>
-<p align="center"><sub>Every pixel is a light ray traced along a real geodesic.</sub></p>
+<p align="center"><sub>Geodesic-based lensing with numerical tracing and lens tables. Moving emission uses snapshot time; the disk is an idealized model.</sub></p>
 
 <table>
 <tr>
@@ -123,7 +123,7 @@ Step out of the cockpit and into **eight physics scenes that run on the real equ
 ## FEATURES
 
 - **True-scale solar system** on today's date, from NASA JPL ephemerides
-- **Real flight physics**: flip-and-burn trajectories, coast plans, the rocket equation, patched conics
+- **Physics-based flight**: feedback-guided flip-and-burn trajectories, coast plans, the rocket equation, patched conics
 - **Trucker career** with cargo, passenger, survey, rescue and intercept jobs across 9 ports
 - **Cockpit, chase and orbit views**, plus a system map and hull floodlights for the night side
 - **Every sound synthesised live**: drive rumble, RCS pops, hull creaks under g. No samples.

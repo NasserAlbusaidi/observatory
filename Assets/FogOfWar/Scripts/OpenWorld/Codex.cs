@@ -80,7 +80,13 @@ namespace FogOfWar.OpenWorld
         public static List<string> Data(SolarSystem sys, Body b, double jd)
         {
             var l = new List<string>();
+            l.Add("Position: " + b.PositionModel(jd));
+            l.Add(b.PositionSource(jd));
             l.Add($"Mean radius {Fmt.Num(b.Radius, b.Radius < 10 ? 2 : 0)} km" + (b.SizeEstimated ? " (estimated)" : ""));
+            l.Add("Radius source: " + b.RadiusSource);
+            l.Add("Shape: " + b.ShapeSource);
+            l.Add("Rotation: " + b.RotationSource);
+            l.Add("Arrival: " + Ship.ArrivalPolicy(b));
             if (b.GM > 1e-6)
             {
                 double g = b.GM / (b.Radius * b.Radius) * 1000; // m/s²
@@ -132,7 +138,7 @@ namespace FogOfWar.OpenWorld
             void Earn(string id, bool cond) { if (cond && Achieved.Add(id)) got.Add(Array.Find(Feats, f => f.Id == id).Title); }
             double au = ship.Pos.Mag / Frame.AU;
             Earn("first_job", c.Done >= 1);
-            Earn("coast", ship.Phase == "cruising");
+            Earn("coast", ship.CruiseSeconds > 0 || ship.Phase == "cruising");
             Earn("belter", DockedAt.Contains("Ceres") || DockedAt.Contains("Vesta"));
             Earn("jovian", Visited.Contains("Jupiter"));
             Earn("ringed", Visited.Contains("Saturn"));

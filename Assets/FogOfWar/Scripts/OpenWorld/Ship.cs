@@ -35,6 +35,7 @@ namespace FogOfWar.OpenWorld
         public D3 StationOffset;
         public double DvUsed;
         public double BurnSeconds;               // sim seconds with the drive firing (career scan time leaves these out)
+        public double CruiseSeconds;             // accumulated plan coast, even when a whole coast fits in one frame
         // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
         // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
         public const double Ve = 10000;          // km/s
@@ -46,6 +47,14 @@ namespace FogOfWar.OpenWorld
         bool cruising;
         public string Phase = "coasting";
         public Body Landed;
+        Body contactBody;
+        D3 contactFixed;
+        public static bool Giant(Body b) => b != null && (b.Look == Look.Gas || b.Look == Look.Ice);
+        public static bool HasAtmosphere(Body b) => Giant(b) || (b != null && (b.Name == "Earth" || b.Name == "Venus" || b.Name == "Mars" || b.Name == "Titan"));
+        public bool AssistedArrival => Landed != null && HasAtmosphere(Landed);
+        public static string ArrivalPolicy(Body b) => Giant(b) ? "Assisted cloud-top hold; no solid surface or atmospheric flight" :
+            HasAtmosphere(b) ? "Assisted surface arrival; drag, heating and pressure are not simulated" : "Airless contact; local surface speed determines safe touchdown";
+        string ContactPhase => AssistedArrival ? (Giant(Landed) ? "assisted cloud-top hold at " : "assisted surface arrival at ") + Landed.Name : "landed on " + Landed.Name;
         bool parked;
         public bool RcsActive;  // RCS fired this step (pilot or autopilot trim)
         public float RcsLevel;  // the same, as a fraction of full RCS thrust (ship sound)
@@ -117,17 +126,19 @@ namespace FogOfWar.OpenWorld
             RcsLevel = (float)Math.Min(1, Math.Sqrt(rcs.Sqr) / RcsAccel);
             if (Landed != null)
             {
+                EnsureContact(sys, jd);
+                Pos = sys.Pos(Landed, jd) + Landed.FromFixed(contactFixed, jd);
+                Vel = sys.Vel(Landed, jd) + Landed.FixedVelocity(contactFixed, jd);
                 var up = (Pos - sys.Pos(Landed, jd)).Norm;
                 bool liftoff = D3.Dot(Heading * (Throttle * AMax) + rcs, up) > 0;
                 if (!liftoff)
                 {
-                    // sitting on the surface: ride along with the body
-                    Pos = sys.Pos(Landed, jd + h / 86400) + up * SurfaceRadius(Landed, up) * 1.0001;
-                    Vel = sys.Vel(Landed, jd);
-                    Phase = "landed on " + Landed.Name;
+                    RideSurface(sys, jd, jd + h / 86400);
+                    Phase = ContactPhase;
                     return;
                 }
                 Landed = null;
+                contactBody = null;
             }
 
             // Velocity Verlet, with gravity sampled at both ends of the step and the drive's thrust (constant across the
@@ -155,8 +166,21 @@ namespace FogOfWar.OpenWorld
             Vel += (g + gEnd) * (0.5 * h) + thrust * (f * h);
             DvUsed += dv * f;
             if (Throttle > 0) BurnSeconds += h * f;
+            if (PlanActive && Phase == "cruising" && Throttle == 0 && !RcsActive) CruiseSeconds += h;
             if (!UnlimitedFuel) Fuel = f < 1 ? 0 : Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
             CheckTouchdown(sys, jd1);
+        }
+
+        // Re-evaluate a parked/cruising plan at the current epoch without integrating an uncounted physics step.
+        public void RecheckPlan(SolarSystem sys, double jd, Body reference)
+        {
+            if (!PlanActive) return;
+            dominant = reference;
+            var cmd = Guide(sys, jd, 0, sys.Gravity(Pos, jd));
+            Throttle = !Dry && cmd.HasValue && cmd.Value.Mag > RcsAccel ? Math.Min(cmd.Value.Mag / AMax, 1) : 0;
+            RcsActive = !Dry && cmd.HasValue && cmd.Value.Sqr > 0 && cmd.Value.Mag <= RcsAccel;
+            RcsLevel = RcsActive ? (float)(cmd.Value.Mag / RcsAccel) : 0;
+            if (Dry) Phase = "out of fuel";
         }
 
         // Attitude only (coasting on rails): holds and manual rotation still move the nose.
@@ -290,6 +314,26 @@ namespace FogOfWar.OpenWorld
         public Body Crashed;
         public double ImpactSpeed;
 
+        void EnsureContact(SolarSystem sys, double jd)
+        {
+            if (contactBody == Landed && contactFixed.Sqr > 0) return;
+            contactBody = Landed;
+            contactFixed = Landed.ToFixed(Pos - sys.Pos(Landed, jd), jd);
+        }
+
+        void RideSurface(SolarSystem sys, double jd0, double jd1)
+        {
+            var fwd = Landed.ToFixed(Heading, jd0);
+            var up = Landed.ToFixed(Frame.FromU(Att * Vector3.up), jd0);
+            Pos = sys.Pos(Landed, jd1) + Landed.FromFixed(contactFixed, jd1);
+            Vel = sys.Vel(Landed, jd1) + Landed.FixedVelocity(contactFixed, jd1);
+            // Supported ships keep their attitude relative to the rotating body; commanded turning still works.
+            Att = Quaternion.LookRotation(Frame.U(Landed.FromFixed(fwd, jd1)), Frame.U(Landed.FromFixed(up, jd1)));
+        }
+
+        public static D3 SurfaceVelocity(SolarSystem sys, Body b, D3 relative, double jd) =>
+            sys.Vel(b, jd) + b.FixedVelocity(b.ToFixed(relative, jd), jd);
+
         public void CheckTouchdown(SolarSystem sys, double jd)
         {
             foreach (var b in Near)
@@ -302,13 +346,13 @@ namespace FogOfWar.OpenWorld
                 {
                     // a step or coast arc can end below the surface; take the speed back up to it, since the fall from
                     // the surface to here (μ(1/r − 1/R)) would otherwise turn a gentle touchdown into a crash
-                    double v = (Vel - sys.Vel(b, jd)).Mag;
+                    double v = (Vel - SurfaceVelocity(sys, b, r.Norm * R, jd)).Mag;
                     ImpactSpeed = Math.Sqrt(Math.Max(0, v * v - 2 * b.GM * (1 / r.Mag - 1 / R)));
                     Pos = bp + r.Norm * R * 1.0001;
-                    Vel = sys.Vel(b, jd);
+                    Vel = SurfaceVelocity(sys, b, Pos - bp, jd);
                     Landed = b; Plan = Plan.None; ThrottleCmd = 0; Throttle = 0; AngVel = Vector3.zero;
-                    bool giant = b.Look == Look.Gas || b.Look == Look.Ice;
-                    Phase = giant ? "in " + b.Name + "'s cloud tops (no surface): climb out" : "landed on " + b.Name;
+                    contactBody = null; EnsureContact(sys, jd);
+                    Phase = ContactPhase;
                     if (ImpactSpeed > SafeTouchdown)
                     {
                         if (Forgiving) Phase += $" (impact {ImpactSpeed * 1000:F0} m/s: sandbox, no damage)";
@@ -443,22 +487,28 @@ namespace FogOfWar.OpenWorld
 
         D3? Pursue(SolarSystem sys, double jd, D3 r, double dist, D3 vrel, D3 comp, double tau)
         {
-            double standoff = Standoff(Target);
+            // A distinct capture zone leaves a one-kilometre clearance reserve outside the old craft standoff.
+            // The target-thrust braking law is deliberately unchanged; its gameplay tradeoff remains issue #89.
+            double standoff = Standoff(Target) + 1;
             var los = dist > 0 ? r / dist : Heading;
-            bool hold = dist < standoff * 1.25 && vrel.Mag < 0.5;
-            if (!hold && Clearance(sys, jd) is D3 guard) { Phase = "climbing clear of " + guardBody.Name; return guard; }
+            bool hold = dist < 20 && vrel.Mag < 0.2;
+            if (!hold && PursueClearance(sys, jd) is D3 guard) { Phase = "climbing clear of " + guardBody.Name; return guard; }
             if (comp.Sqr >= AMax * AMax) { Phase = "matching its burn"; return comp.Norm * AMax; }
             D3 want, ff = D3.Zero;
             if (hold)
             {
-                // station-keeping beside it, as Brachistochrone's hover: back to the standoff, braking to stop by half of it
-                want = los * ((dist - standoff) * 0.002);
-                double closing = D3.Dot(vrel, los);
-                if (closing > 0) ff = -los * Math.Min(PursueMargin * Spare(comp, -los, AMax), closing * closing / (2 * Math.Max(dist - standoff * 0.5, 0.05)));
+                // Critically damped relative position control, with target acceleration fed forward. Unlike the
+                // player's loose hover this rejects closing bias without crossing the craft's exclusion distance.
+                double omega = Math.Min(0.05, 1 / Math.Max(20, 4 * tau / 3));
                 Phase = "holding station";
-                return Share((want - vrel) / tau + ff, comp);
+                return Share(los * ((dist - standoff) * omega * omega) - vrel * (2 * omega), comp);
             }
-            var dir = Avoid(sys, jd, los, dist);
+            // Short relative-motion lead: capped so an acceleration change cannot put the aim far behind the target.
+            double leadSeconds = Math.Min(600, Math.Sqrt(Math.Max(dist - standoff, 0) / AMax));
+            var transverse = vrel - los * D3.Dot(vrel, los);
+            var lead = r - transverse * leadSeconds;
+            var aim = lead.Sqr > 0 && D3.Dot(lead, r) > 0 ? lead.Norm : los;
+            var dir = Avoid(sys, jd, aim, dist);
             double brake = PursueMargin * Spare(comp, -dir, AMax), vb = Math.Sqrt(2 * brake * Math.Max(dist - standoff, 0));
             want = dir * vb;
             // on or above the braking curve, feed its own deceleration forward (see Brachistochrone)
@@ -467,6 +517,31 @@ namespace FogOfWar.OpenWorld
             // what the drive does, not where the steering points: braking against a target that pulls away can need no thrust
             Phase = cmd.Mag <= RcsAccel ? "trimming (RCS)" : D3.Dot(cmd, los) >= 0 ? "closing" : "braking";
             return cmd;
+        }
+
+        // Pursuit has an active braking curve, so a ballistic periapsis alone does not predict an impact. Its guard
+        // uses the actual stopping distance on that curve plus a bounded turn margin; the player's Climb is unchanged.
+        D3? PursueClearance(SolarSystem sys, double jd)
+        {
+            foreach (var b in Obstacles)
+            {
+                if (b == null || b == sys.Sun || b == Target || b.GM < 1) continue;
+                var r = Pos - sys.Pos(b, jd); double rm = r.Mag;
+                if (rm > 40 * b.Radius) continue;
+                var outward = r / Math.Max(rm, 1e-9); var v = Vel - sys.Vel(b, jd);
+                // Avoid still bends the path outside 1.5 R + 200 km. This last-resort braking guard protects the
+                // physical surface, rather than repeatedly ejecting a safe approach from that wider routing margin.
+                double inward = -D3.Dot(v, outward), safe = b.Radius * 1.1 + 20;
+                double net = Math.Max(AMax - b.GM / (rm * rm), 1e-9);
+                double stop = inward > 0 ? inward * inward / (2 * PursueMargin * net) : 0;
+                double turnMargin = Math.Min(0.05 * safe, Math.Max(0, inward) * 5);
+                if (rm > safe && (inward <= 0 || rm - safe > stop + turnMargin)) continue;
+                guardBody = b;
+                var lateral = v - outward * D3.Dot(v, outward);
+                var tangent = lateral.Sqr > 1e-12 ? lateral.Norm : D3.Cross(b.Pole, outward).Norm;
+                return (outward + tangent * 0.2).Norm * AMax;
+            }
+            return null;
         }
 
         // The most the drive has left along unit vector u once it matches the target: the largest k ≥ 0 with
@@ -622,6 +697,8 @@ namespace FogOfWar.OpenWorld
             public double throttle;
             public float wx, wy, wz;
             public string landed;
+            public bool fixedContact;
+            public double contactX, contactY, contactZ;
         }
 
         public SaveData ToSave(double jd, int warp) => new SaveData
@@ -631,6 +708,8 @@ namespace FogOfWar.OpenWorld
             qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Career.IsRaider(Target) ? null : Target?.Name, warp = warp, assist = FlightAssist,
             plan = (int)(PlanActive ? Plan : Plan.None), hold = (int)Hold, throttle = ThrottleCmd,
             wx = AngVel.x, wy = AngVel.y, wz = AngVel.z, landed = Landed?.Name,
+            fixedContact = Landed != null && contactBody == Landed && contactFixed.Sqr > 0,
+            contactX = contactFixed.x, contactY = contactFixed.y, contactZ = contactFixed.z,
         };
 
         public void FromSave(SaveData s, SolarSystem sys)
@@ -643,6 +722,20 @@ namespace FogOfWar.OpenWorld
             Target = string.IsNullOrEmpty(s.target) ? null : sys[s.target];
             FlightAssist = s.assist; Plan = Plan.None; Hold = Hold.Off; ThrottleCmd = 0; Throttle = 0;
             Landed = string.IsNullOrEmpty(s.landed) ? null : sys[s.landed];
+            contactBody = null;
+            if (Landed != null)
+            {
+                // Older saves migrate their saved world position at their saved epoch to a body-fixed point.
+                // Their centre-only velocity is replaced by the supported surface velocity, not reused at liftoff.
+                if (s.fixedContact)
+                {
+                    contactBody = Landed;
+                    contactFixed = new D3(s.contactX, s.contactY, s.contactZ);
+                }
+                EnsureContact(sys, s.jd);
+                RideSurface(sys, s.jd, s.jd);
+                Phase = ContactPhase;
+            }
         }
     }
 }

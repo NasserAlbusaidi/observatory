@@ -326,6 +326,8 @@ namespace FogOfWar
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
             list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
+            list.Add(new Readout("Flight model", FlightModel, Coasting() ? Tone.Bad : Tone.Normal));
+            if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, Tone.Bad));
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
@@ -334,13 +336,18 @@ namespace FogOfWar
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
             list.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
-            // jet power P = ½·m·a·vₑ with the live mass and the D–He³-class exhaust; no known physics sheds that heat
-            if (ship.Throttle > 0) list.Add(new Readout("Jet power (fictional efficiency)", Fmt.Num(0.5 * ship.Mass * 1e3 * ship.Throttle * ship.AMax * 1e3 * Ship.Ve * 1e3 / 1e12, 3) + " TW", Tone.Bad));
+            // Ideal exhaust kinetic power P = ½ m a vₑ (SI, displayed in TW), not onboard waste heat.
+            if (ship.Throttle > 0) list.Add(new Readout("Exhaust power (ideal, not heat)", Fmt.Num(0.5 * ship.Mass * 1e3 * ship.Throttle * ship.AMax * 1e3 * Ship.Ve * 1e3 / 1e12, 3) + " TW", Tone.Bad));
             if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "approximate (JPL fits: Jul 2000 – Jun 2099)", Tone.Bad));
             if (ship.Target != null)
             {
                 TargetRel(out var r, out var vr, out double closing);
                 list.Add(new Readout("Target", ship.Target.Name + (ship.Target.SizeEstimated ? " (size unknown, shown 2 km)" : ""), Tone.Hot));
+                if (!Career.IsCraft(ship.Target))
+                {
+                    list.Add(new Readout("Position model", ship.Target.PositionModel(jd)));
+                    list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
+                }
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
                 list.Add(new Readout("Relative speed", Fmt.Num(vr.Mag, 3) + " km/s"));
@@ -382,9 +389,9 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- panel
 
-        // the planet buttons in both shells: the Sun's own bodies, less the asteroids (their own list), traffic and a
-        // raider's proxy
-        List<Body> PlanetButtons() => sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x) && !Career.IsRaider(x));
+        // the planet buttons in both shells: the Sun's own bodies, less the asteroids (their own list), traffic,
+        // raider proxies and contract craft
+        List<Body> PlanetButtons() => sys.Bodies.FindAll(x => x.Parent == sys.Sun && !x.Asteroid && !Traffic.Is(x) && !Career.IsRaider(x) && !Career.IsCraft(x));
 
         public override void Controls(PanelUI ui)
         {
@@ -493,11 +500,13 @@ namespace FogOfWar
             int i = Array.IndexOf(args, "-fowsavekey");
             if (i >= 0 && i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
             // the unattended suites save, load and autosave too (the -fowqa "save" step, a dock): keep them off the player's save
-            return Unattended() ? "fow-save-qa" : "fow-save-v1";
+            // A process nonce also isolates two copies of the same suite/build. Keep it for this process's lifetime
+            // so scene restarts and Continue still share their own save. Explicit keys remain reusable across runs.
+            return Unattended() ? "fow-save-qa-" + Guid.NewGuid().ToString("N") : "fow-save-v1";
         }
         // an unattended suite is running: no player save, and no route calls to drop the warp mid-trip (a method, not a
         // static field, so SaveKey's initialiser never sees it unset)
-        static bool Unattended() => Array.Exists(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots" },
+        static bool Unattended() => Array.Exists(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" },
             a => Array.IndexOf(Environment.GetCommandLineArgs(), a) >= 0);
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
         public static string SaveSummary

@@ -77,6 +77,43 @@ namespace FogOfWar.OpenWorld
         public Color ColA = Color.gray, ColB = Color.gray, Atmo = Color.clear;
         public string Texture;              // Resources path, optional
         public Cheb Cheb;
+        public bool FitExpected, ElementsCalibrated;
+        public string ElementSource = "catalogue mean elements", RadiusSource = "catalogue radius", RotationSource = "orientation parameters (source unspecified)";
+        public string ShapeSource = "procedural sphere/spheroid; terrain where supplied (not a measured full shape)";
+
+        public string PositionModel(double jd)
+        {
+            if (Path != null) return "scripted craft trajectory";
+            if (Parent == null) return "heliocentric origin";
+            if (Cheb == null) return (ElementsCalibrated ? "calibrated mean elements" : "mean elements") + (FitExpected ? " (fit asset unavailable)" : "");
+            if (jd < Cheb.JdStart || jd >= Cheb.JdEnd) return "mean-element fallback (outside fit coverage)";
+            double edge = Math.Min(jd - Cheb.JdStart, Cheb.JdEnd - jd);
+            return edge < SolarSystem.BlendDays ? "fit / mean-element boundary blend" : "fitted JPL Horizons ephemeris";
+        }
+
+        public string PositionSource(double jd) => (Cheb != null ?
+            $"JPL Horizons fit: JD {Cheb.JdStart:0.0}–{Cheb.JdEnd:0.0} TDB, 180-day edge blends; " : "") +
+            $"{ElementSource}, element epoch JD {EpochJd:0.0} TDB. Numerical accuracy not quantified.";
+
+        public D3 ToFixed(D3 relative, double jd)
+        {
+            Axes(jd, out var prime, out var east, out var pole);
+            return new D3(D3.Dot(relative, prime), D3.Dot(relative, east), D3.Dot(relative, pole));
+        }
+
+        public D3 FromFixed(D3 point, double jd)
+        {
+            Axes(jd, out var prime, out var east, out var pole);
+            return prime * point.x + east * point.y + pole * point.z;
+        }
+
+        // Differentiate the orientation actually rendered, including retrograde and synchronous bodies.
+        // Divide by the represented JD span rather than assuming subsecond dates are exact.
+        public D3 FixedVelocity(D3 point, double jd)
+        {
+            double lo = jd - 0.25 / 86400, hi = jd + 0.25 / 86400;
+            return (FromFixed(point, hi) - FromFixed(point, lo)) / ((hi - lo) * 86400);
+        }
 
         // Orientation: IAU pole (RA/Dec J2000) and prime meridian W = W0 + Wd * days (TDB from J2000).
         public double PoleRa = 0, PoleDec = 90, W0, Wd;
@@ -360,6 +397,9 @@ namespace FogOfWar.OpenWorld
                 var b = new Body
                 {
                     Name = m.name.Replace('_', ' '), Parent = parent, GM = m.gm, Radius = r > 0 ? r : 2, SizeEstimated = r <= 0,
+                    ElementsCalibrated = m.calibrated, ElementSource = "JPL SSD satellite elements" + (m.calibrated ? " with Horizons calibration" : ""),
+                    RadiusSource = m.radiusKm > 0 ? "JPL supplied radius" : r > 0 ? "art catalogue radius" : "assumed nominal radius (unmeasured)",
+                    RotationSource = "assumed synchronous orientation; not a measured spin solution",
                     Look = Look.Rocky, Texture = "Planets/" + m.name + "/Color", Synchronous = true,
                     ColA = icy ? new Color(0.62f, 0.62f, 0.64f) : new Color(0.42f, 0.39f, 0.36f),
                     ColB = icy ? new Color(0.86f, 0.86f, 0.88f) : new Color(0.62f, 0.58f, 0.53f),
@@ -368,6 +408,7 @@ namespace FogOfWar.OpenWorld
                 };
                 if (b.Name == "Phobos") { b.Synchronous = false; b.PoleRa = 317.68; b.PoleDec = 52.90; b.W0 = 35.06; b.Wd = 1128.8445850; }
                 if (b.Name == "Deimos") { b.Synchronous = false; b.PoleRa = 316.65; b.PoleDec = 53.52; b.W0 = 79.41; b.Wd = 285.1618970; }
+                if (!b.Synchronous) b.RotationSource = "IAU parameter model; periodic terms omitted";
                 s.Bodies.Add(b);
                 if (parent.Barycentric && b.GM > 1) parent.MassiveMoons.Add(b);
             }
@@ -400,6 +441,8 @@ namespace FogOfWar.OpenWorld
                     Name = name, Parent = s.Sun, GM = gm, Radius = r, Look = Look.Rocky, Asteroid = true, Texture = "Planets/" + name + "/Color",
                     ColA = new Color(0.33f, 0.31f, 0.29f), ColB = new Color(0.5f, 0.48f, 0.45f),
                     PoleRa = ra, PoleDec = dec, W0 = w0, Wd = 360 / (Math.Abs(rotH) / 24) * Math.Sign(rotH),
+                    ElementSource = "JPL Horizons osculating elements", RadiusSource = "catalogue / mission radius",
+                    RotationSource = ra == 0 && dec == 90 ? "catalogue period with assumed pole and prime meridian" : "catalogue pole and period model; some prime meridians assumed",
                 };
                 if (el != null)
                 {
@@ -436,6 +479,9 @@ namespace FogOfWar.OpenWorld
             {
                 b.Parent = sun; b.GM = gm; b.Radius = req; b.Flattening = f; b.J2 = j2; b.Look = look; b.ColA = a; b.ColB = bcol;
                 b.PoleRa = ra; b.PoleDec = dec; b.W0 = w0; b.Wd = wd; b.Texture = tex; b.Atmo = atmo;
+                b.ElementSource = "JPL approximate planet elements (nominal domain 1800–2050)";
+                b.RadiusSource = "NASA planetary fact-sheet radius";
+                b.RotationSource = "IAU orientation model";
                 s.Bodies.Add(b);
                 return b;
             }
@@ -453,6 +499,7 @@ namespace FogOfWar.OpenWorld
                 Name = "Moon", Parent = s.Earth, GM = 4902.8, Radius = 1738.1, Flattening = 0.0012, Look = Look.Rocky, ColA = new Color(0.5f, 0.5f, 0.5f), ColB = new Color(0.7f, 0.69f, 0.67f), Texture = "Planets/Moon/Color",
                 A = 384400, E = 0.0549, I = 5.145, Node = 125.0445, dNode = -0.0529538083, Peri = 83.3532, dPeri = 0.1114040803, L = 218.3165, dL = 13.17639648,
                 PoleRa = 269.9949, PoleDec = 66.5392, W0 = 38.3213, Wd = 13.17635815,
+                ElementSource = "precessing mean lunar elements", RadiusSource = "catalogue equatorial radius", RotationSource = "IAU orientation model with selected periodic terms",
             };
             s.Bodies.Add(s.Moon);
             P(Planet("Mars", 1.52371034, 0.00001847, 0.09339410, 0.00007882, 1.84969142, -0.00813131, -4.55343205, 19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343),
@@ -475,6 +522,7 @@ namespace FogOfWar.OpenWorld
             foreach (var b in s.Bodies)
             {
                 if (b.Parent != null && b.Parent != sun && b != s.Moon) continue; // moons use mean elements
+                b.FitExpected = b.Parent != null;
                 b.Cheb = Cheb.Load(b.Name);
                 if (b.Cheb != null) { s.EphemStart = Math.Max(s.EphemStart, b.Cheb.JdStart + BlendDays); s.EphemEnd = Math.Min(s.EphemEnd, b.Cheb.JdEnd - BlendDays); }
             }

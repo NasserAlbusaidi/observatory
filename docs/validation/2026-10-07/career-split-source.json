@@ -1,0 +1,8 @@
+{
+  "moveOnly": true,
+  "movedLines": 252,
+  "bodySha256": "1b40bf0ac62379e668b6bdab82f8b2addce7768a3e2f4725d9992e7ad7305738",
+  "mainLines": 776,
+  "partialLines": 267,
+  "yieldPolicy": "foreach forwards the exact original yielded values without adding a coroutine wait"
+}

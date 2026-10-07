@@ -1,0 +1,111 @@
+API VERSION: 1.2
+API SOURCE: NASA/JPL Horizons API
+
+*******************************************************************************
+ Revised: April 12, 2021       Neptune Barycenter                             8
+ 
+ Dynamical point:
+ ---------------
+ The location of the center-of-mass of the Neptune system. The point about 
+ which Neptune and its satellites revolve. See 899 for Neptune center.
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Tue Oct  6 21:35:58 2026 Pasadena, USA      / Horizons
+*******************************************************************************
+Target body name: Neptune Barycenter (8)          {source: DE441}
+Center body name: Sun (10)                        {source: DE441}
+Center-site name: BODY CENTER
+*******************************************************************************
+Start time      : A.D. 2000-Jan-01 00:00:00.0000 TDB
+Stop  time      : A.D. 2099-Dec-19 00:00:00.0000 TDB
+Step-size       : DISCRETE TIME-LIST
+*******************************************************************************
+Center geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}
+Output units    : KM-S
+Calendar mode   : Mixed Julian/Gregorian
+Output type     : GEOMETRIC cartesian states
+Output format   : 2 (position and velocity)
+Reference frame : Ecliptic of J2000.0
+*******************************************************************************
+            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,                     VX,                     VY,                     VZ,
+**************************************************************************************************************************************************************************************************
+$$SOE
+2451544.500000000, A.D. 2000-Jan-01 00:00:00.0000,  2.514853497996160E+09, -3.738847418648400E+09,  1.903944585550165E+07,  4.466067066900526E+00,  3.076399415216854E+00, -1.660623407914873E-01,
+2451560.500000000, A.D. 2000-Jan-17 00:00:00.0000,  2.521023737465303E+09, -3.734589567633780E+09,  1.880985904069734E+07,  4.460782332162245E+00,  3.083686679262794E+00, -1.660942845559983E-01,
+2461144.499000000, A.D. 2026-Apr-13 23:58:33.6000,  4.467283930840449E+09,  1.262651618495589E+08, -1.055459808350874E+08, -2.002752072000525E-01,  5.463296742458110E+00, -1.079658261628524E-01,
+2461144.500000000, A.D. 2026-Apr-14 00:00:00.0000,  4.467283913536644E+09,  1.262656338784734E+08, -1.055459901633357E+08, -2.002757740808360E-01,  5.463296709021201E+00, -1.079658126152339E-01,
+2461144.501000000, A.D. 2026-Apr-14 00:01:26.4000,  4.467283896232791E+09,  1.262661059073850E+08, -1.055459994915828E+08, -2.002763409615631E-01,  5.463296675584255E+00, -1.079657990676166E-01,
+2461316.500000000, A.D. 2026-Oct-03 00:00:00.0000,  4.463585294761462E+09,  2.074111074669433E+08, -1.071332085734814E+08, -2.975839235844953E-01,  5.457325017816631E+00, -1.056347786798324E-01,
+2488040.500000000, A.D. 2099-Dec-03 00:00:00.0000, -4.343394832367899E+09,  1.245008911586909E+09,  7.447216903590196E+07, -1.526305988838790E+00, -5.203950787522547E+00,  1.421433366743117E-01,
+2488056.499000000, A.D. 2099-Dec-18 23:58:33.6000, -4.345498516894079E+09,  1.237813731952240E+09,  7.466854987501782E+07, -1.517409151959011E+00, -5.206391952398710E+00,  1.419902541934235E-01,
+2488056.500000000, A.D. 2099-Dec-19 00:00:00.0000, -4.345498647998226E+09,  1.237813282119897E+09,  7.466856214297742E+07, -1.517408595802556E+00, -5.206392104865989E+00,  1.419902446285115E-01,
+$$EOE
+**************************************************************************************************************************************************************************************************
+ 
+TIME
+
+  Barycentric Dynamical Time ("TDB" or T_eph) output was requested. This
+continuous coordinate time is equivalent to the relativistic proper time
+of a clock at rest in a reference frame co-moving with the solar system
+barycenter but outside the system's gravity well. It is the independent
+variable in the solar system relativistic equations of motion.
+
+  TDB runs at a uniform rate of one SI second per second and is independent
+of irregularities in Earth's rotation.
+ 
+CALENDAR SYSTEM
+
+  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+are in the Julian calendar system, which is automatically extended for dates
+prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+matching historical dates. The Gregorian calendar more accurately corresponds
+to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+available if such physical events are the primary interest.
+
+REFERENCE FRAME AND COORDINATES
+
+  Ecliptic at the standard reference epoch
+
+    Reference epoch: J2000.0
+    X-Y plane: adopted Earth orbital plane at the reference epoch
+               Note: IAU76 obliquity of 84381.448 arcseconds wrt ICRF X-Y plane
+    X-axis   : ICRF
+    Z-axis   : perpendicular to the X-Y plane in the directional (+ or -) sense
+               of Earth's north pole at the reference epoch.
+
+  Symbol meaning:
+
+    JDTDB    Julian Day Number, Barycentric Dynamical Time
+      X      X-component of position vector (km)
+      Y      Y-component of position vector (km)
+      Z      Z-component of position vector (km)
+      VX     X-component of velocity vector (km/sec)                           
+      VY     Y-component of velocity vector (km/sec)                           
+      VZ     Z-component of velocity vector (km/sec)                           
+
+ABERRATIONS AND CORRECTIONS
+
+ Geometric state vectors have NO corrections or aberrations applied.
+
+Computations by ...
+
+    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+    4800 Oak Grove Drive, Jet Propulsion Laboratory
+    Pasadena, CA  91109   USA
+
+    General site: https://ssd.jpl.nasa.gov/
+    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+                  command-line   telnet ssd.jpl.nasa.gov 6775
+                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+    Inquiries   : Jon.D.Giorgini@jpl.nasa.gov
+*******************************************************************************

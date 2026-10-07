@@ -310,7 +310,9 @@ float4 deriv(float4 s, float b, float q, float a, float M, out float php)
     float P = r * r + a * a - a * b;
     float K = (b - a) * (b - a) + q;
     float D = r * r - 2.0 * M * r + a * a;
-    php = -(a * P / D - a + b / (st * st));
+    // At zero spin the radial azimuth term cancels identically, including at the horizon. Evaluating 0/0 in an
+    // intermediate RK stage otherwise invents a numerical failure for a captured Schwarzschild ray.
+    php = -(a == 0.0 ? 0.0 : a * P / D - a) - b / (st * st);
     float rpp = 2.0 * r * P - (r - M) * K;
     float thpp = b * b * cs / (st * st * st) - a * a * sn * cs;
     return float4(s.y, rpp, s.w, thpp);
@@ -338,7 +340,10 @@ float3 skyDir(float4 s, float ph, float b, float q, float a, float M)
     float3 eph = float3(-sp, 0, cp);
     float p1;
     deriv(s, b, q, a, M, p1);
-    return normalize(er * s.y + eth * (s.x * s.w) + eph * (s.x * st * p1));
+    float3 direction = er * s.y + eth * (s.x * s.w) + eph * (s.x * st * p1);
+    // Captured states can lie at the coordinate horizon, where the unused sky tangent is singular. Keep diagnostic
+    // textures finite as well as the visible image; a zero direction carries no escaped-ray claim.
+    return any(!isfinite(direction)) || dot(direction, direction) <= 0.0 ? float3(0, 0, 0) : normalize(direction);
 }
 
 // ---- shading at an equator crossing ----------------------------------------------------------------------
@@ -441,7 +446,8 @@ void photon(float3 n, float boost, float M, out float b, out float q, out float 
 struct Ray
 {
     float3 col; float trans, spotLum, firstHit, firstG;
-    float4 s; float ph; int steps; bool escaped;
+    float4 s; float ph; int steps; bool escaped, fallbackSky;
+    int reason; // 0 capture, 1 confirmed escape, 2 exhausted budget, 3 opaque hit, 4 numerical failure
     float count; float4 x0, x1, x2; float rmin, rmax;
 };
 
@@ -453,24 +459,38 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
     float ph0 = _CamBL.z, ph = ph0;
     float rCap = _RH + 1e-3;
     float projR = 1e-3, projT = 1e-3 * (q + b * b + 1.0);
+    // Keep the polar coordinate measured from the NEARER pole. Storing pi-epsilon in float loses the small angle
+    // at the south pole, corrupting the sharp b/sin(theta)^2 azimuth swing even as the step size tends to zero.
+    // The local polar equation is symmetric between hemispheres; convert back only for geometry/output.
+    bool south = s.z > UNITY_HALF_PI;
+    if (south) { s.z = UNITY_PI - s.z; s.w = -s.w; }
     bool plane = table || _Disk > 0.5 || _DebrisRange.z > 0.5 || _GuideOn > 0.5 || _SpotOn > 0.5;
     float3 pPrev = 0;
     float crossings = 0.0; int stepsUsed = 0;
     bool escaped = false;
+    int reason = 2;
     // A ray that can fall in has R > 0 all the way down to the horizon. If R(rCap) < 0 it has a turning
     // point outside, and a step that lands inside rCap overshot it: retry that step smaller (QA-034).
     bool canFall = Rpot(rCap, b, q, a, M) > 0.0;
     float hScale = 1.0;
     [loop] for (int k = 0; k < _Steps; k++)
     {
+        stepsUsed = k + 1;
         float p1, p2, p3, p4;
         float4 k1 = deriv(s, b, q, a, M, p1);
-        float h = hScale * _StepK / (abs(s.y) / s.x + sqrt(abs(k1.y) / s.x) + abs(p1) + abs(s.w) / max(abs(sin(s.z)), 1e-7) + sqrt(abs(k1.w)));
+        // An exactly meridional ray can cross the coordinate pole: forcing h proportional to sin(theta) otherwise
+        // strands it there forever. Other near-polar rays need a tighter azimuth step to converge their sky direction.
+        bool meridian = abs(b) < 1e-6;
+        float polar = meridian ? 1.0 : max(abs(sin(s.z)), 1e-7);
+        float stepK = abs(sin(s.z)) < 0.1 ? min(_StepK, 0.1) : _StepK;
+        float h = hScale * stepK / (abs(s.y) / s.x + sqrt(abs(k1.y) / s.x) + abs(p1) + abs(s.w) / polar + sqrt(abs(k1.w)));
         float4 k2 = deriv(s + 0.5 * h * k1, b, q, a, M, p2);
         float4 k3 = deriv(s + 0.5 * h * k2, b, q, a, M, p3);
         float4 k4 = deriv(s + h * k3, b, q, a, M, p4);
         float4 sn = s + h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
         float phn = ph + h / 6.0 * (p1 + 2.0 * p2 + 2.0 * p3 + p4);
+        if (any(!isfinite(sn)) || !isfinite(phn)) { reason = 4; break; }
+        if (meridian && sn.z < 0.0) { sn.z = -sn.z; sn.w = -sn.w; phn += UNITY_PI; }
         if (sn.x < rCap && !canFall && hScale > 1e-3) { hScale *= 0.25; continue; }
         hScale = min(hScale * 2.0, 1.0);
         // hold the first integrals r'² = R(r) and θ'² = Θ(θ) (except near turning points) so errors don't drift
@@ -491,8 +511,8 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
         }
         if (nearBody)
         {
-            pPrev = toCart(s.x, s.z, ph, a);
-            pNext = toCart(sn.x, sn.z, phn, a);
+            pPrev = toCart(s.x, south ? UNITY_PI - s.z : s.z, ph, a);
+            pNext = toCart(sn.x, south ? UNITY_PI - sn.z : sn.z, phn, a);
             [loop] for (int bi = 0; bi < _NB; bi++)
             {
                 float3 nb;
@@ -523,7 +543,7 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
                 float phHit = lerp(ph, phn, t);
                 float Dh = max(rHit * rHit - 2.0 * M * rHit + a * a, 1e-4);
                 float prHit = -lerp(s.y, sn.y, t) / Dh;   // the physical photon's p_r
-                float thd = lerp(s.w, sn.w, t);
+                float thd = lerp(s.w, sn.w, t) * (south ? -1.0 : 1.0);
                 if (table)
                 {
                     float4 X = float4(rHit, phHit - ph0, prHit, thd);
@@ -532,7 +552,7 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
                 else
                 {
                     shadeCrossing(rHit, phHit, prHit, thd, b, q, EF, M, crossings, -1.0, R.col, R.trans, R.spotLum, R.firstHit, R.firstG);
-                    if (R.trans < 0.01) break;
+                    if (R.trans < 0.01) { reason = 3; break; }
                 }
             }
             crossings += 1.0;
@@ -544,17 +564,30 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
             float prB = -lerp(s.y, sn.y, tBody) / Db;
             R.col += R.trans * bodyColor(hitI, nrm, normalize(pNext - pPrev), b, prB, EF);
             R.trans = 0;
+            reason = 3;
             break;
         }
-        s = sn; ph = phn; stepsUsed = k;
-        if (s.x < rCap) break;
-        if (s.x > _RMax && s.y > 0.0) { escaped = true; break; }
+        if (sn.z > UNITY_HALF_PI) { sn.z = UNITY_PI - sn.z; sn.w = -sn.w; south = !south; }
+        s = sn; ph = phn;
+        if (s.x < rCap) { reason = 0; break; }
+        if (s.x > _RMax && s.y > 0.0) { escaped = true; reason = 1; break; }
     }
-    // a ray still going after all its steps is circling near the photon orbit; it would almost always leave
-    // again, so take the sky in its current direction rather than black
-    if (!escaped && R.trans > 0.01 && (!canFall || (s.x >= rCap * 1.05 && s.y > 0.0))) escaped = true;
+    // Display-only fallback: an unfinished ray can still sample the sky, but it is never a confirmed escape.
+    // Diagnostics and lens tables retain the unresolved state; its current direction is not asymptotic evidence.
+    R.fallbackSky = reason == 2 && R.trans > 0.01 && (!canFall || (s.x >= rCap * 1.05 && s.y > 0.0));
+    R.reason = reason;
+    if (south) { s.z = UNITY_PI - s.z; s.w = -s.w; }
     R.s = s; R.ph = ph; R.steps = stepsUsed; R.escaped = escaped; R.count = crossings;
     return R;
+}
+
+float4 traceReasonColour(float reason, bool fallbackSky)
+{
+    if (reason < 0.5) return float4(1, 0, 0, 1); // capture
+    if (reason < 1.5) return float4(0, 1, 0, 1); // confirmed escape
+    if (reason < 2.5) return fallbackSky ? float4(0, 1, 1, 1) : float4(0, 0, 1, 1); // unresolved
+    if (reason < 3.5) return float4(1, 1, 1, 1); // opaque
+    return float4(1, 0, 1, 1); // numerical failure
 }
 
 // The sky seen along an escaping direction, weight w (0 = none). dir's screen-space differentials pick the
@@ -593,7 +626,7 @@ float3 skyTerm(float3 dir, float w, float EF, float px)
 // away from it, ρ warped logarithmically about the shadow edge ρc(ψ) (computed on the CPU from the photon-orbit
 // family) so cells crowd the critical curve and none straddles capture and escape. One table covers every sign
 // of b and of the initial p_r and p_θ.
-//   T0: fate × 8 + crossings (max 4; fate 0 captured, 1 escaped, 2 neither), escape direction at camera φ = 0
+//   T0: reason × 8 + crossings (max 4; 0 capture, 1 escape, 2 budget, 3 opaque, 4 numerical), direction at camera φ = 0
 //   T1..T3: the first three equator crossings (r, φ − φ_camera, p_r, dθ/dλ)
 //   T4: the radial range of the path (for bodies)
 Texture2D<float4> _LensT0, _LensT1, _LensT2, _LensT3, _LensT4;
@@ -696,6 +729,14 @@ float lensCode(float3 d)
     return _LensT0.Load(int3(fx < 0.5 ? i0 : i1, fy < 0.5 ? j0 : j0 + 1, 0)).x;
 }
 
+float4 lensReasonColour(float3 d)
+{
+    int i0, i1, j0; float fx, fy;
+    lensCells(d, i0, i1, j0, fx, fy);
+    int3 cell = int3(fx < 0.5 ? i0 : i1, fy < 0.5 ? j0 : j0 + 1, 0);
+    return traceReasonColour(floor(_LensT0.Load(cell).x / 8.0), _LensT4.Load(cell).w > 0.5);
+}
+
 // The four cells' fate × 8 + count codes.
 float4 lensCodes(int i0, int i1, int j0)
 {
@@ -763,6 +804,7 @@ bool lensSample(float3 d, float b, float q, float EF, float3 Cr, float3 Cph, flo
     bool plane = _Disk > 0.5 || _DebrisRange.z > 0.5 || _GuideOn > 0.5 || _SpotOn > 0.5;
     if (plane ? any(codes != codes.x) : any(fates != fates.x)) return false;
     float fate = fates.x, cnt = codes.x - fate * 8.0;
+    if (fate >= 2.0) return false; // an unresolved/numerically failed cell is not trusted as a resolved lens sample
     code = codes.x;
     if (_NB > 0)
     {

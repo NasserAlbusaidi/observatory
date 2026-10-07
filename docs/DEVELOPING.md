@@ -2,6 +2,8 @@
 
 The full reference behind the [store page](../README.md): game rules and numbers, controls, how to build and test, the repository layout and every data credit.
 
+The [models and limits guide](MODEL-FIDELITY.md) records each subsystem's assumptions, supported domain and validation limits, including the retained drive/RCS/wheel model and snapshot-time black-hole emission.
+
 ## Contents
 
 - [Game rules](#game-rules)
@@ -40,7 +42,7 @@ Deadlines are in game days, so time compression saves your patience but not the 
 
 If the tank runs dry, you are adrift. An emergency tender brings 30 t for 20,000 cr. Debt is allowed.
 
-On screen, the drive's efficiency and endurance above 3 g are labelled as fictional. The trajectories and Δv are real.
+The drive is acceleration-regulated with assumed thrust reserve; cargo increases fuel cost without reducing commanded g. Translational RCS shares the drive's effective exhaust velocity. Reaction wheels use no reaction mass and omit momentum saturation and cargo-dependent inertia. Reactor power, heat rejection and high-g endurance are assumed technology, not solved engineering. The [spacecraft decisions](MODEL-FIDELITY.md#spacecraft-decisions) specify the retained model.
 
 ### Ports
 
@@ -83,9 +85,9 @@ A new career starts docked at Earth with one job: medical supplies to Luna. A sh
 ## The solar system
 
 - **Positions.** The planets, the Moon and 21 named asteroids use Chebyshev fits to JPL Horizons vectors from 2000 to 2100 (TDB). Outside that span, bodies fall back to mean orbital elements.
-- **453 moons** from the JPL SSD tables: Mars 2, Jupiter 115, Saturn 291, Uranus 29, Neptune 16. Fast moons are re-fitted to Horizons so resonances such as Io–Europa–Ganymede hold.
+- **453 moons** from the JPL SSD tables: Mars 2, Jupiter 115, Saturn 291, Uranus 29, Neptune 16. Most use mean elements, with Horizons calibration for some fast moons; calibration is not a time-resolved fitted trajectory. Missing radii and default synchronous rotations are assumptions.
 - **Asteroid belt.** A procedural sample of about 1 % of the real belt, with the Kirkwood gaps, five collision families, Hungarias, Hildas in the 3:2 resonance and Jupiter's Trojans.
-- **Flight.** Coasting follows two-body conics around the dominant body (patched conics). Time compression runs from 1× to 1M×. The autopilot plans at 0.3, 1, 3, 5 or 10 g, flips at the midpoint and parks in orbit. You can also fly by hand with RCS and reaction wheels.
+- **Flight.** Through 100×, drive-off and powered flight share multi-body/J2 gravity. At 1k× and above, eligible coasts use labelled dominant-body conics. Time compression runs from 1× to 1M×. The autopilot uses feedback guidance at 0.3, 1, 3, 5 or 10 g to accelerate, brake and park; the midpoint flip is an ideal planning estimate. You can also fly by hand with RCS and reaction wheels. See the [arrival policy](MODEL-FIDELITY.md#arrival-and-contact-policy) for airless contact and assisted atmospheric/cloud-top arrival.
 - **Views.** Chase, orbit and cockpit cameras, a system map, and hull floodlights for the night side.
 - **Sound.** All ship sound (drive, RCS, wheels, creaks, docking, alarms) is synthesised live by the game. No audio files ship.
 - **Rendering.** Physics runs in double-precision heliocentric km. The camera is the floating origin, and anything past 100,000 km is compressed logarithmically, so angular sizes stay exact.
@@ -190,7 +192,9 @@ The built game takes these flags. Each run writes its report and screenshots to 
 
 Other flags:
 
-- `-fowsavekey <key>` uses another save slot. `-fowqa`, `-fowcareer` and `-fowtour` use `fow-save-qa`, so they never touch your save.
+- `-fowsavekey <key>` uses another save slot. Without it, unattended suites generate a unique `fow-save-qa-<nonce>` per process, isolating concurrent suites and worktrees from one another and from the player's save. Use an explicit unique key only when intentionally continuing a save across processes.
+- `-fowcareer` uses a fixed TDB epoch and a fixed simulated frame duration. Flight limits use game time; a wall-clock hang guard reports `TIMEOUT` and exits 2. Functional failures exit 1. Timing samples report `PERF PASS` or `PERF SLOW` separately. `-fowcareertraffic` alongside `-fowcareer <dir>` runs just the deterministic traffic section.
+- Run focused coast-clock regressions with `Unity.exe -batchmode -nographics -projectPath "<repo>" -executeMethod FogOfWar.EditorTools.FogOfWarRegressionCheck.Run -logFile Logs/regression-editor.log`. The analytic circle and zero-motion guidance checks write `Logs/issue-regressions.txt` and exit nonzero on failure.
 - `-fowqa` runs the career in sandbox: unlimited reaction mass and no contracts, so the physics tests keep working.
 - `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fowprof` logs frame time every 2 s. `-fownobloom` turns bloom off. `-fowlegacyui` uses the old IMGUI shell.
 - `-fowspawnrunner <class>` (courier, packet, liner, freighter, tanker or hauler) starts a new game, accepts an intercept for that runner and holds the ship 2 km beside it, camera on it, for filming. It accepts a real job, so use it with `-fowsavekey`.
