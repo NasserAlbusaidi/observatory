@@ -371,9 +371,16 @@ namespace FogOfWar
                 Put("warpIdx", 6);
                 float t0 = Time.realtimeSinceStartup;
                 double jd0 = jd;
-                yield return Fly(() => career.Call != null, 6, 30);
+                int callWarp = -1;
+                // Capture at arrival, before Fly restores warp. A missing production DropWarp must fail this check.
+                yield return Fly(() =>
+                {
+                    if (career.Call == null) return false;
+                    callWarp = Get<int>("warpIdx");
+                    return true;
+                }, 6, 30);
                 yield return null;
-                Check(career.Call != null && Get<int>("warpIdx") == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, warp {Get<int>("warpIdx")}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
+                Check(career.Call != null && callWarp == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, arrival warp {callWarp}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
                 yield return Shot("c05c-route-call");
                 career.RouteEvents = false;
                 career.Answer(false, jd);
