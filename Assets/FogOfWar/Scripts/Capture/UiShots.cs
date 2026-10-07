@@ -56,6 +56,8 @@ namespace FogOfWar
             Controls.Locked = true;
             app.InputLocked = true;
             yield return null;
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowclassicshots") >= 0)
+            { yield return ClassicShots(app); yield break; }
             var shell = UiShell.Instance;
             if (shell == null) { log.WriteLine("no UI shell"); Quit(); yield break; }
             classicWas = GameSettings.ClassicPanel;
@@ -448,6 +450,39 @@ namespace FogOfWar
         {
             var f = typeof(FogOfWarApp).GetField("gameStarted", BindingFlags.Instance | BindingFlags.NonPublic);
             f?.SetValue(app, v);
+        }
+
+        // IMGUI needs a visible player render loop; this optional path captures the classic shell directly.
+        IEnumerator ClassicShots(FogOfWarApp app)
+        {
+            classicWas = GameSettings.ClassicPanel;
+            GameSettings.ClassicPanel = true;
+            foreach (var size in sizes)
+            {
+                Screen.SetResolution(size.x, size.y, FullScreenMode.Windowed);
+                yield return Wait(1);
+                app.NewGame();
+                yield return Wait(1);
+                var os = (OpenSystemScene)app.Current;
+                os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(os);
+                foreach (bool landed in new[] { false, true })
+                {
+                    os.TestSurfaceReadout(landed ? 0.001 : 50, landed);
+                    yield return Wait(0.6f);
+                    yield return new WaitForEndOfFrame();
+                    string tag = $"{size.x}x{size.y}-classic-surface-{(landed ? "landed" : "arrival")}";
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(dir, tag + ".png"), tex.EncodeToPNG());
+                    bool fits = os.TestClassicSpeedFits(out float text, out float available);
+                    bool sized = tex.width == size.x && tex.height == size.y;
+                    log.WriteLine($"  {tag}: {os.ClassicSpeedLine}; text {text:F1} / {available:F1}, captured {tex.width}x{tex.height}");
+                    if (!fits || !sized) { errors++; log.WriteLine($"    ERROR {tag}: status line clipped or capture size changed"); }
+                    Destroy(tex);
+                }
+            }
+            GameSettings.ClassicPanel = classicWas;
+            log.WriteLine($"done, {errors} errors");
+            Quit();
         }
 
         static IEnumerator Wait(float s)
