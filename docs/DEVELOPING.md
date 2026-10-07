@@ -191,6 +191,7 @@ The built game takes these flags. Each run writes its report and screenshots to 
 Other flags:
 
 - `-fowsavekey <key>` uses another save slot. Without it, unattended suites reuse `fow-save-qa-<hash>`, a stable short hash of the build data path and suite flag. This bounds the saved key pairs and separates suites and worktrees from the player's save. Concurrent copies of the same build and suite share that pair; give them distinct explicit keys when isolation is needed. `-fowfidelity` and `-fowbhshots` are unattended too, so route events are disabled for them.
+- `-fowcareer` uses a fixed TDB epoch and a fixed simulated frame duration. Flight limits use game time; a wall-clock hang guard reports `TIMEOUT` and exits 2. Functional failures exit 1. Timing samples report `PERF PASS` or `PERF SLOW` separately. `-fowcareertraffic` alongside `-fowcareer <dir>` runs just the deterministic traffic section.
 - `-fowqa` runs the career in sandbox: unlimited reaction mass and no contracts, so the physics tests keep working.
 - `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fowprof` logs frame time every 2 s. `-fownobloom` turns bloom off. `-fowlegacyui` uses the old IMGUI shell.
 - `-fowspawnrunner <class>` (courier, packet, liner, freighter, tanker or hauler) starts a new game, accepts an intercept for that runner and holds the ship 2 km beside it, camera on it, for filming. It accepts a real job, so use it with `-fowsavekey`.
