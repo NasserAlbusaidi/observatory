@@ -91,10 +91,8 @@ namespace FogOfWar.OpenWorld
             " errVel = |sys.Vel(stand-in, j) - (v0 + a t)| at every pirate step start j. stale = sys.Pos(stand-in, j) != its path at j.",
             " Runs with h < 1 s stop once a hold reaches 7800 s (7200 s plus a 600 s steady window).",
             " S5: the pirate is alongside when the burns start, so a loss of contact at the first burn counts as a break; peak vrel = max |vrel| in burns.",
-            "G1 at h < 1 s passes by the alongside rule only. Coast() (the scene's, so the copy's) propagates the raw chunk while jd advances by the chunk",
-            "rounded to its 40 us grid, so a coasting player's conic drifts against the pirate's clock: about 11 m/s at 1/60 s and 3.6 m/s at 0.05 s at",
-            "18.6 km/s heliocentric. The hold is then a limit cycle (steady vrel, turn entries). S4 here is the drive off (Plan.None) at Pallas, not the",
-            "design's plan-on 'in orbit' at Vesta, which Coast()'s 1 ms re-check moves. PR 5b fixes Coast() and reruns S1, S4 and that S4 at 1/60 s.",
+            "After #88, Coast propagates exactly the represented clock interval; RecheckPlan advances no physics. After #50, h < 30 s runs use the",
+            "normal integrated gravity model. The 30/50 s span runs explicitly exercise the high-warp conic approximation. S4 is a free Pallas orbit.",
             "",
             "PRE-REGISTERED VERDICT RULE. Committed in 25ea354 before the first run of the scenarios. AMENDED after review, in the commit that adds this",
             "paragraph, before any run of the amended check. Each amendment tightens a gate or restates one; none loosens a gate: G1's hold is the",
@@ -332,7 +330,9 @@ namespace FogOfWar.OpenWorld
                 {
                     if (t >= nextDom - 1e-9) { domPl = Ship.Dominant(sys, pl.Pos, jd); nextDom = t + DomS; }
                     D3 p0 = pl.Pos, v0 = pl.Vel;
-                    double used = Coasting(pl) ? Coast(sys, pl, jd, simDt, domPl) : 0, cut = used;
+                    // Short-frame runs exercise the normal integrated force model. 30/50 s spans explicitly
+                    // exercise the high-compression conic approximation, including its represented-time clock.
+                    double used = h0 >= 30 && Coasting(pl) ? Coast(sys, pl, jd, simDt, domPl) : 0, cut = used;
                     if (used <= 0)
                     {
                         used = (jd + simDt / 86400 - jd) * 86400;
