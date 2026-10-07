@@ -80,14 +80,19 @@ namespace FogOfWar.OpenWorld
             // Reuse each slow parent track for its moons. The same cubic approximation was already used for
             // the parent clearance; moons retain their fast, fully sampled local orbits. This avoids evaluating
             // a giant planet's fit and massive-moon barycentre correction once per moon per sample.
-            var parentTracks = smooth ? new System.Collections.Generic.Dictionary<Body, D3[]>() : null;
-            D3[] ParentTrack(Body parent)
+            var parentTracks = smooth ? new System.Collections.Generic.Dictionary<Body, (D3[] points, double[] distances, double min)>() : null;
+            (D3[] points, double[] distances, double min) ParentTrack(Body parent)
             {
                 if (parentTracks.TryGetValue(parent, out var track)) return track;
                 var knots = new D3[Samples / Stride + 3];
                 for (int k = 0; k < knots.Length; k++) knots[k] = sys.PosAt(parent, At((k - 1) * Stride));
-                track = new D3[Samples + 1];
-                for (int i = 0; i <= Samples; i++) track[i] = path[i] - Cubic(knots, i);
+                var points = new D3[Samples + 1]; var distances = new double[Samples]; double min = double.MaxValue;
+                for (int i = 0; i <= Samples; i++)
+                {
+                    points[i] = path[i] - Cubic(knots, i);
+                    if (i > 0) { distances[i - 1] = Closest(points[i - 1], points[i]); min = Math.Min(min, distances[i - 1]); }
+                }
+                track = (points, distances, min);
                 parentTracks.Add(parent, track);
                 return track;
             }
@@ -99,7 +104,7 @@ namespace FogOfWar.OpenWorld
                 double min = double.MaxValue;
                 if (localMoon)
                 {
-                    var relative = ParentTrack(b.Parent);
+                    var parent = ParentTrack(b.Parent); var relative = parent.points;
                     // An interpolated moon segment stays inside the largest endpoint orbital radius. A ship
                     // segment outside that sphere plus the standoff cannot hit it. The bound also covers rates
                     // in a/e over the trip; fitted/custom moon paths take the full sampling path below.
@@ -107,23 +112,26 @@ namespace FogOfWar.OpenWorld
                     double a = Math.Max(Math.Abs(b.A + b.dA * d0), Math.Abs(b.A + b.dA * d1));
                     double e = Math.Min(0.99, Math.Max(0, Math.Max(b.E + b.dE * d0, b.E + b.dE * d1)));
                     double envelope = a * (1 + e) + Ship.Standoff(b);
+                    // Parent distances are identical for every sibling: calculate them once, and skip an
+                    // entire moon when every segment is already outside its orbital envelope.
+                    if (parent.min > envelope) continue;
                     D3 prev = D3.Zero; int last = -1;
                     for (int i = 1; i <= Samples; i++)
                     {
-                        if (Closest(relative[i - 1], relative[i]) > envelope) continue;
+                        if (parent.distances[i - 1] > envelope) continue;
                         if (last != i - 1) prev = relative[i - 1] - b.Kepler(At(i - 1));
                         var r = relative[i] - b.Kepler(At(i));
                         min = Math.Min(min, Closest(prev, r));
                         prev = r; last = i;
                     }
                 }
+                else if (fit) min = ParentTrack(b).min;
                 else
                 {
-                    var track = fit ? ParentTrack(b) : null;
                     D3 prev = D3.Zero;
                     for (int i = 0; i <= Samples; i++)
                     {
-                        var r = fit ? track[i] : path[i] - sys.PosAt(b, At(i));
+                        var r = path[i] - sys.PosAt(b, At(i));
                         if (i > 0) min = Math.Min(min, Closest(prev, r));
                         prev = r;
                     }
