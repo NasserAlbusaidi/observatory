@@ -238,6 +238,15 @@ namespace FogOfWar
             GUI.color = Color.white;
         }
 
+        internal string ClassicSpeedLine => $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} / {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num((ship.Vel - RefVel(reference)).Mag, 3)} km/s VS {RefName(reference).ToUpperInvariant()}   ·   {WarpNames[warpIdx]}";
+        internal bool TestClassicSpeedFits(out float text, out float available)
+        {
+            Styles();
+            text = hudStyle.CalcSize(new GUIContent(ClassicSpeedLine)).x;
+            available = Mathf.Min(520, UnityEngine.Screen.width / App.UiScale - App.PanelWidth - 56);
+            return text <= available;
+        }
+
         void DrawHud()
         {
             Styles();
@@ -267,8 +276,7 @@ namespace FogOfWar
             GUI.color = new Color(1, 1, 1, 0.15f); GUI.DrawTexture(bar, Texture2D.whiteTexture);
             GUI.color = new Color(1f, 0.71f, 0.28f, 0.9f); GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * (float)ship.Throttle, bar.height), Texture2D.whiteTexture);
             GUI.color = Color.white; GUI.DrawTexture(new Rect(bar.x + bar.width * (float)ship.ThrottleCmd - 1, bar.y - 3, 2, bar.height + 6), Texture2D.whiteTexture);
-            var vRef = (ship.Vel - RefVel(reference)).Mag;
-            string l1 = $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} / {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num(vRef, 3)} km/s VS {RefName(reference).ToUpperInvariant()}   ·   {WarpNames[warpIdx]}";
+            string l1 = ClassicSpeedLine;
             string l2 = $"ASSIST {(ship.FlightAssist ? "ON" : "OFF")}   ·   HOLD {HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)]}   ·   " +
                         (ship.PlanActive ? $"NAV {PlanNames[(int)ship.Plan]}: {ship.Phase}" : $"NAV idle ({ship.Phase})") + $"   ·   CAM {(pivot == Pivot.Ship ? camMode.ToString() : pivot.ToString())}";
             GUI.Label(new Rect(x, y + 22, w, 18), l1, hudStyle);
