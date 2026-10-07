@@ -1,0 +1,1690 @@
+{
+  "reference": "Actual retained JPL Horizons fitting inputs; nearest available original samples to boundary/interior fixtures",
+  "frame": "ICRF ecliptic J2000 geometric parent-centred",
+  "timescale": "TDB",
+  "units": "km",
+  "provenance": [
+    {
+      "body": "Bennu",
+      "fitSha256": "539a8ea261f26249bc3e6a69ce6b0fa186abdad7352899c84c2ca3a93f0abc6d",
+      "sources": [
+        {
+          "file": "Bennu_2451544.5_2464872.5_384.txt",
+          "sha256": "4e452b7beb660a853ee4c1a9d052e0d276b84b974a08b466d02922090fe5819e",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\nStatistical uncertainties not available for object due to:\n  truncated database EST list: +\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:26:26 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 101955 Bennu (1999 RQ36) (2101955) {source: ORX_merged_DE424}\nCenter body name: Sun (10)                        {source: ORX_merged_DE424}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Bennu_2464872.5_2478200.5_384.txt",
+          "sha256": "2a29488a1935e311556471b864b467a9c7b81b48fe4352c2928b0030ed6db240",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\nStatistical uncertainties not available for object due to:\n  truncated database EST list: +\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:26:39 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 101955 Bennu (1999 RQ36) (2101955) {source: ORX_merged_DE424}\nCenter body name: Sun (10)                        {source: ORX_merged_DE424}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStop  time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Bennu_2478200.5_2488069.5_384.txt",
+          "sha256": "9dcf228aded9bb2be97b214fd73000a353bfbdc2137321a607a14753ac5f72be",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\nStatistical uncertainties not available for object due to:\n  truncated database EST list: +\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:26:58 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 101955 Bennu (1999 RQ36) (2101955) {source: ORX_merged_DE424}\nCenter body name: Sun (10)                        {source: ORX_merged_DE424}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Ceres",
+      "fitSha256": "4d995f1400871f557cc93a15e96082290c7a0acced04fb64f6aeb9555e8d40eb",
+      "sources": [
+        {
+          "file": "Ceres_2451544.5_2488069.5_1843.txt",
+          "sha256": "f79a312e42f73f3ff0a46c850b7eadde119d1236fc054a86d8514cd9ec154b8d",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:24:26 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 1 Ceres (A801 AA)               {source: JPL#48}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458849.5 ! 2020-Jan-01.00 (TDB)         Residual RMS= .24563        \n   EC= .07687465013145245  QR= 2.556401146697176   TP= 2458240.1791309435      \n   OM= 80.3011901917491    W=  73.80896808746482   IN= 10.59127767086216       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 1.007608869613381E+00  Y=-2.390064275223502E+00  Z=-1.332124522752402E+00\n  VX= 9.201724467227128E-03 VY= 3.370381135398406E-03 VZ=-2.850337057661093E-04\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 62.6284             RAD= 469.7              ROTPER= 9.07417             \n   H= 3.34                 G= .120                 B-V= .713                   \n                           ALBEDO= .090            STYP= C                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Cybele",
+      "fitSha256": "510967232db396f9eb57a2d2f8d11563b768687ced9ede054217069c5f7ed55b",
+      "sources": [
+        {
+          "file": "Cybele_2451544.5_2488069.5_1843.txt",
+          "sha256": "d60871da2b8db0dd68fcee9397e91e6f03a700156c824c5c25daae405938fff9",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:25 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 65 Cybele (A861 EB)             {source: JPL#122}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457873.5 ! 2017-Apr-30.00 (TDB)         Residual RMS= .23893        \n   EC= .1113143957469976   QR= 3.046856558821604   TP= 2456917.8469244749      \n   OM= 155.6329280269273   W=  102.3483241624334   IN= 3.562760547807362       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 2.297622563148561E+00  Y= 2.817495953553129E+00  Z= 9.734699838744401E-01\n  VX=-6.382730596151265E-03 VY= 5.098788262261966E-03 VZ= 2.049718894044194E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 118.63             ROTPER= 6.0814              \n   H= 6.83                 G= .010                 B-V= .690                   \n                           ALBEDO= .0706           STYP= Xc                    \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Davida",
+      "fitSha256": "748d17ec8d29d160fe59a759c0a31af3b467e9cc8d773e045cfb6e1fa0cc0fe6",
+      "sources": [
+        {
+          "file": "Davida_2451544.5_2488069.5_1843.txt",
+          "sha256": "af629241561a38b2b0089b22bbef48f3cc8d71e61793164d2962e02612a4c3b4",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:35 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 511 Davida (A903 KB)            {source: JPL#128}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457897.5 ! 2017-May-24.00 (TDB)         Residual RMS= .22053        \n   EC= .1881510201647112   QR= 2.567902876073004   TP= 2458749.6694223331      \n   OM= 107.6071776831559   W=  337.6125129653269   IN= 15.94046073352377       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 1.071124277437907E+00  Y=-3.253074562534759E+00  Z=-1.394903579002239E+00\n  VX= 7.282941737564744E-03 VY= 3.555937710055142E-03 VZ=-8.931180506219847E-04\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 135.1635           ROTPER= 5.1297              \n   H= 6.42                 G= .160                 B-V= .717                   \n                           ALBEDO= .076            STYP= C                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Earth",
+      "fitSha256": "8f5af6afd3afee4a308efc0437b8a3d2c3e2ad025bf27502d020085a0150ae24",
+      "sources": [
+        {
+          "file": "Earth_2451544.5_2476152.5_709.txt",
+          "sha256": "3c8921ef763911a64d6dc16b1eaf36ba5d4be512e298bdb637d79e512537f72d",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:17:00 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Earth (399)                     {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2067-May-17 00:00:00.0000 TDB\nStep-size       : 709 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Earth_2476152.5_2488069.5_709.txt",
+          "sha256": "0650947efb7b8a8250a90b9327d76ae15acbe83181610f3319d4562ef76b358a",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:17:05 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Earth (399)                     {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2067-May-17 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 709 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Eros",
+      "fitSha256": "1e99f16d95f5f1b5268fd1f57f5187c8f721d5f24326952ac82c0b49d4e81747",
+      "sources": [
+        {
+          "file": "Eros_2451544.5_2464872.5_384.txt",
+          "sha256": "d8c07a4d46f27818d58ddeb044b743aa53ace33669e612b93d6e328912905936",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n  \n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:23 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 433 Eros (A898 PA)              {source: JPL#659}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2453311.5 ! 2004-Nov-02.00 (TDB)         Residual RMS= .3494         \n   EC= .2228078944584026   QR= 1.133355399799004   TP= 2453371.5859943051      \n   OM= 304.4010273379536   W=  178.665326776373    IN= 10.8291838260782        \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 3.739742611161106E-01  Y= 9.771563321932180E-01  Z= 6.227690580154441E-01\n  VX=-1.640089070798141E-02 VY= 3.657007337298757E-03 VZ=-8.820021479138533E-04\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= .0004463            RAD= 8.42               ROTPER= 5.27                \n   H= 10.4                 G= .460                 B-V= .921                   \n                           ALBEDO= .250            STYP= S                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Eros_2464872.5_2478200.5_384.txt",
+          "sha256": "a75e0bef617d22994ab4f51f1abf3ea0967f9d69306018cf8ec24d19bec3e5d6",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:30 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 433 Eros (A898 PA)              {source: JPL#659}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStop  time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2453311.5 ! 2004-Nov-02.00 (TDB)         Residual RMS= .3494         \n   EC= .2228078944584026   QR= 1.133355399799004   TP= 2453371.5859943051      \n   OM= 304.4010273379536   W=  178.665326776373    IN= 10.8291838260782        \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 3.739742611161106E-01  Y= 9.771563321932180E-01  Z= 6.227690580154441E-01\n  VX=-1.640089070798141E-02 VY= 3.657007337298757E-03 VZ=-8.820021479138533E-04\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= .0004463            RAD= 8.42               ROTPER= 5.27                \n   H= 10.4                 G= .460                 B-V= .921                   \n                           ALBEDO= .250            STYP= S                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Eros_2478200.5_2488069.5_384.txt",
+          "sha256": "601ae61edcc8ee9c3a615b9586af8b91e2501d8b00839fba94c545c5d60d91e0",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:36 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 433 Eros (A898 PA)              {source: JPL#659}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2453311.5 ! 2004-Nov-02.00 (TDB)         Residual RMS= .3494         \n   EC= .2228078944584026   QR= 1.133355399799004   TP= 2453371.5859943051      \n   OM= 304.4010273379536   W=  178.665326776373    IN= 10.8291838260782        \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 3.739742611161106E-01  Y= 9.771563321932180E-01  Z= 6.227690580154441E-01\n  VX=-1.640089070798141E-02 VY= 3.657007337298757E-03 VZ=-8.820021479138533E-04\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= .0004463            RAD= 8.42               ROTPER= 5.27                \n   H= 10.4                 G= .460                 B-V= .921                   \n                           ALBEDO= .250            STYP= S                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Eunomia",
+      "fitSha256": "bdd750f99013510a9db21c164581a6e9a4a749e7a4daed22b061056cbb510b34",
+      "sources": [
+        {
+          "file": "Eunomia_2451544.5_2488069.5_1843.txt",
+          "sha256": "623cadfa4e1109a2a14a2009fc49d654c692a8d004e7f4a2b0f7118ed09bf933",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n  \n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:12 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 15 Eunomia (A851 OA)            {source: JPL#109}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457933.5 ! 2017-Jun-29.00 (TDB)         Residual RMS= .23794        \n   EC= .1868495533189816   QR= 2.150324403143148   TP= 2457360.3919607955      \n   OM= 293.159840305314    W=  97.68892622201878   IN= 11.73422707649824       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-2.955320947222574E+00  Y= 4.307307443075499E-01  Z=-4.076557918336519E-01\n  VX=-1.685763884741907E-03 VY=-7.811630163451147E-03 VZ=-4.536477943280371E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 115.8445           ROTPER= 6.083               \n   H= 5.42                 G= .230                 B-V= .839                   \n                           ALBEDO= .248            STYP= S                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Euphrosyne",
+      "fitSha256": "d4e70c800c84211e493105211245596577072d787b188bb7b276e5c006f16948",
+      "sources": [
+        {
+          "file": "Euphrosyne_2451544.5_2488069.5_1843.txt",
+          "sha256": "544ec8dd7bdaa4cc8414ac3e27b03d65c55eae63d035dcf0c04a59abc912ba76",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:21 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 31 Euphrosyne (A854 RA)         {source: JPL#135}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457909.5 ! 2017-Jun-05.00 (TDB)         Residual RMS= .21777        \n   EC= .2213423263423602   QR= 2.457601479520319   TP= 2458104.7295951354      \n   OM= 31.11881601611178   W=  61.42803992629701   IN= 26.30556741794948       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 2.045891099267397E+00  Y= 1.456239889606088E+00  Z= 8.302911245313038E-01\n  VX=-8.006867458459611E-03 VY= 4.083489403137909E-03 VZ= 7.015479080550624E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 133.54             ROTPER= 5.53                \n   H= 6.83                 G= .150                 B-V= .687                   \n                           ALBEDO= .053            STYP= Cb                    \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Gaspra",
+      "fitSha256": "8bff33e4b951b71ff5f45d28a5266efff63960d1bd788b3b096cf0c264c287a0",
+      "sources": [
+        {
+          "file": "Gaspra_2451544.5_2488069.5_1843.txt",
+          "sha256": "d6d5c606387f54eb60b718866ea165e27d2349c254a4900884b55882ae41d338",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:15 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 951 Gaspra (A916 OJ)            {source: JPL#162}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457494.5 ! 2016-Apr-16.00 (TDB)         Residual RMS= .25357        \n   EC= .1732376805673328   QR= 1.826870243370493   TP= 2457223.0491970377      \n   OM= 253.1590449794715   W=  129.5161306698612   IN= 4.102515912480554       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-1.236650832915929E+00  Y= 1.735450973147421E+00  Z= 6.182475389426992E-01\n  VX=-1.050409206734340E-02 VY=-4.063515196082911E-03 VZ=-2.441265883069102E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 6.1                ROTPER= 7.042               \n   H= 11.49                G= .150                 B-V= .870                   \n                           ALBEDO= .246            STYP= S                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Hektor",
+      "fitSha256": "7dc0d0c6aca795cb6b1f39dc508f082f36c5277573b3f2d4aa0abec51ff17093",
+      "sources": [
+        {
+          "file": "Hektor_2451544.5_2488069.5_1843.txt",
+          "sha256": "5d00f75409f8dec151b1d2cac73269862ddc71e1235a9b949a1fcc02d2aa7d33",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:39 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 624 Hektor (A907 CF)            {source: JPL#139}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458404.5 ! 2018-Oct-13.00 (TDB)         Residual RMS= .16987        \n   EC= .02353385568878924  QR= 5.13467827385213    TP= 2456535.9293249538      \n   OM= 342.7923856178209   W=  185.2773489739936   IN= 18.16455201953355       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 4.259255004410008E+00  Y=-2.712857929359012E+00  Z=-1.823604671073943E+00\n  VX= 4.481815432647638E-03 VY= 4.120091992785358E-03 VZ= 4.110204633764871E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 112.5              ROTPER= 6.924               \n   H= 7.32                 G= .150                 B-V= .776                   \n                           ALBEDO= .025            STYP= D                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Hygiea",
+      "fitSha256": "2702746c5b2c26b072b3aeafdcfa5d8e79af6c753de682b4d5327aa8701998a9",
+      "sources": [
+        {
+          "file": "Hygiea_2451544.5_2488069.5_1843.txt",
+          "sha256": "ecf82c9c617ff62c4cfecb347b4ffa9ff73f5fd39c7bd10031f13c13051479a1",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:24:49 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 10 Hygiea (A849 GA)             {source: JPL#129}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458286.5 ! 2018-Jun-17.00 (TDB)         Residual RMS= .19672        \n   EC= .112654977900141    QR= 2.786705885566622   TP= 2457740.1931742947      \n   OM= 283.2130782677748   W=  312.1526533545334   IN= 3.831604174627114       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 3.098900886980702E+00  Y=-8.598476493147879E-01  Z=-1.668360930324855E-01\n  VX= 3.483873030254272E-03 VY= 7.921933227879652E-03 VZ= 3.828844848081958E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 7.                  RAD= 203.56             ROTPER= 13.828              \n   H= 5.65                 G= .150                 B-V= .696                   \n                           ALBEDO= .0717           STYP= C                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Ida",
+      "fitSha256": "cc0307f7873a9ab0eb32f3bdca6bc5698276f6341d05561892842e7afb98163d",
+      "sources": [
+        {
+          "file": "Ida_2451544.5_2488069.5_1843.txt",
+          "sha256": "607c5250415fa47087df3409d5f07b0666ef95c817ac27fbb0d11cdabfa5d78a",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:04 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 243 Ida (A884 SB)               {source: JPL#191}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457351.5 ! 2015-Nov-25.00 (TDB)         Residual RMS= .24115        \n   EC= .04122993671311469  QR= 2.743314291471128   TP= 2457409.7583745634      \n   OM= 324.0195562677311   W=  110.8060925381941   IN= 1.13212254291052        \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 1.291453710939774E+00  Y= 2.201519524774752E+00  Z= 1.013047763308616E+00\n  VX=-9.386565280984078E-03 VY= 4.506012546593854E-03 VZ= 1.920184950177493E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= .00275              RAD= 16.                ROTPER= 4.634               \n   H= 10.06                G= .150                 B-V= .802                   \n                           ALBEDO= .262            STYP= S                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Interamnia",
+      "fitSha256": "4ec955e1e8af90126a8a7c39a30f07cb3f6427408e02f9b0e428e2385a7cdfac",
+      "sources": [
+        {
+          "file": "Interamnia_2451544.5_2488069.5_1843.txt",
+          "sha256": "666f8392670fa8e91bcfc34998953a9d3b025842a4976ad8d88ab26211b005fb",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:44 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 704 Interamnia (A910 TC)        {source: JPL#179}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458017.5 ! 2017-Sep-21.00 (TDB)         Residual RMS= .21896        \n   EC= .1544907966122377   QR= 2.586047142291063   TP= 2458055.1798834042      \n   OM= 280.2915505068219   W=  95.11910176428331   IN= 17.30633244763847       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 2.462438912872993E+00  Y=-8.346836794556944E-02  Z= 8.013209506280095E-01\n  VX=-1.447933858053997E-03 VY= 1.036710401287533E-02 VZ= 4.701442360005276E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 5.                  RAD= 153.1565           ROTPER= 8.727               \n   H= 6.34                 G= -.020                B-V= .645                   \n                           ALBEDO= .078            STYP= B                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Itokawa",
+      "fitSha256": "5a549e451bf4d404d68aed966bd917e72ed6658dd65569b58c6460f43dd38ec3",
+      "sources": [
+        {
+          "file": "Itokawa_2451544.5_2464872.5_384.txt",
+          "sha256": "61c5c6a999e88c197914ee9a63b5134221170a13290163348707fe63527d732c",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:42 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 25143 Itokawa (1998 SF36)       {source: JPL#237}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2453005.5 ! 2004-Jan-01.00 (TDB)         Residual RMS= .18946        \n   EC= .279465894044321    QR= .9531059217424466   TP= 2453145.4131572028      \n   OM= 70.91767938852736   W=  161.0144462702274   IN= 1.727962095421385       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-5.074294448421780E-01  Y= 1.210347180821775E+00  Z= 5.548273515664519E-01\n  VX=-1.112385853876371E-02 VY=-7.651333120743616E-03 VZ=-3.060140960374531E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 2.1E-9              RAD= .165               ROTPER= 12.132              \n   H= 19.26                G= .150                 B-V= n.a.                   \n                           ALBEDO= n.a.            STYP= S(IV)                 \nAsteroid non-gravitational force model (AMRAT= m^2/kg;A1,A2,A3=au/d^2;R0=au):  \n   AMRAT=  0.                                                                  \n   A1= 0.                  A2= -2.855043703676E-14 A3= 0.                      \n Non-standard or simulated/proxy model:                                        \n   ALN=  1.            NK=  0.       NM=  2.       NN=  5.093    R0=  1.       \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Itokawa_2464872.5_2478200.5_384.txt",
+          "sha256": "c09e6775652e6a2d36f51f799ba6fc592fc7f5e56c879f8f76108ccd7006e2ef",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:49 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 25143 Itokawa (1998 SF36)       {source: JPL#237}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStop  time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2453005.5 ! 2004-Jan-01.00 (TDB)         Residual RMS= .18946        \n   EC= .279465894044321    QR= .9531059217424466   TP= 2453145.4131572028      \n   OM= 70.91767938852736   W=  161.0144462702274   IN= 1.727962095421385       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-5.074294448421780E-01  Y= 1.210347180821775E+00  Z= 5.548273515664519E-01\n  VX=-1.112385853876371E-02 VY=-7.651333120743616E-03 VZ=-3.060140960374531E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 2.1E-9              RAD= .165               ROTPER= 12.132              \n   H= 19.26                G= .150                 B-V= n.a.                   \n                           ALBEDO= n.a.            STYP= S(IV)                 \nAsteroid non-gravitational force model (AMRAT= m^2/kg;A1,A2,A3=au/d^2;R0=au):  \n   AMRAT=  0.                                                                  \n   A1= 0.                  A2= -2.855043703676E-14 A3= 0.                      \n Non-standard or simulated/proxy model:                                        \n   ALN=  1.            NK=  0.       NM=  2.       NN=  5.093    R0=  1.       \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Itokawa_2478200.5_2488069.5_384.txt",
+          "sha256": "909d12efb44979d594cfb51039b3620a0bd30699c92e7e03645e61fbbca21563",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:56 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 25143 Itokawa (1998 SF36)       {source: JPL#237}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2453005.5 ! 2004-Jan-01.00 (TDB)         Residual RMS= .18946        \n   EC= .279465894044321    QR= .9531059217424466   TP= 2453145.4131572028      \n   OM= 70.91767938852736   W=  161.0144462702274   IN= 1.727962095421385       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-5.074294448421780E-01  Y= 1.210347180821775E+00  Z= 5.548273515664519E-01\n  VX=-1.112385853876371E-02 VY=-7.651333120743616E-03 VZ=-3.060140960374531E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 2.1E-9              RAD= .165               ROTPER= 12.132              \n   H= 19.26                G= .150                 B-V= n.a.                   \n                           ALBEDO= n.a.            STYP= S(IV)                 \nAsteroid non-gravitational force model (AMRAT= m^2/kg;A1,A2,A3=au/d^2;R0=au):  \n   AMRAT=  0.                                                                  \n   A1= 0.                  A2= -2.855043703676E-14 A3= 0.                      \n Non-standard or simulated/proxy model:                                        \n   ALN=  1.            NK=  0.       NM=  2.       NN=  5.093    R0=  1.       \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Juno",
+      "fitSha256": "8d2bfc4b6876267668d66097fd786e4e92ae99668c1166d81fffb46721137517",
+      "sources": [
+        {
+          "file": "Juno_2451544.5_2488069.5_1843.txt",
+          "sha256": "5e9bb430ff92e62e4339309eef6b8d267fd6edffe66a2720a308d755bd4cb857",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:08 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 3 Juno (A804 RA)                {source: JPL#144}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457994.5 ! 2017-Aug-29.00 (TDB)         Residual RMS= .29201        \n   EC= .2568515931129983   QR= 1.983113707867091   TP= 2458446.1727731572      \n   OM= 169.858274446681    W=  248.2066852787921   IN= 12.98996271067357       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 1.020082010147919E+00  Y=-2.725908539769240E+00  Z=-5.534982182162431E-01\n  VX= 7.840898575049344E-03 VY= 5.191795293676724E-03 VZ= 6.598655787564316E-04\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 123.298            ROTPER= 7.21                \n   H= 5.19                 G= .320                 B-V= .824                   \n                           ALBEDO= .214            STYP= Sk                    \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Jupiter",
+      "fitSha256": "05741eec1d8f776eecc374d7b2931afe5406a2a475a55a0a3e7df5e6ad486b1f",
+      "sources": [
+        {
+          "file": "Jupiter_2451544.5_2488069.5_1843.txt",
+          "sha256": "528f70af39116c37f455f78718bff0d4c3dd676ef5957fc00caf6b65214f9d4d",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:17:36 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Jupiter Barycenter (5)          {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Lutetia",
+      "fitSha256": "12d11c42561ee3b9ecd1bcae7aaef61012fa9e0bf9e4092333555c2c64d4cff9",
+      "sources": [
+        {
+          "file": "Lutetia_2451544.5_2488069.5_1843.txt",
+          "sha256": "318f1a76a70a3b77b82f8ebf3cd8a3860f06ae5e0cc2dd900b4c8d1e1e2158c1",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:16 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 21 Lutetia (A852 VA)            {source: JPL#146}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458038.5 ! 2017-Oct-12.00 (TDB)         Residual RMS= .26368        \n   EC= .16441745231496     QR= 2.034302249141347   TP= 2458660.8280116157      \n   OM= 80.87713173318545   W=  249.9805287486084   IN= 3.063715686871191       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-2.711523858765331E+00  Y= 6.359698190941995E-01  Z= 4.389191548411003E-01\n  VX=-2.111868313588704E-03 VY=-8.417301856421720E-03 VZ=-3.612427391264297E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= .1134               RAD= 49.                ROTPER= 8.1655              \n   H= 7.48                 G= .110                 B-V= .686                   \n                           ALBEDO= .190            STYP= Xk                    \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Mars",
+      "fitSha256": "d07991e6a9487fbc76410875aa673d1f9158371b91b045fcd995cdf827aef973",
+      "sources": [
+        {
+          "file": "Mars_2451544.5_2488069.5_1536.txt",
+          "sha256": "9b5ae504b74e24ec44e62b565f083124bbe0325bb5ac735d202f192387209418",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:17:08 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Mars (499)                      {source: mar099}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1536 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Mathilde",
+      "fitSha256": "5c0d0588efc0fd0f45193f427f08bfbccf3ecfd1a626cf0f1423a2803f5c6497",
+      "sources": [
+        {
+          "file": "Mathilde_2451544.5_2488069.5_1843.txt",
+          "sha256": "14168090ad1a9992ca2873072fbca53034d93e29851bde22ce69f8e244a4065f",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:25:09 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 253 Mathilde (A885 VA)          {source: JPL#250}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2456394.5 ! 2013-Apr-12.00 (TDB)         Residual RMS= .20336        \n   EC= .2661453496717469   QR= 1.942201899881878   TP= 2456854.9469178542      \n   OM= 179.6192943895378   W=  157.3246051935762   IN= 6.741334773946812       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-2.695873755173556E+00  Y=-1.229480218869513E+00  Z=-3.666220875153864E-01\n  VX= 5.857154457641783E-03 VY=-6.913078849579757E-03 VZ=-2.078543266315242E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= .00689              RAD= 26.4               ROTPER= 417.7               \n   H= 10.35                G= .150                 B-V= n.a.                   \n                           ALBEDO= .0436           STYP= Cb                    \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Mercury",
+      "fitSha256": "9f4c882afbf3c985508b8475f93944b88faec75ed0d8791e7c72566ff94303a5",
+      "sources": [
+        {
+          "file": "Mercury_2451544.5_2462960.5_329.txt",
+          "sha256": "52a49e6fdb74fb34012aa34233afafa2aa81191a483434922b2de9d311ac7fe4",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:22 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Mercury (199)                   {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2031-Apr-04 00:00:00.0000 TDB\nStep-size       : 329 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Mercury_2462960.5_2474376.5_329.txt",
+          "sha256": "1a6d859eee0e2d7ecb8cbb68c9e04214693d2078db2048b119078468f3b620ed",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:26 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Mercury (199)                   {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2031-Apr-04 00:00:00.0000 TDB\nStop  time      : A.D. 2062-Jul-06 00:00:00.0000 TDB\nStep-size       : 329 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Mercury_2474376.5_2485792.5_329.txt",
+          "sha256": "f9cb06a7c3f118ec95ad0b274966c4823066e376cccdb46ea274548b758e8e6a",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:44 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Mercury (199)                   {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2062-Jul-06 00:00:00.0000 TDB\nStop  time      : A.D. 2093-Oct-07 00:00:00.0000 TDB\nStep-size       : 329 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Mercury_2485792.5_2488069.5_329.txt",
+          "sha256": "2289ad96efdbfe00eee8de3dec1e855c95c2691440a6c067ec4f74bd2b82671d",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:49 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Mercury (199)                   {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2093-Oct-07 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 329 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Moon",
+      "fitSha256": "5e0f916680fb5e8c67f76497a190b1445732d17c0b250dd501da81918fa92cbe",
+      "sources": [
+        {
+          "file": "Moon_2451544.5_2457688.5_177.txt",
+          "sha256": "45963f7ac1a787d8a326dfa2f72ce1a1605f2c7e7ce7ce6e127f0020fdce5a0b",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:15:31 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Moon (301)                      {source: DE441}\nCenter body name: Earth (399)                     {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2016-Oct-27 00:00:00.0000 TDB\nStep-size       : 177 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nEOP file        : eop.261002.p261229\nEOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-02. PREDICTS-> 2026-DEC-28\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Moon_2457688.5_2463832.5_177.txt",
+          "sha256": "ea3521b40b64ff99f7ea6998d4b00aac7e64ce1eb88a544b4b15d914265e8cb2",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:15:49 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Moon (301)                      {source: DE441}\nCenter body name: Earth (399)                     {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2016-Oct-27 00:00:00.0000 TDB\nStop  time      : A.D. 2033-Aug-23 00:00:00.0000 TDB\nStep-size       : 177 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nEOP file        : eop.261002.p261229\nEOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-02. PREDICTS-> 2026-DEC-28\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Moon_2463832.5_2469976.5_177.txt",
+          "sha256": "d936745319ffdfcf6d24ef6b68175188a436a62f5831237e401a4b9a3f0e5af3",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:15:54 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Moon (301)                      {source: DE441}\nCenter body name: Earth (399)                     {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2033-Aug-23 00:00:00.0000 TDB\nStop  time      : A.D. 2050-Jun-19 00:00:00.0000 TDB\nStep-size       : 177 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nEOP file        : eop.261002.p261229\nEOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-02. PREDICTS-> 2026-DEC-28\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Moon_2469976.5_2476120.5_177.txt",
+          "sha256": "c78ac86ce520775b74e56f0234ed393f6f6338522a7f3d4b3b0571d8d7fc8e9e",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:00 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Moon (301)                      {source: DE441}\nCenter body name: Earth (399)                     {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2050-Jun-19 00:00:00.0000 TDB\nStop  time      : A.D. 2067-Apr-15 00:00:00.0000 TDB\nStep-size       : 177 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nEOP file        : eop.261002.p261229\nEOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-02. PREDICTS-> 2026-DEC-28\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Moon_2476120.5_2482264.5_177.txt",
+          "sha256": "af6bb84760b3610262148bc7b2d6f3b67a99e226eab247320c8d46cefb064fa1",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:04 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Moon (301)                      {source: DE441}\nCenter body name: Earth (399)                     {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2067-Apr-15 00:00:00.0000 TDB\nStop  time      : A.D. 2084-Feb-09 00:00:00.0000 TDB\nStep-size       : 177 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nEOP file        : eop.261002.p261229\nEOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-02. PREDICTS-> 2026-DEC-28\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Moon_2482264.5_2488069.5_177.txt",
+          "sha256": "a40c029a6f3ff881d8124a7bc6af553990e4c74a0ad8112af3c05e60002e053d",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:09 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Moon (301)                      {source: DE441}\nCenter body name: Earth (399)                     {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2084-Feb-09 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 177 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nEOP file        : eop.261002.p261229\nEOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-02. PREDICTS-> 2026-DEC-28\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Neptune",
+      "fitSha256": "2b7401633b1d91e3dd87326e95e616aa91f6b4ae79b81812835abec6efebabc4",
+      "sources": [
+        {
+          "file": "Neptune_2451544.5_2488069.5_2304.txt",
+          "sha256": "8eae686f395f490bbe63b03de9b9c0ac78d9a39887ae724c75e4b2de9ac10c10",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:22:27 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Neptune Barycenter (8)          {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 2304 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Pallas",
+      "fitSha256": "1a2660414b4a858d8bfc69e014b69e6279757e12acfcf3ab5a717989b577144c",
+      "sources": [
+        {
+          "file": "Pallas_2451544.5_2488069.5_1843.txt",
+          "sha256": "0966a11d2d04f1b7ac09854a4a0a9d0029b77c038a90302bdce2099b8ff80758",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:24:37 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 2 Pallas (A802 FA)              {source: JPL#74}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457870.5 ! 2017-Apr-27.00 (TDB)         Residual RMS= .2715         \n   EC= .2306545322740501   QR= 2.133412766281533   TP= 2458320.7264918056      \n   OM= 173.0883296888898   W=  309.9974922427895   IN= 34.83970334384021       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 2.964644625908994E+00  Y= 1.388006445185039E-01  Z=-2.357603578016924E-01\n  VX=-2.665042983361161E-03 VY= 9.076070444260308E-03 VZ=-1.610668575697252E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 13.63               RAD= 256.5              ROTPER= 7.813221            \n   H= 4.12                 G= .110                 B-V= .635                   \n                           ALBEDO= .155            STYP= B                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Psyche",
+      "fitSha256": "6532d9abc28c4c1e46c53ae49e0ab876384d5bb24a5c59c26fcabfa91292f609",
+      "sources": [
+        {
+          "file": "Psyche_2451544.5_2488069.5_1843.txt",
+          "sha256": "8d62d588994f0b23dbc2888ec9e96ad95a2968b673b8353f09da0c7053bcc9e6",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:24:57 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 16 Psyche (A852 FA)             {source: JPL#92}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2457856.5 ! 2017-Apr-13.00 (TDB)         Residual RMS= .1514         \n   EC= .1354428631790678   QR= 2.527888467382581   TP= 2457129.4685003939      \n   OM= 150.2750236911914   W=  227.3612622931746   IN= 3.098574197998143       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-3.198228540743174E+00  Y= 5.444066039441158E-01  Z= 2.979295093331773E-01\n  VX=-2.332260322758251E-03 VY=-8.121403709973612E-03 VZ=-3.009699354931045E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 1.601               RAD= 111.               ROTPER= 4.196               \n   H= 6.2                  G= .200                 B-V= .729                   \n                           ALBEDO= .1203           STYP= X                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Ryugu",
+      "fitSha256": "6b5df9934406c2bff361fe1156c6ff73305583e2abc7131ede002ad4bf57bacc",
+      "sources": [
+        {
+          "file": "Ryugu_2451544.5_2464872.5_384.txt",
+          "sha256": "72dbab2eca3b1935fcf38faa1874571025a221a6c4ec0dbec9050fd6e371c36c",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:26:05 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 162173 Ryugu (1999 JU3)         {source: JPL#270}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458753.5 ! 2019-Sep-27.00 (TDB)         Residual RMS= .18156        \n   EC= .1903782605596403   QR= .963114783617966    TP= 2458745.5392894726      \n   OM= 251.5874649641874   W=  211.4457746039085   IN= 5.884195597891756       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-3.595956563467519E-01  Y= 8.450730289743180E-01  Z= 2.963663464334829E-01\n  VX=-1.779329063220012E-02 VY=-5.591159101558621E-03 VZ=-4.080870520596382E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 3.E-8               RAD= .448               ROTPER= 7.63262             \n   H= 19.55                G= .150                 B-V= n.a.                   \n                           ALBEDO= .045            STYP= Cb                    \nAsteroid non-gravitational force model (AMRAT= m^2/kg;A1,A2,A3=au/d^2;R0=au):  \n   AMRAT=  0.                                                                  \n   A1= 0.                  A2= -2.487268602636E-14 A3= 0.                      \n Non-standard or simulated/proxy model:                                        \n   ALN=  1.            NK=  0.       NM=  2.       NN=  5.093    R0=  1.       \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Ryugu_2464872.5_2478200.5_384.txt",
+          "sha256": "88292825e4cb0ecd4eac80952f739fd325d8d038055429db1822c1d8553ba89d",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n  \n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:26:13 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 162173 Ryugu (1999 JU3)         {source: JPL#270}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2036-Jun-28 00:00:00.0000 TDB\nStop  time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458753.5 ! 2019-Sep-27.00 (TDB)         Residual RMS= .18156        \n   EC= .1903782605596403   QR= .963114783617966    TP= 2458745.5392894726      \n   OM= 251.5874649641874   W=  211.4457746039085   IN= 5.884195597891756       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-3.595956563467519E-01  Y= 8.450730289743180E-01  Z= 2.963663464334829E-01\n  VX=-1.779329063220012E-02 VY=-5.591159101558621E-03 VZ=-4.080870520596382E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 3.E-8               RAD= .448               ROTPER= 7.63262             \n   H= 19.55                G= .150                 B-V= n.a.                   \n                           ALBEDO= .045            STYP= Cb                    \nAsteroid non-gravitational force model (AMRAT= m^2/kg;A1,A2,A3=au/d^2;R0=au):  \n   AMRAT=  0.                                                                  \n   A1= 0.                  A2= -2.487268602636E-14 A3= 0.                      \n Non-standard or simulated/proxy model:                                        \n   ALN=  1.            NK=  0.       NM=  2.       NN=  5.093    R0=  1.       \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Ryugu_2478200.5_2488069.5_384.txt",
+          "sha256": "e23b978ea2669e6d07ea0f33d03cddc9040fad9370a4c63db172c2ba85b4b41d",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n  \n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:26:19 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 162173 Ryugu (1999 JU3)         {source: JPL#270}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 384 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458753.5 ! 2019-Sep-27.00 (TDB)         Residual RMS= .18156        \n   EC= .1903782605596403   QR= .963114783617966    TP= 2458745.5392894726      \n   OM= 251.5874649641874   W=  211.4457746039085   IN= 5.884195597891756       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X=-3.595956563467519E-01  Y= 8.450730289743180E-01  Z= 2.963663464334829E-01\n  VX=-1.779329063220012E-02 VY=-5.591159101558621E-03 VZ=-4.080870520596382E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 3.E-8               RAD= .448               ROTPER= 7.63262             \n   H= 19.55                G= .150                 B-V= n.a.                   \n                           ALBEDO= .045            STYP= Cb                    \nAsteroid non-gravitational force model (AMRAT= m^2/kg;A1,A2,A3=au/d^2;R0=au):  \n   AMRAT=  0.                                                                  \n   A1= 0.                  A2= -2.487268602636E-14 A3= 0.                      \n Non-standard or simulated/proxy model:                                        \n   ALN=  1.            NK=  0.       NM=  2.       NN=  5.093    R0=  1.       \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Saturn",
+      "fitSha256": "060903d727d6cc2783e4b1c503d8dedaa18c6a4f1d3ef5ddf213e0635d7cc049",
+      "sources": [
+        {
+          "file": "Saturn_2451544.5_2488069.5_2048.txt",
+          "sha256": "8586c0b8f8f5eb400e1e514cf309fad479c2d01d6770f76d5e2b9bb921123044",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:22:00 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Saturn Barycenter (6)           {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 2048 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Sylvia",
+      "fitSha256": "693412bb4dbc9d893cd470061339db01098cf0db76d7d335cfb2282191357e89",
+      "sources": [
+        {
+          "file": "Sylvia_2451544.5_2488069.5_1843.txt",
+          "sha256": "d05ecc60a7185d4981f5d45eb1805f948ab83eb647bd4c287794bb6d27176fa3",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:42:30 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 87 Sylvia (A866 KA)             {source: JPL#130}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458183.5 ! 2018-Mar-06.00 (TDB)         Residual RMS= .21243        \n   EC= .09273906498295156  QR= 3.158964786406858   TP= 2457988.2050619442      \n   OM= 73.04709042962104   W=  263.5300135595193   IN= 10.87674391668213       \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 3.090718678022924E+00  Y= 8.380636504053129E-01  Z=-2.140624473054615E-01\n  VX=-1.513331494328624E-03 VY= 8.680358598629001E-03 VZ= 4.666250716761224E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= n.a.                RAD= 126.5255           ROTPER= 5.184               \n   H= 6.93                 G= .150                 B-V= .710                   \n                           ALBEDO= .046            STYP= X                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Uranus",
+      "fitSha256": "539408724331235707d054080be2ceca04bc33d0c013adf896c993ddc60a7820",
+      "sources": [
+        {
+          "file": "Uranus_2451544.5_2488069.5_2304.txt",
+          "sha256": "5a52feade5cb442d5e1ab9ef05e45987eeaa54fa27f3682994905ae3ac609252",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:22:13 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Uranus Barycenter (7)           {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 2304 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Venus",
+      "fitSha256": "ab2fc75d1d27f45fcf7a0ea1c63e9ee487222648463724056d7c738c643ace9f",
+      "sources": [
+        {
+          "file": "Venus_2451544.5_2478200.5_768.txt",
+          "sha256": "6ef7256d8d1c712643228019a7a1de5bc05e268783e48664a7ebfb40797bd753",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:52 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Venus (299)                     {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStep-size       : 768 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        },
+        {
+          "file": "Venus_2478200.5_2488069.5_768.txt",
+          "sha256": "0a6d6fc402fa5e27b0880b81acde54c3c19167ad7a01582f3e38758daaeee3f4",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 00:16:57 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: Venus (299)                     {source: DE441}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2072-Dec-24 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 768 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    },
+    {
+      "body": "Vesta",
+      "fitSha256": "fca9b6cd70528425c7bac037544a32e1c500b5556fbe3063ce5b5b32cd878288",
+      "sources": [
+        {
+          "file": "Vesta_2451544.5_2488069.5_1843.txt",
+          "sha256": "e6764e9513bc322114a7413c4ff40224c2e3dc1ee887447de4d82fb17c944db3",
+          "header": "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\n\n  \n\n*******************************************************************************\nEphemeris / API_USER Sat Oct  3 01:24:44 2026 Pasadena, USA      / Horizons\n*******************************************************************************\nTarget body name: 4 Vesta (A807 FA)               {source: JPL#36}\nCenter body name: Sun (10)                        {source: DE441}\nCenter-site name: BODY CENTER\n*******************************************************************************\nStart time      : A.D. 2000-Jan-01 00:00:00.0000 TDB\nStop  time      : A.D. 2100-Jan-01 00:00:00.0000 TDB\nStep-size       : 1843 minutes\n*******************************************************************************\nCenter geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}\nCenter cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}\nCenter radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}\nSmall perturbers: Yes                             {source: SB441-N16}\nOutput units    : KM-S\nCalendar mode   : Mixed Julian/Gregorian\nOutput type     : GEOMETRIC cartesian states\nOutput format   : 1 (position only)\nReference frame : Ecliptic of J2000.0\n*******************************************************************************\nInitial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):\n  EPOCH=  2458849.5 ! 2020-Jan-01.00 (TDB)         Residual RMS= .47385        \n   EC= .08857261385730482  QR= 2.15270823108896    TP= 2458247.8038331456      \n   OM= 103.8092892453337   W=  150.8357762126256   IN= 7.14181494423702        \n  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):\n   X= 1.243605461680222E+00  Y= 2.133870405923554E+00  Z= 6.874866847781977E-01\n  VX=-8.779290950353064E-03 VY= 4.462599423343603E-03 VZ= 2.927653651039283E-03\nAsteroid physical parameters (km, seconds, rotational period in hours):        \n   GM= 17.28828            RAD= 261.385            ROTPER= 5.342128            \n   H= 3.25                 G= .320                 B-V= .782                   \n                           ALBEDO= .4228           STYP= V                     \n*******************************************************************************\n            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,\n**************************************************************************************************************************\n"
+        }
+      ]
+    }
+  ],
+  "vectors": [
+    {
+      "body": "Bennu",
+      "jd": 2451544.5,
+      "x": -70870444.6959969,
+      "y": 124184638.1830249,
+      "z": 13383188.46458802
+    },
+    {
+      "body": "Bennu",
+      "jd": 2451548.5,
+      "x": -81157911.19366845,
+      "y": 119757763.5197395,
+      "z": 12957524.80559653
+    },
+    {
+      "body": "Bennu",
+      "jd": 2453944.5,
+      "x": -10089848.0447946,
+      "y": -198740904.1333633,
+      "z": -20959140.05412689
+    },
+    {
+      "body": "Bennu",
+      "jd": 2461316.5,
+      "x": -100067196.8730425,
+      "y": -174809075.177269,
+      "z": -18101229.07735524
+    },
+    {
+      "body": "Bennu",
+      "jd": 2488060.5,
+      "x": -168851309.6945425,
+      "y": -73592090.25575696,
+      "z": -7808773.739765074
+    },
+    {
+      "body": "Bennu",
+      "jd": 2488064.233333333,
+      "x": -166668918.802081,
+      "y": -81378812.85677543,
+      "z": -8662220.636521414
+    },
+    {
+      "body": "Ceres",
+      "jd": 2451544.5,
+      "x": -355673469.3089468,
+      "y": 119794569.466189,
+      "z": 69239521.44034588
+    },
+    {
+      "body": "Ceres",
+      "jd": 2451561.138194445,
+      "x": -363763753.6222826,
+      "y": 93189767.32731444,
+      "z": 69909451.68140145
+    },
+    {
+      "body": "Ceres",
+      "jd": 2461144.738194444,
+      "x": 282372997.7753695,
+      "y": 308807962.5525405,
+      "z": -42243929.65894331
+    },
+    {
+      "body": "Ceres",
+      "jd": 2461316.239583333,
+      "x": 39356086.15349038,
+      "y": 397761012.0698234,
+      "z": 5342120.788895428
+    },
+    {
+      "body": "Ceres",
+      "jd": 2488041.019444444,
+      "x": 290764310.9146858,
+      "y": 303077704.3547153,
+      "z": -42587587.52741356
+    },
+    {
+      "body": "Ceres",
+      "jd": 2488056.377777778,
+      "x": 272837635.6239529,
+      "y": 317535950.2052412,
+      "z": -38787998.83049226
+    },
+    {
+      "body": "Cybele",
+      "jd": 2451544.5,
+      "x": -387905146.0065176,
+      "y": 377827257.7322646,
+      "z": -11528750.23253384
+    },
+    {
+      "body": "Cybele",
+      "jd": 2451561.138194445,
+      "x": -401382949.6855284,
+      "y": 360587693.5064587,
+      "z": -10211582.34624866
+    },
+    {
+      "body": "Cybele",
+      "jd": 2461144.738194444,
+      "x": -489155560.1148291,
+      "y": -3126317.097013973,
+      "z": 13008806.61452932
+    },
+    {
+      "body": "Cybele",
+      "jd": 2461316.239583333,
+      "x": -395188808.077728,
+      "y": -238101463.1778551,
+      "z": 23823335.49192838
+    },
+    {
+      "body": "Cybele",
+      "jd": 2488041.019444444,
+      "x": 285234661.3638234,
+      "y": 483067200.5210494,
+      "z": -35622782.85180336
+    },
+    {
+      "body": "Cybele",
+      "jd": 2488056.377777778,
+      "x": 268901725.2322994,
+      "y": 493514532.1303255,
+      "z": -35714629.00321704
+    },
+    {
+      "body": "Davida",
+      "jd": 2451544.5,
+      "x": -38868930.82179848,
+      "y": -556532810.7560399,
+      "z": 59078316.80400294
+    },
+    {
+      "body": "Davida",
+      "jd": 2451561.138194445,
+      "x": -19612481.38885609,
+      "y": -558092874.5648957,
+      "z": 53975742.40110332
+    },
+    {
+      "body": "Davida",
+      "jd": 2461144.738194444,
+      "x": -416035254.1439282,
+      "y": 114355182.9270282,
+      "z": 103507508.6234507
+    },
+    {
+      "body": "Davida",
+      "jd": 2461316.239583333,
+      "x": -453739067.9788297,
+      "y": -129165115.0801254,
+      "z": 134772145.1353971
+    },
+    {
+      "body": "Davida",
+      "jd": 2488041.019444444,
+      "x": -389003730.8119984,
+      "y": 168108245.6689335,
+      "z": 93553672.72474018
+    },
+    {
+      "body": "Davida",
+      "jd": 2488056.377777778,
+      "x": -400059458.3251074,
+      "y": 147189746.0913315,
+      "z": 98233168.13181251
+    },
+    {
+      "body": "Earth",
+      "jd": 2451544.5,
+      "x": -25210928.55899356,
+      "y": 144927919.5838006,
+      "z": -616.4165719002485
+    },
+    {
+      "body": "Earth",
+      "jd": 2451552.377777778,
+      "x": -45215083.59842928,
+      "y": 139991510.5576031,
+      "z": -84.15516597777605
+    },
+    {
+      "body": "Earth",
+      "jd": 2456344.528472222,
+      "x": -131071589.8634805,
+      "y": 68625115.10073033,
+      "z": -1652.477869402617
+    },
+    {
+      "body": "Earth",
+      "jd": 2461316.390972222,
+      "x": 147737972.7647011,
+      "y": 24264332.64532249,
+      "z": -2711.758848138154
+    },
+    {
+      "body": "Earth",
+      "jd": 2488048.436805556,
+      "x": 31206529.27300009,
+      "y": 144000629.7394828,
+      "z": -33129.60477832705
+    },
+    {
+      "body": "Earth",
+      "jd": 2488056.314583333,
+      "x": 10820184.98918653,
+      "y": 146818111.6564313,
+      "z": -33671.38421402872
+    },
+    {
+      "body": "Eros",
+      "jd": 2451544.5,
+      "x": -179336639.7645075,
+      "y": -82848343.67216942,
+      "z": -37254695.82711332
+    },
+    {
+      "body": "Eros",
+      "jd": 2451548.5,
+      "x": -177056529.0874719,
+      "y": -91720650.70868263,
+      "z": -37854066.09014881
+    },
+    {
+      "body": "Eros",
+      "jd": 2453944.5,
+      "x": 80174763.40366744,
+      "y": 165240913.6213874,
+      "z": 30506715.55162483
+    },
+    {
+      "body": "Eros",
+      "jd": 2461316.5,
+      "x": -7924318.412397956,
+      "y": -251562494.9892631,
+      "z": -28346198.80925781
+    },
+    {
+      "body": "Eros",
+      "jd": 2488060.5,
+      "x": 7490287.261212765,
+      "y": 174566171.3372768,
+      "z": 19787782.67957582
+    },
+    {
+      "body": "Eros",
+      "jd": 2488064.233333333,
+      "x": -2056138.682560873,
+      "y": 173842585.1349193,
+      "z": 18195253.40846501
+    },
+    {
+      "body": "Eunomia",
+      "jd": 2451544.5,
+      "x": -386681639.7432171,
+      "y": 174776328.9852613,
+      "z": -59230796.769522
+    },
+    {
+      "body": "Eunomia",
+      "jd": 2451561.138194445,
+      "x": -398929106.1109763,
+      "y": 154418475.111048,
+      "z": -63255311.77790116
+    },
+    {
+      "body": "Eunomia",
+      "jd": 2461144.738194444,
+      "x": -447628584.8654847,
+      "y": -60486105.32348295,
+      "z": -90763063.00367829
+    },
+    {
+      "body": "Eunomia",
+      "jd": 2461316.239583333,
+      "x": -372130769.3229625,
+      "y": -270005237.122673,
+      "z": -93242262.59682393
+    },
+    {
+      "body": "Eunomia",
+      "jd": 2488041.019444444,
+      "x": -346736743.926676,
+      "y": -301032413.2858876,
+      "z": -90105020.36999322
+    },
+    {
+      "body": "Eunomia",
+      "jd": 2488056.377777778,
+      "x": -332815968.1331949,
+      "y": -315609328.5330707,
+      "z": -88534692.44738394
+    },
+    {
+      "body": "Euphrosyne",
+      "jd": 2451544.5,
+      "x": 447547168.7442876,
+      "y": -48951553.06579886,
+      "z": -135829466.7440841
+    },
+    {
+      "body": "Euphrosyne",
+      "jd": 2451561.138194445,
+      "x": 446484657.1297304,
+      "y": -26693779.42390067,
+      "z": -126137247.8681366
+    },
+    {
+      "body": "Euphrosyne",
+      "jd": 2461144.738194444,
+      "x": -43119808.56619015,
+      "y": -531217868.0798993,
+      "z": -214723313.6675243
+    },
+    {
+      "body": "Euphrosyne",
+      "jd": 2461316.239583333,
+      "x": 148627052.8235185,
+      "y": -491418340.5176394,
+      "z": -246341279.5220734
+    },
+    {
+      "body": "Euphrosyne",
+      "jd": 2488041.019444444,
+      "x": 252728650.2954448,
+      "y": -436820929.2252451,
+      "z": -248155975.8417993
+    },
+    {
+      "body": "Euphrosyne",
+      "jd": 2488056.377777778,
+      "x": 267232167.5031293,
+      "y": -425669269.5426306,
+      "z": -246878578.8697985
+    },
+    {
+      "body": "Gaspra",
+      "jd": 2451544.5,
+      "x": -256282586.5079123,
+      "y": 231757780.8503572,
+      "z": -22380187.84380731
+    },
+    {
+      "body": "Gaspra",
+      "jd": 2451561.138194445,
+      "x": -276935490.1978098,
+      "y": 213981211.6250652,
+      "z": -23433304.82023033
+    },
+    {
+      "body": "Gaspra",
+      "jd": 2461144.738194444,
+      "x": -257257615.3359669,
+      "y": 230654481.8611235,
+      "z": -22499795.41952023
+    },
+    {
+      "body": "Gaspra",
+      "jd": 2461316.239583333,
+      "x": -380556552.4303514,
+      "y": 2426566.016607134,
+      "z": -26161451.05056662
+    },
+    {
+      "body": "Gaspra",
+      "jd": 2488041.019444444,
+      "x": -108861336.5041465,
+      "y": -345121670.6580631,
+      "z": 230664.5130244642
+    },
+    {
+      "body": "Gaspra",
+      "jd": 2488056.377777778,
+      "x": -84797918.12027943,
+      "y": -348060615.6555383,
+      "z": 1944811.088620752
+    },
+    {
+      "body": "Hektor",
+      "jd": 2451544.5,
+      "x": -316901058.4006672,
+      "y": 674678576.5506059,
+      "z": 181174750.0434406
+    },
+    {
+      "body": "Hektor",
+      "jd": 2451561.138194445,
+      "x": -333930526.093109,
+      "y": 667127957.8176188,
+      "z": 177144454.7347341
+    },
+    {
+      "body": "Hektor",
+      "jd": 2461144.738194444,
+      "x": -763580078.8626361,
+      "y": -59422007.8797853,
+      "z": -92605070.93710749
+    },
+    {
+      "body": "Hektor",
+      "jd": 2461316.239583333,
+      "x": -720024029.1232316,
+      "y": -242740705.0760269,
+      "z": -145782323.7305929
+    },
+    {
+      "body": "Hektor",
+      "jd": 2488041.019444444,
+      "x": -361415233.5625331,
+      "y": -626480801.4966799,
+      "z": -233604458.0100729
+    },
+    {
+      "body": "Hektor",
+      "jd": 2488056.377777778,
+      "x": -346030937.7163546,
+      "y": -634961175.0335593,
+      "z": -234722386.9279027
+    },
+    {
+      "body": "Hygiea",
+      "jd": 2451544.5,
+      "x": -355611091.7688934,
+      "y": -218277300.4262652,
+      "z": -26672803.63821541
+    },
+    {
+      "body": "Hygiea",
+      "jd": 2451561.138194445,
+      "x": -339784472.7763267,
+      "y": -240152637.6744488,
+      "z": -25986910.97924171
+    },
+    {
+      "body": "Hygiea",
+      "jd": 2461144.738194444,
+      "x": -150907529.9283166,
+      "y": 475344165.3263073,
+      "z": -2614225.475423276
+    },
+    {
+      "body": "Hygiea",
+      "jd": 2461316.239583333,
+      "x": -339608588.7554085,
+      "y": 331171971.3953804,
+      "z": -17101802.97062938
+    },
+    {
+      "body": "Hygiea",
+      "jd": 2488041.019444444,
+      "x": -431991584.5970029,
+      "y": -32469993.60840422,
+      "z": -29105263.97969975
+    },
+    {
+      "body": "Hygiea",
+      "jd": 2488056.377777778,
+      "x": -427378487.8482254,
+      "y": -56142858.96681935,
+      "z": -29078181.51587869
+    },
+    {
+      "body": "Ida",
+      "jd": 2451544.5,
+      "x": 315926448.8820595,
+      "y": -301952375.7229402,
+      "z": -1219833.689332008
+    },
+    {
+      "body": "Ida",
+      "jd": 2451561.138194445,
+      "x": 331778941.2608973,
+      "y": -282879565.6691624,
+      "z": -728870.5376186371
+    },
+    {
+      "body": "Ida",
+      "jd": 2461144.738194444,
+      "x": -197362144.4384872,
+      "y": 363035002.4068241,
+      "z": 3446461.972115666
+    },
+    {
+      "body": "Ida",
+      "jd": 2461316.239583333,
+      "x": -384191504.767469,
+      "y": 178200518.4591073,
+      "z": -1677210.480312116
+    },
+    {
+      "body": "Ida",
+      "jd": 2488041.019444444,
+      "x": -421880242.8792148,
+      "y": -108075128.25687,
+      "z": -6759717.99204161
+    },
+    {
+      "body": "Ida",
+      "jd": 2488056.377777778,
+      "x": -416459331.0741426,
+      "y": -130366716.801536,
+      "z": -7028669.865618303
+    },
+    {
+      "body": "Interamnia",
+      "jd": 2451544.5,
+      "x": -203581434.9615187,
+      "y": -443895013.7490461,
+      "z": -88007786.31989348
+    },
+    {
+      "body": "Interamnia",
+      "jd": 2451561.138194445,
+      "x": -182935392.2142081,
+      "y": -450869020.2191669,
+      "z": -82081310.98951271
+    },
+    {
+      "body": "Interamnia",
+      "jd": 2461144.738194444,
+      "x": -393395070.3426353,
+      "y": -311782210.5955387,
+      "z": -137876363.9917162
+    },
+    {
+      "body": "Interamnia",
+      "jd": 2461316.239583333,
+      "x": -216965820.3352728,
+      "y": -438707900.1535633,
+      "z": -90722471.45290297
+    },
+    {
+      "body": "Interamnia",
+      "jd": 2488041.019444444,
+      "x": -406999410.1456259,
+      "y": 267949737.1207462,
+      "z": -112312288.6228427
+    },
+    {
+      "body": "Interamnia",
+      "jd": 2488056.377777778,
+      "x": -418838018.161358,
+      "y": 251743037.2804883,
+      "z": -116731039.2759704
+    },
+    {
+      "body": "Itokawa",
+      "jd": 2451544.5,
+      "x": 93784133.0917205,
+      "y": -139527019.1636185,
+      "z": -3987234.31759689
+    },
+    {
+      "body": "Itokawa",
+      "jd": 2451548.5,
+      "x": 103405223.969384,
+      "y": -135717670.4146416,
+      "z": -4224911.52101054
+    },
+    {
+      "body": "Itokawa",
+      "jd": 2453944.5,
+      "x": 196698133.7812012,
+      "y": 155591236.9977763,
+      "z": -3631705.544909313
+    },
+    {
+      "body": "Itokawa",
+      "jd": 2461316.5,
+      "x": -11383949.80942697,
+      "y": 231261082.5608168,
+      "z": 2638164.87024051
+    },
+    {
+      "body": "Itokawa",
+      "jd": 2488060.5,
+      "x": -95184706.75410528,
+      "y": 183288808.0879911,
+      "z": 4526007.895935334
+    },
+    {
+      "body": "Itokawa",
+      "jd": 2488064.233333333,
+      "x": -100903719.8011278,
+      "y": 177629258.1550835,
+      "z": 4613941.710044719
+    },
+    {
+      "body": "Juno",
+      "jd": 2451544.5,
+      "x": 56842871.5577248,
+      "y": -452348483.1683088,
+      "z": 100399518.0306536
+    },
+    {
+      "body": "Juno",
+      "jd": 2451561.138194445,
+      "x": 77696977.9632224,
+      "y": -445110785.8160155,
+      "z": 97937708.08991048
+    },
+    {
+      "body": "Juno",
+      "jd": 2461144.738194444,
+      "x": 109555282.3398076,
+      "y": -430691521.8978764,
+      "z": 93291078.98482764
+    },
+    {
+      "body": "Juno",
+      "jd": 2461316.239583333,
+      "x": 287856126.743877,
+      "y": -261780564.2653236,
+      "z": 47676682.31070399
+    },
+    {
+      "body": "Juno",
+      "jd": 2488041.019444444,
+      "x": -124597132.1791334,
+      "y": -466070831.240088,
+      "z": 110963567.612094
+    },
+    {
+      "body": "Juno",
+      "jd": 2488056.377777778,
+      "x": -105803866.7013152,
+      "y": -468739734.0694076,
+      "z": 110686700.9609421
+    },
+    {
+      "body": "Jupiter",
+      "jd": 2451544.5,
+      "x": 598909107.583253,
+      "y": 439122650.6808444,
+      "z": -15232509.32047367
+    },
+    {
+      "body": "Jupiter",
+      "jd": 2451561.138194445,
+      "x": 587351305.3868265,
+      "y": 455020151.2775239,
+      "z": -15039623.21037963
+    },
+    {
+      "body": "Jupiter",
+      "jd": 2461144.738194444,
+      "x": -361880768.1802773,
+      "y": 696865365.0862552,
+      "z": 5201775.813552439
+    },
+    {
+      "body": "Jupiter",
+      "jd": 2461316.239583333,
+      "x": -523664945.295424,
+      "y": 596753590.3240249,
+      "z": 9237378.132653832
+    },
+    {
+      "body": "Jupiter",
+      "jd": 2488041.019444444,
+      "x": -808277888.567557,
+      "y": -105568307.4418108,
+      "z": 18503409.9256748
+    },
+    {
+      "body": "Jupiter",
+      "jd": 2488056.377777778,
+      "x": -806067277.3818845,
+      "y": -121950861.3158403,
+      "z": 18522957.57930648
+    },
+    {
+      "body": "Lutetia",
+      "jd": 2451544.5,
+      "x": 568173.1450597998,
+      "y": -329004825.1236659,
+      "z": -2803030.247404397
+    },
+    {
+      "body": "Lutetia",
+      "jd": 2451561.138194445,
+      "x": 30461476.79271829,
+      "y": -323733872.7698507,
+      "z": -4339876.373407423
+    },
+    {
+      "body": "Lutetia",
+      "jd": 2461144.738194444,
+      "x": -200054502.2797974,
+      "y": -298059944.7682284,
+      "z": 8032889.765942439
+    },
+    {
+      "body": "Lutetia",
+      "jd": 2461316.239583333,
+      "x": 96242675.84240964,
+      "y": -301073143.1654796,
+      "z": -7652851.971774787
+    },
+    {
+      "body": "Lutetia",
+      "jd": 2488041.019444444,
+      "x": 231670428.0401215,
+      "y": 248540342.8765304,
+      "z": -9903096.79921253
+    },
+    {
+      "body": "Lutetia",
+      "jd": 2488056.377777778,
+      "x": 214229545.959805,
+      "y": 269024551.4584013,
+      "z": -8799653.059822872
+    },
+    {
+      "body": "Mars",
+      "jd": 2451544.5,
+      "x": 207995054.9836171,
+      "y": -3143009.713942494,
+      "z": -5178781.243488781
+    },
+    {
+      "body": "Mars",
+      "jd": 2451560.5,
+      "x": 206875154.3153571,
+      "y": 33081753.144727,
+      "z": -4392380.487113382
+    },
+    {
+      "body": "Mars",
+      "jd": 2461144.5,
+      "x": 202386104.5055813,
+      "y": -43115643.69198959,
+      "z": -5866212.217900913
+    },
+    {
+      "body": "Mars",
+      "jd": 2461316.233333333,
+      "x": 15556786.36454259,
+      "y": 232870064.7419165,
+      "z": 4498649.460895389
+    },
+    {
+      "body": "Mars",
+      "jd": 2488040.5,
+      "x": 140444123.5848045,
+      "y": 169595298.112599,
+      "z": 137598.147199735
+    },
+    {
+      "body": "Mars",
+      "jd": 2488055.433333333,
+      "x": 116182462.4540433,
+      "y": 190408187.2737676,
+      "z": 1165419.437712163
+    },
+    {
+      "body": "Mathilde",
+      "jd": 2451544.5,
+      "x": -479044183.4184978,
+      "y": -36750363.47789676,
+      "z": 4457293.858610485
+    },
+    {
+      "body": "Mathilde",
+      "jd": 2451561.138194445,
+      "x": -473420003.0577325,
+      "y": -57140911.67624477,
+      "z": 6854180.445533359
+    },
+    {
+      "body": "Mathilde",
+      "jd": 2461144.738194444,
+      "x": -376630598.8499139,
+      "y": -220301124.2262405,
+      "z": 26428994.83953082
+    },
+    {
+      "body": "Mathilde",
+      "jd": 2461316.239583333,
+      "x": -142888362.3228715,
+      "y": -336906724.8682228,
+      "z": 39965912.89245838
+    },
+    {
+      "body": "Mathilde",
+      "jd": 2488041.019444444,
+      "x": -191261175.2620803,
+      "y": -328891762.2960105,
+      "z": 40047713.04779439
+    },
+    {
+      "body": "Mathilde",
+      "jd": 2488056.377777778,
+      "x": -166565120.8568852,
+      "y": -334517399.5890411,
+      "z": 40626354.2076094
+    },
+    {
+      "body": "Mercury",
+      "jd": 2451544.5,
+      "x": -21052621.0724407,
+      "y": -66406638.1225343,
+      "z": -3492445.94657772
+    },
+    {
+      "body": "Mercury",
+      "jd": 2451548.6125,
+      "x": -7619135.072273152,
+      "y": -69108037.48942785,
+      "z": -4946123.307234328
+    },
+    {
+      "body": "Mercury",
+      "jd": 2453944.600694444,
+      "x": 50489620.28375052,
+      "y": -30368571.00047641,
+      "z": -7114425.469137518
+    },
+    {
+      "body": "Mercury",
+      "jd": 2461316.485416667,
+      "x": 3432900.823571872,
+      "y": -68819077.000369,
+      "z": -5939030.449411329
+    },
+    {
+      "body": "Mercury",
+      "jd": 2488060.54375,
+      "x": 8178064.660030361,
+      "y": -68020756.48456027,
+      "z": -6314030.108023949
+    },
+    {
+      "body": "Mercury",
+      "jd": 2488064.427777778,
+      "x": 20835969.9708774,
+      "y": -63675337.75690012,
+      "z": -7117041.218439374
+    },
+    {
+      "body": "Moon",
+      "jd": 2451544.5,
+      "x": -317650.2412950324,
+      "y": -241883.1762389348,
+      "z": 36555.82307692753
+    },
+    {
+      "body": "Moon",
+      "jd": 2451546.466666667,
+      "x": -197002.5813092366,
+      "y": -352806.6571073559,
+      "z": 33052.4623111955
+    },
+    {
+      "body": "Moon",
+      "jd": 2452744.535416667,
+      "x": -360501.8511657572,
+      "y": 3637.876421336523,
+      "z": 28497.00795699233
+    },
+    {
+      "body": "Moon",
+      "jd": 2461316.508333333,
+      "x": -13884.55528826998,
+      "y": 368404.4763956601,
+      "z": 27800.10235245529
+    },
+    {
+      "body": "Moon",
+      "jd": 2488066.535416667,
+      "x": -158479.6228428822,
+      "y": 342130.5782404207,
+      "z": 26716.26435107509
+    },
+    {
+      "body": "Moon",
+      "jd": 2488068.379166667,
+      "x": -287218.5185058442,
+      "y": 238133.4197129938,
+      "z": 15507.2633685796
+    },
+    {
+      "body": "Neptune",
+      "jd": 2451544.5,
+      "x": 2514853497.99616,
+      "y": -3738847418.6484,
+      "z": 19039445.85550165
+    },
+    {
+      "body": "Neptune",
+      "jd": 2451560.5,
+      "x": 2521023737.465303,
+      "y": -3734589567.63378,
+      "z": 18809859.04069734
+    },
+    {
+      "body": "Neptune",
+      "jd": 2461144.5,
+      "x": 4467283913.536644,
+      "y": 126265633.8784734,
+      "z": -105545990.1633357
+    },
+    {
+      "body": "Neptune",
+      "jd": 2461315.7,
+      "x": 4463605848.055094,
+      "y": 207033896.0630396,
+      "z": -107125906.7156933
+    },
+    {
+      "body": "Neptune",
+      "jd": 2488040.5,
+      "x": -4343394832.367899,
+      "y": 1245008911.586909,
+      "z": 74472169.03590196
+    },
+    {
+      "body": "Neptune",
+      "jd": 2488054.9,
+      "x": -4345288819.928526,
+      "y": 1238532996.902051,
+      "z": 74648932.35377342
+    },
+    {
+      "body": "Pallas",
+      "jd": 2451544.5,
+      "x": -124954093.6163301,
+      "y": 247703287.0350769,
+      "z": -160936520.2417548
+    },
+    {
+      "body": "Pallas",
+      "jd": 2451561.138194445,
+      "x": -153639134.5810261,
+      "y": 236487249.4972214,
+      "z": -150817348.3312397
+    },
+    {
+      "body": "Pallas",
+      "jd": 2461144.738194444,
+      "x": 460414416.6545753,
+      "y": -104587225.685288,
+      "z": 32664490.55578207
+    },
+    {
+      "body": "Pallas",
+      "jd": 2461316.239583333,
+      "x": 400223370.9517273,
+      "y": 89370239.78299917,
+      "z": -96559576.76839465
+    },
+    {
+      "body": "Pallas",
+      "jd": 2488041.019444444,
+      "x": 447669427.9692985,
+      "y": -171181443.1003583,
+      "z": 76331618.89461853
+    },
+    {
+      "body": "Pallas",
+      "jd": 2488056.377777778,
+      "x": 451888990.5293157,
+      "y": -155241931.4746954,
+      "z": 64894165.57958852
+    },
+    {
+      "body": "Psyche",
+      "jd": 2451544.5,
+      "x": 374265711.7239518,
+      "y": -84387105.44091596,
+      "z": -6002366.800785631
+    },
+    {
+      "body": "Psyche",
+      "jd": 2451561.138194445,
+      "x": 377712650.7665476,
+      "y": -56262956.25848759,
+      "z": -7416581.663947131
+    },
+    {
+      "body": "Psyche",
+      "jd": 2461144.738194444,
+      "x": -102467190.8360478,
+      "y": 410792550.1304467,
+      "z": -16478174.9256689
+    },
+    {
+      "body": "Psyche",
+      "jd": 2461316.239583333,
+      "x": -334732594.4205692,
+      "y": 312204664.9051128,
+      "z": -5562787.48559238
+    },
+    {
+      "body": "Psyche",
+      "jd": 2488041.019444444,
+      "x": 373275680.5376622,
+      "y": -88289576.81900376,
+      "z": -6360938.404544707
+    },
+    {
+      "body": "Psyche",
+      "jd": 2488056.377777778,
+      "x": 376732129.7266328,
+      "y": -62360134.81033899,
+      "z": -7670960.015523072
+    },
+    {
+      "body": "Ryugu",
+      "jd": 2451544.5,
+      "x": 170343650.4143057,
+      "y": 28825607.42628916,
+      "z": 15739773.45406806
+    },
+    {
+      "body": "Ryugu",
+      "jd": 2451548.5,
+      "x": 166750546.5520793,
+      "y": 37839552.7758061,
+      "z": 15096822.23383094
+    },
+    {
+      "body": "Ryugu",
+      "jd": 2453944.5,
+      "x": 126683575.9962526,
+      "y": 95902494.9736253,
+      "z": 9292417.938091423
+    },
+    {
+      "body": "Ryugu",
+      "jd": 2461316.5,
+      "x": -28745325.11601226,
+      "y": -206966828.0874315,
+      "z": 4024357.339723736
+    },
+    {
+      "body": "Ryugu",
+      "jd": 2488060.5,
+      "x": 1033240.464857487,
+      "y": -214017570.1211581,
+      "z": 7405708.109815553
+    },
+    {
+      "body": "Ryugu",
+      "jd": 2488064.233333333,
+      "x": 8211399.684032365,
+      "y": -214155400.5207853,
+      "z": 8088194.543804631
+    },
+    {
+      "body": "Saturn",
+      "jd": 2451544.5,
+      "x": 958706141.4899858,
+      "y": 982565418.4265196,
+      "z": -55220745.22373873
+    },
+    {
+      "body": "Saturn",
+      "jd": 2451560.144444444,
+      "x": 948618329.0693744,
+      "y": 991626713.8969778,
+      "z": -54977375.5227856
+    },
+    {
+      "body": "Saturn",
+      "jd": 2461144.5,
+      "x": 1412551184.536222,
+      "y": 124171070.7462895,
+      "z": -58390325.01023022
+    },
+    {
+      "body": "Saturn",
+      "jd": 2461316.588888889,
+      "x": 1384725437.608029,
+      "y": 266002824.6426898,
+      "z": -59753114.60214723
+    },
+    {
+      "body": "Saturn",
+      "jd": 2488040.144444444,
+      "x": -1375568783.799364,
+      "y": -437243671.0354353,
+      "z": 62415597.90521738
+    },
+    {
+      "body": "Saturn",
+      "jd": 2488055.788888889,
+      "x": -1372267046.605155,
+      "y": -449712657.027788,
+      "z": 62498933.42336886
+    },
+    {
+      "body": "Sylvia",
+      "jd": 2451544.5,
+      "x": -1198379.937438917,
+      "y": 531754886.7255504,
+      "z": 29459054.10893255
+    },
+    {
+      "body": "Sylvia",
+      "jd": 2451561.138194445,
+      "x": -23212681.8954763,
+      "y": 532729725.2981075,
+      "z": 33558382.070158
+    },
+    {
+      "body": "Sylvia",
+      "jd": 2461144.738194444,
+      "x": -134600542.3082367,
+      "y": 527368664.3299049,
+      "z": 54296853.79990596
+    },
+    {
+      "body": "Sylvia",
+      "jd": 2461316.239583333,
+      "x": -335414554.0505381,
+      "y": 443096170.1099153,
+      "z": 86324667.22023067
+    },
+    {
+      "body": "Sylvia",
+      "jd": 2488041.019444444,
+      "x": -518598007.7356603,
+      "y": -200189712.5420649,
+      "z": 79472208.86366855
+    },
+    {
+      "body": "Sylvia",
+      "jd": 2488056.377777778,
+      "x": -510488319.5147275,
+      "y": -217874165.8652096,
+      "z": 76851688.00678374
+    },
+    {
+      "body": "Uranus",
+      "jd": 2451544.5,
+      "x": 2158774690.050523,
+      "y": -2054825152.574603,
+      "z": -35623636.32503366
+    },
+    {
+      "body": "Uranus",
+      "jd": 2451560.5,
+      "x": 2165175053.315471,
+      "y": -2048418794.78489,
+      "z": -35682765.81139255
+    },
+    {
+      "body": "Uranus",
+      "jd": 2461144.5,
+      "x": 1424970029.547251,
+      "y": 2540598087.361197,
+      "z": -9041250.941723228
+    },
+    {
+      "body": "Uranus",
+      "jd": 2461315.7,
+      "x": 1335386253.256057,
+      "y": 2583627915.88504,
+      "z": -7719487.426243901
+    },
+    {
+      "body": "Uranus",
+      "jd": 2488040.5,
+      "x": 2827846251.790644,
+      "y": 964397212.9795022,
+      "z": -32990724.44609451
+    },
+    {
+      "body": "Uranus",
+      "jd": 2488054.9,
+      "x": 2825040819.484405,
+      "y": 972001184.2733539,
+      "z": -32926112.7811324
+    },
+    {
+      "body": "Venus",
+      "jd": 2451544.5,
+      "x": -107505550.271985,
+      "y": -3366520.666522362,
+      "z": 6159219.789239045
+    },
+    {
+      "body": "Venus",
+      "jd": 2451552.5,
+      "x": -104185337.1453929,
+      "y": -27379206.32717532,
+      "z": 5639384.147085004
+    },
+    {
+      "body": "Venus",
+      "jd": 2456344.5,
+      "x": 71911106.13933532,
+      "y": -81667118.62709218,
+      "z": -5269243.692745205
+    },
+    {
+      "body": "Venus",
+      "jd": 2461316.233333333,
+      "x": 108308763.2230511,
+      "y": -7117411.514849215,
+      "z": -6347032.050247273
+    },
+    {
+      "body": "Venus",
+      "jd": 2488048.5,
+      "x": 104882153.9954183,
+      "y": -28253375.4218652,
+      "z": -6439213.87917606
+    },
+    {
+      "body": "Venus",
+      "jd": 2488055.966666667,
+      "x": 108360627.4561389,
+      "y": -6088813.092058852,
+      "z": -6330652.017393339
+    },
+    {
+      "body": "Vesta",
+      "jd": 2451544.5,
+      "x": -203211935.3266599,
+      "y": -249743050.3530293,
+      "z": 32219473.49192549
+    },
+    {
+      "body": "Vesta",
+      "jd": 2451561.138194445,
+      "x": -178512954.2768032,
+      "y": -267191591.9302996,
+      "z": 29745894.17983751
+    },
+    {
+      "body": "Vesta",
+      "jd": 2461144.738194444,
+      "x": 298140822.423846,
+      "y": -166345595.4873038,
+      "z": -31365835.38785271
+    },
+    {
+      "body": "Vesta",
+      "jd": 2461316.239583333,
+      "x": 349174280.4822093,
+      "y": 106266806.3513567,
+      "z": -45672836.80314634
+    },
+    {
+      "body": "Vesta",
+      "jd": 2488041.019444444,
+      "x": 147997655.559564,
+      "y": 353571668.7082978,
+      "z": -28098358.97607674
+    },
+    {
+      "body": "Vesta",
+      "jd": 2488056.377777778,
+      "x": 126297218.0082902,
+      "y": 362362183.7846457,
+      "z": -25700070.68043934
+    }
+  ]
+}

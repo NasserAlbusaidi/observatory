@@ -62,9 +62,10 @@ namespace FogOfWar.OpenWorld
         // samples are even in time, so they are close together near the ports, where the course bends most.
         public Clearance Check() => Check(sys.Bodies, false);
 
-        // The cheap test, for traffic (the full one costs about 21 ms): the Sun, and the planet each end orbits when that
-        // end is a moon. QA runs the full test on scheduled trips to show what this one misses.
-        public Clearance CheckEnds() => Check(From.Parent == To.Parent ? new[] { From.Parent } : new[] { From.Parent, To.Parent }, true);
+        // The traffic shortcut checks each endpoint's parent and siblings too: a Titan-to-Enceladus course can cross
+        // Rhea even when it clears Saturn. QA independently checks every scheduled trip against the full body list.
+        public Clearance CheckEnds() => Check(sys.Bodies.FindAll(b => b == From.Parent || b == To.Parent ||
+            b.Parent == From.Parent || b.Parent == To.Parent), true);
 
         Clearance Check(System.Collections.Generic.IEnumerable<Body> bodies, bool smooth)
         {

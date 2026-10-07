@@ -1,0 +1,125 @@
+API VERSION: 1.2
+API SOURCE: NASA/JPL Horizons API
+
+*******************************************************************************
+ Revised: April 12, 2021                Venus                           299 / 2
+ 
+ PHYSICAL DATA (updated 2020-Oct-19):
+  Vol. Mean Radius (km) =  6051.84+-0.01 Density (g/cm^3)      =  5.204
+  Mass x10^23 (kg)      =    48.685      Volume (x10^10 km^3)  = 92.843
+  Sidereal rot. period  =   243.018484 d Sid. Rot. Rate (rad/s)= -0.00000029924
+  Mean solar day        =   116.7490 d   Equ. gravity  m/s^2   =  8.870
+  Mom. of Inertia       =     0.33       Core radius (km)      = ~3200
+  Geometric Albedo      =     0.65       Potential Love # k2   = ~0.25
+  GM (km^3/s^2)         = 324858.592     Equatorial Radius, Re = 6051.893 km
+  GM 1-sigma (km^3/s^2) =    +-0.006     Mass ratio (Sun/Venus)= 408523.72
+  Atmos. pressure (bar) =  90            Max. angular diam.    =   60.2"
+  Mean Temperature (K)  = 735            Visual mag. V(1,0)    =   -4.40
+  Obliquity to orbit    = 177.3 deg      Hill's sphere rad.,Rp =  167.1
+  Sidereal orb. per., y =   0.61519726   Orbit speed, km/s     =   35.021
+  Sidereal orb. per., d = 224.70079922   Escape speed, km/s    =   10.361
+                                 Perihelion  Aphelion    Mean
+  Solar Constant (W/m^2)         2759         2614       2650
+  Maximum Planetary IR (W/m^2)    153         153         153
+  Minimum Planetary IR (W/m^2)    153         153         153
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Tue Oct  6 21:36:39 2026 Pasadena, USA      / Horizons
+*******************************************************************************
+Target body name: Venus (299)                     {source: DE441}
+Center body name: Sun (10)                        {source: DE441}
+Center-site name: BODY CENTER
+*******************************************************************************
+Start time      : A.D. 2000-Jan-01 00:00:00.0000 TDB
+Stop  time      : A.D. 2099-Dec-19 00:00:00.0000 TDB
+Step-size       : DISCRETE TIME-LIST
+*******************************************************************************
+Center geodetic : 0.0, 0.0, 0.0                   {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center radii    : 695700.0, 695700.0, 695700.0 km {Equator_a, b, pole_c}
+Output units    : KM-S
+Calendar mode   : Mixed Julian/Gregorian
+Output type     : GEOMETRIC cartesian states
+Output format   : 2 (position and velocity)
+Reference frame : Ecliptic of J2000.0
+*******************************************************************************
+            JDTDB,            Calendar Date (TDB),                      X,                      Y,                      Z,                     VX,                     VY,                     VZ,
+**************************************************************************************************************************************************************************************************
+$$SOE
+2451544.500000000, A.D. 2000-Jan-01 00:00:00.0000, -1.075055502719850E+08, -3.366520666522362E+06,  6.159219789239045E+06,  8.891597859686224E-01, -3.515920774137907E+01, -5.318594228644749E-01,
+2451552.500000000, A.D. 2000-Jan-09 00:00:00.0000, -1.041853371453929E+08, -2.737920632717532E+07,  5.639384147085004E+06,  8.672479247387189E+00, -3.402936299004737E+01, -9.656718888151676E-01,
+2456344.499000000, A.D. 2013-Feb-20 23:58:33.6000,  7.190885506364416E+07, -8.166910713436949E+07, -5.269141023381807E+06,  2.605443137859605E+01,  2.301476462962297E+01, -1.188325986295193E+00,
+2456344.500000000, A.D. 2013-Feb-21 00:00:00.0000,  7.191110613933532E+07, -8.166711862709218E+07, -5.269243692745205E+06,  2.605379366860904E+01,  2.301548887136892E+01, -1.188279258205366E+00,
+2456344.501000000, A.D. 2013-Feb-21 00:01:26.4000,  7.191335715992747E+07, -8.166513005724114E+07, -5.269346358071253E+06,  2.605315593866238E+01,  2.301621309547700E+01, -1.188232529205290E+00,
+2461316.500000000, A.D. 2026-Oct-03 00:00:00.0000,  1.083550879147172E+08, -6.315758135766067E+06, -6.338690164518558E+06,  1.881748149448469E+00,  3.480181484370459E+01,  3.696046379405686E-01,
+2488048.500000000, A.D. 2099-Dec-11 00:00:00.0000,  1.048821539954183E+08, -2.825337542186520E+07, -6.439213879176060E+06,  8.931103033602485E+00,  3.366136625684899E+01, -4.541256091034285E-02,
+2488056.499000000, A.D. 2099-Dec-18 23:58:33.6000,  1.084320860482482E+08, -4.487274934074862E+06, -6.312439379562835E+06,  1.296132663176587E+00,  3.483281973715141E+01,  4.109921044294680E-01,
+2488056.500000000, A.D. 2099-Dec-19 00:00:00.0000,  1.084321979923185E+08, -4.484265376234701E+06, -6.312403867405301E+06,  1.295164842474898E+00,  3.483285977599151E+01,  4.110484467142435E-01,
+$$EOE
+**************************************************************************************************************************************************************************************************
+ 
+TIME
+
+  Barycentric Dynamical Time ("TDB" or T_eph) output was requested. This
+continuous coordinate time is equivalent to the relativistic proper time
+of a clock at rest in a reference frame co-moving with the solar system
+barycenter but outside the system's gravity well. It is the independent
+variable in the solar system relativistic equations of motion.
+
+  TDB runs at a uniform rate of one SI second per second and is independent
+of irregularities in Earth's rotation.
+ 
+CALENDAR SYSTEM
+
+  Mixed calendar mode was active such that calendar dates after AD 1582-Oct-15
+(if any) are in the modern Gregorian system. Dates prior to 1582-Oct-5 (if any)
+are in the Julian calendar system, which is automatically extended for dates
+prior to its adoption on 45-Jan-1 BC.  The Julian calendar is useful for
+matching historical dates. The Gregorian calendar more accurately corresponds
+to the Earth's orbital motion and seasons. A "Gregorian-only" calendar mode is
+available if such physical events are the primary interest.
+
+REFERENCE FRAME AND COORDINATES
+
+  Ecliptic at the standard reference epoch
+
+    Reference epoch: J2000.0
+    X-Y plane: adopted Earth orbital plane at the reference epoch
+               Note: IAU76 obliquity of 84381.448 arcseconds wrt ICRF X-Y plane
+    X-axis   : ICRF
+    Z-axis   : perpendicular to the X-Y plane in the directional (+ or -) sense
+               of Earth's north pole at the reference epoch.
+
+  Symbol meaning:
+
+    JDTDB    Julian Day Number, Barycentric Dynamical Time
+      X      X-component of position vector (km)
+      Y      Y-component of position vector (km)
+      Z      Z-component of position vector (km)
+      VX     X-component of velocity vector (km/sec)                           
+      VY     Y-component of velocity vector (km/sec)                           
+      VZ     Z-component of velocity vector (km/sec)                           
+
+ABERRATIONS AND CORRECTIONS
+
+ Geometric state vectors have NO corrections or aberrations applied.
+
+Computations by ...
+
+    Solar System Dynamics Group, Horizons On-Line Ephemeris System
+    4800 Oak Grove Drive, Jet Propulsion Laboratory
+    Pasadena, CA  91109   USA
+
+    General site: https://ssd.jpl.nasa.gov/
+    Mailing list: https://ssd.jpl.nasa.gov/email_list.html
+    System news : https://ssd.jpl.nasa.gov/horizons/news.html
+    User Guide  : https://ssd.jpl.nasa.gov/horizons/manual.html
+    Connect     : browser        https://ssd.jpl.nasa.gov/horizons/app.html#/x
+                  API            https://ssd-api.jpl.nasa.gov/doc/horizons.html
+                  command-line   telnet ssd.jpl.nasa.gov 6775
+                  e-mail/batch   https://ssd.jpl.nasa.gov/ftp/ssd/horizons_batch.txt
+                  scripts        https://ssd.jpl.nasa.gov/ftp/ssd/SCRIPTS
+    Inquiries   : Jon.D.Giorgini@jpl.nasa.gov
+*******************************************************************************

@@ -48,12 +48,12 @@ namespace FogOfWar
             s.tau = Math.Min(Math.Max(tau, 0), s.T);
             if (s.tau <= s.th)
             {
-                s.w = a * s.tau; s.t = Math.Sinh(s.w) / a; s.x = (Math.Cosh(s.w) - 1) / a;
+                s.w = a * s.tau; s.t = Math.Sinh(s.w) / a; s.x = CoshMinusOne(s.w) / a;
             }
             else
             {
                 double r = s.T - s.tau; s.w = a * r;
-                s.t = s.tTotal - Math.Sinh(s.w) / a; s.x = D - (Math.Cosh(s.w) - 1) / a;
+                s.t = s.tTotal - Math.Sinh(s.w) / a; s.x = D - CoshMinusOne(s.w) / a;
             }
             s.beta = Math.Tanh(s.w);
             s.oneMinusBeta = 2 / (Math.Exp(2 * s.w) + 1);
@@ -63,6 +63,8 @@ namespace FogOfWar
         }
 
         static double Acosh(double x) => Math.Log(x + Math.Sqrt(x * x - 1));
+        // cosh(w)-1 loses the displacement to cancellation at low rapidity. The half-angle identity is stable at w=0.
+        static double CoshMinusOne(double w) { double sh = Math.Sinh(w / 2); return 2 * sh * sh; }
 
         protected override void Build()
         {

@@ -1,0 +1,210 @@
+{
+  "domain": "tonemapped RGB image difference",
+  "rows": [
+    {
+      "name": "bh-edge-on",
+      "mode": "table/full",
+      "pass_": true,
+      "rmse": 0.0016630947967469346,
+      "largeErrorFraction": 6.26929012345679e-06,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-edge-on.png",
+          "sha256": "df52302982a61ba884e1d0e59d1e31c25f14e2f016065f37cc201ade4730faba"
+        },
+        {
+          "name": "bh-edge-on-full.png",
+          "sha256": "398e1664508eb1033cbb98fec6e6bf07ac10784436e790d7c9c1665920401f4d"
+        }
+      ]
+    },
+    {
+      "name": "bh-edge-on",
+      "mode": "full/reference",
+      "pass_": true,
+      "rmse": 0.0016796372148744018,
+      "largeErrorFraction": 4.822530864197531e-07,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-edge-on-full.png",
+          "sha256": "398e1664508eb1033cbb98fec6e6bf07ac10784436e790d7c9c1665920401f4d"
+        },
+        {
+          "name": "bh-edge-on-reference.png",
+          "sha256": "3f5651925a3d590dc1ec6680ab9a5bb4d17ac5b06939b3dba571693479bd4754"
+        }
+      ]
+    },
+    {
+      "name": "bh-edge-on",
+      "mode": "reason-counters",
+      "pass_": false,
+      "capture": 70455,
+      "escape": 2002967,
+      "unresolved": 0,
+      "displayFallback": 0,
+      "opaque": 0,
+      "numerical": 1,
+      "total": 2073600,
+      "note": "table geometry reason map; full trace may terminate earlier on opaque emission"
+    },
+    {
+      "name": "bh-hotspot",
+      "mode": "table/full",
+      "pass_": true,
+      "rmse": 0.0015563957791940833,
+      "largeErrorFraction": 6.26929012345679e-06,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-hotspot.png",
+          "sha256": "ea9dd219c87797a0eeaa8063d27a4fcc16911ca96c79a43af046412af378d1a0"
+        },
+        {
+          "name": "bh-hotspot-full.png",
+          "sha256": "8cf3f6aed134a15fcead337bd0c88ee27598ee5227ad63c8525f4c2fe780bb79"
+        }
+      ]
+    },
+    {
+      "name": "bh-hotspot",
+      "mode": "full/reference",
+      "pass_": true,
+      "rmse": 0.0014502266855379426,
+      "largeErrorFraction": 0.0,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-hotspot-full.png",
+          "sha256": "8cf3f6aed134a15fcead337bd0c88ee27598ee5227ad63c8525f4c2fe780bb79"
+        },
+        {
+          "name": "bh-hotspot-reference.png",
+          "sha256": "de1c0fc48c1885c398d72ba5170d436768d0fff0565ac589a0a21cc85dd0c5a0"
+        }
+      ]
+    },
+    {
+      "name": "bh-hotspot",
+      "mode": "reason-counters",
+      "pass_": true,
+      "capture": 81734,
+      "escape": 1991670,
+      "unresolved": 0,
+      "displayFallback": 0,
+      "opaque": 0,
+      "numerical": 0,
+      "total": 2073600,
+      "note": "table geometry reason map; full trace may terminate earlier on opaque emission"
+    },
+    {
+      "name": "bh-kerr-0.998-guides",
+      "mode": "table/full",
+      "pass_": true,
+      "rmse": 0.0012160625424712196,
+      "largeErrorFraction": 0.0,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-kerr-0.998-guides.png",
+          "sha256": "1b4ecf5dd3417826b51d5557b7243b07a44dc1d3b5b0945cf9017e7c08e2a75b"
+        },
+        {
+          "name": "bh-kerr-0.998-guides-full.png",
+          "sha256": "849b7c87e509d64f18c482384d17d3124d8e14b25e80548ec2993c6d7bb066a1"
+        }
+      ]
+    },
+    {
+      "name": "bh-kerr-0.998-guides",
+      "mode": "full/reference",
+      "pass_": true,
+      "rmse": 0.0009311376138606976,
+      "largeErrorFraction": 0.0,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-kerr-0.998-guides-full.png",
+          "sha256": "849b7c87e509d64f18c482384d17d3124d8e14b25e80548ec2993c6d7bb066a1"
+        },
+        {
+          "name": "bh-kerr-0.998-guides-reference.png",
+          "sha256": "bb7d56d34aefc31a7ac33d0f823900f40b8a19952fe992c1b78d913249082ceb"
+        }
+      ]
+    },
+    {
+      "name": "bh-kerr-0.998-guides",
+      "mode": "reason-counters",
+      "pass_": true,
+      "capture": 63811,
+      "escape": 2009586,
+      "unresolved": 0,
+      "displayFallback": 0,
+      "opaque": 0,
+      "numerical": 0,
+      "total": 2073600,
+      "note": "table geometry reason map; full trace may terminate earlier on opaque emission"
+    },
+    {
+      "name": "bh-polar",
+      "mode": "table/full",
+      "pass_": true,
+      "rmse": 0.0012729833310145666,
+      "largeErrorFraction": 0.0,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-polar.png",
+          "sha256": "ea48e818e92c2eedec756f3cc0978f98c5590a9b54b251b4c235e69a30c7de47"
+        },
+        {
+          "name": "bh-polar-full.png",
+          "sha256": "d60d4327b03f62372d696cb1c1a4c7e0ec9631aa3abc67175456cbfb1e029524"
+        }
+      ]
+    },
+    {
+      "name": "bh-polar",
+      "mode": "full/reference",
+      "pass_": true,
+      "rmse": 0.0013833305769221232,
+      "largeErrorFraction": 4.822530864197531e-07,
+      "rmseLimit": 0.02,
+      "largeErrorFractionLimit": 0.01,
+      "files": [
+        {
+          "name": "bh-polar-full.png",
+          "sha256": "d60d4327b03f62372d696cb1c1a4c7e0ec9631aa3abc67175456cbfb1e029524"
+        },
+        {
+          "name": "bh-polar-reference.png",
+          "sha256": "54eade2ea2e8383109d578f65a7e0b4a214c6d47b6090bb8f3cb7e83d797cf03"
+        }
+      ]
+    },
+    {
+      "name": "bh-polar",
+      "mode": "reason-counters",
+      "pass_": true,
+      "capture": 13872,
+      "escape": 835650,
+      "unresolved": 0,
+      "displayFallback": 0,
+      "opaque": 1223345,
+      "numerical": 0,
+      "total": 2073600,
+      "note": "table geometry reason map; full trace may terminate earlier on opaque emission"
+    }
+  ],
+  "failed": 1
+}

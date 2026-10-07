@@ -1,0 +1,48 @@
+{
+  "physics-editor-1.log": [
+    "BENCH FAIL ephemeris/Ryugu/2488060.5/fit-position: 4.511428E+000 <= 2.000000E+000 km ",
+    "BENCH FAIL ephemeris/Ryugu/2488064.499/fit-position: 4.506770E+000 <= 2.000000E+000 km ",
+    "BENCH FAIL Journey/dest=0/low-tau=1E-08: 1.000000E+000 <= 1.000000E-008 relative position ",
+    "BENCH FAIL Journey/dest=0/low-tau=1E-05: 1.932861E-006 <= 1.000000E-008 relative position ",
+    "BENCH FAIL Journey/dest=1/low-tau=1E-08: 1.000000E+000 <= 1.000000E-008 relative position ",
+    "BENCH FAIL Journey/dest=1/low-tau=1E-05: 1.932861E-006 <= 1.000000E-008 relative position ",
+    "BENCH FAIL Journey/dest=2/low-tau=1E-08: 1.000000E+000 <= 1.000000E-008 relative position ",
+    "BENCH FAIL Journey/dest=2/low-tau=1E-05: 1.932861E-006 <= 1.000000E-008 relative position ",
+    "BENCH FAIL Journey/dest=3/low-tau=1E-08: 1.000000E+000 <= 1.000000E-008 relative position ",
+    "BENCH FAIL Journey/dest=3/low-tau=1E-05: 1.932861E-006 <= 1.000000E-008 relative position "
+  ],
+  "gpu-editor-1.log": [
+    "BENCH FAIL a=0/theta=1/r=12/reference-unresolved: 8.333333E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0/theta=1/r=48/reference-unresolved: 8.333333E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0/theta=30/r=12/reference-unresolved: 4.166667E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0/theta=30/r=48/reference-unresolved: 4.166667E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0/theta=60/r=12/reference-unresolved: 4.166667E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0/theta=60/r=48/reference-unresolved: 4.166667E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0/theta=89/r=12/reference-unresolved: 4.166667E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0/theta=89/r=48/reference-unresolved: 4.166667E-002 <= 2.000000E-002 fraction N=96; k=.025; budget=16000",
+    "BENCH FAIL a=0.9/theta=1/r=48/Balanced/escape-direction: 2.124668E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48",
+    "BENCH FAIL a=0.998/theta=1/r=48/Balanced/escape-direction: 2.400282E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48"
+  ],
+  "gpu-editor-6.log": [
+    "BENCH FAIL a=0.9/theta=1/r=12/independent-direction: 2.375857E-002 <= 2.000000E-002 unit-vector distance ",
+    "BENCH FAIL a=0.9/theta=1/r=12/Fast/escape-direction: 2.600244E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48; worst b=0.0046599407742031994,q=23.807809338036609,polarSign=1,criticalOffset=0.010000000000000007; sky=RGBA(-0.062, 0.195, -0.979, 410.967); ref=RGBA(-0.036, 0.195, -0.980, 402.028)",
+    "BENCH FAIL a=0.9/theta=1/r=12/Balanced/escape-direction: 2.584129E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48; worst b=-0.0037866108336602079,q=23.84286105170127,polarSign=1,criticalOffset=0.010000000000000007; sky=RGBA(0.034, 0.197, -0.980, 430.067); ref=RGBA(0.060, 0.198, -0.978, 400.860)",
+    "BENCH FAIL a=0.9/theta=1/r=12/Sharp/escape-direction: 2.430424E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48; worst b=-0.0037866108336602079,q=23.84286105170127,polarSign=1,criticalOffset=0.010000000000000007; sky=RGBA(0.036, 0.198, -0.980, 424.311); ref=RGBA(0.060, 0.198, -0.978, 400.860)",
+    "BENCH FAIL a=0.9/theta=1/r=48/independent-direction: 2.309317E-002 <= 2.000000E-002 unit-vector distance ",
+    "BENCH FAIL a=0.9/theta=1/r=48/Sharp/escape-direction: 4.948142E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48; worst b=-0.0037528687569246214,q=23.419831993594467,polarSign=1,criticalOffset=0.00099999999999989; sky=RGBA(0.859, -0.304, 0.411, 416.180); ref=RGBA(0.837, -0.304, 0.455, 402.105)",
+    "BENCH FAIL a=0.9/theta=30/r=48/Sharp/escape-direction: 2.320398E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=47; worst b=0.015067668019509924,q=23.342189284341003,polarSign=1,criticalOffset=0.00099999999999989; sky=RGBA(0.902, 0.196, 0.384, 418.364); ref=RGBA(0.893, 0.196, 0.405, 403.084)",
+    "BENCH FAIL a=0.998/theta=1/r=12/Sharp/escape-direction: 2.459550E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48; worst b=0.00479696944816205,q=22.358525246988815,polarSign=1,criticalOffset=0.00099999999999989; sky=RGBA(0.937, -0.088, -0.339, 421.826); ref=RGBA(0.945, -0.087, -0.315, 402.200)",
+    "BENCH FAIL a=0.998/theta=1/r=48/independent-direction: 2.475106E-002 <= 2.000000E-002 unit-vector distance ",
+    "BENCH FAIL a=0.998/theta=1/r=48/Balanced/escape-direction: 3.166163E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48; worst b=0.00479696944816205,q=22.358525246988815,polarSign=1,criticalOffset=0.00099999999999989; sky=RGBA(0.918, 0.216, -0.333, 433.280); ref=RGBA(0.928, 0.216, -0.303, 400.116)",
+    "BENCH FAIL a=0.998/theta=1/r=48/Sharp/escape-direction: 2.541116E-002 <= 2.000000E-002 unit-vector distance resolved escape comparisons=48; worst b=0.00479696944816205,q=22.358525246988815,polarSign=1,criticalOffset=0.00099999999999989; sky=RGBA(0.920, 0.216, -0.327, 402.909); ref=RGBA(0.928, 0.216, -0.303, 400.116)",
+    "BENCH FAIL a=0.998/theta=60/r=48/independent-direction: 7.087284E-002 <= 2.000000E-002 unit-vector distance ",
+    "BENCH FAIL a=0.998/theta=89/r=48/independent-direction: 1.668753E-001 <= 2.000000E-002 unit-vector distance "
+  ],
+  "gpu-editor-7.log": [
+    "BENCH FAIL a=0.998/theta=60/r=48/independent-direction: 6.706853E-002 <= 2.000000E-002 unit-vector distance ",
+    "BENCH FAIL a=0.998/theta=89/r=48/independent-direction: 1.651526E-001 <= 2.000000E-002 unit-vector distance "
+  ],
+  "pursuit-editor-1.log": [
+    "PURSUIT   G6 S4r: h 1: catch 5688/5609 s; climb entries 248 <= 10; hold 30314 s, h 5: catch 5275/5609 s; climb entries 70 <= 10; hold 30730 s: FAIL"
+  ]
+}

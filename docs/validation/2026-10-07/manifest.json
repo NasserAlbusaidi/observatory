@@ -1,0 +1,70 @@
+{
+  "testedCommit": "57954edbb5bbfd962308ca17f30c87e0d07cbd29",
+  "platform": "Windows 11, Unity 6000.6.4f1, Direct3D11, RTX 4080, Ryzen 9 7900X",
+  "nativeHashes": {
+    "FogOfWar.exe": "91a36fa14dd3ccf390b99720805eda0553da1ca1108381b49c98c938f69dc256",
+    "FogOfWar_Data/Managed/Assembly-CSharp.dll": "6b8a46a2052a6ee59168df2432ec89558f8fafddd364d3aa0d0485c957ae1f6f",
+    "FogOfWar_Data/resources.assets": "f1f512c2465bdf5e8f585eb1f2acfaa3c6c3d35c7358f4545cdaa23652549b47"
+  },
+  "secondWorktree": "spacesim-parallel-qa/SpaceSim",
+  "parallelBinaries": "same tested build in distinct worktree paths; hard-linked read-only game files",
+  "sourceMutation": "25 days only in separate Lookback25 build; restored 30 before accepted checks/build",
+  "playerSaveUnchanged": true,
+  "concurrentIntervals": {
+    "career-a": {
+      "createdUnix": 1791350389.3281367,
+      "lastWriteUnix": 1791350525.9847386
+    },
+    "career-b": {
+      "createdUnix": 1791350389.3393412,
+      "lastWriteUnix": 1791350524.5277302
+    },
+    "unity-build": {
+      "createdUnix": 1791350388.2295585,
+      "lastWriteUnix": 1791350402.6389427
+    }
+  },
+  "sha256": {
+    "bhshots.txt": "5e1dc47dcb7c3adedd9de2a8100f2bda19d6866e5b6d53c095dc06484bca26aa",
+    "career-comparison.json": "760e1bbfe7ab44c78030161e0099e0530e2722b497fc8a912544519f8b7a0986",
+    "career-final-a.txt": "5f058e2123f141cea857094f3475b10228c0d5bebfeb274d808fda82f6ef4d97",
+    "career-final-b.txt": "62dd917f07c1927b6c6658bdbef5ea8ab6a5bb2d9dfa22984d2c7d6d2d09053d",
+    "career-pre-split.txt": "022f1af241989b28e2b930b44048ca24f60b40c0f20813682119db077c4aed54",
+    "career-split-source.json": "734dd26d2cf10561514aec38aaea4a480fd31964c16896b6a5dda461a5174afa",
+    "current-horizons-comparison.json": "592d749360f23206f97f68042447230be690d1440edfbf58d0a8c75aee897f11",
+    "development-failures.json": "498b20db5ee0ff89e3cd6677a526171d11b59b4eb3c530d21ee672ab532d8c57",
+    "gpu-benchmarks.json": "a6c7c6cb2cb391dc56420c237644b774735984d00c10d700a32589c86f3a85c5",
+    "image-comparison.json": "a7fdb961f0bdbca8ee6238a82e41c3bf218a8e956c5824f6e20ba60e306afee8",
+    "issue-regressions.txt": "1d8fcbaac9099eb6abf95ba321bb48082bb8861a2595e9ef7bf1cabc093664d3",
+    "physics-benchmarks.json": "bfdb9da0de08dfd0c3cabc6834f24d38754e7e4f5eb92a36374d688169374b8c",
+    "provenance-ui.txt": "6d2b3ef47415311ee0c9ef628db83d165eca110fa80ebd3e5229cae3250d445a",
+    "pursuit-check-table.txt": "1706f2415478a8ebc2142182bfbefbdb2bb7ed51ff6b35c837030124dda5a9e6",
+    "pursuit-focused.json": "9683af67c909683bd032e2fe3dd202fe0fd27eb7671a6375608af3ec61aee2da",
+    "reference-development-comparison.json": "d4224448ea4a52babbbf6d37d137a30e9b99f505428c0b5b601ea11f1dbb805b",
+    "render-before-horizon-fix.json": "4edc9de5dee90bda3b0748986c054e3047b996040057179cce26785392c3a5d8",
+    "snapshot-ui.txt": "7aab17b9ef2da7747cfc30a47c204bcc4a7fe3438d9f719f9ea3f0d4f881d136",
+    "traffic-mutation25-final.txt": "ab9739cae641cecc0d4593b48cf23541640178607a77309375e4cce082824d10",
+    "images/1920x1080-06b-provenance-estimated.png": "428e05bc08dc262b1c69c13f4acc6b2b5d7e0df771c37be07cfcaa7cda55acf3",
+    "images/1920x1080-06b-provenance-fallback.png": "423cdffb322a7402601d5fd80f13345c2692d096549cffe684700bfbbd73b9b2",
+    "images/1920x1080-06b-provenance-fitted.png": "95423e5d02645af9cb1c75de9b91864e57959fad31f03235bab4c0ad0afeffce",
+    "images/1920x1080-06b-provenance-giant.png": "a1d1f4f88bb210fbeaf4c992f26d137312a79ce365c50cd868e27a36f2ec0bc6",
+    "images/1920x1080-06b-provenance-mean-moon.png": "49b139b00c15b5ef5e036d098d89034cf5143af187dddc0c782a048920230592",
+    "images/bh-edge-on-full.png": "2a4d504fbe1bdff4e52faced942a5798961bb2635d62f3e82336f0202b08fce6",
+    "images/bh-edge-on-reasons.png": "da636b4bbe69d601efac0635c7dcac71f1e135072ae06dfc97d66007aaece70c",
+    "images/bh-edge-on-reference.png": "cc728480f083ec32ae4f01ff636d3cce048eb18af2b4e78597d5b243c16a8f91",
+    "images/bh-edge-on.png": "df52302982a61ba884e1d0e59d1e31c25f14e2f016065f37cc201ade4730faba",
+    "images/bh-hotspot-full.png": "91fea6a2cb9c118adfee0224f92eb4f69112d7f1286ba5672ae9224ad743408d",
+    "images/bh-hotspot-reasons.png": "02bf72dfd634afc0b54a841dd972451bad7573835c20f36413d27fbfe4ab9979",
+    "images/bh-hotspot-reference.png": "5c0f160efd36e4c9dbe8a1323f1621f7f77d8b772b2ec82ae8d4b2575d73a856",
+    "images/bh-hotspot.png": "2953a726e975373f20f6aad81cf8dbc6f9bbf82db3491f767fb8c80fa2b1f5bc",
+    "images/bh-kerr-0.998-guides-full.png": "5bed007ab767c3b51b3218c10ce435060cf3db3affc61cc63a94d220074eadb3",
+    "images/bh-kerr-0.998-guides-reasons.png": "c6fc96a31943217fa20ffc37a9d788682f3b6112ac8b7a17081d7c5c8d285f7b",
+    "images/bh-kerr-0.998-guides-reference.png": "acd8fd6c787bd03521d11bb71241395127494349642a8bff5aacbe4d14105883",
+    "images/bh-kerr-0.998-guides.png": "2bdc33c2aaac957c2a0eaf2e2a68d7a66fb86bf240d101c9906d62583c352f10",
+    "images/bh-polar-full.png": "d5ec921758e6b666c0956462ead11a434518d1ccc6c6744d9c7f6dc3baa9ccb9",
+    "images/bh-polar-reasons.png": "aeb3c0bb774090d9e3717975cf6b6c7425a4af54b590040d380aa9ffdb76272e",
+    "images/bh-polar-reference.png": "2d28f7c03e9a9a785b2e4718507d5ba7b064571801cc3d4f44891b6c6c0bcf68",
+    "images/bh-polar.png": "af523c0bf175b5130d9f9815ea94c14ecf431a14da09959b940bc797ef945062",
+    "images/snapshot-time-hud.png": "a806fee4427f275606b3074baf8af4b592fb2915498ba3e0a68a43d5ae1a9c79"
+  }
+}
