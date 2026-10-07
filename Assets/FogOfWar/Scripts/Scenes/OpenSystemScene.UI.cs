@@ -83,22 +83,33 @@ namespace FogOfWar
         // #27: velocity holds, the speed readout and the approach aid measure against the orbit (the dominant body) or
         // the target. Switching needs a target; losing the target falls back to the orbit.
         void ToggleVelRef() => ship.VelRef = ship.VelRef == null && ship.Target != null ? ship.Target : null;
-        // Shared with the arrival notice: this is the existing atmospheric arrival boundary.
+        // Atmospheric arrival boundary; the readout also uses this altitude band on airless bodies.
         bool InArrivalBoundary(Body b) => b != null && Ship.HasAtmosphere(b) &&
             (ship.Pos - sys.Pos(b, jd)).Mag - b.Radius < Math.Max(300, b.Radius * 0.1);
-        bool SurfaceRef(Body b) => b != null && (ship.Landed == b || (ship.Landed == null && InArrivalBoundary(b)));
-        internal D3 RefVel(Body b) => SurfaceRef(b) ? Ship.SurfaceVelocity(sys, b, ship.Pos - sys.Pos(b, jd), jd) : sys.Vel(b, jd);
-        internal string RefName(Body b) => b.Name + (SurfaceRef(b) ? " surface" : "");
+        // Craft proxies have paths (including traffic and raiders), never a turning surface.
+        bool NearSurface(Body b) => b != null && b != sys.Sun && !Career.IsCraft(b) && !Traffic.Is(b) &&
+            (ship.Pos - sys.Pos(b, jd)).Mag - b.Radius < Math.Max(300, b.Radius * 0.1);
+        bool SurfaceRef(Body b) => b != null && (ship.Landed == b || (ship.Landed == null && NearSurface(b)));
+        internal D3 RefVel(Body b) => b != null && ship.Landed == b ? ship.Vel :
+            SurfaceRef(b) ? Ship.SurfaceVelocity(sys, b, ship.Pos - sys.Pos(b, jd), jd) : sys.Vel(b, jd);
+        internal string RefName(Body b) => b.Name + (SurfaceRef(b) ? (Ship.Giant(b) ? " cloud tops" : " surface") : "");
 
         // Deterministic equatorial fixture shared by the career checks and UI captures.
-        internal void TestSurfaceReadout(double altitude, bool landed)
+        internal void TestSurfaceReadout(double altitude, bool landed, string bodyName = "Earth")
         {
-            reference = sys.Earth; ship.VelRef = null; ship.Target = sys.Moon;
-            ship.Landed = landed ? sys.Earth : null; ship.Crashed = null;
-            var rel = sys.Earth.FromFixed(new D3(sys.Earth.Radius + altitude, 0, 0), jd);
-            ship.Pos = sys.Pos(sys.Earth, jd) + rel;
-            ship.Vel = Ship.SurfaceVelocity(sys, sys.Earth, rel, jd);
+            var body = sys[bodyName];
+            reference = body; ship.VelRef = null; ship.Target = sys.Moon;
+            ship.Landed = landed ? body : null; ship.Crashed = null;
+            var rel = body.FromFixed(new D3(body.Radius + altitude, 0, 0), jd);
+            ship.Pos = sys.Pos(body, jd) + rel;
+            ship.Vel = Ship.SurfaceVelocity(sys, body, rel, jd);
             ship.Plan = Plan.None; ship.Throttle = ship.ThrottleCmd = 0;
+        }
+
+        internal Readout TestSpeedReadout()
+        {
+            var rows = new List<Readout>(); Readouts(rows);
+            return rows.Find(row => row.label.StartsWith("Speed vs ", StringComparison.Ordinal));
         }
 
         Body VelRefBody => ship.VelRef ?? reference;
@@ -238,7 +249,7 @@ namespace FogOfWar
             GUI.color = Color.white;
         }
 
-        internal string ClassicSpeedLine => $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} / {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num((ship.Vel - RefVel(reference)).Mag, 3)} km/s VS {RefName(reference).ToUpperInvariant()}   ·   {WarpNames[warpIdx]}";
+        internal string ClassicSpeedLine => $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} g of {Fmt.Num(ship.MaxG, 1)} g   ·   {SpeedText((ship.Vel - RefVel(reference)).Mag)} vs {RefName(reference)}   ·   {WarpNames[warpIdx]}";
         internal bool TestClassicSpeedFits(out float text, out float available)
         {
             Styles();
@@ -346,7 +357,7 @@ namespace FogOfWar
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
-            list.Add(new Readout("Speed vs " + RefName(reference), Fmt.Num((ship.Vel - RefVel(reference)).Mag, 3) + " km/s"));
+            list.Add(new Readout("Speed vs " + RefName(reference), SpeedText((ship.Vel - RefVel(reference)).Mag)));
             list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
@@ -533,7 +544,7 @@ namespace FogOfWar
         // Each runner checks at report creation, independently of registration in UnattendedSuites.
         internal static void CheckUnattendedSaveKey(System.IO.TextWriter report)
         {
-            if (SaveKey == "fow-save-v1" || CareerKey == "fow-career-v1")
+            if (SaveKey == "fow-save-v1" || SaveKey == "fow-career-v1")
                 report.WriteLine("ERROR unattended suite is using the player's save key");
         }
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
