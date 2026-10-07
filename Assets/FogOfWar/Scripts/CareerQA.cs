@@ -198,6 +198,7 @@ namespace FogOfWar
                     Call("TickSound", 0.0);
                     Check(Touchdowns() == clean, "a crash does not queue a successful touchdown sound");
                     // Exercise LoadGame itself with a temporary career and isolated QA save, without abandoning the live jobs.
+                    // Keep this in preflight, before the tutorial/camera are used: tutorial state, camDist and jd are not restored.
                     var player = ship; var currentCareer = career; var reference = Get<Body>("reference");
                     var state = new System.Collections.Generic.Dictionary<string, object>();
                     foreach (string field in new[] { "autosaveArmed", "autosaveDue", "autosaveNote", "homePort", "careerTicks", "warpIdx", "pivot", "camMode", "targetIdx", "wasDocked" })
@@ -238,13 +239,21 @@ namespace FogOfWar
                 s.TestSurfaceReadout(0.001, true);
                 double centre = (ship.Vel - sys.Vel(sys.Earth, jd)).Mag;
                 double shown = (ship.Vel - s.RefVel(sys.Earth)).Mag;
-                Check(shown < 0.001 && centre > 0.1 && s.RefName(sys.Earth).EndsWith(" surface"),
+                Check(shown == 0 && centre > 0.1 && s.RefName(sys.Earth).EndsWith(" surface"),
                     $"landed equatorial Earth speed {shown:F6} km/s (centre {centre:F6}), label {s.RefName(sys.Earth)}");
+                var row = s.TestSpeedReadout();
+                Check(s.ClassicSpeedLine.Contains("0 m/s vs Earth surface") && !s.ClassicSpeedLine.Contains("10^")
+                    && row.label == "Speed vs Earth surface" && row.value == "0 m/s" && !row.value.Contains("10^"),
+                    $"landed text: {s.ClassicSpeedLine}; {row.label} {row.value}");
                 Check((s.RefVel(sys.Moon) - sys.Vel(sys.Moon, jd)).Mag < 1e-12 && !s.RefName(sys.Moon).EndsWith(" surface"),
                     "a different reference keeps its centre velocity while landed on Earth");
                 s.TestSurfaceReadout(50, false);
                 Check((ship.Vel - s.RefVel(sys.Earth)).Mag < 0.001 && s.RefName(sys.Earth).EndsWith(" surface"),
                     "near-surface arrival uses the surface frame before touchdown (50 km above Earth)");
+                ship.Vel = s.RefVel(sys.Earth) + new D3(0.0001, 0, 0);
+                row = s.TestSpeedReadout();
+                Check(row.value == "0.1 m/s" && s.ClassicSpeedLine.Contains("0.1 m/s vs Earth surface")
+                    && !s.ClassicSpeedLine.Contains("10^"), "slow descent reads 0.1 m/s in the classic line and data row");
                 double altitude = Math.Max(300, sys.Earth.Radius * 0.1) + 100;
                 s.TestSurfaceReadout(altitude, false);
                 ship.Vel = sys.Vel(sys.Earth, jd) + sys.Earth.FromFixed(new D3(0, Math.Sqrt(sys.Earth.GM / (sys.Earth.Radius + altitude)), 0), jd);
@@ -252,6 +261,30 @@ namespace FogOfWar
                 centre = (ship.Vel - sys.Vel(sys.Earth, jd)).Mag;
                 Check(Math.Abs(shown - centre) < 1e-12 && !s.RefName(sys.Earth).EndsWith(" surface"),
                     $"parking orbit at {altitude:F1} km reads centre speed {shown:F6} km/s, label {s.RefName(sys.Earth)}");
+                foreach (string name in new[] { "Moon", "Ceres", "Vesta", "Pallas", "Mercury" })
+                {
+                    var body = sys[name]; double boundary = Math.Max(300, body.Radius * 0.1);
+                    s.TestSurfaceReadout(boundary - 0.001, false, name);
+                    Check(s.RefName(body) == name + " surface" && (ship.Vel - s.RefVel(body)).Mag < 1e-8
+                        && !(bool)s.GetType().GetMethod("InArrivalBoundary", F).Invoke(s, new object[] { body }), name + " uses the near-surface frame without an atmospheric arrival notice");
+                    s.TestSurfaceReadout(boundary + 0.001, false, name);
+                    Check(s.RefName(body) == name && (s.RefVel(body) - sys.Vel(body, jd)).Mag == 0,
+                        name + " switches back to the centre frame above the altitude boundary");
+                    double parking = Ship.Standoff(body) - body.Radius;
+                    s.TestSurfaceReadout(parking, false, name);
+                    Check(parking > boundary && s.RefName(body) == name,
+                        $"{name} switch altitude {boundary:F3} km, Ship.Standoff radius {Ship.Standoff(body):F3} km, parking altitude {parking:F3} km");
+                }
+                s.TestSurfaceReadout(50, true, "Jupiter");
+                row = s.TestSpeedReadout();
+                Check(s.RefName(sys["Jupiter"]) == "Jupiter cloud tops" && row.label == "Speed vs Jupiter cloud tops"
+                    && row.value == "0 m/s" && s.ClassicSpeedLine.Contains("0 m/s vs Jupiter cloud tops"),
+                    "giant cloud-top hold reads 0 m/s and names cloud tops in both text readouts");
+                s.TestSurfaceReadout(50, false, "Sun");
+                Check(s.RefName(sys.Sun) == "Sun", "the Sun never uses a surface readout frame");
+                var proxy = new Body { Name = "readout craft probe", Parent = sys.Sun, Radius = 0.05, Path = _ => ship.Pos };
+                Check(s.RefName(proxy) == proxy.Name && (s.RefVel(proxy) - sys.Vel(proxy, jd)).Mag == 0,
+                    "a craft path proxy never uses a surface readout frame");
             }
             finally { Put("ship", player); Put("reference", reference); }
         }

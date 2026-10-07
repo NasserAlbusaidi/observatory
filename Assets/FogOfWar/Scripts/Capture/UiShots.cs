@@ -263,32 +263,53 @@ namespace FogOfWar
                         }
                     }
                 }
-                // Surface-speed label at arrival and contact, at every capture resolution.
+                // Isolated surface/cloud-top fixtures must not award feats or docks to the scripted career.
                 if (os != null)
                 {
                     var f = BindingFlags.Instance | BindingFlags.NonPublic;
                     var shipField = typeof(OpenSystemScene).GetField("ship", f);
                     var refField = typeof(OpenSystemScene).GetField("reference", f);
-                    var player = shipField.GetValue(os); var reference = refField.GetValue(os);
-                    double stop = os.QaStopJd;
+                    var careerField = typeof(OpenSystemScene).GetField("career", f);
+                    var player = shipField.GetValue(os); var reference = refField.GetValue(os); var career = careerField.GetValue(os);
+                    var sys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", f).GetValue(os);
+                    var setCam = typeof(OpenSystemScene).GetMethod("SetCam", f);
+                    var pitch = typeof(OpenSystemScene).GetField("lookPitch", f);
+                    object oldCam = typeof(OpenSystemScene).GetField("camMode", f).GetValue(os), oldPitch = pitch.GetValue(os);
+                    double stop = os.QaStopJd; bool console = os.TestConsoleOpen;
                     try
                     {
-                        shipField.SetValue(os, new OpenWorld.Ship());
+                        var fixture = new OpenWorld.Ship();
+                        shipField.SetValue(os, fixture);
+                        careerField.SetValue(os, new OpenWorld.Career { Sys = sys });
                         os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", f).GetValue(os);
-                        foreach (bool landed in new[] { false, true })
+                        foreach (var c in SurfaceCases)
                         {
-                            os.TestSurfaceReadout(landed ? 0.001 : 50, landed);
-                            string shot = landed ? "06v-surface-landed" : "06u-surface-arrival";
-                            yield return Shot(app, shell, camRT, uiRT, tag, shot);
+                            os.TestSurfaceReadout(c.altitude, c.landed, c.body);
+                            if (c.body == "Ceres") fixture.Vel += new OpenWorld.D3(0.0001, 0, 0);
+                            os.ShowConsoleTab(4);
+                            yield return Shot(app, shell, camRT, uiRT, tag, c.shot);
+                            CheckSurfaceText(os, c.frame, c.speed, c.shot);
                             var label = (UnityEngine.UIElements.Label)typeof(OpenSystemScene).GetField("spdRef", f).GetValue(os);
+                            var value = (UnityEngine.UIElements.Label)typeof(OpenSystemScene).GetField("spdVal", f).GetValue(os);
                             var measured = label.MeasureTextSize(label.text, 0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined,
                                 0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined);
                             bool fits = measured.x <= label.contentRect.width + 1;
-                            log.WriteLine($"    {shot}: {label.text}, text {measured.x:F1} px / {label.contentRect.width:F1} px");
-                            if (!fits || !label.text.Contains("EARTH SURFACE")) { errors++; log.WriteLine($"    ERROR {shot}: surface label missing or clipped"); }
+                            log.WriteLine($"    {c.shot}: HUD {value.text} {label.text}, text {measured.x:F1} px / {label.contentRect.width:F1} px");
+                            if (!fits || label.text != "M/S VS " + c.frame.ToUpperInvariant() || value.text + " m/s" != c.speed)
+                            { errors++; log.WriteLine($"    ERROR {c.shot}: surface speed/label wrong or clipped"); }
+                            typeof(OpenSystemScene).GetMethod("SetConsole", f).Invoke(os, new object[] { false });
+                            setCam.Invoke(os, new object[] { 2 }); pitch.SetValue(os, 22f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, c.shot + "-mfd");
+                            CheckMfdSurfaceText(os, c.frame, c.speed, c.shot);
+                            setCam.Invoke(os, new object[] { 0 }); pitch.SetValue(os, oldPitch);
                         }
                     }
-                    finally { shipField.SetValue(os, player); refField.SetValue(os, reference); os.QaStopJd = stop; }
+                    finally
+                    {
+                        shipField.SetValue(os, player); refField.SetValue(os, reference); careerField.SetValue(os, career); os.QaStopJd = stop;
+                        setCam.Invoke(os, new[] { oldCam }); pitch.SetValue(os, oldPitch);
+                        typeof(OpenSystemScene).GetMethod("SetConsole", f).Invoke(os, new object[] { console });
+                    }
                 }
 
                 // the full-screen Jobs and Codex pages
@@ -510,6 +531,42 @@ namespace FogOfWar
             f?.SetValue(app, v);
         }
 
+        static readonly (string body, double altitude, bool landed, string shot, string frame, string speed)[] SurfaceCases =
+        {
+            ("Earth", 50, false, "06u-surface-arrival", "Earth surface", "0 m/s"),
+            ("Earth", 0.001, true, "06v-surface-landed", "Earth surface", "0 m/s"),
+            ("Jupiter", 0.001, true, "06w-cloud-top-hold", "Jupiter cloud tops", "0 m/s"),
+            ("Ceres", 1, false, "06x-airless-near-surface", "Ceres surface", "0.1 m/s"),
+        };
+
+        void CheckSurfaceText(OpenSystemScene os, string frame, string speed, string tag)
+        {
+            var row = os.TestSpeedReadout(); string line = os.ClassicSpeedLine;
+            log.WriteLine($"    {tag}: {line}; DATA {row.label} {row.value}");
+            if (!line.Contains(speed + " vs " + frame) || line.Contains("10^")
+                || row.label != "Speed vs " + frame || row.value != speed || row.value.Contains("10^"))
+            { errors++; log.WriteLine($"    ERROR {tag}: classic/data speed must read {speed} vs {frame}, without scientific notation"); }
+        }
+
+        void CheckMfdSurfaceText(OpenSystemScene os, string frame, string speed, string tag)
+        {
+            var f = BindingFlags.Instance | BindingFlags.NonPublic;
+            var cockpit = (Cockpit.CockpitView)typeof(OpenSystemScene).GetField("cockpit", f).GetValue(os);
+            var rows = (System.Collections.Generic.List<(UnityEngine.UIElements.Label k, UnityEngine.UIElements.Label v)>[])
+                typeof(Cockpit.CockpitMfd).GetField("rows", f).GetValue(cockpit.Mfd);
+            for (int screen = 0; screen < 2; screen++)
+            {
+                var row = rows[screen].Find(r => r.k.text == "Speed");
+                if (row.k == null) { errors++; log.WriteLine($"    ERROR {tag}: MFD {screen + 1} missing Speed row"); continue; }
+                float Width(UnityEngine.UIElements.Label label) => label.MeasureTextSize(label.text, 0,
+                    UnityEngine.UIElements.VisualElement.MeasureMode.Undefined, 0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined).x;
+                float width = Width(row.k) + Width(row.v), available = row.k.parent.contentRect.width;
+                log.WriteLine($"    {tag}: MFD {screen + 1} {row.v.text}, text {width:F1} px / {available:F1} px");
+                if (row.v.text != speed + " vs " + frame || width > available + 1)
+                { errors++; log.WriteLine($"    ERROR {tag}: MFD {screen + 1} speed/frame wrong or clipped"); }
+            }
+        }
+
         // IMGUI needs a visible player render loop; this optional path captures the classic shell directly.
         IEnumerator ClassicShots(FogOfWarApp app)
         {
@@ -522,20 +579,30 @@ namespace FogOfWar
                 app.NewGame();
                 yield return Wait(1);
                 var os = (OpenSystemScene)app.Current;
-                os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(os);
-                foreach (bool landed in new[] { false, true })
+                var f = BindingFlags.Instance | BindingFlags.NonPublic;
+                os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", f).GetValue(os);
+                var setCam = typeof(OpenSystemScene).GetMethod("SetCam", f);
+                var pitch = typeof(OpenSystemScene).GetField("lookPitch", f);
+                foreach (var c in SurfaceCases)
                 {
-                    os.TestSurfaceReadout(landed ? 0.001 : 50, landed);
-                    yield return Wait(0.6f);
-                    yield return new WaitForEndOfFrame();
-                    string tag = $"{size.x}x{size.y}-classic-surface-{(landed ? "landed" : "arrival")}";
-                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
-                    File.WriteAllBytes(Path.Combine(dir, tag + ".png"), tex.EncodeToPNG());
-                    bool fits = os.TestClassicSpeedFits(out float text, out float available);
-                    bool sized = tex.width == size.x && tex.height == size.y;
-                    log.WriteLine($"  {tag}: {os.ClassicSpeedLine}; text {text:F1} / {available:F1}, captured {tex.width}x{tex.height}");
-                    if (!fits || !sized) { errors++; log.WriteLine($"    ERROR {tag}: status line clipped or capture size changed"); }
-                    Destroy(tex);
+                    os.TestSurfaceReadout(c.altitude, c.landed, c.body);
+                    if (c.body == "Ceres") ((OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", f).GetValue(os)).Vel += new OpenWorld.D3(0.0001, 0, 0);
+                    foreach (bool mfd in new[] { false, true })
+                    {
+                        setCam.Invoke(os, new object[] { mfd ? 2 : 0 }); pitch.SetValue(os, mfd ? 22f : 0f);
+                        yield return Wait(0.6f);
+                        yield return new WaitForEndOfFrame();
+                        string tag = $"{size.x}x{size.y}-classic-{c.shot.Substring(4)}" + (mfd ? "-mfd" : "");
+                        var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                        File.WriteAllBytes(Path.Combine(dir, tag + ".png"), tex.EncodeToPNG());
+                        bool fits = os.TestClassicSpeedFits(out float text, out float available);
+                        bool sized = tex.width == size.x && tex.height == size.y;
+                        log.WriteLine($"  {tag}: text {text:F1} / {available:F1}, captured {tex.width}x{tex.height}");
+                        if (!fits || !sized) { errors++; log.WriteLine($"    ERROR {tag}: status line clipped or capture size changed"); }
+                        CheckSurfaceText(os, c.frame, c.speed, tag);
+                        if (mfd) CheckMfdSurfaceText(os, c.frame, c.speed, tag);
+                        Destroy(tex);
+                    }
                 }
             }
             GameSettings.ClassicPanel = classicWas;
