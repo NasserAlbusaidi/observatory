@@ -202,6 +202,31 @@ namespace FogOfWar
             }
         }
 
+        void CoastStateChecks()
+        {
+            var sun = new Body { Name = "Sun", Look = Look.Sun };
+            var testSys = new SolarSystem { Sun = sun }; testSys.Bodies.Add(sun);
+            var target = new Body { Name = "Derelict aim probe", Parent = sun, Radius = 0.05,
+                Path = _ => new D3(10000, 0, 0), PathAccel = _ => D3.Zero };
+            var probe = new Ship { Pos = new D3(11000, 0, 0), Vel = new D3(1, 0, 0), Target = target,
+                Plan = Plan.MatchVelocity, UnlimitedFuel = true, Att = Quaternion.LookRotation(Frame.U(new D3(1, 0, 0))) };
+            probe.RecheckPlan(testSys, jd, sun);
+            Check(probe.Throttle == 0 && probe.Phase == "turning", "coast wake-up waits for the 3 degree drive aim gate");
+            probe.Att = Quaternion.LookRotation(Frame.U(new D3(-1, 0, 0)));
+            probe.RecheckPlan(testSys, jd, sun);
+            Check(probe.Throttle > 0, "coast wake-up permits an aligned drive command");
+            probe.BurnSeconds = 12; probe.CruiseSeconds = 34;
+            var saved = JsonUtility.FromJson<Ship.SaveData>(JsonUtility.ToJson(probe.ToSave(jd, 0)));
+            probe.BurnSeconds = 100; probe.CruiseSeconds = 200;
+            probe.FromSave(saved, testSys);
+            Check(probe.BurnSeconds == 12 && probe.CruiseSeconds == 34, "save round-trip restores burn and cruise time");
+            saved.burnSeconds = saved.cruiseSeconds = 0;
+            probe.FromSave(saved, testSys); probe.Phase = "game loaded";
+            var codex = new Codex(); codex.CheckFeats(new Career(), probe);
+            Check(probe.BurnSeconds == 0 && probe.CruiseSeconds == 0 && !codex.Has("coast"),
+                "loading a pre-cruise save cannot grant the coast feat from a later timeline");
+        }
+
         IEnumerator Start()
         {
             Directory.CreateDirectory(dir);
@@ -218,6 +243,22 @@ namespace FogOfWar
             { yield return TrafficChecks(); Finish(); yield break; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
             TouchdownSoundChecks();
+            CoastStateChecks();
+            var keyPolicy = typeof(OpenSystemScene).GetMethod("SaveKeyFor", BindingFlags.Static | BindingFlags.NonPublic);
+            string Key(string[] args, string path) => (string)keyPolicy.Invoke(null, new object[] { args, path });
+            Check(SaveKey != "fow-save-v1" && SaveKey != "fow-career-v1", "unattended career never uses the player's save key");
+            var suiteKeys = new System.Collections.Generic.HashSet<string>();
+            foreach (string flag in new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" })
+            {
+                string key = Key(new[] { flag }, Application.dataPath);
+                Check(key.StartsWith("fow-save-qa-", StringComparison.Ordinal) && suiteKeys.Add(key)
+                    && key == Key(new[] { flag }, Application.dataPath)
+                    && key != Key(new[] { flag }, Application.dataPath + "-other"),
+                    flag + " reuses a bounded isolated save key per build and suite");
+            }
+            Check(Key(Array.Empty<string>(), Application.dataPath) == "fow-save-v1"
+                && Key(new[] { "-fowcareer", "-fowsavekey", "fow-save-job3" }, Application.dataPath) == "fow-save-job3",
+                "normal play keeps its key and an explicit save key wins");
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
             Check(!ship.UnlimitedFuel && Math.Abs(ship.Fuel - 200) < 1e-6, "tank full, reaction mass is limited");
@@ -416,9 +457,16 @@ namespace FogOfWar
                 Put("warpIdx", 6);
                 float t0 = Time.realtimeSinceStartup;
                 double jd0 = jd;
-                yield return Fly(() => career.Call != null, 6, 30);
+                int callWarp = -1;
+                // Capture at arrival, before Fly restores warp. A missing production DropWarp must fail this check.
+                yield return Fly(() =>
+                {
+                    if (career.Call == null) return false;
+                    callWarp = Get<int>("warpIdx");
+                    return true;
+                }, 6, 30);
                 yield return null;
-                Check(career.Call != null && Get<int>("warpIdx") == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, warp {Get<int>("warpIdx")}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
+                Check(career.Call != null && callWarp == 0, $"in flight a call comes in and drops the warp ({career.Call?.Title ?? "none"} after {Time.realtimeSinceStartup - t0:F1} s; plan {ship.PlanActive} {ship.Phase}, docked {career.Docked?.Name ?? "-"}, landed {ship.Landed?.Name ?? "-"}, target {ship.Target?.Name ?? "-"}, arrival warp {callWarp}, jd +{(jd - jd0) * 24:F1} h, active {career.Active.Count})");
                 yield return Shot("c05c-route-call");
                 career.RouteEvents = false;
                 career.Answer(false, jd);
