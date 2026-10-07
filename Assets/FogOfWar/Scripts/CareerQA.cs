@@ -198,6 +198,9 @@ namespace FogOfWar
             app.Restart(app.GameIndex);
             yield return Frames(1.5f);
             s = (OpenSystemScene)app.Current;
+            log.WriteLine($"fixture epoch {Epoch:R} TDB; save key {SaveKey}; Unity {Application.unityVersion}");
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcareertraffic") >= 0)
+            { yield return TrafficChecks(); Finish(); yield break; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
             CoastStateChecks();
             var keyPolicy = typeof(OpenSystemScene).GetMethod("SaveKeyFor", BindingFlags.Static | BindingFlags.NonPublic);

@@ -37,7 +37,7 @@ namespace FogOfWar
         IEnumerator TrafficChecks()
         {
             var qs = SolarSystem.Build(); // a system of its own, so the checks add no ships to the scene's
-            double j0 = jd;
+            double j0 = Epoch;
             long day0 = (long)Math.Floor(j0);
 
             string Trips(Traffic tr)
@@ -57,7 +57,7 @@ namespace FogOfWar
             var swScan = Stopwatch.StartNew();
             for (long d = day0; d < day0 + 20 * 366; d += 7)
                 foreach (var t in scan.Day(d))
-                    if (longest == null || t.Arr - t.Dep > longest.Arr - longest.Dep) longest = t;
+                    if ((longest == null || t.Arr - t.Dep > longest.Arr - longest.Dep) && scan.Ready(t)) longest = t;
             Check(longest != null && longest.Arr - longest.Dep < Traffic.LookbackDays,
                 $"traffic: the longest trip in 20 years ({longest?.From.Name} > {longest?.To.Name}, {longest?.Name}) takes {(longest != null ? longest.Arr - longest.Dep : 0):F1} days, inside the {Traffic.LookbackDays:0}-day lookback ({swScan.Elapsed.TotalMilliseconds:F0} ms)");
 
@@ -119,22 +119,41 @@ namespace FogOfWar
                 $"traffic: of {n} courses the cheap test passed, the full clearance test refuses {sunFail} near the Sun and {Count(missed)} through a body" + (missed.Count > 0 ? $" ({string.Join(", ", miss)})" : ""));
             stepped.Clear(); fresh.Clear();
 
-            // the scene's own traffic, after 5 s at 1M×, matches the schedule and is in the system. 5 s holds at least one
-            // whole -fowprof window (2 s) between the two marks.
+            // Reset enumerates whole departure days: a 25-day lookback can retain a nearly 26-day-old trip.
+            // Cross that day boundary before reset, then advance exactly six game hours.
+            // The independent reference enumerates 40 days directly, rather than sharing Reset's lookback bug.
+            Check(longest != null && longest.Arr - longest.Dep > 26, "traffic: fixed fixture contains a valid trip longer than 26 days");
+            if (longest == null || longest.Arr - longest.Dep <= 26) yield break;
+            double sceneStart = Math.Floor(longest.Dep) + 26.05;
+            double sceneEnd = sceneStart + 0.25;
+            Check(sceneEnd < longest.Arr, "traffic: long-trip fixture remains active throughout the six-hour scene interval");
+            if (sceneEnd >= longest.Arr) yield break;
+            Put("jd", sceneStart);
+            Call("PlaceShipNearEarth");
+            ship.Plan = Plan.None; ship.ThrottleCmd = 0;
+            s.TrafficNow?.Clear();
+            Call("TickTraffic");
+            s.QaStopJd = sceneEnd;
             Put("warpIdx", 6);
             UnityEngine.Debug.Log("CareerQA traffic: 1M× scene start");
-            float t0 = Time.realtimeSinceStartup; int sceneFrames = 0;
-            while (Time.realtimeSinceStartup - t0 < 5) { sceneFrames++; yield return null; }
+            int sceneFrames = 0;
+            while (jd < sceneEnd && sceneFrames < 10000) { sceneFrames++; yield return null; }
             UnityEngine.Debug.Log("CareerQA traffic: 1M× scene end");
             Put("warpIdx", 0);
             var live = s.TrafficNow;
+            s.QaStopJd = double.PositiveInfinity;
             var check = new Traffic(qs, 1);
-            check.Update(jd);
+            var expected = new List<string>();
+            for (long d = (long)Math.Floor(sceneEnd - 40); d <= (long)Math.Floor(sceneEnd); d++)
+                foreach (var t in check.Day(d))
+                    if (t.Dep <= sceneEnd && t.Arr > sceneEnd && check.Ready(t)) expected.Add(t.Name);
+            expected.Sort(StringComparer.Ordinal);
             bool inSys = live != null;
             if (live != null) foreach (var t in live.Flying) inSys &= t.Body != null && sys.Bodies.Contains(t.Body);
-            Check(live != null && live.Flying.Count > 0 && inSys && Names(live) == Names(check),
-                $"traffic: the scene's ships in flight after 5 s at 1M× match the schedule ({live?.Flying.Count ?? 0} ships, {(inSys ? "all" : "not all")} in the system; {sceneFrames} frames)"
-                + (live != null && Names(live) != Names(check) ? $" (scene against schedule: {Diff(live, check, jd)})" : ""));
+            Check(jd == sceneEnd && live != null && live.Flying.Count > 0 && inSys && Names(live) == string.Join(",", expected),
+                $"traffic: fixed scene {sceneStart:R} -> {sceneEnd:R} TDB matches independent schedule ({live?.Flying.Count ?? 0}/{expected.Count} ships, {(inSys ? "all" : "not all")} in the system; {sceneFrames} frames)");
+            Check(live != null && Array.IndexOf(Names(live).Split(','), longest.Name) >= 0, $"traffic: long-trip fixture {longest.Name} is still in flight after the scene reset");
+            log.WriteLine("  traffic fixture ships: " + (live != null ? Names(live) : "none"));
             check.Clear();
         }
 
