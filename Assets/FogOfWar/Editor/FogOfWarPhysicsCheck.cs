@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using FogOfWar.OpenWorld;
@@ -14,9 +15,14 @@ namespace FogOfWar.EditorTools
     {
         [Serializable] public sealed class Result
         {
-            public string id, reference, units, detail;
+            public string id, reference, units, detail, category;
             public double measured, tolerance;
             public bool pass;
+        }
+        [Serializable] public sealed class Sample
+        {
+            public string id, units, reference, detail;
+            public double measured;
         }
         [Serializable] public sealed class Source { public string path, sha256; }
         public string utc = DateTime.UtcNow.ToString("O"), commit, unity = Application.unityVersion;
@@ -24,6 +30,7 @@ namespace FogOfWar.EditorTools
         public string graphics = SystemInfo.graphicsDeviceVersion, os = SystemInfo.operatingSystem;
         public List<Source> sources = new List<Source>();
         public List<Result> checks = new List<Result>();
+        public List<Sample> diagnostics = new List<Sample>();
         public int failed;
         public BenchmarkReport(string precision)
         {
@@ -36,18 +43,24 @@ namespace FogOfWar.EditorTools
             foreach (string path in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
                 if (!path.EndsWith(".meta")) sources.Add(new Source { path = path.Replace('\\', '/'), sha256 = BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(path))).Replace("-", "").ToLowerInvariant() });
         }
-        public void Check(string id, double value, double limit, string units, string reference, string detail = "")
+        public void Check(string id, double value, double limit, string units, string reference, string detail = "", string category = "invariant-or-coverage")
         {
             bool ok = !double.IsNaN(value) && !double.IsInfinity(value) && value <= limit;
             if (!ok) failed++;
-            checks.Add(new Result { id = id, measured = value, tolerance = limit, units = units, reference = reference, detail = detail, pass = ok });
+            checks.Add(new Result { id = id, measured = value, tolerance = limit, units = units, reference = reference, detail = detail, pass = ok, category = category });
             Debug.Log($"BENCH {(ok ? "PASS" : "FAIL")} {id}: {value:E6} <= {limit:E6} {units} {detail}");
+        }
+        public void Diagnostic(string id, double value, string units, string reference, string detail = "")
+        {
+            diagnostics.Add(new Sample { id = id, measured = value, units = units, reference = reference, detail = detail });
+            Debug.Log($"BENCH DIAGNOSTIC {id}: {value:E6} {units} {detail}");
         }
         public void Save(string name)
         {
             Directory.CreateDirectory("Logs");
             File.WriteAllText("Logs/" + name + ".json", JsonUtility.ToJson(this, true) + "\n");
-            Debug.Log($"BENCH {name}: {checks.Count} checks, {failed} failed");
+            string groups = string.Join(", ", checks.GroupBy(c => c.category).Select(g => $"{g.Key}={g.Count()}"));
+            Debug.Log($"BENCH {name}: {checks.Count} checks, {failed} failed ({groups}); {diagnostics.Count} diagnostics, not gates");
         }
     }
 
@@ -62,10 +75,10 @@ namespace FogOfWar.EditorTools
             try
             {
                 report.Check("contact-clock-provenance-regressions", FogOfWarRegressionCheck.RunChecks(), 0, "failed checks",
-                    "Rodrigues rotation / analytic circular orbit; details in issue-regressions.txt");
+                    "Rodrigues rotation / analytic circular orbit; details in issue-regressions.txt", category: "invariant-or-coverage");
                 Burns(); Conics(); Gravity(); Ephemerides(); Relativity(); Journey();
             }
-            catch (Exception e) { report.Check("exception", 1, 0, "exceptions", "suite must complete", e.ToString()); }
+            catch (Exception e) { report.Check("exception", 1, 0, "exceptions", "suite must complete", e.ToString(), category: "invariant-or-coverage"); }
             report.Save("physics-benchmarks");
             if (Application.isBatchMode) EditorApplication.Exit(report.failed == 0 ? 0 : 1);
         }
@@ -91,10 +104,10 @@ namespace FogOfWar.EditorTools
                 double tb = deplete ? Ship.Ve * Math.Log(initialMass / dryMass) / spendAccel : duration;
                 D3 expected = p0 + v0 * duration + acceleration * (tb * (duration - tb / 2));
                 string id = $"burn/cargo={cargo}/rcs={rcs}/h={step}/deplete={deplete}";
-                report.Check(id + "/position", (ship.Pos - expected).Mag, 1e-6, "km", "constant acceleration then inertial coast; x=x0+v0*T+a*tb*(T-tb/2)");
-                report.Check(id + "/velocity", (ship.Vel - v0 - acceleration * tb).Mag, 1e-8, "km/s", "integrated thrust impulse a*tb");
+                report.Check(id + "/position", (ship.Pos - expected).Mag, 1e-6, "km", "constant acceleration then inertial coast; x=x0+v0*T+a*tb*(T-tb/2)", category: "independent-reference");
+                report.Check(id + "/velocity", (ship.Vel - v0 - acceleration * tb).Mag, 1e-8, "km/s", "integrated thrust impulse a*tb", category: "independent-reference");
                 double fuel = deplete ? 0 : initialMass * Math.Exp(-spendAccel * duration / Ship.Ve) - dryMass;
-                report.Check(id + "/fuel", Math.Abs(ship.Fuel - fuel), 1e-8, "tonnes", "Tsiolkovsky rocket equation; cargo included in inert mass; main/RCS exhaust costs add");
+                report.Check(id + "/fuel", Math.Abs(ship.Fuel - fuel), 1e-8, "tonnes", "Tsiolkovsky rocket equation; cargo included in inert mass; main/RCS exhaust costs add", category: "independent-reference");
             }
         }
 
@@ -124,16 +137,16 @@ namespace FogOfWar.EditorTools
                 }
                 bool ok = Rails.Propagate(new D3(rp, 0, 0), new D3(0, vperi, 0), mu, dt, out var p, out var v);
                 string id = $"conic/e={e}/anomaly={anomaly}";
-                report.Check(id + "/solve", ok ? 0 : 1, 0, "failures", "elliptic eccentric anomaly / hyperbolic anomaly closed forms");
-                report.Check(id + "/position", (p - expectedP).Mag, 0.001, "km", "Kepler ellipse/hyperbola parameterisation, no universal variables");
-                report.Check(id + "/velocity", (v - expectedV).Mag, 1e-6, "km/s", "time derivative of anomaly parameterisation");
+                report.Check(id + "/solve", ok ? 0 : 1, 0, "failures", "elliptic eccentric anomaly / hyperbolic anomaly closed forms", category: "independent-reference");
+                report.Check(id + "/position", (p - expectedP).Mag, 0.001, "km", "Kepler ellipse/hyperbola parameterisation, no universal variables", category: "independent-reference");
+                report.Check(id + "/velocity", (v - expectedV).Mag, 1e-6, "km/s", "time derivative of anomaly parameterisation", category: "independent-reference");
             }
             // Inbound half of e=.5 ellipse: crossing occurs before periapsis, then arc ends outside again.
             double eccentricity = 0.5, radius = 15000, E = 2 * Math.PI - Math.Acos((1 - radius / axis) / eccentricity);
             double rate = Math.Sqrt(mu / Math.Pow(axis, 3)), period = 2 * Math.PI / rate;
             double crossing = (E - eccentricity * Math.Sin(E) - Math.PI) / rate;
             double hit = Rails.FirstCrossing(new D3(-30000, 0, 0), new D3(0, -Math.Sqrt(mu * (1 - eccentricity) / 30000), 0), mu, radius, period);
-            report.Check("surface/first-crossing", Math.Abs(hit - crossing), 1e-4, "s", "Kepler anomaly solve for r=15000 on inbound e=.5 ellipse; end outside surface");
+            report.Check("surface/first-crossing", Math.Abs(hit - crossing), 1e-4, "s", "Kepler anomaly solve for r=15000 on inbound e=.5 ellipse; end outside surface", category: "independent-reference");
         }
 
         static Ship Integrated(SolarSystem sys, D3 p, D3 v, double duration, double step)
@@ -174,9 +187,9 @@ namespace FogOfWar.EditorTools
                 {
                     var ship = Integrated(model, p0, v0, duration, h);
                     double dp = (ship.Pos - fine.Pos).Mag, dv = (ship.Vel - fine.Vel).Mag;
-                    report.Check($"gravity/{fixture}/h={h}/position", dp, 0.25, "km", "zero-thrust production Ship.Step; same forces; reference h=.25s at same TDB endpoint", $"duration={duration}s");
-                    report.Check($"gravity/{fixture}/h={h}/velocity", dv, 0.0003, "km/s", "same-force step refinement");
-                    report.Check($"gravity/{fixture}/h={h}/convergence", dp <= previous + 1e-5 ? 0 : 1, 0, "nonconvergent refinements", "position error must fall on step halving (10 mm roundoff floor)");
+                    report.Check($"gravity/{fixture}/h={h}/position", dp, 0.25, "km", "zero-thrust production Ship.Step; same forces; reference h=.25s at same TDB endpoint", $"duration={duration}s", category: "self-convergence");
+                    report.Check($"gravity/{fixture}/h={h}/velocity", dv, 0.0003, "km/s", "same-force step refinement", category: "self-convergence");
+                    report.Check($"gravity/{fixture}/h={h}/convergence", dp <= previous + 1e-5 ? 0 : 1, 0, "nonconvergent refinements", "position error must fall on step halving (10 mm roundoff floor)", category: "self-convergence");
                     previous = dp;
                 }
                 var scene = new OpenSystemScene(); var coastShip = new Ship { Pos = p0, Vel = v0 };
@@ -207,13 +220,8 @@ namespace FogOfWar.EditorTools
                 double planeAngle=Math.Acos(Math.Max(-1,Math.Min(1,D3.Dot(normalFine,normalCoast))));
                 report.Check($"gravity/{fixture}/high-warp-model-difference", difference, fixture == "isolated-sphere" ? 0.01 : 250, "km",
                     "dominant-body conic versus three-body/J2 integrator; model difference, NOT integrator accuracy",
-                    $"duration={duration}s; dominant transitions={transitions}; velocity difference={(coastShip.Vel-fine.Vel).Mag:R} km/s; osculating eccentricity difference={Math.Abs(Eccentricity(coastShip)-Eccentricity(fine)):R}; specific-energy difference={Math.Abs(Energy(coastShip)-Energy(fine)):R} km^2/s^2; orbital-plane angle={planeAngle:R} rad");
-                D3 beforeP = coastShip.Pos, beforeV = coastShip.Vel;
-                typeof(OpenSystemScene).GetField("warpIdx", Private).SetValue(scene, 0);
-                coastShip.Step(model, jd, 0, dom);
-                report.Check($"gravity/{fixture}/mode-switch-jump", (coastShip.Pos-beforeP).Mag+(coastShip.Vel-beforeV).Mag, 0, "km + km/s",
-                    "switching mode itself must preserve world state (zero elapsed time)");
-                if (fixture == "Moon-SOI-exit") report.Check("gravity/SOI-fixture-crosses-boundary", transitions > 0 ? 0 : 1, 0, "missing transitions", "fixture must actually cross a dominant-body boundary");
+                    $"duration={duration}s; dominant transitions={transitions}; velocity difference={(coastShip.Vel-fine.Vel).Mag:R} km/s; osculating eccentricity difference={Math.Abs(Eccentricity(coastShip)-Eccentricity(fine)):R}; specific-energy difference={Math.Abs(Energy(coastShip)-Energy(fine)):R} km^2/s^2; orbital-plane angle={planeAngle:R} rad", category: "model-difference");
+                if (fixture == "Moon-SOI-exit") report.Check("gravity/SOI-fixture-crosses-boundary", transitions > 0 ? 0 : 1, 0, "missing transitions", "fixture must actually cross a dominant-body boundary", category: "invariant-or-coverage");
             }
         }
 
@@ -228,14 +236,14 @@ namespace FogOfWar.EditorTools
             {
                 bool ok = sys[f.body].Cheb.Eval(f.jd, out var p);
                 report.Check($"ephemeris/{f.body}/{f.jd:R}/original-source-position", ok ? (p-new D3(f.x,f.y,f.z)).Mag : double.PositiveInfinity,
-                    2,"km","original JPL Horizons fitting inputs; raw header, source SHA256, fit SHA256 retained in fit-inputs.json");
+                    2,"km","original JPL Horizons fitting inputs; raw header, source SHA256, fit SHA256 retained in fit-inputs.json", category: "independent-reference");
             }
             var currentComparison = new List<BenchmarkReport.Result>();
             foreach (var f in fixtures.vectors)
             {
                 var body = sys[f.body]; bool ok = body.Cheb.Eval(f.jd, out var p, out var v);
                 string id = $"ephemeris/{f.body}/{f.jd:R}";
-                report.Check(id + "/coverage", ok != f.outside ? 0 : 1, 0, "failures", "retained source vectors and usable segment bounds; no extrapolation past fit");
+                report.Check(id + "/coverage", ok != f.outside ? 0 : 1, 0, "failures", "retained source vectors and usable segment bounds; no extrapolation past fit", category: "invariant-or-coverage");
                 if (!ok) continue;
                 // Fresh service vectors are NOT silently substituted for the input data version. Preserve every
                 // discrepancy, including Ryugu's ~4.5 km late-century mismatch, separately from polynomial-fit error.
@@ -243,7 +251,7 @@ namespace FogOfWar.EditorTools
                 currentComparison.Add(new BenchmarkReport.Result { id=id, measured=difference, tolerance=2, units="km",
                     reference="fresh Horizons query versus shipped fit; may include source integration/model differences", pass=difference<=2,
                     detail="Diagnostic comparison, separate from original-input fit assertion. See source provenance in both fixture files." });
-                report.Check(id + "/fit-velocity", (v - new D3(f.vx, f.vy, f.vz)).Mag, 0.0001, "km/s", "retained Horizons velocity (analytic derivative of fitted polynomial compared separately)");
+                report.Check(id + "/fit-velocity", (v - new D3(f.vx, f.vy, f.vz)).Mag, 0.0001, "km/s", "retained Horizons velocity (analytic derivative of fitted polynomial compared separately)", category: "independent-reference");
             }
             File.WriteAllText("Logs/current-horizons-comparison.json", JsonUtility.ToJson(new Comparisons { checks=currentComparison },true));
             // A boundary blend is deliberately a model transition, not a Horizons-accurate fit. Gate continuity only.
@@ -255,8 +263,10 @@ namespace FogOfWar.EditorTools
                     double delta = 0.001 / 86400;
                     D3 v = sys.Vel(body, boundary), p0 = sys.PosAt(body, boundary-delta), p1 = sys.PosAt(body, boundary+delta);
                     double elapsed = ((boundary+delta)-(boundary-delta))*86400;
-                    report.Check($"blend/{body.Name}/{boundary:R}", (p1-p0-v*elapsed).Mag, 0.001, "km",
-                        "C1 continuity across mean-element/fit boundary, not source-vector accuracy in the blend");
+                    report.Check($"blend/{body.Name}/{boundary:R}/position", (p1-p0-v*elapsed).Mag, 0.001, "km",
+                        "position continuity across mean-element/fit boundary, not source-vector accuracy in the blend", category: "invariant-or-coverage");
+                    report.Check($"blend/{body.Name}/{boundary:R}/velocity", (sys.Vel(body, boundary+delta)-sys.Vel(body, boundary-delta)).Mag,
+                        0.0001, "km/s", "velocity continuity across the same boundary (0.1 m/s, sampled 1 ms on each side)", category: "invariant-or-coverage");
                 }
             }
         }
@@ -279,16 +289,16 @@ namespace FogOfWar.EditorTools
                     orbit.Step(spin, orbit.StepSize(spin, 0.04));
                     invariant = Math.Max(invariant, Math.Abs(orbit.w*orbit.w-orbit.R(orbit.r,spin))/Math.Pow(orbit.r,4));
                 }
-                report.Check($"Kerr/a={spin}/r={r}/frequency", Math.Abs(orbit.phi/orbit.t-1/(Math.Pow(r,1.5)+spin)), 1e-10, "1/M", "exact equatorial circular geodesic Omega=1/(r^(3/2)+a)");
-                report.Check($"Kerr/a={spin}/r={r}/radius", Math.Abs(orbit.r-r), 1e-7, "M", "constant-radius analytic solution");
-                report.Check($"Kerr/a={spin}/r={r}/radial-invariant", invariant, 1e-9, "dimensionless", "normalised Carter radial first integral");
+                report.Check($"Kerr/a={spin}/r={r}/frequency", Math.Abs(orbit.phi/orbit.t-1/(Math.Pow(r,1.5)+spin)), 1e-10, "1/M", "exact equatorial circular geodesic Omega=1/(r^(3/2)+a)", category: "independent-reference");
+                report.Check($"Kerr/a={spin}/r={r}/radius", Math.Abs(orbit.r-r), 1e-7, "M", "constant-radius analytic solution", category: "independent-reference");
+                report.Check($"Kerr/a={spin}/r={r}/radial-invariant", invariant, 1e-9, "dimensionless", "normalised Carter radial first integral", category: "independent-reference");
             }
             foreach (var ends in new[] { new[] { 20.0,80.0 }, new[] { 8.0,20.0 } })
             {
                 double rp = ends[0], ra = ends[1], p = 2*rp*ra/(rp+ra), e = (ra-rp)/(ra+rp);
                 Func<double,double> f = chi => Math.Sqrt(p/(p-6-2*e*Math.Cos(chi)));
                 double reference = Simpson(f,0,2*Math.PI,16384)-2*Math.PI;
-                report.Check($"Schwarzschild/{rp}/{ra}/quadrature", Math.Abs(reference-(Simpson(f,0,2*Math.PI,8192)-2*Math.PI)), 1e-10, "rad", "Darwin anomaly integral; independent quadrature refinement");
+                report.Check($"Schwarzschild/{rp}/{ra}/quadrature", Math.Abs(reference-(Simpson(f,0,2*Math.PI,8192)-2*Math.PI)), 1e-10, "rad", "Darwin anomaly integral; independent quadrature refinement", category: "self-convergence");
                 foreach (double k in new[] { 0.08, 0.04, 0.02 })
                 {
                     var orbit = Geo.Bound(rp, ra, 0); double last = 0, advance = 0, invariant = 0; int count = 0;
@@ -298,8 +308,8 @@ namespace FogOfWar.EditorTools
                         invariant = Math.Max(invariant,Math.Abs(orbit.w*orbit.w-orbit.R(orbit.r,0))/Math.Pow(orbit.r,4));
                         if (orbit.peris > count) { if(count>0) advance = orbit.periPhi-last-2*Math.PI; last=orbit.periPhi; count=orbit.peris; }
                     }
-                    report.Check($"Schwarzschild/{rp}/{ra}/k={k}/precession", count<4 ? 1e9 : Math.Abs(advance-reference), 0.0005, "rad/orbit", "integral_0^2pi sqrt(p/(p-6-2e cos chi)) dchi - 2pi; PhysRevD.92.044048");
-                    report.Check($"Schwarzschild/{rp}/{ra}/k={k}/invariant", invariant, 2e-5, "dimensionless", "radial first integral over four eccentric orbits");
+                    report.Check($"Schwarzschild/{rp}/{ra}/k={k}/precession", count<4 ? 1e9 : Math.Abs(advance-reference), 0.0005, "rad/orbit", "integral_0^2pi sqrt(p/(p-6-2e cos chi)) dchi - 2pi; PhysRevD.92.044048", category: "independent-reference");
+                    report.Check($"Schwarzschild/{rp}/{ra}/k={k}/invariant", invariant, 2e-5, "dimensionless", "radial first integral over four eccentric orbits", category: "invariant-or-coverage");
                 }
             }
         }
@@ -314,13 +324,13 @@ namespace FogOfWar.EditorTools
                 typeof(JourneyScene).GetField("dest",Private).SetValue(scene,destination);
                 double distance = new[] {4.24,26670,220000,2537000.0}[destination], a = 1.0323;
                 object start=At(0); double T=Field(start,"T"), midTime = Math.Sqrt(distance/a+distance*distance/4);
-                report.Check($"Journey/dest={destination}/reference-time",Math.Abs(Field(start,"tTotal")-2*midTime),1e-7,"yr","hyperbolic worldline: half-trip t=sqrt(D/a+D^2/4)");
-                var end=At(T); report.Check($"Journey/dest={destination}/arrival",Math.Abs(Field(end,"x")-distance)+Math.Abs(Field(end,"beta")),1e-8,"ly + c","end at destination and rest");
-                var mid=At(T/2); report.Check($"Journey/dest={destination}/midpoint",Math.Abs(Field(mid,"x")-distance/2),1e-7,"ly","symmetric constant proper acceleration worldline");
+                report.Check($"Journey/dest={destination}/reference-time",Math.Abs(Field(start,"tTotal")-2*midTime),1e-7,"yr","hyperbolic worldline: half-trip t=sqrt(D/a+D^2/4)", category: "independent-reference");
+                var end=At(T); report.Check($"Journey/dest={destination}/arrival",Math.Abs(Field(end,"x")-distance)+Math.Abs(Field(end,"beta")),1e-8,"ly + c","end at destination and rest", category: "independent-reference");
+                var mid=At(T/2); report.Check($"Journey/dest={destination}/midpoint",Math.Abs(Field(mid,"x")-distance/2),1e-7,"ly","symmetric constant proper acceleration worldline", category: "independent-reference");
                 foreach (double tau in new[] {1e-8,1e-5})
                 {
                     var low=At(tau); double x=Field(low,"x"), expected=0.5*a*tau*tau;
-                    report.Check($"Journey/dest={destination}/low-tau={tau}",Math.Abs(x-expected)/expected,1e-8,"relative position","Newtonian low-rapidity Taylor limit x=a*tau^2/2");
+                    report.Check($"Journey/dest={destination}/low-tau={tau}",Math.Abs(x-expected)/expected,1e-8,"relative position","Newtonian low-rapidity Taylor limit x=a*tau^2/2", category: "independent-reference");
                 }
             }
         }

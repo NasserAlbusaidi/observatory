@@ -78,7 +78,7 @@ namespace FogOfWar.OpenWorld
             "The integrate branch steps the whole frame and leaves out OpenSystemScene.SubstepSize. No run here would split differently: above 0.25 s",
             "the attitude slews by MaxRate h and leaves AngVel 0, so the 0.05 s rotation cap never applies; the plan term 0.05 d/v is over 21 s on every",
             "powered leg (S2 toward Mars; S3 on the 0.85 g curve, d/v >= 435 s); the orbit term is over 53 s at Vesta; at h <= 0.05 s the step is the frame.",
-            "Stand-in radius Rs = 0.05 km (Pursuit.Radius): the pirate seeks 2.05 km, with a 1.05 km exclusion gate. Its own 20 km/0.2 km/s capture zone",
+            "Stand-in radius Rs = 0.05 km (Pursuit.Radius): the pirate seeks 2.05 km; the 1.05 km exclusion is gated only for S1ahead. Its 20 km/0.2 km/s capture zone",
             "uses critically damped relative position control. Transverse-motion lead is capped at 600 s. Pirate constructor: UnlimitedFuel, CruiseCap 0,",
             "Att facing the player, Obstacles by the scene's rule (Parent != null, Radius >= 100), Near empty.",
             "Measures. alongside = |pirate.Pos - player.Pos| < 500 km AND |pirate.Vel - player.Vel| < 0.1 km/s, from the two Ships at each span end.",
@@ -115,9 +115,15 @@ namespace FogOfWar.OpenWorld
             "     matches ('matching its burn', or Share with a spare near 0). Burning at the pirate's own g escapes. Closed form: under 0.1 km in 6 h.",
             " G6 (#97) S4r at h=1 and 5 s: lasting catch <=1.2 x closed form, hold >=7200 s, at most 10 climb entries (previously 114 at h=1).",
             " G7 (#97) S1ahead at h=1/60,.05,1,5,30,50 s: minimum separation >= Rs+1 km and hold >=7200 s. Added before the new scenario runs.",
-            " VERDICT pass if G1-G7 all hold, else fail. Exit code 0 on pass, 1 on fail. Gameplay choices #89-92 remain open; braking margin stays .85.",
+            " REVIEW AMENDMENT: this paragraph and G8 are committed before the first run of the amended check. It adds a gate; no old gate is loosened.",
+            " G8 S4 (Pallas, all six h/spans) and S4v (Vesta, h=1 and 5 s): lasting catch <=1.05 x closed form, hold >=7200 s, climb entries <=10.",
+            "     The historical #115 table motivates this regression: a pole approach must not repeatedly trip the last-resort surface guard.",
+            " JOB 4 AMENDMENT: G9 is committed before its first run. S4guard is a 1 g inward plunge at Pallas; h=1 and 5 s must",
+            "     stay at altitude >= 0.1 R + 20 km (the guard safe radius minus R) and enter climbing >=1 time. No old gate changes.",
+            "     Call-level guard checks require non-null for a braking segment through the far side, and null for S4's safe pole geometry.",
+            " VERDICT pass if G1-G9 all hold, else fail. Exit code 0 on pass, 1 on fail. Gameplay choices #89-92 remain open; braking margin stays .85.",
             " Report only: S2b-cut and S2b-flip (under 10,000 km the player cuts the drive, or flips and burns at the pirate: the pass and the run-out),",
-            " S4v (Vesta), S3 (S3m-2g, 375,000 km out, tests the 2 g boarding band), S5 (S5-1g also at 1/60 s, S5-2g",
+            " S3 (S3m-2g, 375,000 km out, tests the 2 g boarding band), S5 (S5-1g also at 1/60 s, S5-2g",
             " also at 1/60 and 0.05 s), and S1 on Plan.Brachistochrone (first alongside and hold against the spike's).",
         };
 
@@ -202,6 +208,16 @@ namespace FogOfWar.OpenWorld
             list.Add(new Scenario { Id = "S4", What = "player parked at Pallas (not a port; 769.5 km, drive off); 1 g pirate 50,000 km out along Pallas' pole", Duration = 10 * 3600, Centre = pallas, Make = () => Parked(pallas, true) });
             list.Add(new Scenario { Id = "S4v", What = "as S4 at Vesta (a port; 788.1 km)", Duration = 10 * 3600, Centre = vesta, Make = () => Parked(vesta, true) });
             list.Add(new Scenario { Id = "S4r", What = "as S4 with the pirate on the Pallas->player line, in the orbit plane", Duration = 10 * 3600, Centre = pallas, Make = () => Parked(pallas, false) });
+            list.Add(new Scenario { Id = "S4guard", What = "1 g pirate 20 Pallas radii out, aimed inward at 90% of its full-drive stopping energy; player on the far side", Duration = 3600, Centre = pallas,
+                Make = () =>
+                {
+                    var i = Parked(pallas, false); var pc = sys.Pos(pallas, Jd0);
+                    var outward = (i.Player.Pos - pc).Norm;
+                    double radius = 20 * pallas.Radius, safe = 1.1 * pallas.Radius + 20;
+                    i.PiratePos = pc - outward * radius;
+                    i.PirateVel = sys.Vel(pallas, Jd0) + outward * Math.Sqrt(2 * 0.9 * 9.80665e-3 * (radius - safe));
+                    return i;
+                } });
             list.Add(new Scenario { Id = "S2a", What = "player 1 g brachistochrone to Mars; 1 g pirate 50,000 km behind on its thrust line, at relative rest", Duration = 6 * 3600, Make = () => Accelerating(1) });
             list.Add(new Scenario { Id = "S2h", What = "as S2a, but the player burns 1 g by hand on its heading (no plan); 1 g pirate", Duration = 6 * 3600, Make = () => HandBurn(1) });
             list.Add(new Scenario { Id = "S2b", What = "as S2a with a 2 g pirate", Duration = 10 * 3600, Make = () => Accelerating(2) });
@@ -550,6 +566,28 @@ namespace FogOfWar.OpenWorld
                 $"c{r.ClimbIn}/t{r.TurnIn}", ph, r.Note);
         }
 
+        // Direct production call: distinguish a far-side crossing from S4's safe off-axis stopping segment.
+        public static bool ClearanceCalls(SolarSystem sys, TextWriter log)
+        {
+            var b = sys["Pallas"]; var pc = sys.Pos(b, Jd0); var vc = sys.Vel(b, Jd0);
+            var rad = (pc.Norm - b.Pole * D3.Dot(pc.Norm, b.Pole)).Norm;
+            var probe = new Ship { MaxG = 1, Pos = pc + rad * (20 * b.Radius), Vel = vc - rad * 12 };
+            probe.Obstacles.Add(b);
+            var guard = typeof(Ship).GetMethod("PursueClearance", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            bool crossing = guard.Invoke(probe, new object[] { sys, Jd0 }) != null;
+            double safe = 1.1 * b.Radius + 20;
+            double stop = 12 * 12 / (2 * Ship.PursueMargin * (probe.AMax - b.GM / Math.Pow(20 * b.Radius, 2)));
+            crossing &= stop > 20 * b.Radius + safe; // the endpoint is beyond the far side, not merely inside the body
+            var target = rad * Ship.Standoff(b);
+            var direction = (target - b.Pole * 50000).Norm;
+            probe.Pos = pc + target * 0.9 + b.Pole * 5000; // point on S4's original pole-to-orbit line
+            probe.Vel = vc + direction * 12;
+            bool pole = guard.Invoke(probe, new object[] { sys, Jd0 }) == null;
+            Echo(log, $"  G9 far-side crossing guard non-null: {(crossing ? "PASS" : "FAIL")}");
+            Echo(log, $"  G9 S4 pole guard null: {(pole ? "PASS" : "FAIL")}");
+            return crossing && pole;
+        }
+
         public static int Run(TextWriter table, TextWriter raw)
         {
             var sys = SolarSystem.Build();
@@ -562,7 +600,7 @@ namespace FogOfWar.OpenWorld
             foreach (var h in SmallHs.Concat(Hs).Concat(Spans)) runs.Add(("S1ahead", h, Plan.Pursue));
             foreach (var id in new[] { "S2a", "S2h" }) foreach (var h in Hs) runs.Add((id, h, Plan.Pursue));
             foreach (var h in new[] { 0.05 }.Concat(Hs)) runs.Add(("S2b", h, Plan.Pursue));
-            foreach (var id in new[] { "S2b-cut", "S2b-flip", "S4v", "S4r", "S3n-1g", "S3n-2g", "S3l-1g", "S3l-2g", "S3m-2g", "S5-1g", "S5-2g", "S5-3g" })
+            foreach (var id in new[] { "S2b-cut", "S2b-flip", "S4v", "S4r", "S4guard", "S3n-1g", "S3n-2g", "S3l-1g", "S3l-2g", "S3m-2g", "S5-1g", "S5-2g", "S5-3g" })
                 foreach (var h in Hs) runs.Add((id, h, Plan.Pursue));
             runs.Add(("S5-1g", SmallHs[0], Plan.Pursue));
             foreach (var h in SmallHs) runs.Add(("S5-2g", h, Plan.Pursue));
@@ -583,10 +621,11 @@ namespace FogOfWar.OpenWorld
             Echo(table, "");
             Echo(table, $"{results.Count} runs in {total.Elapsed.TotalSeconds:F0} s wall clock; {results.Sum(r => r.SubSteps):N0} pirate steps at {results.Sum(r => r.UsPirate * r.SubSteps) / Math.Max(1, results.Sum(r => r.SubSteps)):F1} us each");
             Echo(table, "");
-            return Verdict(results, probe, table);
+            bool guardCalls = ClearanceCalls(sys, table);
+            return Verdict(results, probe, table, guardCalls);
         }
 
-        static int Verdict(List<Result> rs, double probe, TextWriter t)
+        static int Verdict(List<Result> rs, double probe, TextWriter t, bool guardCalls)
         {
             IEnumerable<Result> Of(string id, Plan plan = Plan.Pursue) => rs.Where(r => r.Id == id && r.Plan == plan);
             string Each(IEnumerable<Result> list, Func<Result, string> f) => string.Join(", ", list.Select(r => $"h {r.H:G3}: {f(r)}"));
@@ -623,7 +662,16 @@ namespace FogOfWar.OpenWorld
             var ahead = Of("S1ahead").ToList();
             bool g7 = ahead.Count == 6 && ahead.All(r => r.Holds && r.MinRange >= r.Rs + 1);
             Echo(t, $"  G7 S1ahead: {Each(ahead,r => $"min range {r.MinRange:F4} >= {r.Rs+1:F2} km; hold {r.Longest:F0} s")}: {(g7 ? "PASS" : "FAIL")}");
-            bool pass = g1 && g2 && g3 && g4 && g5 && g6 && g7;
+            var poleRuns = Of("S4").Concat(Of("S4v")).ToList();
+            bool g8 = poleRuns.Count == 8 && poleRuns.All(r => r.Capture >= 0 && r.Capture <= 1.05 * r.ClosedForm && r.Holds && r.ClimbIn <= 10);
+            foreach (var id in new[] { "S4", "S4v" })
+                Echo(t, $"  G8 {id}: {Each(Of(id), r => $"catch {r.Capture:F0}/{1.05*r.ClosedForm:F0} s; climb entries {r.ClimbIn} <= 10; hold {r.Longest:F0} s")}");
+            Echo(t, $"  G8 {(g8 ? "PASS" : "FAIL")}");
+            var guardRuns = Of("S4guard").ToList();
+            double floor = 0.1 * SolarSystem.Build()["Pallas"].Radius + 20;
+            bool g9 = guardCalls && guardRuns.Count == 2 && guardRuns.All(r => r.MinAlt >= floor && r.ClimbIn >= 1);
+            Echo(t, $"  G9 S4guard: {Each(guardRuns, r => $"min altitude {r.MinAlt:F3} >= {floor:F3} km; climb entries {r.ClimbIn} >= 1")}: {(g9 ? "PASS" : "FAIL")}");
+            bool pass = g1 && g2 && g3 && g4 && g5 && g6 && g7 && g8 && g9;
             Echo(t, $"  VERDICT: {(pass ? "pass" : "fail")}");
             return pass ? 0 : 1;
         }

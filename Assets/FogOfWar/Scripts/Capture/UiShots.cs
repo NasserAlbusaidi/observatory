@@ -51,10 +51,13 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "uishots.txt")) { AutoFlush = true };
+            OpenSystemScene.CheckUnattendedSaveKey(log);
             var app = GetComponent<FogOfWarApp>();
             Controls.Locked = true;
             app.InputLocked = true;
             yield return null;
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowclassicshots") >= 0)
+            { yield return ClassicShots(app); yield break; }
             var shell = UiShell.Instance;
             if (shell == null) { log.WriteLine("no UI shell"); Quit(); yield break; }
             classicWas = GameSettings.ClassicPanel;
@@ -273,6 +276,34 @@ namespace FogOfWar
                         }
                     }
                 }
+                // Surface-speed label at arrival and contact, at every capture resolution.
+                if (os != null)
+                {
+                    var f = BindingFlags.Instance | BindingFlags.NonPublic;
+                    var shipField = typeof(OpenSystemScene).GetField("ship", f);
+                    var refField = typeof(OpenSystemScene).GetField("reference", f);
+                    var player = shipField.GetValue(os); var reference = refField.GetValue(os);
+                    double stop = os.QaStopJd;
+                    try
+                    {
+                        shipField.SetValue(os, new OpenWorld.Ship());
+                        os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", f).GetValue(os);
+                        foreach (bool landed in new[] { false, true })
+                        {
+                            os.TestSurfaceReadout(landed ? 0.001 : 50, landed);
+                            string shot = landed ? "06v-surface-landed" : "06u-surface-arrival";
+                            yield return Shot(app, shell, camRT, uiRT, tag, shot);
+                            var label = (UnityEngine.UIElements.Label)typeof(OpenSystemScene).GetField("spdRef", f).GetValue(os);
+                            var measured = label.MeasureTextSize(label.text, 0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined,
+                                0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined);
+                            bool fits = measured.x <= label.contentRect.width + 1;
+                            log.WriteLine($"    {shot}: {label.text}, text {measured.x:F1} px / {label.contentRect.width:F1} px");
+                            if (!fits || !label.text.Contains("EARTH SURFACE")) { errors++; log.WriteLine($"    ERROR {shot}: surface label missing or clipped"); }
+                        }
+                    }
+                    finally { shipField.SetValue(os, player); refField.SetValue(os, reference); os.QaStopJd = stop; }
+                }
+
                 // the full-screen Jobs and Codex pages
                 os?.TestHandJob(true);
                 os?.TestShipPaid(350000);
@@ -303,28 +334,55 @@ namespace FogOfWar
                     var career = (OpenWorld.Career)typeof(OpenSystemScene).GetField("career", f).GetValue(os);
                     var epoch = typeof(OpenSystemScene).GetField("jd", f);
                     double oldJd = (double)epoch.GetValue(os);
-                    var oldTarget = craft.Target;
+                    var oldTarget = craft.Target; var oldPlan = craft.Plan; string oldPhase = craft.Phase;
+                    var targetIndex = typeof(OpenSystemScene).GetField("targetIdx", f);
+                    var cameraDistance = typeof(OpenSystemScene).GetField("camDist", f);
+                    object oldIndex = targetIndex.GetValue(os), oldDistance = cameraDistance.GetValue(os);
+                    var setTarget = typeof(OpenSystemScene).GetMethod("SetTarget", f);
+                    bool oldFreeze = os.QaFreeze;
+                    string oldCareer = JsonUtility.ToJson(career.ToSave(craft));
+                    var visited = new System.Collections.Generic.HashSet<string>(career.Codex.Visited);
                     var toastLayer = (UnityEngine.UIElements.VisualElement)typeof(UiShell).GetField("toastLayer", f).GetValue(shell);
                     bool toastsVisible = toastLayer.visible;
                     toastLayer.visible = false;
+                    os.QaFreeze = true;
                     var mean = system.Bodies.Find(b => b.ElementsCalibrated && b.Cheb == null) ?? system.Bodies.Find(b => b.Synchronous && b.Cheb == null);
                     var estimated = system.Bodies.Find(b => b.SizeEstimated);
-                    var targets = new[] { system.Earth, mean, estimated, system.Earth, system["Jupiter"] };
-                    var names = new[] { "fitted", "mean-moon", "estimated", "fallback", "giant" };
-                    for (int q = 0; q < targets.Length; q++)
+                    var targets = new[] { system.Earth, mean, estimated, system.Earth, system["Jupiter"], system["Psyche"], system["Phobos"], system["Titan"] };
+                    var names = new[] { "fitted", "mean-moon", "estimated", "fallback", "giant", "procedural-mesh", "shape-asset", "parent-fallback" };
+                    try
                     {
-                        var body = targets[q]; if (body == null) continue;
-                        bool added = career.Codex.Visited.Add(body.Name);
-                        craft.Target = body;
-                        epoch.SetValue(os, q == 3 ? system.Earth.Cheb.JdEnd + 1 : CareerQA.Epoch);
-                        os.ShowCodex(0);
-                        yield return Wait(0.5f);
-                        yield return Shot(app, shell, camRT, uiRT, tag, "06b-provenance-" + names[q]);
-                        log.WriteLine($"    provenance {names[q]}: {body.Name}; {body.PositionModel((double)epoch.GetValue(os))}; radius {body.RadiusSource}; rotation {body.RotationSource}");
-                        if (added) career.Codex.Visited.Remove(body.Name);
+                        for (int q = 0; q < targets.Length; q++)
+                        {
+                            var body = targets[q]; if (body == null) continue;
+                            bool added = career.Codex.Visited.Add(body.Name);
+                            setTarget.Invoke(os, new object[] { body });
+                            epoch.SetValue(os, names[q] == "fallback" ? system.Earth.Cheb.JdEnd + 1 :
+                                names[q] == "parent-fallback" ? body.Parent.Cheb.JdEnd + 1 : CareerQA.Epoch);
+                            os.ShowCodex(0);
+                            yield return Wait(0.5f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06b-provenance-" + names[q]);
+                            log.WriteLine($"    provenance {names[q]}: {body.Name}; {body.PositionModel((double)epoch.GetValue(os))}; radius {body.RadiusSource}; shape {body.ShapeSource}; rotation {body.RotationSource}");
+                            bool honest = names[q] != "procedural-mesh" || (body.ShapeSource.StartsWith("procedural") && body.RadiusSource == "catalogue triaxial-diameter radius");
+                            honest &= names[q] != "shape-asset" || body.ShapeSource.StartsWith("shape model");
+                            honest &= names[q] != "parent-fallback" || body.PositionModel((double)epoch.GetValue(os)).Contains("Saturn's mean-element fallback");
+                            if (!honest) { errors++; log.WriteLine("    ERROR provenance " + names[q] + ": wrong model label"); }
+                            if (added) career.Codex.Visited.Remove(body.Name);
+                        }
                     }
-                    craft.Target = oldTarget; epoch.SetValue(os, oldJd);
-                    toastLayer.visible = toastsVisible;
+                    finally
+                    {
+                        if (oldTarget != null) setTarget.Invoke(os, new object[] { oldTarget });
+                        else craft.Target = null;
+                        craft.Plan = oldPlan; craft.Phase = oldPhase;
+                        targetIndex.SetValue(os, oldIndex); cameraDistance.SetValue(os, oldDistance);
+                        epoch.SetValue(os, oldJd);
+                        career.Codex.Visited.Clear(); career.Codex.Visited.UnionWith(visited);
+                        os.QaFreeze = oldFreeze; toastLayer.visible = toastsVisible;
+                    }
+                    bool restored = (double)epoch.GetValue(os) == oldJd && JsonUtility.ToJson(career.ToSave(craft)) == oldCareer;
+                    log.WriteLine("    " + (restored ? "PASS" : "ERROR") + " provenance restores the scene date and career state");
+                    if (!restored) errors++;
                 }
                 os?.ShowCodex(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
@@ -463,6 +521,39 @@ namespace FogOfWar
         {
             var f = typeof(FogOfWarApp).GetField("gameStarted", BindingFlags.Instance | BindingFlags.NonPublic);
             f?.SetValue(app, v);
+        }
+
+        // IMGUI needs a visible player render loop; this optional path captures the classic shell directly.
+        IEnumerator ClassicShots(FogOfWarApp app)
+        {
+            classicWas = GameSettings.ClassicPanel;
+            GameSettings.ClassicPanel = true;
+            foreach (var size in sizes)
+            {
+                Screen.SetResolution(size.x, size.y, FullScreenMode.Windowed);
+                yield return Wait(1);
+                app.NewGame();
+                yield return Wait(1);
+                var os = (OpenSystemScene)app.Current;
+                os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(os);
+                foreach (bool landed in new[] { false, true })
+                {
+                    os.TestSurfaceReadout(landed ? 0.001 : 50, landed);
+                    yield return Wait(0.6f);
+                    yield return new WaitForEndOfFrame();
+                    string tag = $"{size.x}x{size.y}-classic-surface-{(landed ? "landed" : "arrival")}";
+                    var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(dir, tag + ".png"), tex.EncodeToPNG());
+                    bool fits = os.TestClassicSpeedFits(out float text, out float available);
+                    bool sized = tex.width == size.x && tex.height == size.y;
+                    log.WriteLine($"  {tag}: {os.ClassicSpeedLine}; text {text:F1} / {available:F1}, captured {tex.width}x{tex.height}");
+                    if (!fits || !sized) { errors++; log.WriteLine($"    ERROR {tag}: status line clipped or capture size changed"); }
+                    Destroy(tex);
+                }
+            }
+            GameSettings.ClassicPanel = classicWas;
+            log.WriteLine($"done, {errors} errors");
+            Quit();
         }
 
         static IEnumerator Wait(float s)

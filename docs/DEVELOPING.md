@@ -192,7 +192,7 @@ The built game takes these flags. Each run writes its report and screenshots to 
 
 Other flags:
 
-- `-fowsavekey <key>` uses another save slot. Without it, unattended suites generate a unique `fow-save-qa-<nonce>` per process, isolating concurrent suites and worktrees from one another and from the player's save. Use an explicit unique key only when intentionally continuing a save across processes.
+- `-fowsavekey <key>` uses another save slot. Without it, unattended suites reuse `fow-save-qa-<hash>`, a stable short hash of the build data path and suite flag. This bounds the saved key pairs and separates suites and worktrees from the player's save. Concurrent copies of the same build and suite share that pair; give them distinct explicit keys when isolation is needed. `-fowfidelity` and `-fowbhshots` are unattended too, so route events are disabled for them.
 - `-fowcareer` uses a fixed TDB epoch and a fixed simulated frame duration. Flight limits use game time; a wall-clock hang guard reports `TIMEOUT` and exits 2. Functional failures exit 1. Timing samples report `PERF PASS` or `PERF SLOW` separately. `-fowcareertraffic` alongside `-fowcareer <dir>` runs just the deterministic traffic section.
 - Run focused coast-clock regressions with `Unity.exe -batchmode -nographics -projectPath "<repo>" -executeMethod FogOfWar.EditorTools.FogOfWarRegressionCheck.Run -logFile Logs/regression-editor.log`. The analytic circle and zero-motion guidance checks write `Logs/issue-regressions.txt` and exit nonzero on failure.
 - `-fowqa` runs the career in sandbox: unlimited reaction mass and no contracts, so the physics tests keep working.

@@ -83,6 +83,24 @@ namespace FogOfWar
         // #27: velocity holds, the speed readout and the approach aid measure against the orbit (the dominant body) or
         // the target. Switching needs a target; losing the target falls back to the orbit.
         void ToggleVelRef() => ship.VelRef = ship.VelRef == null && ship.Target != null ? ship.Target : null;
+        // Shared with the arrival notice: this is the existing atmospheric arrival boundary.
+        bool InArrivalBoundary(Body b) => b != null && Ship.HasAtmosphere(b) &&
+            (ship.Pos - sys.Pos(b, jd)).Mag - b.Radius < Math.Max(300, b.Radius * 0.1);
+        bool SurfaceRef(Body b) => b != null && (ship.Landed == b || (ship.Landed == null && InArrivalBoundary(b)));
+        internal D3 RefVel(Body b) => SurfaceRef(b) ? Ship.SurfaceVelocity(sys, b, ship.Pos - sys.Pos(b, jd), jd) : sys.Vel(b, jd);
+        internal string RefName(Body b) => b.Name + (SurfaceRef(b) ? " surface" : "");
+
+        // Deterministic equatorial fixture shared by the career checks and UI captures.
+        internal void TestSurfaceReadout(double altitude, bool landed)
+        {
+            reference = sys.Earth; ship.VelRef = null; ship.Target = sys.Moon;
+            ship.Landed = landed ? sys.Earth : null; ship.Crashed = null;
+            var rel = sys.Earth.FromFixed(new D3(sys.Earth.Radius + altitude, 0, 0), jd);
+            ship.Pos = sys.Pos(sys.Earth, jd) + rel;
+            ship.Vel = Ship.SurfaceVelocity(sys, sys.Earth, rel, jd);
+            ship.Plan = Plan.None; ship.Throttle = ship.ThrottleCmd = 0;
+        }
+
         Body VelRefBody => ship.VelRef ?? reference;
 
         // Stopping against the target at full drive (or RCS, if that is all there is) after a flip: no gravity, the mass
@@ -231,6 +249,15 @@ namespace FogOfWar
             GUI.color = Color.white;
         }
 
+        internal string ClassicSpeedLine => $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} / {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num((ship.Vel - RefVel(reference)).Mag, 3)} km/s VS {RefName(reference).ToUpperInvariant()}   ·   {WarpNames[warpIdx]}";
+        internal bool TestClassicSpeedFits(out float text, out float available)
+        {
+            Styles();
+            text = hudStyle.CalcSize(new GUIContent(ClassicSpeedLine)).x;
+            available = Mathf.Min(520, UnityEngine.Screen.width / App.UiScale - App.PanelWidth - 56);
+            return text <= available;
+        }
+
         void DrawHud()
         {
             Styles();
@@ -260,8 +287,7 @@ namespace FogOfWar
             GUI.color = new Color(1, 1, 1, 0.15f); GUI.DrawTexture(bar, Texture2D.whiteTexture);
             GUI.color = new Color(1f, 0.71f, 0.28f, 0.9f); GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * (float)ship.Throttle, bar.height), Texture2D.whiteTexture);
             GUI.color = Color.white; GUI.DrawTexture(new Rect(bar.x + bar.width * (float)ship.ThrottleCmd - 1, bar.y - 3, 2, bar.height + 6), Texture2D.whiteTexture);
-            var vRef = (ship.Vel - sys.Vel(reference, jd)).Mag;
-            string l1 = $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} g of {Fmt.Num(ship.MaxG, 1)} g   ·   {Fmt.Num(vRef, 3)} km/s vs {reference.Name}   ·   {WarpNames[warpIdx]}";
+            string l1 = ClassicSpeedLine;
             string l2 = $"ASSIST {(ship.FlightAssist ? "ON" : "OFF")}   ·   HOLD {HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)]}   ·   " +
                         (ship.PlanActive ? $"NAV {PlanNames[(int)ship.Plan]}: {ship.Phase}" : $"NAV idle ({ship.Phase})") + $"   ·   CAM {(pivot == Pivot.Ship ? camMode.ToString() : pivot.ToString())}";
             GUI.Label(new Rect(x, y + 22, w, 18), l1, hudStyle);
@@ -326,12 +352,12 @@ namespace FogOfWar
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
             list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
-            list.Add(new Readout("Flight model", FlightModel, Coasting() ? Tone.Bad : Tone.Normal));
-            if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, Tone.Bad));
+            list.Add(new Readout("Flight model", FlightModel, Tone.Normal));
+            if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, ship.Landed != null ? Tone.Normal : Tone.Bad));
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
-            list.Add(new Readout("Speed vs " + reference.Name, Fmt.Num((ship.Vel - sys.Vel(reference, jd)).Mag, 3) + " km/s"));
+            list.Add(new Readout("Speed vs " + RefName(reference), Fmt.Num((ship.Vel - RefVel(reference)).Mag, 3) + " km/s"));
             list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
@@ -346,7 +372,7 @@ namespace FogOfWar
                 if (!Career.IsCraft(ship.Target))
                 {
                     list.Add(new Readout("Position model", ship.Target.PositionModel(jd)));
-                    list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
+                    if (ship.Target.Parent != null) list.Add(new Readout("Arrival policy", Ship.ArrivalPolicy(ship.Target), Ship.HasAtmosphere(ship.Target) ? Tone.Bad : Tone.Normal));
                 }
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
@@ -494,20 +520,34 @@ namespace FogOfWar
         // `-fowsavekey <name>` points Save, Continue and F5 at another PlayerPrefs key, so live QA never touches the
         // player's own save (the career goes under <name>-career)
         static readonly string SaveKey = SaveKeyFromArgs();
-        static string SaveKeyFromArgs()
+        static string SaveKeyFromArgs() => SaveKeyFor(Environment.GetCommandLineArgs(), Application.dataPath);
+        // Pure policy entry point so QA can exercise every unattended flag without changing process arguments.
+        static string SaveKeyFor(string[] args, string dataPath)
         {
-            var args = Environment.GetCommandLineArgs();
             int i = Array.IndexOf(args, "-fowsavekey");
             if (i >= 0 && i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1])) return args[i + 1];
             // the unattended suites save, load and autosave too (the -fowqa "save" step, a dock): keep them off the player's save
-            // A process nonce also isolates two copies of the same suite/build. Keep it for this process's lifetime
-            // so scene restarts and Continue still share their own save. Explicit keys remain reusable across runs.
-            return Unattended() ? "fow-save-qa-" + Guid.NewGuid().ToString("N") : "fow-save-v1";
+            // Reuse a bounded pair per build path and suite; repeated runs must not leave orphan registry values.
+            // Concurrent copies of the same build/suite share this slot; give them distinct explicit keys if needed.
+            string suite = UnattendedSuite(args);
+            if (suite == null) return "fow-save-v1";
+            using var hash = System.Security.Cryptography.SHA256.Create();
+            byte[] digest = hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(dataPath.Replace('\\', '/').TrimEnd('/') + "\n" + suite));
+            return "fow-save-qa-" + BitConverter.ToString(digest, 0, 8).Replace("-", "").ToLowerInvariant();
         }
         // an unattended suite is running: no player save, and no route calls to drop the warp mid-trip (a method, not a
-        // static field, so SaveKey's initialiser never sees it unset)
-        static bool Unattended() => Array.Exists(new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" },
-            a => Array.IndexOf(Environment.GetCommandLineArgs(), a) >= 0);
+        // static field, so SaveKey's initialiser never sees it unset). -fowfidelity and -fowbhshots are unattended too:
+        // this also turns route events off for both of those suites.
+        static bool Unattended() => UnattendedSuite(Environment.GetCommandLineArgs()) != null;
+        internal static string[] UnattendedSuites() => new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" };
+        static string UnattendedSuite(string[] args) => Array.Find(UnattendedSuites(),
+            a => Array.IndexOf(args, a) >= 0);
+        // Each runner checks at report creation, independently of registration in UnattendedSuites.
+        internal static void CheckUnattendedSaveKey(System.IO.TextWriter report)
+        {
+            if (SaveKey == "fow-save-v1" || CareerKey == "fow-career-v1")
+                report.WriteLine("ERROR unattended suite is using the player's save key");
+        }
         public static bool HasSave => PlayerPrefs.HasKey(SaveKey);
         public static string SaveSummary
         {
@@ -543,6 +583,7 @@ namespace FogOfWar
             catch (Exception e) { Debug.LogWarning("Fog of War: could not read the save: " + e.Message); return; }
             jd = s.jd;
             ship.FromSave(s, sys);
+            wasLanded = ship.Landed != null && ship.Crashed == null;
             // #18: the save keeps no plan to fly on, so Continue starts at 1× with the drive off and says what it dropped
             warpIdx = 0;
             reference = Ship.Dominant(sys, ship.Pos, jd);

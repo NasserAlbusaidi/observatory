@@ -599,9 +599,9 @@ namespace FogOfWar
             UpdateTargetCard();
 
             // flight cluster
-            var vRef = (ship.Vel - sys.Vel(VelRefBody, jd)).Mag;
+            var vRef = (ship.Vel - RefVel(VelRefBody)).Mag;
             Ui.Text(spdVal, SpeedNum(vRef, out string spdUnit));
-            Ui.Text(spdRef, spdUnit.ToUpperInvariant() + " VS " + VelRefBody.Name.ToUpperInvariant());
+            Ui.Text(spdRef, spdUnit.ToUpperInvariant() + " VS " + RefName(VelRefBody).ToUpperInvariant());
             Ui.Text(drvVal, Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g");
             Ui.SetClass(drvVal, "accent", ship.Throttle > 0);
             Ui.SetClass(drvVal, "glow", ship.Throttle > 0);
@@ -625,7 +625,7 @@ namespace FogOfWar
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : null, "hot");
             SetPill(pLanded, ship.Landed != null ? (ship.AssistedArrival ? "ASSISTED ARRIVAL " : "LANDED ") + ship.Landed.Name.ToUpperInvariant() : null, "ok");
             SetPill(pModel, Coasting() ? "TWO-BODY COAST · APPROXIMATE" : null, "cold");
-            SetPill(pArrival, ArrivalNotice != null ? (Ship.Giant(reference) ? "CLOUD-TOP ASSIST · NO SOLID SURFACE" : "ARRIVAL ASSIST · NO ATMOSPHERIC FLIGHT") : null, "bad");
+            SetPill(pArrival, ship.Landed == null && ArrivalNotice != null ? (Ship.Giant(reference) ? "CLOUD-TOP ASSIST · NO SOLID SURFACE" : "ARRIVAL ASSIST · NO ATMOSPHERIC FLIGHT") : null, "bad");
             SetPill(pLimited, limited ? "WARP LIMITED " + Fmt.Num(effectiveWarp, 0) + "×" : null, "bad");
 
             UpdatePages();

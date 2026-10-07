@@ -10,7 +10,7 @@ Shader "Hidden/FogOfWar/BlackHoleBenchmark"
             #pragma vertex vert_img
             #pragma fragment frag
             #pragma target 4.5
-            #include "BlackHoleCore.cginc"
+            #include "Assets/FogOfWar/Resources/Shaders/BlackHoleCore.cginc"
             sampler2D _Fixture;
             int _Output, _TableProbe;
             float4 frag(v2f_img i) : SV_Target

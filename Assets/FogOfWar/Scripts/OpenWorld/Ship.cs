@@ -178,6 +178,9 @@ namespace FogOfWar.OpenWorld
             dominant = reference;
             var cmd = Guide(sys, jd, 0, sys.Gravity(Pos, jd));
             Throttle = !Dry && cmd.HasValue && cmd.Value.Mag > RcsAccel ? Math.Min(cmd.Value.Mag / AMax, 1) : 0;
+            // Same aim gate as Step: waking from a coast must not light the drive before the flip finishes.
+            if (Throttle > 0 && D3.Dot(Heading, cmd.Value.Norm) < Math.Cos(3 * Math.PI / 180))
+            { Throttle = 0; Phase = "turning"; }
             RcsActive = !Dry && cmd.HasValue && cmd.Value.Sqr > 0 && cmd.Value.Mag <= RcsAccel;
             RcsLevel = RcsActive ? (float)(cmd.Value.Mag / RcsAccel) : 0;
             if (Dry) Phase = "out of fuel";
@@ -497,9 +500,10 @@ namespace FogOfWar.OpenWorld
             D3 want, ff = D3.Zero;
             if (hold)
             {
-                // Critically damped relative position control, with target acceleration fed forward. Unlike the
-                // player's loose hover this rejects closing bias without crossing the craft's exclusion distance.
-                double omega = Math.Min(0.05, 1 / Math.Max(20, 4 * tau / 3));
+                // Critically damped relative position control, with target acceleration fed forward. It seeks the
+                // 2.05 km standoff; transient approaches can come closer (only S1ahead gates a 1.05 km exclusion).
+                // Guide supplies tau >= 20 s, so omega <= 0.0375 /s without additional clamps.
+                double omega = 3 / (4 * tau);
                 Phase = "holding station";
                 return Share(los * ((dist - standoff) * omega * omega) - vrel * (2 * omega), comp);
             }
@@ -520,7 +524,8 @@ namespace FogOfWar.OpenWorld
         }
 
         // Pursuit has an active braking curve, so a ballistic periapsis alone does not predict an impact. Its guard
-        // uses the actual stopping distance on that curve plus a bounded turn margin; the player's Climb is unchanged.
+        // checks the segment to the stopping point along the velocity, plus a bounded turn margin. Radial stopping
+        // distance alone falsely treats an off-axis moon-orbit approach as a plunge. The player's Climb is unchanged.
         D3? PursueClearance(SolarSystem sys, double jd)
         {
             foreach (var b in Obstacles)
@@ -533,9 +538,14 @@ namespace FogOfWar.OpenWorld
                 // physical surface, rather than repeatedly ejecting a safe approach from that wider routing margin.
                 double inward = -D3.Dot(v, outward), safe = b.Radius * 1.1 + 20;
                 double net = Math.Max(AMax - b.GM / (rm * rm), 1e-9);
-                double stop = inward > 0 ? inward * inward / (2 * PursueMargin * net) : 0;
-                double turnMargin = Math.Min(0.05 * safe, Math.Max(0, inward) * 5);
-                if (rm > safe && (inward <= 0 || rm - safe > stop + turnMargin)) continue;
+                double speed = v.Mag, stop = speed * speed / (2 * PursueMargin * net);
+                double turnMargin = Math.Min(0.05 * safe, speed * 5);
+                // The minimum radius on the whole braking segment, not just the radius of its endpoint: a stop
+                // beyond the far side of the body must still trigger the guard. A safe pole approach misses it.
+                var direction = speed > 0 ? v / speed : D3.Zero;
+                double along = Math.Max(0, Math.Min(stop + turnMargin, -D3.Dot(r, direction)));
+                double closest = (r + direction * along).Mag;
+                if (rm > safe && (inward <= 0 || closest > safe)) continue;
                 guardBody = b;
                 var lateral = v - outward * D3.Dot(v, outward);
                 var tangent = lateral.Sqr > 1e-12 ? lateral.Norm : D3.Cross(b.Pole, outward).Norm;
@@ -687,6 +697,7 @@ namespace FogOfWar.OpenWorld
         [Serializable] public class SaveData
         {
             public double jd, px, py, pz, vx, vy, vz, maxG, dv;
+            public double burnSeconds, cruiseSeconds; // older saves default to zero; counters belong to the saved timeline
             public float qx, qy, qz, qw;
             public string target;
             public int warp;
@@ -704,6 +715,7 @@ namespace FogOfWar.OpenWorld
         public SaveData ToSave(double jd, int warp) => new SaveData
         {
             jd = jd, px = Pos.x, py = Pos.y, pz = Pos.z, vx = Vel.x, vy = Vel.y, vz = Vel.z, maxG = MaxG, dv = DvUsed,
+            burnSeconds = BurnSeconds, cruiseSeconds = CruiseSeconds,
             // a raider is not saved (D8), so neither is it as the target: the Continue line would name a ship that is gone
             qx = Att.x, qy = Att.y, qz = Att.z, qw = Att.w, target = Career.IsRaider(Target) ? null : Target?.Name, warp = warp, assist = FlightAssist,
             plan = (int)(PlanActive ? Plan : Plan.None), hold = (int)Hold, throttle = ThrottleCmd,
@@ -715,6 +727,7 @@ namespace FogOfWar.OpenWorld
         public void FromSave(SaveData s, SolarSystem sys)
         {
             Pos = new D3(s.px, s.py, s.pz); Vel = new D3(s.vx, s.vy, s.vz); MaxG = s.maxG; DvUsed = s.dv;
+            BurnSeconds = s.burnSeconds; CruiseSeconds = s.cruiseSeconds;
             Att = Quaternion.Normalize(new Quaternion(s.qx, s.qy, s.qz, s.qw));
             // with flight assist off nothing damps a spin: keep it (assist on would have stopped it anyway)
             AngVel = s.assist ? Vector3.zero : Vector3.ClampMagnitude(new Vector3(s.wx, s.wy, s.wz), MaxRate);

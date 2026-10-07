@@ -62,10 +62,16 @@ namespace FogOfWar.OpenWorld
         // samples are even in time, so they are close together near the ports, where the course bends most.
         public Clearance Check() => Check(sys.Bodies, false);
 
-        // The traffic shortcut checks each endpoint's parent and siblings too: a Titan-to-Enceladus course can cross
-        // Rhea even when it clears Saturn. QA independently checks every scheduled trip against the full body list.
-        public Clearance CheckEnds() => Check(sys.Bodies.FindAll(b => b == From.Parent || b == To.Parent ||
-            b.Parent == From.Parent || b.Parent == To.Parent), true);
+        // The traffic shortcut checks endpoint parents, plus siblings only for moon endpoints: Titan-to-Enceladus
+        // can cross Rhea while clearing Saturn. Planet endpoints retain the old set (no heliocentric sibling sweep).
+        // QA checks 400 accepted scheduled trips against the full body list and a Titan/Enceladus Rhea regression.
+        // Endpoint children (such as the Moon on Earth departures) remain outside this cheap test's scope.
+        public Clearance CheckEnds() => Check(sys.Bodies.FindAll(b => !b.Asteroid && !Career.IsCraft(b) && !Traffic.Is(b) &&
+            (b == From.Parent || b == To.Parent ||
+             (From.Parent != null && From.Parent != sys.Sun && b.Parent == From.Parent) ||
+             (To.Parent != null && To.Parent != sys.Sun && b.Parent == To.Parent))), true);
+
+        internal Clearance CheckParents() => Check(new[] { From.Parent, To.Parent }, true);
 
         Clearance Check(System.Collections.Generic.IEnumerable<Body> bodies, bool smooth)
         {
@@ -73,23 +79,64 @@ namespace FogOfWar.OpenWorld
             var path = new D3[Samples + 1];
             for (int i = 0; i <= Samples; i++) path[i] = Pos(At(i));
             for (int i = 0; i < Samples; i++) c.SunAu = Math.Min(c.SunAu, Closest(path[i], path[i + 1]) / Frame.AU);
-            D3[] knots = null;
+            // Reuse each slow parent track for its moons. The same cubic approximation was already used for
+            // the parent clearance; moons retain their fast, fully sampled local orbits. This avoids evaluating
+            // a giant planet's fit and massive-moon barycentre correction once per moon per sample.
+            var parentTracks = smooth ? new System.Collections.Generic.Dictionary<Body, (D3[] points, double[] distances, double min)>() : null;
+            (D3[] points, double[] distances, double min) ParentTrack(Body parent)
+            {
+                if (parentTracks.TryGetValue(parent, out var track)) return track;
+                var knots = new D3[Samples / Stride + 3];
+                for (int k = 0; k < knots.Length; k++) knots[k] = sys.PosAt(parent, At((k - 1) * Stride));
+                var points = new D3[Samples + 1]; var distances = new double[Samples]; double min = double.MaxValue;
+                for (int i = 0; i <= Samples; i++)
+                {
+                    points[i] = path[i] - Cubic(knots, i);
+                    if (i > 0) { distances[i - 1] = Closest(points[i - 1], points[i]); min = Math.Min(min, distances[i - 1]); }
+                }
+                track = (points, distances, min);
+                parentTracks.Add(parent, track);
+                return track;
+            }
             foreach (var b in bodies)
             {
                 if (b == null || b.Parent == null || Career.IsCraft(b) || (b.Parent != sys.Sun && b.Radius < MinMoonKm)) continue;
-                bool fit = smooth && b.Parent == sys.Sun; // a moon's orbit is too fast for the knots
-                if (fit)
-                {
-                    knots ??= new D3[Samples / Stride + 3];
-                    for (int k = 0; k < knots.Length; k++) knots[k] = sys.PosAt(b, At((k - 1) * Stride));
-                }
+                bool fit = smooth && b.Parent == sys.Sun;
+                bool localMoon = smooth && b.Parent.Parent == sys.Sun && b.Cheb == null && b.Path == null && !b.Barycentric;
                 double min = double.MaxValue;
-                D3 prev = D3.Zero;
-                for (int i = 0; i <= Samples; i++)
+                if (localMoon)
                 {
-                    var r = path[i] - (fit ? Cubic(knots, i) : sys.PosAt(b, At(i)));
-                    if (i > 0) min = Math.Min(min, Closest(prev, r));
-                    prev = r;
+                    var parent = ParentTrack(b.Parent); var relative = parent.points;
+                    // An interpolated moon segment stays inside the largest endpoint orbital radius. A ship
+                    // segment outside that sphere plus the standoff cannot hit it. The bound also covers rates
+                    // in a/e over the trip; fitted/custom moon paths take the full sampling path below.
+                    double d0 = T0 - b.EpochJd, d1 = T1 - b.EpochJd;
+                    double a = Math.Max(Math.Abs(b.A + b.dA * d0), Math.Abs(b.A + b.dA * d1));
+                    double e = Math.Min(0.99, Math.Max(0, Math.Max(b.E + b.dE * d0, b.E + b.dE * d1)));
+                    double envelope = a * (1 + e) + Ship.Standoff(b);
+                    // Parent distances are identical for every sibling: calculate them once, and skip an
+                    // entire moon when every segment is already outside its orbital envelope.
+                    if (parent.min > envelope) continue;
+                    D3 prev = D3.Zero; int last = -1;
+                    for (int i = 1; i <= Samples; i++)
+                    {
+                        if (parent.distances[i - 1] > envelope) continue;
+                        if (last != i - 1) prev = relative[i - 1] - b.Kepler(At(i - 1));
+                        var r = relative[i] - b.Kepler(At(i));
+                        min = Math.Min(min, Closest(prev, r));
+                        prev = r; last = i;
+                    }
+                }
+                else if (fit) min = ParentTrack(b).min;
+                else
+                {
+                    D3 prev = D3.Zero;
+                    for (int i = 0; i <= Samples; i++)
+                    {
+                        var r = path[i] - sys.PosAt(b, At(i));
+                        if (i > 0) min = Math.Min(min, Closest(prev, r));
+                        prev = r;
+                    }
                 }
                 double ratio = min / Ship.Standoff(b);
                 if (ratio < c.Ratio) { c.Ratio = ratio; c.Nearest = b; }

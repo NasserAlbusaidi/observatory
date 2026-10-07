@@ -47,7 +47,9 @@ namespace FogOfWar.EditorTools
             {
                 if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
                     throw new Exception("Native graphics device required: do not use -nographics. GPU suite unavailable, not passed.");
-                material = new Material(Shader.Find("Hidden/FogOfWar/BlackHoleBenchmark"));
+                var shader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/FogOfWar/Editor/BlackHoleBenchmark.shader");
+                if (shader == null) throw new Exception("Editor benchmark shader missing");
+                material = new Material(shader);
                 if (!material.shader.isSupported) throw new Exception("Benchmark shader unsupported");
                 var fixtures = JsonUtility.FromJson<Fixtures>(File.ReadAllText("Tools/benchmarks/fixtures/rays.json"));
                 report.Check("independent-direction-fixtures",fixtures.rays.Count(r=>r.expected==1 && !r.hasDirection),0,
@@ -75,10 +77,10 @@ namespace FogOfWar.EditorTools
                         if(error>oracleError) {oracleError=error;oracleWorst=i;}
                     }
                     report.Check(id+"/independent-direction",oracleError,0.02,"unit-vector distance","float64 separated radial quadrature and analytic Jacobi polar motion, Teo equations 5-6",
-                        oracleWorst<0 ? "" : $"b={rays[oracleWorst].b:R},q={rays[oracleWorst].q:R},sign={rays[oracleWorst].polarSign},offset={rays[oracleWorst].criticalOffset:R}; native={refSky[oracleWorst]}; independent=({rays[oracleWorst].dirx:R},{rays[oracleWorst].diry:R},{rays[oracleWorst].dirz:R})");
+                        oracleWorst<0 ? "" : $"b={rays[oracleWorst].b:R},q={rays[oracleWorst].q:R},sign={rays[oracleWorst].polarSign},offset={rays[oracleWorst].criticalOffset:R}; native={refSky[oracleWorst]}; independent=({rays[oracleWorst].dirx:R},{rays[oracleWorst].diry:R},{rays[oracleWorst].dirz:R})", category: "independent-reference");
                     int wrong=0, unresolved=0, numerical=0;
                     for(int i=0;i<n;i++) { int reason=(int)reference[i].r; if(reason==2) unresolved++; else if(reason==4 || !Finite(reference[i])) numerical++; else if(reason!=rays[i].expected) wrong++; }
-                    report.Check(id+"/reference-classification",wrong,0,"wrong resolved rays","quartic root oracle, Teo 2003 eq. 5b; critical curve +/-0.1% and +/-1%, near-polar inclinations included");
+                    report.Check(id+"/reference-classification",wrong,0,"wrong resolved rays","quartic root oracle, Teo 2003 eq. 5b; critical curve +/-0.1% and +/-1%, near-polar inclinations included", category: "independent-reference");
                     report.Check(id+"/reference-numerical-failures",numerical,0,"rays","finite native shader output");
                     report.Check(id+"/reference-unresolved",unresolved/(double)n,0.02,"fraction","unresolved explicitly counted; fine trace is convergence comparison, not truth",$"N={n}; k=.025; budget=16000");
                     foreach(var setting in new[]{(0.3f,1000,"Fast"),(0.2f,1000,"Balanced"),(0.15f,1200,"Sharp")})
@@ -100,16 +102,17 @@ namespace FogOfWar.EditorTools
                             if(cross[i].r>0 && refCross[i].r>0) { maxCross=Math.Max(maxCross,Math.Abs(cross[i].r-refCross[i].r)/refCross[i].r); crossings++; }
                         }
                         string qid=id+"/"+setting.Item3;
-                        report.Check(qid+"/classification",wrong,0,"wrong resolved rays","independent quartic root classification");
+                        report.Check(qid+"/classification",wrong,0,"wrong resolved rays","independent quartic root classification", category: "independent-reference");
                         report.Check(qid+"/finite",numerical,0,"rays","native float output must be finite");
-                        report.Check(qid+"/mode-consistency",mismatchedMode,0,"rays","full trace versus lens-table generation with no opaque emitters");
+                        report.Check(qid+"/mode-consistency",mismatchedMode,0,"rays","full trace versus lens-table generation with no opaque emitters", category: "consistency");
                         report.Check(qid+"/unresolved",unresolved/(double)n,0.1,"fraction","near-critical fixture budget ceiling; unresolved never counted as escaped",$"fallback={fallback}/{n}; N={n}; dispatch+fence={timing:F3} ms; k={setting.Item1}; budget={setting.Item2}; near-pole steps capped at k=.1");
                         string worstRay = worst<0 ? "" : $"; worst b={rays[worst].b:R},q={rays[worst].q:R},polarSign={rays[worst].polarSign},criticalOffset={rays[worst].criticalOffset:R}; sky={sky[worst]}; ref={refSky[worst]}";
-                        report.Check(qid+"/escape-direction",maxDir,0.02,"unit-vector distance","fine native convergence reference k=.025/16000; classification independently checked",$"resolved escape comparisons={escaped}"+worstRay);
-                        report.Check(qid+"/first-crossing",maxCross,0.02,"relative radius","first equatorial intersection versus fine convergence reference",$"crossing comparisons={crossings}");
-                        // A fallback near the unstable critical orbit can have any sky direction. Report it as a
-                        // display uncertainty bounded by the unit-sphere diameter; never present it as a converged ray.
-                        report.Check(qid+"/fallback-direction",maxFallbackDir,2.000001,"unit-vector distance","display-only unresolved fallback; whole-sky uncertainty (NOT 0.02 resolved-ray budget)", $"fallbacks={fallback}; flagged cyan in diagnostics");
+                        report.Check(qid+"/self-convergence/escape-direction",maxDir,0.02,"unit-vector distance","fine native convergence reference k=.025/16000; classification independently checked",$"resolved escape comparisons={escaped}"+worstRay, category: "self-convergence");
+                        report.Check(qid+"/self-convergence/first-crossing",maxCross,0.02,"relative radius","first equatorial intersection versus fine convergence reference",$"crossing comparisons={crossings}", category: "self-convergence");
+                        // Unit-vector distance <=2 is a tautology, not an accuracy gate. Keep the observed value
+                        // and fallback count as a diagnostic; the unresolved fraction has its own real budget gate.
+                        report.Diagnostic(qid+"/fallback-direction",maxFallbackDir,"unit-vector distance",
+                            "display-only unresolved fallback, no directional accuracy assertion", $"fallbacks={fallback}; flagged cyan in diagnostics");
                     }
                     // Forced exhausted budget: outgoing finite ray offers a display fallback but must remain reason 2.
                     input.SetPixels(Enumerable.Repeat(new Color(1,1,1,1),n).ToArray()); input.Apply();

@@ -165,6 +165,7 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "career.txt")) { AutoFlush = true };
+            OpenSystemScene.CheckUnattendedSaveKey(log);
             app = GetComponent<FogOfWarApp>();
             int ti = Array.IndexOf(Environment.GetCommandLineArgs(), "-fowtrace"); if (ti >= 0) { traceEvery = 0.25f; moonWarp = int.Parse(Environment.GetCommandLineArgs()[ti + 1]); }
             app.InputLocked = true; Controls.Locked = true;
@@ -176,6 +177,10 @@ namespace FogOfWar
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcareertraffic") >= 0)
             { yield return TrafficChecks(); Finish(); yield break; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowqa041") >= 0) { yield return Repro041(); yield break; }
+            TouchdownSoundChecks();
+            SurfaceReadoutChecks();
+            CoastStateChecks();
+            SaveKeyChecks();
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
             Check(!ship.UnlimitedFuel && Math.Abs(ship.Fuel - 200) < 1e-6, "tank full, reaction mass is limited");

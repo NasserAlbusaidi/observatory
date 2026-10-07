@@ -447,7 +447,7 @@ struct Ray
 {
     float3 col; float trans, spotLum, firstHit, firstG;
     float4 s; float ph; int steps; bool escaped, fallbackSky;
-    int reason; // 0 capture, 1 confirmed escape, 2 exhausted budget, 3 opaque hit, 4 numerical failure
+    int reason; // 0 capture, 1 confirmed escape, 2 unresolved (budget exhausted, or a forbidden plunge at the retry floor), 3 opaque hit, 4 numerical failure
     float count; float4 x0, x1, x2; float rmin, rmax;
 };
 
@@ -569,7 +569,8 @@ Ray march(float b, float q, float EF, float4 s, float a, float M, bool table)
         }
         if (sn.z > UNITY_HALF_PI) { sn.z = UNITY_PI - sn.z; sn.w = -sn.w; south = !south; }
         s = sn; ph = phn;
-        if (s.x < rCap) { reason = 0; break; }
+        // A forbidden plunge after the retry floor is unresolved, never a confirmed capture.
+        if (s.x < rCap) { reason = canFall ? 0 : 2; break; }
         if (s.x > _RMax && s.y > 0.0) { escaped = true; reason = 1; break; }
     }
     // Display-only fallback: an unfinished ray can still sample the sky, but it is never a confirmed escape.
@@ -626,9 +627,9 @@ float3 skyTerm(float3 dir, float w, float EF, float px)
 // away from it, ρ warped logarithmically about the shadow edge ρc(ψ) (computed on the CPU from the photon-orbit
 // family) so cells crowd the critical curve and none straddles capture and escape. One table covers every sign
 // of b and of the initial p_r and p_θ.
-//   T0: reason × 8 + crossings (max 4; 0 capture, 1 escape, 2 budget, 3 opaque, 4 numerical), direction at camera φ = 0
+//   T0: reason × 8 + crossings (max 4; 0 capture, 1 escape, 2 unresolved (budget exhausted, or a forbidden plunge at the retry floor), 3 opaque, 4 numerical), direction at camera φ = 0
 //   T1..T3: the first three equator crossings (r, φ − φ_camera, p_r, dθ/dλ)
-//   T4: the radial range of the path (for bodies)
+//   T4: xy radial range of the path (for bodies), z steps used, w display-only fallbackSky flag
 Texture2D<float4> _LensT0, _LensT1, _LensT2, _LensT3, _LensT4;
 Texture2D<float> _LensEdge;    // ρc at the centres of _LensN bins over ψ
 float _LensOn, _LensN;
