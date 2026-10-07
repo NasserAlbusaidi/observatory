@@ -97,8 +97,8 @@ namespace FogOfWar
                     $"pirates: the proxy {p.Name} is in the system, the pirate's stand-in for the player is not; the proxy is no obstacle, no Near body, no frame and pulls nothing");
                 double lag = (e.Chase.SpanEnd - jd) * 86400, dp = (sys.Pos(p, jd) - e.Pirate.Pos).Mag, dv = (sys.Vel(p, jd) - e.Pirate.Vel).Mag;
                 // sys.Vel differences the path 30 s either side, on jd's 40 µs grid: the stand-in's gate (pursuit check G4)
-                Check(R<bool>("Coasting") && lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel && e.Pirate.DvUsed > 0,
-                    $"pirates: in the scene, the ship coasting, the pirate flies the player's spans: its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s (< {PursuitCheck.GateVel:E0}) off it, Δv {e.Pirate.DvUsed:F3} km/s ({e.Pirate.Phase})");
+                Check(!R<bool>("Coasting") && lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel && e.Pirate.DvUsed > 0,
+                    $"pirates: in the scene at 1×, the ship in free flight on integrated gravity, the pirate flies the player's spans: its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s (< {PursuitCheck.GateVel:E0}) off it, Δv {e.Pirate.DvUsed:F3} km/s ({e.Pirate.Phase})");
                 Put("warpIdx", 6);
             });
             if (ok) yield return null;
@@ -108,7 +108,11 @@ namespace FogOfWar
                 double cap = career.WarpCap, ran = Get<double>("frameWarp");
                 Check(cap == Career.ChaseWarp && WarpOf(w) <= cap && WarpOf(w + 1) > cap && ran <= cap * (1 + 1e-9),
                     $"pirates: 1M× asked during a chase {e.Range:N0} km off runs at {WarpOf(w):N0}× (cap {cap:N0}×; the frame ran at {ran:N0}×)");
-                e.Pirate.Pos = ship.Pos + (ship.Pos - sys.Pos(sys["Vesta"], jd)).Norm * -5000; e.Pirate.Vel = ship.Vel;
+                var p = e.Proxy;
+                double lag = (e.Chase.SpanEnd - jd) * 86400, dp = (sys.Pos(p, jd) - e.Pirate.Pos).Mag, dv = (sys.Vel(p, jd) - e.Pirate.Vel).Mag;
+                Check(R<bool>("Coasting") && lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel,
+                    $"pirates: at the {WarpOf(w):N0}× cap the ship coasts on its conic and the pirate flies those spans: its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s (< {PursuitCheck.GateVel:E0}) off it");
+                e.Pirate.Pos =ship.Pos + (ship.Pos - sys.Pos(sys["Vesta"], jd)).Norm * -5000; e.Pirate.Vel = ship.Vel;
                 Put("warpIdx", 6);
             });
             if (ok) yield return null;
