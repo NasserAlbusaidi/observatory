@@ -550,7 +550,7 @@ namespace FogOfWar
         // static field, so SaveKey's initialiser never sees it unset). -fowfidelity and -fowbhshots are unattended too:
         // this also turns route events off for both of those suites.
         static bool Unattended() => UnattendedSuite(Environment.GetCommandLineArgs()) != null;
-        internal static string[] UnattendedSuites() => new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots" };
+        internal static string[] UnattendedSuites() => new[] { "-fowqa", "-fowcareer", "-fowtour", "-fowuishots", "-fowaudioqa", "-fowshipshots", "-fowfidelity", "-fowbhshots", "-fowbhclip" };
         static string UnattendedSuite(string[] args) => Array.Find(UnattendedSuites(),
             a => Array.IndexOf(args, a) >= 0);
         // Each runner checks at report creation, independently of registration in UnattendedSuites.
