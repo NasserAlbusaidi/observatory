@@ -30,7 +30,8 @@ namespace FogOfWar.OpenWorld
             public Body Centre;   // the body the player is at (pirate altitude, dock time), or null
             public bool TrackDock;
             public double BurnG;  // S5: the player's hand burns once the pirate is alongside (0: none)
-            public string Evade;  // S2b-cut, S2b-flip: "cut" or "flip" once the range falls under EvadeKm (null: none)
+            public string Evade;  // S2b-cut, S2b-flip: "cut" or "flip" once the range falls under EvadeKm (null: none);
+                                  // S6: "brake", no action, only the autopilot's brake start marked
             public double EvadeKm;
             public Func<Init> Make;
         }
@@ -42,7 +43,7 @@ namespace FogOfWar.OpenWorld
             public Plan Plan;
             public double FirstAlong = -1, Capture = -1, Longest, EntryVrel, SteadyVrelMax, SteadyVrelMed = double.NaN, MedRangeAlong = double.NaN;
             public double MinRange = double.MaxValue, MinRangeT, MinRangeVrel = double.NaN, Range0, EndRange, Dv, ErrVel, Gap, UsPirate, ClosedForm = double.NaN;
-            public double MinAlt = double.MaxValue, DockT = -1, AlongAtDock, AlongTotalAtDock, CatchT = -1, BurnStart = -1, PeakVrel, SteadyPreDock;
+            public double MinAlt = double.MaxValue, MinAltPreDock = double.MaxValue, MinAltPreDockT, DockT = -1, AlongAtDock, AlongTotalAtDock, CatchT = -1, BurnStart = -1, PeakVrel, SteadyPreDock;
             // S2b-cut, S2b-flip: when the player acted, at what range and closing speed; the pass that followed (closest
             // approach inside a pirate step and the relative speed there) and how far the pirate then ran past
             public double EvadeT = -1, EvadeRange, EvadeClosing, PassRange = double.NaN, PassVrel = double.NaN, Apex = double.NaN;
@@ -202,6 +203,23 @@ namespace FogOfWar.OpenWorld
                 return new Init { Player = pl, PiratePos = pV + ur * out_ + ut * 2e4, PirateVel = vV, PirateG = g, Jd = Jd0 };
             }
 
+            double CruiseBack(double tb) { double a1 = Ship.G0, a2 = Ship.PursueMargin * Ship.G0, t = tb * 3600; return a1 * t * t / 2 * (1 + a1 / a2); }
+
+            // on rails at the cruise cap, its brake point tb hours ahead; one 1 s step first, so the run starts cruising
+            Init Cruising(double tb)
+            {
+                const double v = 100;
+                var pl = Player(sys, pV, vV, ur);
+                double brake = v * v / (2 * Ship.PursueMargin * pl.AMax) + Ship.Standoff(vesta);
+                double jd = Jd0 - 1.0 / 86400;
+                D3 p = sys.Pos(vesta, jd), u = p.Norm;
+                pl = Player(sys, p + u * (brake + v * (tb * 3600 + 1)), sys.Vel(vesta, jd) - u * v, u);
+                pl.Target = vesta; pl.Plan = Plan.Brachistochrone; pl.CruiseCap = v;
+                pl.Step(sys, jd, (Jd0 - jd) * 86400, Ship.Dominant(sys, pl.Pos, jd));
+                if (pl.Phase != "cruising") throw new InvalidOperationException($"S6: the player is '{pl.Phase}', not cruising");
+                return new Init { Player = pl, PiratePos = pl.Pos + u * CruiseBack(tb), PirateVel = pl.Vel, PirateG = 1, Jd = Jd0 };
+            }
+
             list.Add(new Scenario { Id = "S1", What = "player coasting at Vesta+1e6 km; 1 g pirate 100,000 km behind on the orbit, at relative rest", Duration = 8 * 3600, Make = () => Coasting(1) });
             list.Add(new Scenario { Id = "S1ahead", What = "S1 with the pirate 100,000 km ahead; exclusion-distance regression", Duration = 8 * 3600,
                 Make = () => { var i=Coasting(1); i.PiratePos=belt+ut*1e5; return i; } });
@@ -240,6 +258,16 @@ namespace FogOfWar.OpenWorld
                         What = $"player braking into Vesta from 600,000 km at 100 km/s; {g:F0} g pirate behind it at its velocity, {g * 9.80665e-3 * Math.Pow(T * 3600, 2) / 4:N0} km back (a {T:F0} h catch from relative rest)",
                         Make = () => { var i = Braking(g, 0); i.PiratePos = i.Player.Pos + ur * (g * 9.80665e-3 * Math.Pow(T * 3600, 2) / 4); i.PirateVel = i.Player.Vel; return i; },
                     });
+            // #89's autopilot case (report only): the player cruises at 100 km/s toward Vesta on a capped brachistochrone and
+            // starts its brake burn tb hours in; a 1 g pirate behind it at its velocity, as far back as makes its closing leg
+            // (1 g, the cruising player has no thrust) end at tb, so its braking leg (0.85 g) starts with the player's
+            foreach (var tb in new[] { 1.0, 2.0, 4.0 })
+                list.Add(new Scenario
+                {
+                    Id = $"S6-{tb:F0}h", Duration = (tb + 6) * 3600, Centre = vesta, TrackDock = true, Evade = "brake",
+                    What = $"player cruising at 100 km/s into Vesta, its brake start {tb:F0} h in; 1 g pirate behind it at its velocity, {CruiseBack(tb):N0} km back",
+                    Make = () => Cruising(tb),
+                });
             foreach (var g in new[] { 1.0, 2.0, 3.0 })
                 list.Add(new Scenario { Id = $"S5-{g:F0}g", What = $"S1 with a 3 g pirate; once alongside {PreHoldS:F0} s, the player burns {g:F0} g by hand and flips every 1800 s for 6 h", Duration = 4 * 3600, BurnG = g, Make = () => Coasting(3) });
             return list;
@@ -347,14 +375,14 @@ namespace FogOfWar.OpenWorld
                     else { pl.Plan = Plan.None; pl.CustomDir = -pl.Heading; pl.Hold = Hold.Custom; }
                     nextFlip += 1800;
                 }
-                if (sc.Evade != null && ev == 0 && (pi.Pos - pl.Pos).Mag < sc.EvadeKm)
+                if (sc.Evade != null && ev == 0 && (sc.Evade == "brake" ? pl.Phase != "cruising" : (pi.Pos - pl.Pos).Mag < sc.EvadeKm))
                 {
                     var rel = pl.Pos - pi.Pos;
                     ev = 1; res.EvadeT = t; res.EvadeRange = rel.Mag; res.EvadeClosing = D3.Dot(pi.Vel - pl.Vel, rel.Norm);
                     // the scene's CutDrive(); or SetThrottle(1) then Flip(): a full burn while it slews to the reverse heading
                     if (sc.Evade == "cut") { pl.ThrottleCmd = 0; pl.Throttle = 0; pl.Plan = Plan.None; pl.Phase = "drive cut"; }
-                    else { pl.ThrottleCmd = 1; pl.Plan = Plan.None; pl.Phase = "pilot override"; pl.CustomDir = -pl.Heading; pl.Hold = Hold.Custom; }
-                    raw?.WriteLine($"  EVENT t={t:F0} player {(sc.Evade == "cut" ? "cuts the drive" : "flips and burns at the pirate")} (range {res.EvadeRange:F1} km, closing {res.EvadeClosing:F2} km/s)");
+                    else if (sc.Evade == "flip") { pl.ThrottleCmd = 1; pl.Plan = Plan.None; pl.Phase = "pilot override"; pl.CustomDir = -pl.Heading; pl.Hold = Hold.Custom; }
+                    raw?.WriteLine($"  EVENT t={t:F0} player {(sc.Evade == "cut" ? "cuts the drive" : sc.Evade == "flip" ? "flips and burns at the pirate" : "leaves the cruise")} (range {res.EvadeRange:F1} km, closing {res.EvadeClosing:F2} km/s)");
                 }
                 double simDt = h0;
                 while (simDt > 1e-9)
@@ -468,7 +496,9 @@ namespace FogOfWar.OpenWorld
                     if (sc.Centre != null)
                     {
                         var cp = sys.Pos(sc.Centre, jd);
-                        res.MinAlt = Math.Min(res.MinAlt, (pi.Pos - cp).Mag - sc.Centre.Radius);
+                        double alt = (pi.Pos - cp).Mag - sc.Centre.Radius;
+                        res.MinAlt = Math.Min(res.MinAlt, alt);
+                        if (sc.TrackDock && res.DockT < 0 && alt < res.MinAltPreDock) { res.MinAltPreDock = alt; res.MinAltPreDockT = tm; }
                         if (sc.TrackDock && res.DockT < 0 && pl.Throttle == 0)
                         {
                             // Career.FindDock's rule, applied to the scenario's body
@@ -497,12 +527,12 @@ namespace FogOfWar.OpenWorld
             if (ev == 1) { res.PassRange = evMin; res.PassVrel = evMinV; }
             if (sc.Id.StartsWith("S2")) res.Note += $"range {res.Range0:F0}->{res.EndRange:F0} km ({(res.EndRange - res.Range0) / res.Range0 * 100:+0.00;-0.00}%); ";
             if (res.EvadeT >= 0)
-                res.Note += $"{(sc.Evade == "cut" ? "drive cut" : "flip")} at {res.EvadeT:F0} s ({res.EvadeRange:F0} km, closing {res.EvadeClosing:F2} km/s), " +
+                res.Note += $"{(sc.Evade == "cut" ? "drive cut" : sc.Evade == "flip" ? "flip" : "brake start")} at {res.EvadeT:F0} s ({res.EvadeRange:F0} km, closing {res.EvadeClosing:F2} km/s), " +
                     $"pass {res.PassRange:F3} km at {res.PassVrel:F2} km/s{(double.IsNaN(res.Apex) ? "" : $", out to {res.Apex:F0} km")}; ";
             if (sc.TrackDock) res.Note += res.DockT < 0 ? "player never docks; " : $"player docks at {res.DockT:F0} s, alongside then {res.AlongAtDock:F0} s continuous, {res.AlongTotalAtDock:F0} s total; ";
             if (sc.TrackDock) res.Note += $"before the dock: steady vrel max {res.SteadyPreDock:E1} km/s, {res.TurnInPreDock} turn entries; ";
             if (sc.BurnG > 0 && res.CatchT >= 0) res.Note += $"caught at {res.CatchT:F0} s, burns from {res.BurnStart:F0} s; max range in burns {maxRange:F2} km, peak vrel {res.PeakVrel:F4} km/s; ";
-            if (sc.Centre != null) res.Note += $"pirate min alt over {sc.Centre.Name} {res.MinAlt:F0} km; ";
+            if (sc.Centre != null) res.Note += $"pirate min alt over {sc.Centre.Name} {res.MinAlt:F0} km" + (sc.TrackDock ? $", {res.MinAltPreDock:F0} km before the dock (at {res.MinAltPreDockT:F0} s)" : "") + "; ";
             if (res.Rebounds > 0) res.Note += $"minima {string.Join("/", res.Minima.Select(m => m.ToString("F1")))} km; ";
             if (res.EarlyStop) res.Note += "stopped at hold 7800 s; ";
             res.Note += $"end: pirate '{pi.Phase}', player '{pl.Phase}'";
@@ -603,6 +633,16 @@ namespace FogOfWar.OpenWorld
         {
             var sys = SolarSystem.Build();
             var scs = Scenarios(sys).Where(s => s.Id.StartsWith("S3b-")).ToList();
+            foreach (var sc in scs) Echo(t, $"  {sc.Id,-8} {sc.What}");
+            int n = 0;
+            foreach (var sc in scs) foreach (var h in new[] { 1.0, 5.0 }) Echo(t, Format(++n, RunOne(sys, sc, h, Plan.Pursue, null)));
+        }
+
+        // #89's measurement (report only): the pirate's pass when the autopilot starts its brake burn under it
+        public static void BrakeStart(TextWriter t)
+        {
+            var sys = SolarSystem.Build();
+            var scs = Scenarios(sys).Where(s => s.Id.StartsWith("S6-")).ToList();
             foreach (var sc in scs) Echo(t, $"  {sc.Id,-8} {sc.What}");
             int n = 0;
             foreach (var sc in scs) foreach (var h in new[] { 1.0, 5.0 }) Echo(t, Format(++n, RunOne(sys, sc, h, Plan.Pursue, null)));
