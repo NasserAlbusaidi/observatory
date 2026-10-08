@@ -240,7 +240,7 @@ namespace FogOfWar
             return m;
         }
 
-        // Billboard-star mesh for FogOfWar/Stars. dirs on the unit sphere; temps in K; mags are brightness.
+        // Billboard-star mesh for FogOfWar/Stars. dirs on the unit sphere; temps in K; mags are visual magnitudes V.
         public static Mesh StarMesh(IList<Vector3> dirs, IList<float> temps, IList<float> mags)
         {
             int n = dirs.Count;
@@ -301,10 +301,13 @@ namespace FogOfWar
                 dirs.Add(Random.onUnitSphere);
                 float r = Random.value;
                 temps.Add(r < 0.7f ? 3200 + Random.value * 2500 : r < 0.93f ? 5500 + Random.value * 3000 : 9000 + Random.value * 14000);
-                mags.Add(0.12f + Mathf.Pow(Random.value, 6) * 2f);
+                mags.Add(RandomStarMag());
             }
             return Obj("Starfield", parent, StarMesh(dirs, temps, mags), StarMat(gain));
         }
+
+        // A random visual magnitude for the procedural skies: star counts grow about x3 per magnitude (10^0.5) up to V 6.5.
+        public static float RandomStarMag() => Mathf.Max(-1.5f, 6.5f + Mathf.Log10(1f - Random.value) * 2f);
 
         static Material StarMat(float gain)
         {

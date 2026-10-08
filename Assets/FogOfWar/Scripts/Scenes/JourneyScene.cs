@@ -111,9 +111,9 @@ namespace FogOfWar
                     float r = Random.value;
                     dirs.Add(d);
                     temps.Add(r < 0.7f ? 3000 + Random.value * 2500 : r < 0.93f ? 5500 + Random.value * 3000 : 9000 + Random.value * 16000);
-                    mags.Add(0.15f + Mathf.Pow(Random.value, 6) * 2.5f);
+                    mags.Add(Gfx.RandomStarMag());
                 }
-                dirs[0] = Vector3.forward; temps[0] = 6000; mags[0] = 3; // the destination, dead ahead
+                dirs[0] = Vector3.forward; temps[0] = 6000; mags[0] = -1.5f; // the destination, dead ahead, as bright as Sirius
             }
             if (skyObj != null) Gfx.Destroy(skyObj);
             if (skyMesh != null) Gfx.Destroy(skyMesh);
