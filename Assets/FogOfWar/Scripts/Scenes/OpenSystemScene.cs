@@ -43,6 +43,7 @@ namespace FogOfWar
         Vector3 engineScale;
         Material plumeMat, orbitMat;
         ShipLighting lighting;
+        readonly StarGlare starGlare = new StarGlare();
         Mesh orbitMesh;
         readonly List<Vector3> pts = new List<Vector3>();
         readonly List<Color> cols = new List<Color>();
@@ -721,6 +722,7 @@ namespace FogOfWar
             TerrainBody.Collect();
             float pxPerRad = Cam.pixelHeight / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
             GeometryUtility.CalculateFrustumPlanes(Cam, frustum);
+            starGlare.Begin(Cam);
             foreach (var v in vis)
             {
                 var b = v.b;
@@ -756,6 +758,8 @@ namespace FogOfWar
                 }
                 float irr = ShipLighting.Irradiance((sunW - bw).Mag);
                 foreach (var m in v.mats) { m.SetVector("_SunDir", sunDir); m.SetVector("_FOWSunDir", sunDir); m.SetFloat("_SunIrr", irr); }
+                // the map is a diagram, and its Sun-centred camera would hold the glare on for good
+                if (!MapView) starGlare.AddBody(v.t.position, b.Radius, bw, camW, sunW, b == sys.Sun);
                 if (b == sys.Sun && sunGlow != null)
                 {
                     sunGlow.localPosition = v.t.localPosition;
@@ -786,6 +790,7 @@ namespace FogOfWar
             }
             lighting?.Update(sys, jd, ship.Pos, sunW, dt, shipT, shipLen * shipT.lossyScale.x,
                              shipT.TransformPoint(new Vector3(0, 0, -shipLen * 0.55f)), thr);
+            starGlare.End(dt, lighting != null ? lighting.Exposure : 1f);
 
             PlaceRings(sunW);
             DrawOrbits();

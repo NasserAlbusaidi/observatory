@@ -35,7 +35,8 @@ Shader "FogOfWar/SkyMap"
             float4 frag(v2f i) : SV_Target
             {
                 float3 c = texToDisplay(tex2DSphere(_MainTex, i.d).rgb) * _Gain;
-                return float4(displayToOutput(c), 1.0);
+                // sunlit bodies in view dim the band like the stars (StarGlare.cs)
+                return float4(displayToOutput(c) * pow(10.0, -0.4 * FOW_STAR_SLOPE * _FOWStarGlare), 1.0);
             }
             ENDCG
         }
