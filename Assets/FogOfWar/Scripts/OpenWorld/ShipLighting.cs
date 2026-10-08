@@ -124,6 +124,7 @@ namespace FogOfWar.OpenWorld
             Shader.SetGlobalVector(idPlumeCol, Vector4.zero);
             Shader.SetGlobalVector(idShadowParams, Vector4.zero);
             Shader.SetGlobalVector(idFloodCol, Vector4.zero);
+            StarGlare.Reset();
         }
 
         // Sunlight at a heliocentric distance, 1 at 1 AU.

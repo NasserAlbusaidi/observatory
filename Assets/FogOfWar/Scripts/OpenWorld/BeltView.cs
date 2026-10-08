@@ -82,6 +82,7 @@ namespace FogOfWar.OpenWorld
             double d0 = jd - 2451545.0;
             // render-space mapping and magnitude are pure per rock, so they run in parallel; batching below stays on this thread
             if (rp == null) { rp = new Vector3[belt.Count]; rk = new float[belt.Count]; dShip = new double[belt.Count]; }
+            float glare = StarGlare.Mag;   // sunlit bodies in view dim the dots like the stars
             System.Threading.Tasks.Parallel.For(0, (belt.Count + 1023) / 1024, chunk =>
             {
                 int end = Math.Min(belt.Count, (chunk + 1) * 1024);
@@ -90,7 +91,7 @@ namespace FogOfWar.OpenWorld
                     rp[j] = map(belt.Pos[j], out double kj);
                     rk[j] = (float)kj;
                     dShip[j] = (belt.Pos[j] - shipW).Sqr;
-                    if (!diagram) peaks[j] = Art.StarPeak(Magnitude(j, camW, sunW));
+                    if (!diagram) peaks[j] = Art.StarPeak(Magnitude(j, camW, sunW) + glare);
                 }
             });
             for (int k = 0; k < belt.Count; k++)

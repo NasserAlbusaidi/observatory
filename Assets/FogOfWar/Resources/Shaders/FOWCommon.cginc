@@ -276,6 +276,8 @@ float3 unitLuma(float3 display) { float3 c = pow(max(display, 0), 2.2); return c
 // multiplies its output by its own sunlight (irr: 1 at 1 AU, inverse square) times the exposure; self-luminous
 // light (city lights, glows) by the exposure alone.
 float _FOWExposure;
+// Magnitudes added to every point source by glare from sunlit bodies in view (StarGlare.cs); 0 outside the open world.
+float _FOWStarGlare;
 // Capped at 1: a sunlit surface never shows brighter than fully exposed sunlight, so the extra exposure the camera
 // takes in an eclipse lifts the ship and glowing light only, not the sunlit planets in view (min(exposure, 1/irr)).
 float fowSunlit(float irr) { return min(irr * _FOWExposure, 1.0); }

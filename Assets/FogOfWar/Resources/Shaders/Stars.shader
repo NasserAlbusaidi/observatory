@@ -44,6 +44,7 @@ Shader "FogOfWar/Stars"
                 float boost = visB(T) / visB(v.uv2.x) / (D * D) * _Gain;
                 // a flux ratio is a magnitude shift, so stars ahead brighten and faint ones fade in, stars behind fade
                 float Veff = v.uv2.y - 2.5 * log10(clamp(boost, 1e-30, 1e30));
+                Veff += _FOWStarGlare;
                 float2 spot = starSpot(starPeak(Veff));
                 o.col = unitLuma(blackbody(T));
                 o.a = spot.x;
