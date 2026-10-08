@@ -59,7 +59,7 @@ namespace FogOfWar
                 Check(career.MakeCall(Career.RouteKind.Distress, run, sys, ship, jd) && career.Call?.Offer != null, "a distress call comes in");
                 var offer = career.Call?.Offer;
                 var (ru, rw) = ship.RelToTarget(sys, jd);
-                Career.Trip(Math.Max((sys.Pos(mars, jd) - ship.Pos).Mag - Ship.Standoff(mars), 0), ship.MaxG * Ship.G0, 1, ship.Mass, out double burn, out _, out _, ru, rw);
+                Career.Trip(Math.Max((sys.Pos(mars, jd) - ship.Pos).Mag - Ship.Standoff(mars), 0), ship.AMax, 1, ship.Mass, out double burn, out _, out _, ru, rw);
                 career.Answer(true, jd);
                 yield return null;
                 Check(offer != null && career.Active.Contains(offer) && sys[offer.To] != null && sys[offer.To].Parent == mars && offer.Days > burn / 86400 && offer.ExpressDays == 0 && career.Call == null,

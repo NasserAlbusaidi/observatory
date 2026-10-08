@@ -23,8 +23,11 @@ namespace FogOfWar.OpenWorld
         public D3 Pos, Vel;
         public Quaternion Att = Quaternion.identity;
         public Vector3 AngVel;                   // body frame, rad/s (x pitch nose-down, y yaw right, z roll left)
-        public double MaxG = 1;
-        public double ThrottleCmd;               // pilot's throttle, 0..1 of MaxG
+        public double MaxG = 1;                  // the pilot's drive limit
+        // Drive thrust in MN; MN per tonne is km/s², so the drive gives at most Thrust / Mass. 0 = no thrust limit: MaxG
+        // alone sets the acceleration (sandbox, pirates, QA ships).
+        public double Thrust;
+        public double ThrottleCmd;               // pilot's throttle, 0..1 of AMax
         public double Throttle;                  // applied this step
         public Vector3 RotInput, RcsInput;       // pilot input this frame, body axes, −1..1 (RCS: x right, y up, z forward)
         public bool FlightAssist = true;
@@ -63,7 +66,8 @@ namespace FogOfWar.OpenWorld
         public readonly List<Body> Near = new List<Body>();
         public readonly List<Body> Obstacles = new List<Body>();
 
-        public double AMax => MaxG * G0;
+        public double AMax => Thrust > 0 ? Math.Min(MaxG * G0, Thrust / Mass) : MaxG * G0;
+        public double AccelG => AMax / G0;       // what full throttle gives now, in g
         public D3 Heading => Frame.FromU(Att * Vector3.forward).Norm;
         public bool PlanActive => Plan != Plan.None && Target != null;
         public bool ManualInput => RotInput.sqrMagnitude > 0 || RcsInput.sqrMagnitude > 0;

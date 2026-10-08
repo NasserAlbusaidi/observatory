@@ -197,7 +197,7 @@ namespace FogOfWar
             double cap = career != null && !career.Sandbox ? career.MaxG : double.MaxValue;
             for (int i = 0; i < Gs.Length; i++) segG.SetEnabled(i, Gs[i] <= cap + 1e-6);
             Ui.Text(segGNote, career == null || career.Sandbox ? "* 10 g needs the juice (fictional)." :
-                $"Drive rated {career.DriveRating:0} g" + (career.CarryingPassengers ? ", held to 1 g with passengers aboard" : "") + ". Upgrade at a port.");
+                $"Drive {career.Thrust:0.0} MN: {Fmt.Num(career.AccelAt(ship.Mass) / Ship.G0, 2)} g at {ship.Mass:N0} t, more as the tank empties" + (career.CarryingPassengers ? ", held to 1 g with passengers aboard" : "") + ". Upgrade at a port.");
         }
 
         Label segGNote;
@@ -249,7 +249,7 @@ namespace FogOfWar
             Ui.KV(c, "Credits", $"{career.Credits:N0} cr", career.Credits < 0 ? "warn" : "accent");
             Ui.KV(c, "Fuel", $"{ship.Fuel:N1} / {career.TankCapacity:N0} t");
             Ui.KV(c, "Hold", $"{career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t");
-            Ui.KV(c, "Drive", $"{career.DriveRating:0} g" + (career.CarryingPassengers ? " (1 g, passengers)" : ""));
+            Ui.KV(c, "Drive", $"{career.Thrust:0.0} MN, {Fmt.Num(career.AccelAt(ship.Mass) / Ship.G0, 2)} g now" + (career.CarryingPassengers ? " (1 g, passengers)" : ""));
             Ui.KV(c, "Speed change left", $"{Career.DvLeft(ship):N0} km/s");
             Ui.KV(c, "Record", CareerRecord());
             // standing with each port owner (Career.Factions.cs): the tier sets the pay on that faction's boards
@@ -378,7 +378,8 @@ namespace FogOfWar
                     var dest = career.TargetOf(j);
                     if (dest == null) continue;
                     double d = Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0);
-                    Career.Trip(d, career.DriveRating * Ship.G0, 1, ship.Mass + j.Load, out double t, out _, out double fuel);
+                    double a = career.AccelAt(ship.Mass + j.Load, j.Kind == JobKind.Passengers);
+                    Career.Trip(d, a, 1, ship.Mass + j.Load, out double t, out _, out double fuel);
                     var card = Ui.E(c, "panel", "soft");
                     card.style.paddingTop = 8; card.style.paddingBottom = 4; card.style.marginBottom = 6;
                     var head = Ui.E(card, "row");
@@ -389,7 +390,7 @@ namespace FogOfWar
                     Ui.L(card, what, "t-body");
                     // a far run can need more than the tank for a full burn: say so here, not after Engage
                     bool overTank = fuel > career.TankCapacity;
-                    var cost = Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {career.DriveRating:0} g: {Dur(t)}, {fuel:N1} t" + (overTank ? " (more than the tank: coast)" : ""), "t-note", "f-mono");
+                    var cost = Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {Fmt.Num(a / Ship.G0, 2)} g: {Dur(t)}, {fuel:N1} t" + (overTank ? " (more than the tank: coast)" : ""), "t-note", "f-mono");
                     Ui.SetClass(cost, "warn", overTank);
                     if (j.ExpressDays > 0)
                         Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done within {Days(j.ExpressDays)}", "t-note", "f-mono", "ok");

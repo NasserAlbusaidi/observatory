@@ -66,7 +66,7 @@ namespace FogOfWar.OpenWorld
             if (dest == null) return false;
             // a full burn from here to the job's target, the yardstick for both calls
             var (u, w) = ship.Target == dest ? ship.RelToTarget(sys, jd) : (0.0, 0.0);
-            Trip(Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0), ship.MaxG * Ship.G0, 1, ship.Mass, out double burn, out _, out _, u, w);
+            Trip(Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0), ship.AMax, 1, ship.Mass, out double burn, out _, out _, u, w);
 
             if (kind == RouteKind.Pirate)
             {

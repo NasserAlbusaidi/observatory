@@ -25,7 +25,7 @@ namespace FogOfWar
         {
             if (cockpit == null) return;
             float dt = Time.unscaledDeltaTime;
-            cockpit.Frame(inside, Quaternion.Euler(lookPitch, lookYaw, 0), (float)(ship.Throttle * ship.MaxG), (float)ship.Throttle, ship.RcsLevel, dt);
+            cockpit.Frame(inside, Quaternion.Euler(lookPitch, lookYaw, 0), (float)(ship.Throttle * ship.AccelG), (float)ship.Throttle, ship.RcsLevel, dt);
             // the MFDs carry the bottom flight cluster's readouts, and in portrait the cluster would sit on top of them
             if ((flightCluster == null || flightCluster.panel == null) && hudShell != null) flightCluster = hudShell.HudLayer?.Q(className: "flight");
             if (flightCluster != null) flightCluster.style.visibility = inside ? Visibility.Hidden : Visibility.Visible;
@@ -87,9 +87,9 @@ namespace FogOfWar
 
             // 1: drive
             mfdLines.Clear();
-            double g = ship.Throttle * ship.MaxG;
+            double g = ship.Throttle * ship.AccelG;
             mfdLines.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(g, 2) + " g" : "safe", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
-            mfdLines.Add(new Readout("Throttle", Fmt.Num(ship.ThrottleCmd * 100, 0) + " %  of " + Fmt.Num(ship.MaxG, 1) + " g"));
+            mfdLines.Add(new Readout("Throttle", Fmt.Num(ship.ThrottleCmd * 100, 0) + " %  of " + Fmt.Num(ship.AccelG, 2) + " g"));
             mfdLines.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
             mfdLines.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
             mfdLines.Add(new Readout("Assist", ship.FlightAssist ? "on" : "off", ship.FlightAssist ? Tone.Normal : Tone.Bad));
@@ -121,7 +121,7 @@ namespace FogOfWar
                 mfdLines.Add(new Readout("Range", Km(r.Mag - ship.Target.Radius)));
                 mfdLines.Add(new Readout("Rel. speed", SpeedText(vr.Mag)));
                 mfdLines.Add(new Readout("Closing", SpeedText(closing), closing > 0 ? Tone.Cold : Tone.Normal));
-                mfdLines.Add(new Readout("Flip & burn", Dur(ship.EtaSeconds(sys, jd)) + " at " + Fmt.Num(ship.MaxG, 1) + " g"));
+                mfdLines.Add(new Readout("Flip & burn", Dur(ship.EtaSeconds(sys, jd)) + " at " + Fmt.Num(ship.AccelG, 2) + " g"));
                 mfdLines.Add(new Readout("Plan", ship.PlanActive ? PlanShort[(int)ship.Plan] : "none", ship.PlanActive ? Tone.Hot : Tone.Normal));
             }
             else mfdLines.Add(new Readout("Target", "none"));

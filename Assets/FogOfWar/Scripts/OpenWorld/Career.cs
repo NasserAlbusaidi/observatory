@@ -77,7 +77,11 @@ namespace FogOfWar.OpenWorld
             new Port { Name = "Enceladus", Body = "Enceladus", FuelPrice = 9, Owner = Faction.Compact, Note = "Plume water from the south pole." },
         };
 
+        // Drives are rated by the g they give at RatedMass (the stock ship with a full tank and an empty hold); the thrust
+        // is fixed, so more mass aboard gives less g and a burn gains g as the tank empties (combat design, decision 1).
         public static readonly double[] DriveG = { 1, 3, 5 };
+        public const double RatedMass = 500;
+        public static double DriveThrust(int level) => DriveG[level] * Ship.G0 * RatedMass; // MN: 4.9, 14.7, 24.5
         public static readonly double[] DriveCost = { 0, 50000, 150000 };
         public const double TankCost = 35000;
         public const int MaxTankLevel = 2;
@@ -127,9 +131,13 @@ namespace FogOfWar.OpenWorld
 
         public double TankCapacity => 200 + TankStep * TankLevel;
         public double DryMass => 300 + TankDryMass * TankLevel;
-        public double DriveRating => DriveG[DriveLevel];
+        public double Thrust => DriveThrust(DriveLevel);
         public bool CarryingPassengers => Active.Exists(c => c.Kind == JobKind.Passengers);
-        public double MaxG => CarryingPassengers ? Math.Min(DriveRating, PassengerG) : DriveRating;
+        // the highest drive limit the pilot can set: what the drive gives with the tank and hold empty, or the passengers' 1 g
+        public double TopG => Thrust / (DryMass * Ship.G0);
+        public double MaxG => CarryingPassengers ? Math.Min(TopG, PassengerG) : TopG;
+        // full drive at a total mass of m tonnes, in km/s², held to 1 g for passengers
+        public double AccelAt(double m, bool passengers = false) => Math.Min(Thrust / m, passengers ? PassengerG * Ship.G0 : double.MaxValue);
         public double CargoTonnes { get { double t = 0; foreach (var c in Active) t += c.Load; return t; } }
 
         public static Port PortAt(string name) => Array.Find(Ports, p => p.Name == name);
@@ -161,7 +169,8 @@ namespace FogOfWar.OpenWorld
         public void Apply(Ship ship)
         {
             ship.UnlimitedFuel = Sandbox;
-            if (Sandbox) { ship.Cargo = 0; return; }
+            if (Sandbox) { ship.Cargo = 0; ship.Thrust = 0; return; }
+            ship.Thrust = Thrust;
             ship.DryMass = DryMass;
             ship.Cargo = CargoTonnes;
             ship.Fuel = Math.Min(ship.Fuel, TankCapacity);
@@ -632,7 +641,7 @@ namespace FogOfWar.OpenWorld
         {
             if (Docked == null || DriveLevel >= DriveG.Length - 1 || Credits < DriveCost[DriveLevel + 1]) return false;
             Credits -= DriveCost[++DriveLevel];
-            Say(Happening.Upgrade, $"Drive upgraded: rated {DriveRating:0} g");
+            Say(Happening.Upgrade, $"Drive upgraded: {Thrust:0.0} MN, {DriveG[DriveLevel]:0} g at {RatedMass:N0} t");
             return true;
         }
 

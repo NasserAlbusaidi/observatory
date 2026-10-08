@@ -602,7 +602,7 @@ namespace FogOfWar
             var vRef = (ship.Vel - RefVel(VelRefBody)).Mag;
             Ui.Text(spdVal, SpeedNum(vRef, out string spdUnit));
             Ui.Text(spdRef, spdUnit.ToUpperInvariant() + " VS " + RefName(VelRefBody).ToUpperInvariant());
-            Ui.Text(drvVal, Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g");
+            Ui.Text(drvVal, Fmt.Num(ship.Throttle * ship.AccelG, 2) + " g");
             Ui.SetClass(drvVal, "accent", ship.Throttle > 0);
             Ui.SetClass(drvVal, "glow", ship.Throttle > 0);
             thrFill.style.width = Length.Percent((float)ship.Throttle * 100);
