@@ -188,7 +188,8 @@ namespace FogOfWar.OpenWorld
             {
                 Kind = RouteKind.Pirate, Job = job, DivertTo = port, Answers = answers.ToArray(),
                 Title = $"{Raiders} in pursuit",
-                Text = $"The {Raiders} had a ship, the {hull}, waiting {(pos - sys.Pos(lair, jd)).Mag:N0} km off {lair.Name}. At {PirateG:0} g it can be alongside in " +
+                Text = $"The {Raiders} had a ship, the {hull}, waiting {(pos - sys.Pos(lair, jd)).Mag:N0} km off {lair.Name}." + SeenLine(ship, pos, jd) +
+                       $" At {PirateG:0} g it can be alongside in " +
                        $"about {Span(catchS / 86400)}, and {Span(Threat.BoardingSeconds / 86400)} alongside is a boarding: it takes {takes}. " +
                        "Run: burn hard, or dock first. " +
                        (port != null ? $"Divert: {port.Name} is {Span(divertS / 86400)} away at full burn, in the {Factions[(int)port.Owner].Name} patrol's reach. " : "") +

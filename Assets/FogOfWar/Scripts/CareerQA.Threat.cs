@@ -54,6 +54,7 @@ namespace FogOfWar
             Call("ToggleMap");
             yield return null;
             Check(rep.Contains("rings 4 patrol, 2 haven, 2 belt"), $"threat: the map draws the patrols' reach, the havens' zones and the belt ({rep})");
+            yield return SignatureChecks(); // 15: what a raider sees
         }
     }
 }

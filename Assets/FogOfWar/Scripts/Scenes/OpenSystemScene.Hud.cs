@@ -122,6 +122,7 @@ namespace FogOfWar
             pills = Ui.E(layer, "pills");
             pills.pickingMode = PickingMode.Ignore;
             pRaider = Pill("RAIDER"); // first: a chase is the one that needs an answer
+            pSeen = Pill("SEEN");
             pAssist = Pill("ASSIST"); pHold = Pill("HOLD"); pNav = Pill("NAV");
             pLanded = Pill("LANDED"); pLimited = Pill("WARP LIMITED");
             pModel = Pill("TWO-BODY COAST"); pArrival = Pill("ASSISTED ARRIVAL");
@@ -624,6 +625,7 @@ namespace FogOfWar
             UpdateLessonCard();
             // a pill only for a state that is not the normal one: a chase, assist off, a hold, a plan flying
             SetPill(pRaider, RaiderLine()?.ToUpperInvariant(), "bad");
+            SetPill(pSeen, SeenPill(), "bad");
             SetPill(pAssist, ship.FlightAssist ? null : "ASSIST OFF", "bad");
             SetPill(pHold, ship.Hold == Hold.Off ? null : "HOLD " + HoldNames[Math.Min((int)ship.Hold, HoldNames.Length - 1)].ToUpperInvariant() + (ship.VelRef != null ? " VS " + ship.VelRef.Name.ToUpperInvariant() : ""), "cold");
             SetPill(pNav, ship.PlanActive ? "NAV " + ship.Phase.ToUpperInvariant() : null, "hot");

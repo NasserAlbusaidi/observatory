@@ -4,9 +4,10 @@ namespace FogOfWar.OpenWorld
 {
     // Route events: calls that come in during a trip, so the time between Engage and payday has decisions in it. A
     // distress call offers a rescue near where you are going; cargo trouble asks you to trade fuel for the load; a raider
-    // (Career.Pirates.cs) gives chase. Rolled in game time while the autopilot flies a job, one call at a time. The scene
-    // turns them off for the unattended suites, whose trips would stall when a call drops the warp. A pending call is not
-    // saved.
+    // (Career.Pirates.cs) gives chase. Rolled in game time, one call at a time. Raiders roll whenever the ship is seen
+    // (combat Phase 2, Career.Signature.cs), hand-flown or not; distress and cargo trouble still ride the autopilot's plan.
+    // The scene turns them off for the unattended suites, whose trips would stall when a call drops the warp. A pending
+    // call is not saved.
     public partial class Career
     {
         public enum RouteKind { Distress, CargoTrouble, Pirate }
@@ -40,16 +41,23 @@ namespace FogOfWar.OpenWorld
                 return;
             }
             if (Encounter != null) return; // one encounter at a time, and no other call while a raider gives chase
-            if (!RouteEvents || Sandbox || Docked != null || ship.Landed != null || !ship.PlanActive || simDt <= 0) return;
+            if (!RouteEvents || Sandbox || Docked != null || ship.Landed != null || simDt <= 0) return;
             if (jd - lastCallJd < RouteGapDays) return;
+            // raiders see the ship, not the autopilot (combat Phase 2); they strike on the approach too (no cut-off): their
+            // rate is where the ship is slow, out of patrol reach
+            var raid = RaidJob(sys, ship, jd);
+            if (raid != null)
+            {
+                double roll = routeRng.NextDouble(); // drawn even when unseen: the draw count stays (CareerQA 5c)
+                if (roll < RaidChance(sys, ship, raid, jd, SeenSeconds(ship, jd, simDt)) && MakeCall(RouteKind.Pirate, raid, sys, ship, jd))
+                {
+                    lastCallJd = jd;
+                    return;
+                }
+            }
+            if (!ship.PlanActive) return; // distress and cargo trouble ride the plan
             var job = Active.Find(c => !c.Tutorial && TargetOf(c) == ship.Target && (c.Kind == JobKind.Cargo || c.Kind == JobKind.Passengers || c.Kind == JobKind.Survey));
             if (job == null) return;
-            // raiders strike on the approach too (no cut-off): their rate is where the ship is slow, out of patrol reach
-            if (routeRng.NextDouble() < 1 - Math.Exp(-PirateRate(sys, ship, job, jd) * simDt / 3600) && MakeCall(RouteKind.Pirate, job, sys, ship, jd))
-            {
-                lastCallJd = jd;
-                return;
-            }
             var t = ship.Target;
             if ((ship.Pos - sys.Pos(t, jd)).Mag < 10 * DockRange(t)) return; // nothing on the approach
             if (routeRng.NextDouble() >= 1 - Math.Exp(-simDt / 86400 / RouteMeanDays)) return;

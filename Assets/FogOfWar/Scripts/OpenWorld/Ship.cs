@@ -39,6 +39,7 @@ namespace FogOfWar.OpenWorld
         public double DvUsed;
         public double BurnSeconds;               // sim seconds with the drive firing (career scan time leaves these out)
         public double CruiseSeconds;             // accumulated plan coast, even when a whole coast fits in one frame
+        public double LoudSeconds, LastLoudJd = double.NegativeInfinity; // Signature.Loud time, and the date it last was (not saved)
         // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
         // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
         public const double Ve = 10000;          // km/s
@@ -172,6 +173,7 @@ namespace FogOfWar.OpenWorld
             Vel += (g + gEnd) * (0.5 * h) + thrust * (f * h);
             DvUsed += dv * f;
             if (Throttle > 0) BurnSeconds += h * f;
+            if (dv > 0 && Signature.Loud(Mass, dv / h)) { LoudSeconds += h * f; LastLoudJd = jd + h * f / 86400; }
             if (PlanActive && Phase == "cruising" && Throttle == 0 && !RcsActive) CruiseSeconds += h;
             if (!UnlimitedFuel) Fuel = f < 1 ? 0 : Math.Max(0, Fuel - Mass * (1 - Math.Exp(-dv / Ve)));
             CheckTouchdown(sys, jd1);

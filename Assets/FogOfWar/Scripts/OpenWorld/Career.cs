@@ -355,15 +355,17 @@ namespace FogOfWar.OpenWorld
         // The ship's state at the start of this update (the end of the last one), so a long update credits only the time
         // actually spent in scan conditions, whatever the time compression.
         D3 lastPos, lastVel, spanPos, spanVel;
-        double lastJd = double.NaN, lastBurn, spanJd, spanBurn;
+        double lastJd = double.NaN, lastBurn, lastLoud, spanJd, spanBurn, spanLoud;
         bool spanOk;
 
         void StartSpan(Ship ship, double jd, double simDt)
         {
             // a load or a jump in the date leaves nothing to interpolate: that update credits no scan time
             spanOk = !double.IsNaN(lastJd) && simDt > 0 && Math.Abs((jd - lastJd) * 86400 - simDt) < 0.01 + 1e-6 * simDt;
-            spanPos = lastPos; spanVel = lastVel; spanJd = lastJd; spanBurn = lastBurn;
-            lastPos = ship.Pos; lastVel = ship.Vel; lastJd = jd; lastBurn = ship.BurnSeconds;
+            spanPos = lastPos; spanVel = lastVel; spanJd = lastJd; spanBurn = lastBurn; spanLoud = lastLoud;
+            lastPos = ship.Pos; lastVel = ship.Vel; lastJd = jd; lastBurn = ship.BurnSeconds; lastLoud = ship.LoudSeconds;
+            // a load or a date jump starts tracked: no chase or track is saved (D8). A frozen frame (same date, no time) is neither
+            if (!spanOk && !(simDt <= 0 && jd == spanJd)) ship.LastLoudJd = jd;
         }
 
         // Seconds of this update spent within range of b with the drive off. In between the update's end states the
