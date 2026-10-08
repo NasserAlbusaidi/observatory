@@ -40,6 +40,20 @@ namespace FogOfWar
             if (watch == Career.Watch.Loud) list.Add(new Readout("Raiders", "can see your burn", Tone.Bad));
             else if (watch == Career.Watch.Tracked) list.Add(new Readout("Raiders", $"tracking you, {Dur(watchLeft)} left", Tone.Bad));
             else if (watch == Career.Watch.Cold) list.Add(new Readout("Raiders", "no track: cold for over 2 h", Tone.Cold));
+            if (traffic != null) list.Add(new Readout("Contacts", $"sensed: {traffic.SeenCount} of {traffic.Flying.Count} in flight"));
+        }
+
+        public int SeenRings { get; private set; } // checks: 1 while the own-burn ring is on the map
+
+        // How far a raider's stock sensors see our burn (no sensor factor), in a warm tone like the patrols' reach.
+        void AddSeenRing(float fade)
+        {
+            SeenRings = 0;
+            double p = Signature.JetW(ship);
+            if (p <= 0 || fade <= 0) return;
+            var c = new Color(1f, 0.55f, 0.2f, 0.5f * fade);
+            MapRing(ship.Pos, Signature.RangeKm(p), c);
+            SeenRings = 1;
         }
 
         // UpdateHud redraws the pill only on its next run, so a test redraws it from a fresh watch before it reads it

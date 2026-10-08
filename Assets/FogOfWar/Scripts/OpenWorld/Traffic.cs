@@ -17,7 +17,12 @@ namespace FogOfWar.OpenWorld
             public Rail Rail;       // built by Ready, the first time the trip is needed
             public bool Refused;    // its course failed Rail.CheckEnds
             public Body Body;       // while in flight
+            public bool Seen;       // our sensors see its burn (Sense); derived each tick, never saved
             internal Body A, Z;
+
+            public double MassT => Signature.HullMassT(LengthM(Hull));
+            // the rail ship's thrust is its path acceleration (km/s²): the Rail leaves out gravity
+            public double JetW(double jd) => Signature.JetW(MassT, Rail.Accel(jd).Mag);
         }
 
         public const string Prefix = "Traffic ";
@@ -31,7 +36,10 @@ namespace FogOfWar.OpenWorld
         // longer than the longest trip, so a reset finds every ship in flight: Jupiter to Saturn across the Sun, both at
         // aphelion, is 15.6 AU and 27.6 days [calc]
         public const double LookbackDays = 30;
-        static readonly string[] Hulls = { "courier", "packet", "liner", "freighter", "tanker", "hauler" }; // the Fleet.json classes
+        public static readonly string[] Hulls = { "courier", "packet", "liner", "freighter", "tanker", "hauler" }; // the Fleet.json classes
+        // lengthM of each, same order (Resources/Models/Fleet.json; OpenWorld cannot Resources.Load, QA compares)
+        public static readonly double[] HullLengthM = { 45.63, 32.38, 142.26, 174.56, 162.96, 123.22 };
+        public static double LengthM(string hull) => HullLengthM[Array.IndexOf(Hulls, hull)];
 
         readonly SolarSystem sys;
         readonly int seed;
@@ -43,6 +51,7 @@ namespace FogOfWar.OpenWorld
         public IReadOnlyList<Trip> Flying => flying;
         public int Checked { get; private set; }    // courses built and tested so far
         public int Refused { get; private set; }    // of those, the ones that failed Rail.CheckEnds
+        public int SeenCount { get; private set; } // the ships seen at the last Sense
 
         public Traffic(SolarSystem sys, int seed = 1)
         {
@@ -96,8 +105,23 @@ namespace FogOfWar.OpenWorld
             return !t.Refused;
         }
 
+        // Which ships in flight our sensors see (combat Phase 2b): a ship is seen inside RangeKm(its jet power) × the sensor
+        // factor. Squared distances, no allocation.
+        public int Sense(D3 from, double jd, double sensorKm)
+        {
+            int n = 0;
+            foreach (var t in flying)
+            {
+                double r = Signature.RangeKm(t.JetW(jd), sensorKm);
+                t.Seen = (sys.Pos(t.Body, jd) - from).Sqr <= r * r;
+                if (t.Seen) n++;
+            }
+            return SeenCount = n;
+        }
+
         void Launch(Trip t)
         {
+            t.Seen = false;
             t.Body = t.Rail.Craft(t.Name);
             sys.Bodies.Add(t.Body);
             flying.Add(t);

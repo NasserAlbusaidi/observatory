@@ -139,11 +139,11 @@ namespace FogOfWar
             // Cross that day boundary before reset, then advance exactly six game hours.
             // The independent reference enumerates 40 days directly, rather than sharing Reset's lookback bug.
             Check(longest != null && longest.Arr - longest.Dep > 26, "traffic: fixed fixture contains a valid trip longer than 26 days");
-            if (longest == null || longest.Arr - longest.Dep <= 26) yield break;
+            if (longest == null || longest.Arr - longest.Dep <= 26) { yield return ContactsChecks(); yield break; }
             double sceneStart = Math.Floor(longest.Dep) + 26.05;
             double sceneEnd = sceneStart + 0.25;
             Check(sceneEnd < longest.Arr, "traffic: long-trip fixture remains active throughout the six-hour scene interval");
-            if (sceneEnd >= longest.Arr) yield break;
+            if (sceneEnd >= longest.Arr) { yield return ContactsChecks(); yield break; }
             Put("jd", sceneStart);
             Call("PlaceShipNearEarth");
             ship.Plan = Plan.None; ship.ThrottleCmd = 0;
@@ -171,6 +171,7 @@ namespace FogOfWar
             Check(live != null && Array.IndexOf(Names(live).Split(','), longest.Name) >= 0, $"traffic: long-trip fixture {longest.Name} is still in flight after the scene reset");
             log.WriteLine("  traffic fixture ships: " + (live != null ? Names(live) : "none"));
             check.Clear();
+            yield return ContactsChecks(); // 11b: what the sensors see of this traffic
         }
 
         static int Count(SortedDictionary<string, int> d) { int c = 0; foreach (var v in d.Values) c += v; return c; }

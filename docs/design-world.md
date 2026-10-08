@@ -109,7 +109,7 @@ The danger is at the ends of a trip, not in the middle.
 - **Look:**
   - Far ships show as drive-plume markers on the map.
   - Near ships use the `Fleet.json` hulls, which already carry a `registry` and a `livery` [code]. Factions add their own liveries.
-  - **W2b:** each ship is a 3 px dot in its owner's colour [design], not a plume. Inside 50,000 km [design], a tag names its hull class and owner. A dot is not a button: nothing can target a traffic ship before W4.
+  - **W2b:** each ship is a 3 px dot in its owner's colour [design], not a plume. Inside 50,000 km [design], a tag names its hull class and owner. A dot is not a button: nothing can target a traffic ship before W4. Since combat Phase 2b, only ships that our sensors see are drawn (see [design-combat.md](design-combat.md)).
   - Near models wait. A hull model shows only inside about 100 km (its true angular size), and a model pool for traffic is its own work.
 - **Count:** about 100 ships in flight [design]. Measure the frame cost. `Ship.Dominant` visits every body, craft included (`Ship.cs:67`).
   - **Measured (W2b):** 108 to 117 ships in flight. The cost is in PR 3.
@@ -246,7 +246,7 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
 - `Traffic.cs`: a schedule from (seed, day) gives the trips: from, to, departure, arrival, hull and faction.
 - Only ships in flight are bodies. Add them at departure and remove them at arrival, as `Career.Rescue.cs:91-92` does.
 - At 1M× warp, one frame can cover many departures. Step through the schedule one day at a time.
-- Ships show as dots in their owner's colour. Near models wait (see "Look" in "NPC traffic").
+- Ships show as dots in their owner's colour. Near models wait (see "Look" in "NPC traffic"). Since combat Phase 2b, only ships that our sensors see are drawn (see [design-combat.md](design-combat.md)).
 - Measure with `-fowprof` at 1M×. QA: the frame budget, and the same seed and day give the same traffic.
 - The saved list of changed ships waits for W4. Before W4, nothing changes a traffic ship.
 - **Built:**
