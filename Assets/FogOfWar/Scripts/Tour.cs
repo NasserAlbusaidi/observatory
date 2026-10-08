@@ -64,7 +64,7 @@ namespace FogOfWar
             log.WriteLine($"done, {errors} errors");
             log.Close();
             log = null;
-            Application.Quit();
+            Application.Quit(errors == 0 ? 0 : 1);
         }
 
         IEnumerator Shot(string name)

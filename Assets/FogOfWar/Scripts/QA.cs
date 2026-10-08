@@ -40,6 +40,8 @@ namespace FogOfWar
         }
 
         readonly HashSet<string> seen = new HashSet<string>();
+        // 0 clean, 1 errors or bad readouts, 2 aborted before the end: a runner can gate on the process, not the report
+        int ExitCode => errors + bad == 0 ? 0 : 1;
 
         static void Set(object o, string field, object value)
         {
@@ -311,7 +313,7 @@ namespace FogOfWar
             app.Activate(1); yield return new WaitForSecondsRealtime(1f); yield return Shot("ui-observatory-scene");
             log.WriteLine($"done: {errors} errors, {bad} bad readouts");
             log.Close(); log = null;
-            Application.Quit();
+            Application.Quit(ExitCode);
         }
 
         IEnumerator Start() => Guard(Run());
@@ -334,7 +336,7 @@ namespace FogOfWar
                     log.WriteLine($"QA aborted: {e}");
                     log.WriteLine($"done: {errors} errors, {bad} bad readouts (aborted)");
                     log.Close(); log = null;
-                    Application.Quit();
+                    Application.Quit(2); // incomplete: the functional result is not known
                     yield break;
                 }
                 if (!more) { stack.Pop(); continue; }
@@ -367,7 +369,7 @@ namespace FogOfWar
                 yield return TerrainPasses();
                 log.WriteLine($"done: {errors} errors, {bad} bad readouts");
                 log.Close(); log = null;
-                Application.Quit();
+                Application.Quit(ExitCode);
                 yield break;
             }
             Directory.CreateDirectory(dir);
@@ -465,7 +467,7 @@ namespace FogOfWar
             log.WriteLine($"done: {errors} errors, {bad} bad readouts");
             log.Close();
             log = null;
-            Application.Quit();
+            Application.Quit(ExitCode);
         }
 
         // Issues #8 and #13: bodies' positions and velocities stay continuous across the ends of the JPL fits, and a

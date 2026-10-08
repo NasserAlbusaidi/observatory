@@ -174,7 +174,7 @@ namespace FogOfWar
             Check(data.Length > 0 && peak > 1e-3, "recording has sound in it");
             log.WriteLine(fails == 0 ? "AUDIO QA: all checks pass" : $"AUDIO QA: {fails} checks FAIL");
             log.Close();
-            Application.Quit();
+            Application.Quit(fails == 0 ? 0 : 1);
         }
 
         int Mark() { lock (recLock) return rec.Count; }

@@ -59,7 +59,7 @@ namespace FogOfWar
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowclassicshots") >= 0)
             { yield return ClassicShots(app); yield break; }
             var shell = UiShell.Instance;
-            if (shell == null) { log.WriteLine("no UI shell"); Quit(); yield break; }
+            if (shell == null) { log.WriteLine("no UI shell"); Quit(2); yield break; }
             classicWas = GameSettings.ClassicPanel;
             if (classicWas) { GameSettings.ClassicPanel = false; log.WriteLine("classic panel setting on: off for this run"); }
 
@@ -509,7 +509,7 @@ namespace FogOfWar
                 Destroy(camRT); Destroy(uiRT);
             }
             log.WriteLine($"done, {errors} errors");
-            Quit();
+            Quit(errors == 0 ? 0 : 1);
         }
 
         IEnumerator CaptureTest()
@@ -630,7 +630,7 @@ namespace FogOfWar
             }
             GameSettings.ClassicPanel = classicWas;
             log.WriteLine($"done, {errors} errors");
-            Quit();
+            Quit(errors == 0 ? 0 : 1);
         }
 
         static IEnumerator Wait(float s)
@@ -693,11 +693,12 @@ namespace FogOfWar
             return t;
         }
 
-        void Quit()
+        // 0 clean, 1 errors, 2 the run could not start
+        void Quit(int code)
         {
             if (classicWas) GameSettings.ClassicPanel = true;
             log?.Close(); log = null;
-            Application.Quit();
+            Application.Quit(code);
         }
     }
 }
