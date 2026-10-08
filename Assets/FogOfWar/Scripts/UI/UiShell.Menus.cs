@@ -65,7 +65,7 @@ namespace FogOfWar.UI
                 Ui.MenuItem(side, "Continue", () => app.ContinueGame());
                 Ui.L(side, "Saved: " + OpenSystemScene.SaveSummary, "menu-item", "sub");
             }
-            if (started) Ui.MenuItem(side, "Save game", () => { app.SaveGame(); Toast("Game saved"); }, "small");
+            if (started) Ui.MenuItem(side, "Save game", () => Toast(app.SaveGame() ? "Game saved" : OpenSystemScene.ChaseNoSave), "small");
             Ui.MenuItem(side, "Observatory", () => app.ShowMenu(MenuObservatory), "small");
             Ui.MenuItem(side, "Settings", () => { settingsTab = 0; app.ShowMenu(MenuSettings); }, "small");
             Ui.MenuItem(side, "Controls", () => app.ShowMenu(MenuControls), "small");

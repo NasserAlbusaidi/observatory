@@ -53,7 +53,7 @@ namespace FogOfWar
         int rebindEndedFrame = -100;
         public void NewGame() => Restart(GameIndex);
         public void ContinueGame() { Activate(GameIndex); (current as OpenSystemScene)?.LoadGame(); }
-        public void SaveGame() => (current as OpenSystemScene)?.SaveGame();
+        public bool SaveGame() => (current as OpenSystemScene)?.SaveGame() ?? false;
 
         readonly PanelUI ui = new PanelUI();
         readonly List<Readout> readouts = new List<Readout>();
