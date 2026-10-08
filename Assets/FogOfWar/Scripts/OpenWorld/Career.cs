@@ -56,6 +56,8 @@ namespace FogOfWar.OpenWorld
         public List<string> taken = new List<string>(); // board slots already taken; older saves have none: only the active jobs' slots
         public List<string> visited = new List<string>(), scanned = new List<string>(), achieved = new List<string>(), dockedAt = new List<string>();
         public bool contact;             // saved during a raider's chase (W4): a load does not resume it, and says so
+        public ShipBuild build;          // the yard's build; saves made before it have none: drive, tank and sensors stand for it
+        public double refitJd;           // in the yard until this date; 0 = not
     }
 
     // The trucker career: credits, reaction mass, ports, contracts and upgrades. Plain data and rules, no UI; the scene
@@ -77,17 +79,7 @@ namespace FogOfWar.OpenWorld
             new Port { Name = "Enceladus", Body = "Enceladus", FuelPrice = 9, Owner = Faction.Compact, Note = "Plume water from the south pole." },
         };
 
-        // Drives are rated by the g they give at RatedMass (the stock ship with a full tank and an empty hold); the thrust
-        // is fixed, so more mass aboard gives less g and a burn gains g as the tank empties (combat design, decision 1).
-        public static readonly double[] DriveG = { 1, 3, 5 };
-        public const double RatedMass = 500;
-        public static double DriveThrust(int level) => DriveG[level] * Ship.G0 * RatedMass; // MN: 4.9, 14.7, 24.5
-        public static readonly double[] DriveCost = { 0, 50000, 150000 };
-        public const double TankCost = 35000;
-        public const int MaxTankLevel = 2;
-        public const double TankStep = 100, TankDryMass = 8; // t of tank, t of dry mass per upgrade
         public const int MaxActive = 3;
-        public const double HoldTonnes = 100;
         public const double PassengerTonnes = 0.25;          // a person, life support and consumables
         public const double PassengerG = 1;                  // sustained comfort limit
         public const double DwellSeconds = 7200;
@@ -112,7 +104,13 @@ namespace FogOfWar.OpenWorld
         public double ShipPaid, StartJd;
         public bool OwnsShip => ShipPaid >= ShipPrice;
         public double ShipStepNow => Math.Min(ShipStep, ShipPrice - ShipPaid);
-        public int DriveLevel, TankLevel, Done, Failed;
+        public int Done, Failed;
+        // The ship as fitted (ShipBuild.cs). The thrust is fixed, so more mass aboard gives less g and a burn gains g as
+        // the tank empties (combat design, decision 1). A refit keeps the ship in the yard, its drive and RCS cold, until
+        // RefitJd.
+        public ShipBuild Build = ShipBuild.Stock();
+        public double RefitJd;
+        public bool InYard => !Sandbox && jd < RefitJd;
         public bool Sandbox;
         public int TutorialStep;         // the scene's first-flight lesson + 1, kept so Continue resumes it (or not) — QA-051
         public readonly List<Contract> Active = new List<Contract>();
@@ -129,9 +127,11 @@ namespace FogOfWar.OpenWorld
         public static bool IsPay(Happening h) => h == Happening.JobPaid || h == Happening.RescueDone || h == Happening.SurveyDone || h == Happening.InterceptDone;
         public readonly List<Note> Notes = new List<Note>();
 
-        public double TankCapacity => 200 + TankStep * TankLevel;
-        public double DryMass => 300 + TankDryMass * TankLevel;
-        public double Thrust => DriveThrust(DriveLevel);
+        public double TankCapacity => Build.TankCapacity;
+        public double DryMass => Build.DryMass;
+        public double Thrust => Build.Thrust;
+        public double HoldTonnes => Build.HoldTonnes;
+        public int PeopleAboard { get { int n = 0; foreach (var c in Active) if (c.Kind == JobKind.Passengers) n += c.People; return n; } }
         public bool CarryingPassengers => Active.Exists(c => c.Kind == JobKind.Passengers);
         // the highest drive limit the pilot can set: what the drive gives with the tank and hold empty, or the passengers' 1 g
         public double TopG => Thrust / (DryMass * Ship.G0);
@@ -169,6 +169,8 @@ namespace FogOfWar.OpenWorld
         public void Apply(Ship ship)
         {
             ship.UnlimitedFuel = Sandbox;
+            Codex.SensorLevel = Build.SensorLevel;
+            ship.InYard = InYard;
             if (Sandbox) { ship.Cargo = 0; ship.Thrust = 0; return; }
             ship.Thrust = Thrust;
             ship.DryMass = DryMass;
@@ -240,14 +242,6 @@ namespace FogOfWar.OpenWorld
             if (Sandbox) { Say(Happening.Scanned, "Codex: " + t.Name + " scanned"); return; }
             Credits += v; Earned += v;
             Say(Happening.Scanned, $"Codex: {t.Name} scanned. First data sold: +{v:N0} cr");
-        }
-
-        public bool BuySensors()
-        {
-            if (Docked == null || Codex.SensorLevel > 0 || Credits < Codex.SensorCost) return false;
-            Credits -= Codex.SensorCost; Codex.SensorLevel = 1;
-            Say(Happening.Upgrade, "Sensors upgraded: scan range ×2, scan time halved");
-            return true;
         }
 
         // Docked: in a bound orbit close to the port body with the drive off (or sitting on its surface). The orbit's
@@ -444,6 +438,7 @@ namespace FogOfWar.OpenWorld
             if (Docked == null) why = "dock first";
             else if (Active.Count >= MaxActive) why = $"{MaxActive} jobs at most";
             else if (CargoTonnes + c.Load > HoldTonnes) why = "hold full";
+            else if (c.Kind == JobKind.Passengers && PeopleAboard + c.People > Build.Seats) why = Build.Seats == 0 ? "no cabin" : "cabin full";
             // an offer left on the board while the runner flew on (QA-064)
             else if (c.Kind == JobKind.Intercept && Sys != null && TargetOf(c) is Body rb && !Catchable(c, rb, Sys, jd)) why = $"can't catch it before it reaches {c.RunTo}";
             else if (ship != null && (c.Kind == JobKind.Intercept || c.Kind == JobKind.Rescue))
@@ -637,21 +632,40 @@ namespace FogOfWar.OpenWorld
             Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of fuel, −{EmergencyCost:N0} cr", false);
         }
 
-        public bool BuyDrive()
+        // ------------------------------------------------------------ the yard
+
+        // Fitting module i in slot s, docked at any port: its price less 70 % of the part it replaces (a smaller part can
+        // pay), and days in the yard. A part the load or the passengers aboard need can't come out; reaction mass a
+        // smaller tank can't hold is sold to the port at its price.
+        public bool CanRefit(Slot s, int i, out string why, out double cost)
         {
-            if (Docked == null || DriveLevel >= DriveG.Length - 1 || Credits < DriveCost[DriveLevel + 1]) return false;
-            Credits -= DriveCost[++DriveLevel];
-            Say(Happening.Upgrade, $"Drive upgraded: {Thrust:0.0} MN, {DriveG[DriveLevel]:0} g at {RatedMass:N0} t");
+            var m = ShipBuild.Catalog[(int)s][i];
+            cost = Math.Round(m.Price - Build[s].Price * ShipBuild.SellBack);
+            var after = Build.Clone(); after.pick[(int)s] = i;
+            why = Sandbox ? "sandbox" : Docked == null ? "dock first" : Build.pick[(int)s] == i ? "fitted"
+                : s == Slot.Drive && m.Size > Build.Hull.MaxThrust ? "too big for the hull"
+                : CargoTonnes > after.HoldTonnes ? "the load aboard needs the hold"
+                : PeopleAboard > after.Seats ? "the passengers aboard need the seats"
+                : cost > 0 && Credits < cost ? "not enough credits" : null;
+            return why == null;
+        }
+
+        public bool Refit(Ship ship, Slot s, int i)
+        {
+            if (!CanRefit(s, i, out _, out double cost)) return false;
+            var m = ShipBuild.Catalog[(int)s][i];
+            Credits -= cost;
+            Build.pick[(int)s] = i;
+            RefitJd = Math.Max(RefitJd, jd) + m.RefitDays;
+            double spill = ship.Fuel - TankCapacity, refund = spill > 0 ? spill * Docked.FuelPrice : 0;
+            if (spill > 0) { ship.Fuel = TankCapacity; Credits += refund; }
+            Apply(ship);
+            Say(Happening.Upgrade, $"Refit: {m.Name} fitted, " + (cost >= 0 ? $"−{cost:N0} cr" : $"+{-cost:N0} cr") +
+                (spill > 0 ? $", {spill:N1} t of fuel sold for {refund:N0} cr" : "") + $". In the yard {RefitDays:0.#} days");
             return true;
         }
 
-        public bool BuyTank(Ship ship)
-        {
-            if (Docked == null || TankLevel >= MaxTankLevel || Credits < TankCost) return false;
-            Credits -= TankCost; TankLevel++;
-            Say(Happening.Upgrade, $"Tank enlarged to {TankCapacity:N0} t");
-            return true;
-        }
+        public double RefitDays => Math.Max(0, RefitJd - jd);
 
         // One step toward the buyout, the last one only what is left. Docked, with the credits in hand: no debt for this.
         public bool PayTowardShip()
@@ -696,9 +710,9 @@ namespace FogOfWar.OpenWorld
 
         public CareerSave ToSave(Ship ship) => new CareerSave
         {
-            credits = Credits, earned = Earned, fuel = ship.Fuel, drive = DriveLevel, tank = TankLevel, nextId = nextId,
+            credits = Credits, earned = Earned, fuel = ship.Fuel, build = Build.Clone(), refitJd = RefitJd, nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
-            sensors = Codex.SensorLevel, shipPaid = ShipPaid, startJd = StartJd, standing = (int[])this.standing.Clone(),
+            shipPaid = ShipPaid, startJd = StartJd, standing = (int[])this.standing.Clone(),
             taken = new List<string>(this.taken),
             visited = new List<string>(Codex.Visited), scanned = new List<string>(Codex.Scanned),
             achieved = new List<string>(Codex.Achieved), dockedAt = new List<string>(Codex.DockedAt), contact = Encounter != null,
@@ -707,7 +721,9 @@ namespace FogOfWar.OpenWorld
         public void FromSave(CareerSave s, Ship ship)
         {
             if (DropContact() || s.contact) contactLost = true; // D8: an encounter is never resumed (LostContact may have said so)
-            Credits = s.credits; Earned = s.earned; DriveLevel = Mathf.Clamp(s.drive, 0, DriveG.Length - 1); TankLevel = Mathf.Clamp(s.tank, 0, MaxTankLevel);
+            Credits = s.credits; Earned = s.earned;
+            Build = s.build?.pick != null && s.build.pick.Length > 0 ? s.build.Checked() : ShipBuild.FromCounters(s.drive, s.tank, s.sensors);
+            RefitJd = s.refitJd;
             nextId = s.nextId; Done = s.done; Failed = s.failed; Sandbox = s.sandbox; TutorialStep = s.tutorial;
             foreach (var c in Active) RemoveDerelict(c);
             Active.Clear(); if (s.active != null) Active.AddRange(s.active);
@@ -716,7 +732,6 @@ namespace FogOfWar.OpenWorld
             Board.Clear(); boardPort = null; taken.Clear();
             if (s.taken != null) taken.UnionWith(s.taken);
             foreach (var c in Active) taken.Add(c.Key);
-            Codex.SensorLevel = s.sensors;
             ShipPaid = Math.Max(0, Math.Min(ShipPrice, s.shipPaid)); StartJd = s.startJd;
             Array.Clear(standing, 0, standing.Length);
             for (int i = 0; s.standing != null && i < Math.Min(standing.Length, s.standing.Length); i++) standing[i] = Mathf.Clamp(s.standing[i], StandingMin, StandingMax);

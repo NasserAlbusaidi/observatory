@@ -537,7 +537,7 @@ namespace FogOfWar
         // Q2: a 1 g pirate 100,000 km behind on the line to Mars, at rest with the ship. A 1 g full burn (the autopilot, as the
         // Fast plan flies it) is never boarded in 12 h; the same start with the ship coasting is. The burn's proxy, read 4 h
         // ahead, goes on straight: it holds the last span's acceleration for 60 s only. The drive's g falls with mass, so the
-        // 1 g burn is the 3 g drive held to 1 g; the stock drive with the load aboard makes less than 1 g and is caught.
+        // 1 g burn is the fast (3 g) drive held to 1 g; the stock drive with the load aboard makes less than 1 g and is caught.
         void PirateEscapeChecks(SolarSystem qs)
         {
             var (vesta, at, vel) = Belt(qs);
@@ -545,7 +545,7 @@ namespace FogOfWar
             string Fly(bool burn, out bool boarded, out bool on, out double range, out double ahead, bool stock = false)
             {
                 var b = MakeBench(qs, at, vel, from: "Vesta", to: "Mars orbit");
-                if (!stock) { b.C.DriveLevel = 1; b.C.Apply(b.Ship); }
+                if (!stock) { b.C.Build.pick[(int)Slot.Drive] = 2; b.C.Apply(b.Ship); }
                 var dir = (qs.Pos(mars, b.Jd) - at).Norm;
                 b.Ship.Att = Quaternion.LookRotation(Frame.U(dir), Frame.U(Frame.EclNorth));
                 if (burn) { b.Ship.Target = mars; b.Ship.Plan = Plan.Brachistochrone; }

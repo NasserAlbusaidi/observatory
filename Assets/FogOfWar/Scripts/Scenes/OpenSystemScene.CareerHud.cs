@@ -212,7 +212,7 @@ namespace FogOfWar
         {
             var sb = new StringBuilder();
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
-              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(career.DriveLevel).Append(career.TankLevel).Append('|').Append(ship.Target?.Name).Append('|')
+              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(string.Join(",", career.Build.pick)).Append(career.InYard).Append('|').Append(ship.Target?.Name).Append('|')
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             for (int i = 1; i < Career.Factions.Length; i++) sb.Append('s').Append(career.Standing((Faction)i));
             // pay and tonnes too: a raider's boarding or give-up changes them on a job that stays on
@@ -248,7 +248,8 @@ namespace FogOfWar
             Ui.Section(c, "Ship's business");
             Ui.KV(c, "Credits", $"{career.Credits:N0} cr", career.Credits < 0 ? "warn" : "accent");
             Ui.KV(c, "Fuel", $"{ship.Fuel:N1} / {career.TankCapacity:N0} t");
-            Ui.KV(c, "Hold", $"{career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t");
+            Ui.KV(c, "Hold", $"{career.CargoTonnes:N1} / {career.HoldTonnes:N0} t");
+            Ui.KV(c, "Cabin", $"{career.PeopleAboard} / {career.Build.Seats} seats");
             Ui.KV(c, "Drive", $"{career.Thrust:0.0} MN, {Fmt.Num(career.AccelAt(ship.Mass) / Ship.G0, 2)} g now" + (career.CarryingPassengers ? " (1 g, passengers)" : ""));
             Ui.KV(c, "Speed change left", $"{Career.DvLeft(ship):N0} km/s");
             Ui.KV(c, "Record", CareerRecord());
@@ -360,15 +361,8 @@ namespace FogOfWar
                     Ui.B(row, $"Fill tank ({fill:N1} t, {career.FillCost(ship):N0} cr)", () => career.BuyFuel(ship, career.TankCapacity - ship.Fuel), "primary");
                     Ui.B(row, "+20 t", () => career.BuyFuel(ship, 20));
                 }
-                if (career.DriveLevel < Career.DriveG.Length - 1)
-                {
-                    double g = Career.DriveG[career.DriveLevel + 1];
-                    Ui.B(row, $"Drive {g:0} g ({Career.DriveCost[career.DriveLevel + 1]:N0} cr)" + (g > 3 ? " *" : ""), () => career.BuyDrive());
-                }
-                if (career.TankLevel < Career.MaxTankLevel)
-                    Ui.B(row, $"Tank +{Career.TankStep:N0} t ({Career.TankCost:N0} cr)", () => career.BuyTank(ship));
-                if (career.Codex.SensorLevel == 0)
-                    Ui.B(row, $"Sensors: ×2 range, ½ scan time ({Codex.SensorCost:N0} cr)", () => career.BuySensors());
+                foreach (var (label, fit) in RefitOffers()) Ui.B(row, label, fit);
+                if (YardLine() is string yard) Ui.L(c, yard, "t-body", "warn").style.marginTop = 4;
 
                 Ui.Section(c, "Contract board (refreshes each day)");
                 if (career.Board.Count == 0) Ui.L(c, "No work posted.", "t-note");

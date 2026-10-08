@@ -27,8 +27,7 @@ namespace FogOfWar.OpenWorld
         public readonly HashSet<string> Scanned = new HashSet<string>();
         public readonly HashSet<string> Achieved = new HashSet<string>();
         public readonly HashSet<string> DockedAt = new HashSet<string>();
-        public int SensorLevel;                      // 0 stock, 1 upgraded: scan range ×2, dwell ÷2
-        public const double SensorCost = 30000;
+        public int SensorLevel;                      // the build's sensors (Career.Apply): 0 stock, 1 long range: scan range ×2, dwell ÷2
         public double ScanProgress;                  // seconds on the current scan target
         public string ScanTarget;
 
@@ -148,7 +147,7 @@ namespace FogOfWar.OpenWorld
             Earn("scan10", Scanned.Count >= 10);
             Earn("scan50", Scanned.Count >= 50);
             Earn("rich", c.Credits >= 100000);
-            Earn("drive3", c.DriveLevel >= 1);
+            Earn("drive3", c.Thrust >= ShipBuild.Rated(3) - 1e-9);
             Earn("landed", ship.Landed != null && ship.Crashed == null); // QA-055: a crash isn't a touchdown
             Earn("fumes", c.Docked != null && ship.Fuel < 5);
             Earn("icarus", au < 0.3);
