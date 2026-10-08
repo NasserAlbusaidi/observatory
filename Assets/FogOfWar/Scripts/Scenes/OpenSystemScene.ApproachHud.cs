@@ -107,7 +107,8 @@ namespace FogOfWar
             stopCue = "";
             if (flightMode == FlightMode.Cruise) { brakeState = "cruise"; return; }
 
-            Ui.Text(brakeHead, flightMode == FlightMode.Docking ? "DOCKING" : "APPROACH");
+            bool hostile = KindOf(t) == TargetKind.Hostile; // #100: no dock and no stop to make at a raider
+            Ui.Text(brakeHead, hostile ? "CONTACT" : flightMode == FlightMode.Docking ? "DOCKING" : "APPROACH");
             Ui.Text(brakeClose, atRest ? "at rest" : (closing >= 0 ? "+" : "") + SpeedText(closing));
             // the bar is the range to the target; the white mark is where a full burn started now would stop
             float frac = double.IsInfinity(ratio) || atRest ? 0 : Mathf.Clamp01((float)ratio);
@@ -120,6 +121,7 @@ namespace FogOfWar
             string note;
             if (atRest) note = "At rest against " + t.Name + ".";
             else if (closing <= 0) note = "Moving away: opening at " + SpeedText(-closing) + ".";
+            else if (hostile) note = "Closing on the raider at " + SpeedText(closing) + ".";
             else if (aStop <= 0) note = "No way to brake: no fuel.";
             else if (late) note = $"TOO FAST: a full burn now stops {Km(dStop - room)} past the target.";
             else
@@ -130,7 +132,7 @@ namespace FogOfWar
             Ui.Text(brakeNote, note);
             Ui.SetClass(brakeNote, "warn", late);
             Ui.SetClass(brakeNote, "accent", now);
-            stopCue = late ? "late" : now ? "now" : "";
+            stopCue = hostile ? "" : late ? "late" : now ? "now" : "";
             brakeState = flightMode + " " + (late ? "late" : now ? "now" : "early") + " " + Mathf.RoundToInt(frac * 100) + "%";
 
             // docking: velocity against the target along the ship's axes, the way the RCS keys push
