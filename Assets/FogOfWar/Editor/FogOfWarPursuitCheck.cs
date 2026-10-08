@@ -52,14 +52,19 @@ namespace FogOfWar.EditorTools
         }
 
         // #90 (report only): -executeMethod FogOfWar.EditorTools.FogOfWarPursuitCheck.Behind writes Logs/pursuit-behind.txt
-        public static void Behind()
+        public static void Behind() => Report("pursuit-behind.txt", OpenWorld.PursuitCheck.Behind);
+
+        // #89 (report only): -executeMethod FogOfWar.EditorTools.FogOfWarPursuitCheck.BrakeStart writes Logs/pursuit-brake-start.txt
+        public static void BrakeStart() => Report("pursuit-brake-start.txt", OpenWorld.PursuitCheck.BrakeStart);
+
+        static void Report(string file, Action<TextWriter> run)
         {
             int code = 0;
             try
             {
                 var dir = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "Logs");
-                using var t = new StreamWriter(Path.Combine(dir, "pursuit-behind.txt"));
-                OpenWorld.PursuitCheck.Behind(t);
+                using var t = new StreamWriter(Path.Combine(dir, file));
+                run(t);
             }
             catch (Exception e) { Debug.LogException(e); code = 1; }
             if (Application.isBatchMode) EditorApplication.Exit(code);
