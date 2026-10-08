@@ -127,7 +127,8 @@ namespace FogOfWar.OpenWorld
         public static string Line(Risk r)
         {
             if (r.Hours < Tiers[0].Below) return "Raider risk: none on this course.";
-            string end = r.Arriving > 2 * r.Leaving ? ", most of it on arrival" : r.Leaving > 2 * r.Arriving ? ", most of it on departure" : "";
+            // #90: a raider called on arrival can't board before the dock (PursuitCheck S3b), so docking first is the answer
+            string end = r.Arriving > 2 * r.Leaving ? ", most of it on arrival: dock first and a raider can't board" :r.Leaving > 2 * r.Arriving ? ", most of it on departure" : "";
             return $"Raider risk: {r.Tier}. {r.Hours:0.0} h slow and out of patrol reach in raider space{end}.";
         }
     }
