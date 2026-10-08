@@ -15,6 +15,24 @@ namespace FogOfWar
         static readonly string[] CruiseNames = { "Full burn", "Coast at 50 %", "Coast at 25 %" };
 
         public Career Career => career; // read by the HUD
+
+        // One step up in each slot the yard has a bigger part for, with its net price and days in the yard.
+        List<(string label, Action fit)> RefitOffers()
+        {
+            var up = new List<(string, Action)>();
+            foreach (Slot s in Enum.GetValues(typeof(Slot)))
+            {
+                int i = career.Build.pick[(int)s] + 1;
+                if (i >= ShipBuild.Catalog[(int)s].Length) continue;
+                var m = ShipBuild.Catalog[(int)s][i];
+                career.CanRefit(s, i, out _, out double cost);
+                string what = s == Slot.Drive ? $"{m.Name} {m.Size:0.0} MN" + (m.Size > ShipBuild.Rated(3) ? " juice: fictional" : "") :s == Slot.Sensors ? $"{m.Name}: ×2 range, ½ scan time" : m.Name;
+                up.Add(($"{what} ({cost:N0} cr, {m.RefitDays:0.#} d)", () => career.Refit(ship, s, i)));
+            }
+            return up;
+        }
+
+        string YardLine() => career.InYard ? $"In the yard: refit done in {Dur(career.RefitDays * 86400)}. Drive and RCS cold." : null;
         Career career;
         int cruiseIdx;
         bool planWasActive;
@@ -280,7 +298,7 @@ namespace FogOfWar
                 CodexPanel(ui);
                 return;
             }
-            GUILayout.Label($"{career.Credits:N0} cr   ·   reaction mass {ship.Fuel:N1} / {career.TankCapacity:N0} t   ·   hold {career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t", ui.label);
+            GUILayout.Label($"{career.Credits:N0} cr   ·   reaction mass {ship.Fuel:N1} / {career.TankCapacity:N0} t   ·   hold {career.CargoTonnes:N1} / {career.HoldTonnes:N0} t", ui.label);
             GUILayout.Label($"Drive {career.Thrust:0.0} MN: {Fmt.Num(career.AccelAt(ship.Mass) / Ship.G0, 2)} g at {ship.Mass:N0} t" + (career.CarryingPassengers ? ": passengers aboard, held to 1 g" : "") +
                             $"   ·   Δv left {Career.DvLeft(ship):N0} km/s", ui.note);
             GUILayout.Label(career.OwnsShip ? "The ship is yours." : $"Ship buyout: {career.ShipPaid:N0} / {Career.ShipPrice:N0} cr paid", ui.note);
@@ -311,15 +329,12 @@ namespace FogOfWar
                     if (fb == 0) career.BuyFuel(ship, fill);
                     if (fb == 1) career.BuyFuel(ship, 20);
                 }
-                var up = new List<(string label, Action buy)>();
-                if (career.DriveLevel < Career.DriveG.Length - 1)
-                    up.Add(($"Drive {Career.DriveG[career.DriveLevel + 1]:0} g ({Career.DriveCost[career.DriveLevel + 1]:N0} cr)" + (Career.DriveG[career.DriveLevel + 1] > 3 ? " juice: fictional" : ""), () => career.BuyDrive()));
-                if (career.TankLevel < Career.MaxTankLevel) up.Add(($"Tank +{Career.TankStep:N0} t ({Career.TankCost:N0} cr)", () => career.BuyTank(ship)));
-                if (career.Codex.SensorLevel == 0) up.Add(($"Sensors: range ×2, scan time halved ({Codex.SensorCost:N0} cr)", () => career.BuySensors()));
+                if (YardLine() is string yard) GUILayout.Label(yard, ui.label);
+                var up = RefitOffers();
                 if (up.Count > 0)
                 {
                     int ub = ui.Buttons(up.ConvertAll(u => u.label).ToArray());
-                    if (ub >= 0) up[ub].buy();
+                    if (ub >= 0) up[ub].fit();
                 }
                 ContractBoard(ui);
             }

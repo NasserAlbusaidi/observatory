@@ -278,17 +278,20 @@ namespace FogOfWar
                 yield return Shot("c04-delivered");
             }
 
+            BuildChecks();
+
             // 3. passengers hold the drive to 1 g
             var pax = career.Board.Find(c => c.Kind == JobKind.Passengers);
             if (pax != null && career.Docked != null)
             {
-                career.DriveLevel = 1; ship.MaxG = 3;
+                career.Build.pick[(int)Slot.Drive] = 2; ship.MaxG = 3;
                 career.Accept(pax, jd);
                 yield return null;
                 Check(ship.MaxG <= 1 + 1e-9, $"passengers aboard: drive held to {ship.MaxG} g");
                 career.Abandon(pax);
-                career.DriveLevel = 0;
+                career.Build.pick[(int)Slot.Drive] = 1;
             }
+            yield return RefitChecks();
 
             // 4. a survey, if this port posts one
             var survey = career.Board.Find(c => c.Kind == JobKind.Survey);
@@ -407,7 +410,7 @@ namespace FogOfWar
                     all += sale; uncapped += v;
                     if (m == saturn) inSaturn += sale;
                 }
-                log.WriteLine($"  codex data market: every first scan sells for {all:N0} cr in all ({uncapped:N0} uncapped), the Saturn system {inSaturn:N0} cr; all upgrades cost {Career.DriveCost[1] + Career.DriveCost[2] + Career.MaxTankLevel * Career.TankCost + Codex.SensorCost:N0} cr");
+                log.WriteLine($"  codex data market: every first scan sells for {all:N0} cr in all ({uncapped:N0} uncapped), the Saturn system {inSaturn:N0} cr; the yard's biggest parts cost {TopRefits():N0} cr over the stock ones' sell-back");
                 cx.Scanned.UnionWith(keep);
             }
             career.Sandbox = false;

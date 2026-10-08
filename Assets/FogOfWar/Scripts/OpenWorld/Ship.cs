@@ -46,6 +46,8 @@ namespace FogOfWar.OpenWorld
         public bool UnlimitedFuel = true;
         public double Mass => DryMass + Fuel + Cargo;
         public bool Dry => !UnlimitedFuel && Fuel <= 0;
+        public bool InYard;                      // a refit under way (Career): drive and RCS cold
+        bool Cold => Dry || InYard;
         public double CruiseCap;                 // km/s; a brachistochrone coasts at this speed instead (0 = none)
         bool cruising;
         public string Phase = "coasting";
@@ -119,13 +121,13 @@ namespace FogOfWar.OpenWorld
                 want = HoldDirMid(sys, jd, h, reference, g);
                 Phase = ThrottleCmd > 0 ? "burning" : RcsInput.sqrMagnitude > 0 ? "RCS" : "coasting";
             }
-            if (Dry) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = "out of fuel"; }
+            if (Cold) { throttle = 0; autoRcs = D3.Zero; if (PlanActive) Phase = InYard ? "in the yard" : "out of fuel"; }
             UpdateAttitude(want, h);
             // the drive fires only along the commanded line: flip first, then burn
             if (PlanActive && want.HasValue && D3.Dot(Heading, want.Value) < Math.Cos(3 * Math.PI / 180)) { throttle = 0; Phase = "turning"; }
             Throttle = throttle;
 
-            var rcs = RcsInput.sqrMagnitude > 0 && !Dry ? Frame.FromU(Att * Vector3.ClampMagnitude(RcsInput, 1)) * RcsAccel : autoRcs;
+            var rcs = RcsInput.sqrMagnitude > 0 && !Cold ? Frame.FromU(Att * Vector3.ClampMagnitude(RcsInput, 1)) * RcsAccel : autoRcs;
             RcsActive = rcs.Sqr > 0;
             RcsLevel = (float)Math.Min(1, Math.Sqrt(rcs.Sqr) / RcsAccel);
             if (Landed != null)
@@ -181,13 +183,13 @@ namespace FogOfWar.OpenWorld
             if (!PlanActive) return;
             dominant = reference;
             var cmd = Guide(sys, jd, 0, sys.Gravity(Pos, jd));
-            Throttle = !Dry && cmd.HasValue && cmd.Value.Mag > RcsAccel ? Math.Min(cmd.Value.Mag / AMax, 1) : 0;
+            Throttle = !Cold && cmd.HasValue && cmd.Value.Mag > RcsAccel ? Math.Min(cmd.Value.Mag / AMax, 1) : 0;
             // Same aim gate as Step: waking from a coast must not light the drive before the flip finishes.
             if (Throttle > 0 && D3.Dot(Heading, cmd.Value.Norm) < Math.Cos(3 * Math.PI / 180))
             { Throttle = 0; Phase = "turning"; }
-            RcsActive = !Dry && cmd.HasValue && cmd.Value.Sqr > 0 && cmd.Value.Mag <= RcsAccel;
+            RcsActive = !Cold && cmd.HasValue && cmd.Value.Sqr > 0 && cmd.Value.Mag <= RcsAccel;
             RcsLevel = RcsActive ? (float)(cmd.Value.Mag / RcsAccel) : 0;
-            if (Dry) Phase = "out of fuel";
+            if (Cold) Phase = InYard ? "in the yard" : "out of fuel";
         }
 
         // Attitude only (coasting on rails): holds and manual rotation still move the nose.
