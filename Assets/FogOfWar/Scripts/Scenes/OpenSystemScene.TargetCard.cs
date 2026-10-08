@@ -12,7 +12,8 @@ namespace FogOfWar
     // on the card. They sit under ENGAGE, so opening them never moves the button under the pointer.
     public partial class OpenSystemScene
     {
-        VisualElement tcBody, tcIcon, tcRelRow, tcMoreRule;
+        VisualElement tcBody, tcIcon, tcRelRow, tcMoreRule, tcAnswers;
+        string tcAnswersSig;
         Label tcName, tcSub, tcDist, tcRel, tcClose, tcTrip, tcBrach, tcNav, tcEngage, tcNoTarget, tcMore;
         Label tcDrift, tcStop, tcStopNote;
         bool cardExpanded, cardHover;
@@ -47,6 +48,9 @@ namespace FogOfWar
             tcNav.style.flexGrow = 1; tcNav.style.flexShrink = 1;
             tcEngage = Ui.B(nrow, "ENGAGE", TogglePlan, "primary", "f-cond");
             tcEngage.style.marginRight = 0; tcEngage.style.marginBottom = 0;
+            // #100: a raider as the target has no trip to fly; its answers take ENGAGE's place
+            tcAnswers = Ui.E(tcBody, "row", "wrap");
+            tcAnswers.style.marginTop = 4;
 
             // details
             tcMoreRule = Ui.E(tcBody, "rule");
@@ -119,9 +123,29 @@ namespace FogOfWar
                 Ui.SetClass(tcNav, "accent", ship.PlanActive);
                 Ui.Text(tcEngage, ship.PlanActive ? "ABORT" : "ENGAGE");
                 Ui.SetClass(tcEngage, "danger", ship.PlanActive);
+                bool hostile = kind == TargetKind.Hostile && career?.Encounter != null;
+                Ui.Show(tcTrip, !hostile); Ui.Show(tcEngage, !hostile); Ui.Show(tcAnswers, hostile);
+                if (hostile) { Ui.Show(tcBrach, false); CardAnswers(); }
+                else tcAnswersSig = null;
             }
             else { flightMode = FlightMode.Cruise; stopCue = ""; brakeState = "no target"; }
             Ui.Show(tcPanel, cockpit == null || !cockpit.Visible || CardInCockpit);
+        }
+
+        void CardAnswers()
+        {
+            var answers = RaiderAnswers(out var call);
+            // the buttons keep the call they were made for: a new call with the same labels needs new buttons
+            string sig = string.Join("|", Array.ConvertAll(answers, a => a.Label)) + "#" + (call == null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(call));
+            if (sig == tcAnswersSig) return;
+            tcAnswersSig = sig;
+            tcAnswers.Clear();
+            for (int i = 0; i < answers.Length; i++)
+            {
+                int k = i; var a = answers[i].What;
+                Ui.B(tcAnswers, answers[i].Label, () => { if (call != null) AnswerCall(call, k); else career.Answer(a, jd); tcAnswersSig = null; }, "small");
+            }
+            Ui.Fontify(tcAnswers);
         }
 
         // the trip the autopilot would fly (the trip planner's coast choice, parking included) in one line: its time,
@@ -136,6 +160,8 @@ namespace FogOfWar
         // review shots
         public void SetCardExpanded(bool on) => cardExpanded = on;
 
+        public string TestCardAnswers() => tcAnswers == null ? "" : string.Join(" / ", tcAnswers.Query<Label>().ToList().ConvertAll(l => l.text)) + " | " + brakeHead.text;
+
         public string TestCardRows()
         {
             if (tcBody == null || tcBody.resolvedStyle.display != DisplayStyle.Flex) return "no target";
@@ -143,7 +169,7 @@ namespace FogOfWar
             void Row(string name, VisualElement e) { if (e.resolvedStyle.display == DisplayStyle.Flex) rows.Add(name); }
             Row("Distance", tcDist.parent); Row("Closing", tcCloseRow); Row("Drift", tcDriftRow); Row("Gauge", brakeBox);
             Row("Trip", tcTrip); Row("Engage", tcEngage); Row("Kind", tcSub); Row("Rel", tcRelRow); Row("Stop", tcStopRow);
-            Row("Brach", tcBrach); Row("Note", tcStopNote);
+            Row("Brach", tcBrach); Row("Note", tcStopNote); Row("Answers", tcAnswers);
             return string.Join(" ", rows);
         }
     }

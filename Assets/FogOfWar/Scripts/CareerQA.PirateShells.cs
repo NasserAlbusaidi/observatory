@@ -107,6 +107,12 @@ namespace FogOfWar
                 Check(kind == "Hostile" && sub.StartsWith("HOSTILE") && sub.Contains(Raiders.ToUpperInvariant()) && arrow.style.display.value == DisplayStyle.Flex && arrow.style.borderTopColor.value == red,
                     $"shells: the raider as the target is {kind}: \"{sub}\", a red arrowhead");
 
+                // #100: no trip to fly to a raider: its answers take ENGAGE's place, and the gauge reads CONTACT
+                string rows = s.TestCardRows(), answers = s.TestCardAnswers();
+                string wantAnswers = string.Join(" / ", Array.ConvertAll(call.Answers, a => a.Label)) + " | CONTACT";
+                Check(answers == wantAnswers && rows.Contains("Answers") && !rows.Contains("Engage") && !rows.Contains("Trip") && !rows.Contains("Brach"),
+                    $"shells: the raider's target card has its answers in ENGAGE's place: \"{answers}\"; rows {rows}");
+
                 var planets = R<List<Body>>("PlanetButtons");
                 int codex = R<int>("CodexBodies");
                 Check(sys.Bodies.Contains(e.Proxy) && !planets.Contains(e.Proxy) && codex == codex0,
@@ -125,6 +131,8 @@ namespace FogOfWar
             {
                 string dot = Get<string>("raiderShown");
                 Check(ship.Target == sys["Vesta"] && dot == $"on: {e.Proxy.Name} · 2 km", $"shells: with Vesta the target, the raider's dot has its tag: {dot}");
+                string rows = s.TestCardRows();
+                Check(rows.Contains("Engage") && rows.Contains("Trip") && !rows.Contains("Answers"), $"shells: with Vesta the target, the card has ENGAGE back and no answers: rows {rows}");
                 Call("SetTarget", e.Proxy);
                 pay = job.Pay;
                 clicked = s.TestClickCallButton(Array.FindIndex(call.Answers, a => a.What == Career.RouteAnswer.GiveUp));
