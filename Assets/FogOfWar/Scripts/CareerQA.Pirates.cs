@@ -56,6 +56,7 @@ namespace FogOfWar
         static string Raiders => Career.Factions[(int)Faction.Raiders].Name;
         static bool HavenNamed(string text) => Array.Exists(Threat.Havens, h => text.Contains(h));
         static double PirateA => Career.PirateG * Ship.G0;
+        static string CareerKey => (string)typeof(OpenSystemScene).GetProperty("CareerKey", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
 
         IEnumerator PirateChecks()
         {
@@ -143,7 +144,11 @@ namespace FogOfWar
                     $"pirates: under thrust by hand ({ship.Phase}, throttle {ship.Throttle:F2}, the ship's Δv +{(ship.DvUsed - shipDv0) * 1000:G4} m/s) the pirate flies the integrated spans: " +
                     $"its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s off it (pirate '{e.Pirate.Phase}', its Δv +{(e.Pirate.DvUsed - dv0) * 1000:G4} m/s)");
                 ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0;
-                s.SaveGame();
+                // #99: no save mid-chase; the save from before it stays, and loading it still drops the chase (D8)
+                string kept = PlayerPrefs.GetString(CareerKey);
+                bool saved = s.SaveGame();
+                Check(!saved && PlayerPrefs.GetString(CareerKey) == kept && career.Notes.Exists(n => n.Text == OpenSystemScene.ChaseNoSave),
+                    $"pirates: Save mid-chase is refused and the save is left as it was ({(saved ? "saved" : OpenSystemScene.ChaseNoSave)})");
                 s.LoadGame();
             });
             if (ok) { yield return null; yield return null; }
@@ -151,6 +156,40 @@ namespace FogOfWar
             {
                 Check(career.Encounter == null && !sys.Bodies.Exists(Career.IsRaider) && career.Notes.Exists(n => n.What == Career.Happening.RaiderGone && n.Text.Contains("not saved") && HavenNamed(n.Text)),
                     $"pirates: a load mid-chase drops it, the proxy goes, and a note says so ({career.Notes.Find(n => n.What == Career.Happening.RaiderGone).Text})");
+            });
+
+            // #99: Give up autosaves, so a reload can't undo the loss
+            Contract given = null;
+            string before = null;
+            if (ok) ok = Guard("give-up autosave setup", () =>
+            {
+                Put("autosaveArmed", true); Put("warpIdx", 0);
+                var vesta = sys["Vesta"];
+                // the load put the ship back where it was saved: out in free flight again, so no dock ends the chase
+                ship.Plan = Plan.None; ship.ThrottleCmd = 0; ship.Throttle = 0; ship.Landed = null; ship.Hold = Hold.Off;
+                ship.Pos = sys.Pos(vesta, jd) + sys.Pos(vesta, jd).Norm * 1e6; ship.Vel = sys.Vel(vesta, jd);
+                given = new Contract { Id = 900304, Kind = JobKind.Cargo, Title = "QA water", From = "Ceres", To = "Vesta", Tonnes = 20, Pay = 20000, Days = 100, IssuedJd = jd, DeadlineJd = jd + 100, Key = "qa/pirate-giveup" };
+                career.Active.Add(given);
+                career.StartContact(given, sys, ship, jd, ship.Pos - sys.Pos(vesta, jd).Norm * 5e4, sys.Vel(vesta, jd));
+                before = PlayerPrefs.GetString(CareerKey);
+                Put("autosaveDue", true);
+            });
+            if (ok) { yield return null; yield return null; }
+            // an autosave due mid-chase waits: a save then would not hold the chase
+            if (ok) ok = Guard("give-up autosave waits", () =>
+            {
+                Check(career.Encounter != null && Get<bool>("autosaveDue") && PlayerPrefs.GetString(CareerKey) == before,
+                    $"pirates: an autosave due mid-chase waits for the chase to end (chase {(career.Encounter != null ? "on" : "over: " + career.Notes.FindLast(n => n.What == Career.Happening.RaiderGone).Text)}, due {Get<bool>("autosaveDue")})");
+                career.Answer(Career.RouteAnswer.GiveUp, jd);
+            });
+            if (ok) { yield return null; yield return null; }
+            if (ok) Guard("give-up autosave", () =>
+            {
+                var saved = JsonUtility.FromJson<CareerSave>(PlayerPrefs.GetString(CareerKey));
+                var job = saved?.active?.Find(c => c.Key == "qa/pirate-giveup");
+                Check(career.Encounter == null && PlayerPrefs.GetString(CareerKey) != before && job != null && Math.Abs(job.Pay - 20000 * (1 - Career.GiveUpShare)) < 1,
+                    $"pirates: Give up autosaves: the save holds the job at {job?.Pay ?? double.NaN:N0} cr");
+                career.Active.Remove(given);
             });
 
             // a landing in the scene: the substep loop rides the surface and flies no span; the same frame's career tick ends it

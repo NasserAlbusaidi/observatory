@@ -573,10 +573,18 @@ namespace FogOfWar
             }
         }
 
-        public void SaveGame()
+        // #99: no save while a raider gives chase, so Save then Load is no free escape (a load still drops a chase, D8)
+        public const string ChaseNoSave = "Can't save during a chase: dock, outrun it or give up first";
+        public bool SaveGame()
         {
+            if (career != null && career.Encounter != null)
+            {
+                career.Notes.Add(new Career.Note { Text = ChaseNoSave, Good = false, Time = Time.realtimeSinceStartup, What = Career.Happening.RouteCall });
+                return false;
+            }
             WriteSave();
             ship.Phase = "game saved";
+            return true;
         }
 
         void WriteSave()

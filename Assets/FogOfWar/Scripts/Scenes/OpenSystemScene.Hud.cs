@@ -547,7 +547,7 @@ namespace FogOfWar
             Ui.L(c, Note, "t-note").style.marginTop = 10;
             Ui.Section(c, "Game");
             var row = Ui.E(c, "row", "wrap");
-            Ui.B(row, "Save  " + UiShell.Keys(A.QuickSave), () => { SaveGame(); hudShell.Toast("Game saved"); });
+            Ui.B(row, "Save  " + UiShell.Keys(A.QuickSave), () => hudShell.Toast(SaveGame() ? "Game saved" : ChaseNoSave));
             Ui.B(row, "Load", () => { if (HasSave) { LoadGame(); hudShell.Toast("Game loaded"); } });
             Ui.B(row, "Main menu", App.OpenMenu);
         }

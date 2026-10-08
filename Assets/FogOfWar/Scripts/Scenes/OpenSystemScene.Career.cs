@@ -61,6 +61,8 @@ namespace FogOfWar
                     case Career.Happening.JobAccepted: case Career.Happening.JobPaid: case Career.Happening.RescueDone:
                     case Career.Happening.InterceptDone: case Career.Happening.SurveyDone: case Career.Happening.Upgrade:
                     case Career.Happening.ShipPayment: case Career.Happening.ShipOwned:
+                    // #99: a boarding or the end of a chase, so a reload can't undo a loss
+                    case Career.Happening.Boarded: case Career.Happening.RaiderGone:
                         autosaveDue |= autosaveArmed; break;
                 }
             };
@@ -232,7 +234,8 @@ namespace FogOfWar
             planCruiseIdx = cruiseIdx;
             career.Tick(sys, ship, jd, simDt);
             if (careerTicks < 2) careerTicks++;
-            if (autosaveDue)
+            // #99: a save made mid-chase would not hold it (D8), so it waits for the chase to end
+            if (autosaveDue && career.Encounter == null)
             {
                 autosaveDue = false;
                 WriteSave();
