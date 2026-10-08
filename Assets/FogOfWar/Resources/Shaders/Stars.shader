@@ -1,6 +1,8 @@
 // Billboarded point stars at infinity. With _Beta > 0 each star is relativistically aberrated and Doppler-shifted
 // for an observer moving along _Fwd: the sky crowds forward, turns blue ahead and fades behind.
-// Mesh layout: 4 vertices per star; normal = direction, uv = quad corner (-1..1), uv2 = (temperature K, brightness).
+// Mesh layout: 4 vertices per star; normal = direction, uv = quad corner (-1..1), uv2 = (temperature K, visual magnitude V).
+// Brightness is photometric: the aberration and Doppler flux change shifts V to an effective magnitude, and starPeak /
+// starSpot (FOWCommon.cginc) turn that into a Gaussian peak and a quad width. Colour carries no brightness.
 Shader "FogOfWar/Stars"
 {
     SubShader
@@ -39,10 +41,14 @@ Shader "FogOfWar/Stars"
                 float D = _Gamma * (1.0 + _Beta * ct);
                 float T = v.uv2.x * D;
                 // point sources: aberration shrinks each star's solid angle by D², so flux carries a 1/D² (McKinley & Doherty 1979)
-                float b = v.uv2.y * visB(T) / visB(v.uv2.x) / (D * D) * _Gain;
-                o.col = blackbody(T);
-                o.a = saturate(b);
-                float size = clamp(1.2 + 1.6 * log(1.0 + b * 4.0), 0.0, 14.0) * _SizePx;
+                float boost = visB(T) / visB(v.uv2.x) / (D * D) * _Gain;
+                // a flux ratio is a magnitude shift, so stars ahead brighten and faint ones fade in, stars behind fade
+                float Veff = v.uv2.y - 2.5 * log10(clamp(boost, 1e-30, 1e30));
+                float2 spot = starSpot(starPeak(Veff));
+                o.col = unitLuma(blackbody(T));
+                o.a = spot.x;
+                // a zero-width quad covers no pixel, so stars past the naked-eye limit cost no fragments
+                float size = spot.x > 0.0 ? min(spot.y, 14.0) * _SizePx : 0.0;
                 float3 wp = _WorldSpaceCameraPos + d2 * (_ProjectionParams.z * 0.8);
                 float4 clip = mul(UNITY_MATRIX_VP, float4(wp, 1.0));
                 clip.xy += v.uv * size / _ScreenParams.xy * clip.w;
@@ -55,8 +61,7 @@ Shader "FogOfWar/Stars"
             {
                 float r2 = dot(i.corner, i.corner);
                 if (r2 > 1.0) discard;
-                float a = exp(-r2 * 4.0) * i.a;
-                return float4(displayToOutput(i.col) * a, 1.0);
+                return float4(linearToOutput(i.col * (i.a * exp(-4.0 * r2))), 1.0);
             }
             ENDCG
         }

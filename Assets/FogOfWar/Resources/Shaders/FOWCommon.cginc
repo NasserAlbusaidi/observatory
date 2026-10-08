@@ -240,6 +240,37 @@ float3 displayToOutput(float3 c)
 #endif
 }
 
+// For shaders that work in linear light.
+float3 linearToOutput(float3 c)
+{
+#ifdef UNITY_COLORSPACE_GAMMA
+    return pow(max(c, 0), 1.0 / 2.2);
+#else
+    return c;
+#endif
+}
+
+// Point-source photometry for the catalogue stars (Stars.shader) and unresolved asteroids (BeltDot.shader, through
+// Art.StarPeak on the CPU). Art.cs and Tools/fidelity/sky.py copy these numbers: keep all three in step.
+// V = visual magnitude. starPeak = linear peak of the point's Gaussian at exposure 1. The slope is 70 % of the real
+// 0.4 per magnitude, as in planetarium software, so Sirius stays below clipping and V 6 stays faint. Points fade out
+// between V 5.5 and the naked-eye limit V 6.5 (smoothstep).
+#define FOW_STAR_SLOPE 0.7
+#define FOW_STAR_V0 6.0
+#define FOW_STAR_P0 0.006
+#define FOW_STAR_VLIM 6.5
+#define FOW_STAR_WIDTH_PX 2.2
+float starPeak(float V)
+{
+    float t = saturate(FOW_STAR_VLIM - V);
+    return FOW_STAR_P0 * pow(10.0, -0.4 * FOW_STAR_SLOPE * (V - FOW_STAR_V0)) * t * t * (3.0 - 2.0 * t);
+}
+// (shown peak, quad width in px). A point brighter than 1 would clip, so its peak holds at 1 and its quad widens
+// instead: the total light keeps the same slope.
+float2 starSpot(float peak) { return float2(min(peak, 1.0), FOW_STAR_WIDTH_PX * sqrt(max(peak, 1.0))); }
+// Linear colour with unit luminance from a display colour, so the magnitude alone sets the brightness.
+float3 unitLuma(float3 display) { float3 c = pow(max(display, 0), 2.2); return c / max(lumaRGB(c), 1e-4); }
+
 // Physical light scale for the open world (ShipLighting.cs). _FOWExposure is the camera exposure, 1 = the look the
 // shaders were tuned for in full sunlight at 1 AU; every other scene keeps it at 1 (FogOfWarApp). A sunlit surface
 // multiplies its output by its own sunlight (irr: 1 at 1 AU, inverse square) times the exposure; self-luminous
