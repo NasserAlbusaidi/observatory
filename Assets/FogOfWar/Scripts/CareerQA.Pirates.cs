@@ -535,14 +535,15 @@ namespace FogOfWar
         }
 
         // Q2: a 1 g pirate 100,000 km behind on the line to Mars, at rest with the ship. A 1 g full burn (the autopilot, as the
-        // Fast plan flies it) is never boarded in 12 h; the same start with the ship coasting is. The burn's proxy, read 4 h
+        // Fast plan flies it) is never boarded, and the raider breaks off once it can't catch it (#98); the same start with the
+        // ship coasting is boarded. The burn's proxy, read 4 h
         // ahead, goes on straight: it holds the last span's acceleration for 60 s only. The drive's g falls with mass, so the
         // 1 g burn is the fast (3 g) drive held to 1 g; the stock drive with the load aboard makes less than 1 g and is caught.
         void PirateEscapeChecks(SolarSystem qs)
         {
             var (vesta, at, vel) = Belt(qs);
             var mars = qs["Mars"];
-            string Fly(bool burn, out bool boarded, out bool on, out double range, out double ahead, bool stock = false)
+            string Fly(bool burn, out bool boarded, out bool outrun, out double range, out double ahead, out double ended, bool stock = false)
             {
                 var b = MakeBench(qs, at, vel, from: "Vesta", to: "Mars orbit");
                 if (!stock) { b.C.Build.pick[(int)Slot.Drive] = 2; b.C.Apply(b.Ship); }
@@ -564,7 +565,8 @@ namespace FogOfWar
                     if (first < 0 && e.Dwell > 0) first = t;
                 }
                 boarded = b.Said.Exists(s => s.What == Career.Happening.Boarded);
-                on = b.C.Encounter == e;
+                outrun = b.Heard(Career.Happening.RaiderGone, "Outrun");
+                ended = t;
                 range = (e.Pirate.Pos - b.Ship.Pos).Mag;
                 // 4 h on: off the straight line from now by at most a·60 s·t, where the span's a·t²/2 would be ~1e6 km
                 ahead = (qs.PosAt(e.Proxy, e.Chase.SpanEnd + 4.0 / 24) - (e.Pirate.Pos + e.Pirate.Vel * (4 * 3600))).Mag;
@@ -572,13 +574,14 @@ namespace FogOfWar
                 b.C.DropContact();
                 return what;
             }
-            string burnRun = Fly(true, out bool burnBoarded, out bool burnOn, out _, out double burnAhead);
-            Check(!burnBoarded && burnOn, $"pirates: a 1 g full burn is not boarded by a 1 g raider in 12 h ({burnRun})");
+            string burnRun = Fly(true, out bool burnBoarded, out bool burnOutrun, out _, out double burnAhead, out double burnEnd);
+            Check(!burnBoarded && burnOutrun && burnEnd >= Career.GiveUpS && burnEnd < Career.GiveUpS + 1800,
+                $"pirates: a 1 g full burn is not boarded by a 1 g raider, which breaks off {Career.GiveUpS / 3600:0} h after its catch goes out of reach ({burnRun})");
             double bound = 1.01 * PirateA * 60 * 4 * 3600;
             Check(burnAhead <= bound, $"pirates: the proxy read 4 h ahead is {burnAhead:N0} km off the straight line from the pirate's state (≤ {bound:N0} km; the span's quadratic would be {0.5 * PirateA * Math.Pow(4 * 3600, 2):N0} km)");
-            string coastRun = Fly(false, out bool coastBoarded, out _, out _, out _);
+            string coastRun = Fly(false, out bool coastBoarded, out _, out _, out _, out _);
             Check(coastBoarded, $"pirates: the control, the same start coasting, is boarded ({coastRun})");
-            string stockRun = Fly(true, out bool stockBoarded, out _, out _, out _, stock: true);
+            string stockRun = Fly(true, out bool stockBoarded, out _, out _, out _, out _, stock: true);
             Check(stockBoarded, $"pirates: the stock drive's full burn with the load aboard is under 1 g, and a 1 g raider boards it ({stockRun})");
         }
 
@@ -611,7 +614,7 @@ namespace FogOfWar
                 b.C.Answer(Career.RouteAnswer.Divert, b.Jd);
                 b.C.Answer(Career.RouteAnswer.GiveUp, b.Jd);
                 foreach (var (_, text) in b.Said) { texts.Add(text); if (text.StartsWith("Incoming: ")) incoming = text; }
-                texts.Add(Career.OffNote(Career.BreakOff.Patrol, "Ceres", "Pallas")); texts.Add(Career.BoardedNote(20, 10000, "Pallas")); texts.Add(Career.LostNote("Pallas"));
+                texts.Add(Career.OffNote(Career.BreakOff.Patrol, "Ceres", "Pallas")); texts.Add(Career.OffNote(Career.BreakOff.Outrun, null, "Pallas")); texts.Add(Career.BoardedNote(20, 10000, "Pallas")); texts.Add(Career.LostNote("Pallas"));
             }
             finally { info.Name = was; }
             var bad = texts.FindAll(t => t == null || t.Contains(name + "'") || t.Contains(name.ToLowerInvariant()) || Regex.IsMatch(t, $@"\b[Aa]n? {name}")

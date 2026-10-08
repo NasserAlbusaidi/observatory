@@ -15,6 +15,7 @@ namespace FogOfWar.OpenWorld
         public readonly string Hull;         // the raider's own name; the proxy's adds the faction's from the table
         public readonly double CatchSeconds; // the closed-form catch time at the start (Career.CatchSeconds)
         public double Dwell;                 // the boarding clock: seconds alongside, reset on any break
+        public double Hopeless;              // seconds the catch has stayed out of reach (#98), reset when it comes back
         public double Range, Vrel;           // from the player at the last career update
         internal readonly SolarSystem Sys;   // the system the proxy is in
         D3 pos, vel, acc;
@@ -75,6 +76,7 @@ namespace FogOfWar.OpenWorld
         public const double BoardShare = 0.5, GiveUpShare = 0.25; // D5: the part of the job's pay, and of its tonnes for cargo
         public const double ChaseWarp = 1000, CloseWarp = 100, CloseKm = 10000; // D7: the warp cap, and where it tightens
         public const double CatchMinS = 2 * 3600, CatchMaxS = 6 * 3600;        // D11: the catch time a raider's start must give
+        public const double GiveUpS = 3600;                       // #98: how long the catch stays past CatchMaxS before it breaks off
         static readonly string[] RaiderHulls = { "Magpie", "Jackal", "Lamprey", "Skua", "Cutlass", "Remora" };
 
         public static bool IsRaider(Body b) => b is Encounter.RaiderBody;
@@ -89,8 +91,8 @@ namespace FogOfWar.OpenWorld
         bool contactLost; // a load dropped an encounter: the note waits for a tick, which knows the date and the ship
 
         // The time compression the scene must hold to while a raider gives chase (0: none). The range is taken now, not at
-        // the last update, so the scene's cap before a frame's sim time is set is that frame's. W4 has no escape end: a
-        // chase the raider cannot win holds the cap until the ship docks, lands, reaches a patrol or gives up.
+        // the last update, so the scene's cap before a frame's sim time is set is that frame's. A chase the raider can't win
+        // ends after GiveUpS (#98).
         public double WarpCap
         {
             get
@@ -130,6 +132,7 @@ namespace FogOfWar.OpenWorld
         // t = (u + 2·√(a·(u² / 2a − d))) / a. Its present thrust is left out: a ship that burns away takes longer.
         public static double CatchSeconds(D3 r, D3 v, double a)
         {
+            if (!(a > 1e-12)) return double.PositiveInfinity;
             double d = r.Mag;
             var los = d > 1e-9 ? r / -d : new D3(1, 0, 0);
             double u = D3.Dot(v, los), w = (v - los * u).Mag;
@@ -225,6 +228,14 @@ namespace FogOfWar.OpenWorld
             e.Range = (e.Pirate.Pos - ship.Pos).Mag;
             e.Vrel = (e.Pirate.Vel - ship.Vel).Mag;
             bool alongside = e.Range < InterceptKm && e.Vrel < InterceptKms; // as Intercepts has it: a NaN is never alongside
+            // #98: the catch from now, on the drive the ship's thrust away from the raider leaves it; past CatchMaxS for
+            // GiveUpS, it breaks off
+            if (!alongside && CatchNow(e, ship) > CatchMaxS)
+            {
+                e.Hopeless += simDt;
+                if (e.Hopeless >= GiveUpS) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Outrun, null, Haven()), true, jd); return; }
+            }
+            else e.Hopeless = 0;
             if (!alongside) { e.Dwell = 0; return; }
             e.Dwell += Math.Min(simDt, 30);
             if (e.Dwell < Threat.BoardingSeconds) return;
@@ -265,7 +276,25 @@ namespace FogOfWar.OpenWorld
         // of a fixed width with no wrap (OpenSystemScene.DrawCareerNotes). So they leave out what the card and the pill say
         // (the range, the job's title), and a faction's name takes no possessive, no indefinite article and no verb that
         // agrees with it (D13).
-        internal enum BreakOff { Docked, Landed, JobOver, Patrol }
+        // #98: the catch from now with the ship's thrust f away from the raider: it closes at a − f and brakes at a + f, so
+        // the peak closing speed vp has (vp² − u²) / 2(a − f) + vp² / 2(a + f) = d. With a ≤ f it can't speed up and only
+        // its closing speed u brings it in. Past a stop-short overshoot it falls back to the coasting ship's closed form.
+        internal static double CatchNow(Encounter e, Ship ship)
+        {
+            var r = e.Pirate.Pos - ship.Pos;
+            double d = r.Mag, a = PirateG * Ship.G0;
+            var los = d > 1e-9 ? r / -d : new D3(1, 0, 0);
+            var v = e.Pirate.Vel - ship.Vel;
+            double u = D3.Dot(v, los), w = (v - los * u).Mag;
+            double f = Math.Max(0, ship.Throttle * ship.AMax * D3.Dot(ship.Heading, los));
+            double a1 = a - f, a2 = a + f;
+            if (f <= 0 || (u > 0 && u * u / (2 * a2) > d)) return CatchSeconds(r, v, Math.Max(a1, 1e-12));
+            if (a1 <= 1e-12) return u > 0 ? d / u + u / (2 * a2) + w / a2 : double.PositiveInfinity;
+            double vp = Math.Sqrt((d + u * u / (2 * a1)) / (1 / (2 * a1) + 1 / (2 * a2)));
+            return (vp - u) / a1 + vp / a2 + w / a2;
+        }
+
+        internal enum BreakOff { Docked, Landed, JobOver, Patrol, Outrun }
         internal const string DryNote = "Can't divert: the tank is dry", NavNote = "Can't divert: the nav computer would not engage";
         internal static string RunNote => $"Running: burn hard, or dock first. Time is held to {ChaseWarp:N0}×";
         internal static string DivertNote(Port p) => $"Diverting to {p.Name}, into the {Factions[(int)p.Owner].Name} patrol's reach";
@@ -273,7 +302,8 @@ namespace FogOfWar.OpenWorld
         internal static string BoardedNote(double t, double pay, string haven) => "Boarded: the raider took " + Loot(t, pay) + (haven != null ? " back to " + haven : "");
         internal static string GaveUpNote(double t, double pay, string haven) => $"Gave up {Loot(t, pay)}: the raider " + (haven != null ? "goes back to " + haven : "leaves");
         internal static string OffNote(BreakOff why, string where, string haven) =>
-            (why == BreakOff.Docked ? $"Docked at {where}" : why == BreakOff.Landed ? $"Landed on {where}" : why == BreakOff.Patrol ? $"{where} patrol in reach" : "The job is over") +
+            (why == BreakOff.Docked ? $"Docked at {where}" : why == BreakOff.Landed ? $"Landed on {where}" : why == BreakOff.Patrol ? $"{where} patrol in reach"
+                : why == BreakOff.Outrun ? "Outrun" : "The job is over") +
             ": the raider breaks off" + Back(haven);
         static string Back(string haven) => haven != null ? ", back to " + haven : "";
         static string Loot(double t, double pay) => (t > 0 ? $"{t:N1} t and " : "") + $"{pay:N0} cr";
