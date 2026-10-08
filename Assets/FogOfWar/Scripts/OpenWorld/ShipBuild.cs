@@ -111,5 +111,17 @@ namespace FogOfWar.OpenWorld
         public double HoldTonnes => this[Slot.Hold].Size;
         public int Seats => (int)this[Slot.Cabin].Size;
         public int SensorLevel => (int)this[Slot.Sensors].Size;
+
+        // the yard's readouts: full burn with an empty hold
+        public double GFull => Thrust / (DryMass + TankCapacity) / Ship.G0;
+        public double GEmpty => Thrust / DryMass / Ship.G0;
+        public double DvFull => Ship.Ve * Math.Log((DryMass + TankCapacity) / DryMass);
+        public double JetPowerTW => 0.5 * Thrust * Ship.Ve / 1000; // ½·F·vₑ; MN × km/s is GW
+        public bool Same(ShipBuild o)
+        {
+            if (hull != o.hull || pick.Length != o.pick.Length) return false;
+            for (int s = 0; s < pick.Length; s++) if (pick[s] != o.pick[s]) return false;
+            return true;
+        }
     }
 }

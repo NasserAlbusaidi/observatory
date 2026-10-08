@@ -352,6 +352,17 @@ namespace FogOfWar
                     if (!own.Contains("owned True") || !own.Contains("cr earned")) { errors++; log.WriteLine("    ERROR 06o-ship-owned: expected the ship owned and the record"); }
                     os.TestBuyoutUndo();
                     os.OpenPage(0);
+                    // the yard with a courier draft: every readout fitted → draft, the trip check and the refit price
+                    os.TestYardDraft(true);
+                    yield return Wait(0.6f);
+                    os.TestYardScroll();
+                    yield return Wait(0.3f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06y-yard");
+                    string yard = os.TestYardReport();
+                    log.WriteLine($"    06y-yard: {yard}");
+                    if (!yard.Contains("->") || !yard.Contains("Mars") || !yard.Contains("shown True") || yard.Contains("NaN") || yard.Contains("∞"))
+                    { errors++; log.WriteLine("    ERROR 06y-yard: expected the draft's readouts, a trip check to Mars and the yard on screen"); }
+                    os.TestYardDraft(false);
                 }
                 os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");

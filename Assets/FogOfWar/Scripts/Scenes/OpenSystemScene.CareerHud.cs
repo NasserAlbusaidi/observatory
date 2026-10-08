@@ -212,7 +212,7 @@ namespace FogOfWar
         {
             var sb = new StringBuilder();
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
-              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(string.Join(",", career.Build.pick)).Append(career.InYard).Append('|').Append(ship.Target?.Name).Append('|')
+              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(string.Join(",", career.Build.pick)).Append(career.InYard).Append(yardDraft == null ? "" : string.Join(",", yardDraft.pick)).Append('|').Append(ship.Target?.Name).Append('|')
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             for (int i = 1; i < Career.Factions.Length; i++) sb.Append('s').Append(career.Standing((Faction)i));
             // pay and tonnes too: a raider's boarding or give-up changes them on a job that stays on
@@ -361,8 +361,7 @@ namespace FogOfWar
                     Ui.B(row, $"Fill tank ({fill:N1} t, {career.FillCost(ship):N0} cr)", () => career.BuyFuel(ship, career.TankCapacity - ship.Fuel), "primary");
                     Ui.B(row, "+20 t", () => career.BuyFuel(ship, 20));
                 }
-                foreach (var (label, fit) in RefitOffers()) Ui.B(row, label, fit);
-                if (YardLine() is string yard) Ui.L(c, yard, "t-body", "warn").style.marginTop = 4;
+                BuildYard(c);
 
                 Ui.Section(c, "Contract board (refreshes each day)");
                 if (career.Board.Count == 0) Ui.L(c, "No work posted.", "t-note");

@@ -16,22 +16,6 @@ namespace FogOfWar
 
         public Career Career => career; // read by the HUD
 
-        // One step up in each slot the yard has a bigger part for, with its net price and days in the yard.
-        List<(string label, Action fit)> RefitOffers()
-        {
-            var up = new List<(string, Action)>();
-            foreach (Slot s in Enum.GetValues(typeof(Slot)))
-            {
-                int i = career.Build.pick[(int)s] + 1;
-                if (i >= ShipBuild.Catalog[(int)s].Length) continue;
-                var m = ShipBuild.Catalog[(int)s][i];
-                career.CanRefit(s, i, out _, out double cost);
-                string what = s == Slot.Drive ? $"{m.Name} {m.Size:0.0} MN" + (m.Size > ShipBuild.Rated(3) ? " juice: fictional" : "") :s == Slot.Sensors ? $"{m.Name}: ×2 range, ½ scan time" : m.Name;
-                up.Add(($"{what} ({cost:N0} cr, {m.RefitDays:0.#} d)", () => career.Refit(ship, s, i)));
-            }
-            return up;
-        }
-
         string YardLine() => career.InYard ? $"In the yard: refit done in {Dur(career.RefitDays * 86400)}. Drive and RCS cold." : null;
         Career career;
         int cruiseIdx;
@@ -329,13 +313,7 @@ namespace FogOfWar
                     if (fb == 0) career.BuyFuel(ship, fill);
                     if (fb == 1) career.BuyFuel(ship, 20);
                 }
-                if (YardLine() is string yard) GUILayout.Label(yard, ui.label);
-                var up = RefitOffers();
-                if (up.Count > 0)
-                {
-                    int ub = ui.Buttons(up.ConvertAll(u => u.label).ToArray());
-                    if (ub >= 0) up[ub].fit();
-                }
+                YardPanel(ui);
                 ContractBoard(ui);
             }
             else GUILayout.Label("Not docked. Park in orbit at a port to dock: " + string.Join(", ", Array.ConvertAll(Career.Ports, p => p.Name)) + ".", ui.note);

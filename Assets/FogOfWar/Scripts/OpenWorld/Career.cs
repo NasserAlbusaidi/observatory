@@ -632,41 +632,6 @@ namespace FogOfWar.OpenWorld
             Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of fuel, −{EmergencyCost:N0} cr", false);
         }
 
-        // ------------------------------------------------------------ the yard
-
-        // Fitting module i in slot s, docked at any port: its price less 70 % of the part it replaces (a smaller part can
-        // pay), and days in the yard. A part the load or the passengers aboard need can't come out; reaction mass a
-        // smaller tank can't hold is sold to the port at its price.
-        public bool CanRefit(Slot s, int i, out string why, out double cost)
-        {
-            var m = ShipBuild.Catalog[(int)s][i];
-            cost = Math.Round(m.Price - Build[s].Price * ShipBuild.SellBack);
-            var after = Build.Clone(); after.pick[(int)s] = i;
-            why = Sandbox ? "sandbox" : Docked == null ? "dock first" : Build.pick[(int)s] == i ? "fitted"
-                : s == Slot.Drive && m.Size > Build.Hull.MaxThrust ? "too big for the hull"
-                : CargoTonnes > after.HoldTonnes ? "the load aboard needs the hold"
-                : PeopleAboard > after.Seats ? "the passengers aboard need the seats"
-                : cost > 0 && Credits < cost ? "not enough credits" : null;
-            return why == null;
-        }
-
-        public bool Refit(Ship ship, Slot s, int i)
-        {
-            if (!CanRefit(s, i, out _, out double cost)) return false;
-            var m = ShipBuild.Catalog[(int)s][i];
-            Credits -= cost;
-            Build.pick[(int)s] = i;
-            RefitJd = Math.Max(RefitJd, jd) + m.RefitDays;
-            double spill = ship.Fuel - TankCapacity, refund = spill > 0 ? spill * Docked.FuelPrice : 0;
-            if (spill > 0) { ship.Fuel = TankCapacity; Credits += refund; }
-            Apply(ship);
-            Say(Happening.Upgrade, $"Refit: {m.Name} fitted, " + (cost >= 0 ? $"−{cost:N0} cr" : $"+{-cost:N0} cr") +
-                (spill > 0 ? $", {spill:N1} t of fuel sold for {refund:N0} cr" : "") + $". In the yard {RefitDays:0.#} days");
-            return true;
-        }
-
-        public double RefitDays => Math.Max(0, RefitJd - jd);
-
         // One step toward the buyout, the last one only what is left. Docked, with the credits in hand: no debt for this.
         public bool PayTowardShip()
         {

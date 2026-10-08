@@ -31,6 +31,8 @@ namespace FogOfWar
                 $"yard: the stock build is today's ship: {b.DryMass} t dry, {b.Thrust:0.000} MN ({g:0.000} g at {ShipBuild.RatedMass} t), {b.TankCapacity} t tank, {b.HoldTonnes} t hold, {b.Seats} seats, sensors {b.SensorLevel}");
             double loaded = b.Thrust / (b.DryMass + b.TankCapacity + b.HoldTonnes) / Ship.G0, empty = b.Thrust / b.DryMass / Ship.G0;
             Check(Math.Abs(loaded - 0.833) < 0.001 && Math.Abs(empty - 1.667) < 0.001, $"yard: the stock drive gives {loaded:0.000} g full and loaded, {empty:0.000} g empty");
+            Check(Math.Abs(b.GFull - 1) < 1e-9 && Math.Abs(b.GEmpty - 5.0 / 3) < 1e-9 && Math.Abs(b.JetPowerTW - 24.5) < 0.05 && Math.Abs(b.DvFull - Ship.Ve * Math.Log(500.0 / 300)) < 1e-6,
+                $"yard: stock readouts: {b.GFull:0.00} g full, {b.GEmpty:0.00} g empty, {b.DvFull:N0} km/s on a full tank, {b.JetPowerTW:0.0} TW jet power");
             foreach (Slot s in Enum.GetValues(typeof(Slot)))
                 Check(Array.TrueForAll(ShipBuild.Catalog[(int)s], m => m.Slot == s && m.Mass >= 0 && m.Price >= 0 && m.RefitDays > 0), $"yard: every {s} part is in its own slot with a mass, a price and refit days");
 
@@ -89,6 +91,29 @@ namespace FogOfWar
             career.Active.Add(load);
             Check(!career.CanRefit(Slot.Hold, 0, out why, out _) && why == "the load aboard needs the hold", $"yard: a 50 t hold can't go in with 80 t aboard ({why})");
             career.Active.Remove(load);
+
+            // several parts at once: the costs and the days add up; a refused refit changes nothing
+            career.Build = was.Clone(); career.RefitJd = 0;
+            var two = was.Clone();
+            two.pick[(int)Slot.Drive] = was.pick[(int)Slot.Drive] == 2 ? 1 : 2;
+            two.pick[(int)Slot.Sensors] = 1 - was.pick[(int)Slot.Sensors];
+            double want = Math.Round(two[Slot.Drive].Price - was[Slot.Drive].Price * ShipBuild.SellBack + two[Slot.Sensors].Price - was[Slot.Sensors].Price * ShipBuild.SellBack);
+            double wantDays = two[Slot.Drive].RefitDays + two[Slot.Sensors].RefitDays;
+            career.CanRefitTo(two, out _, out double twoCost, out double twoDays);
+            career.Credits = twoCost - 1;
+            career.CanRefitTo(two, out why, out _, out _);
+            Check(why == "not enough credits" && !career.RefitTo(ship, two) && career.Build.Same(was) && career.Credits == twoCost - 1 && career.RefitJd == 0 && !career.InYard,
+                $"yard: a refit short of credits changes nothing ({why})");
+            career.Credits = 500000;
+            Check(career.RefitTo(ship, two) && career.Build.Same(two) && Math.Abs(twoCost - want) < 1 && Math.Abs(500000 - career.Credits - want) < 1
+                  && Math.Abs(twoDays - wantDays) < 1e-9 && Math.Abs(career.RefitJd - jd - wantDays) < 0.01,
+                $"yard: drive and sensors in one refit: {twoCost:N0} cr, {twoDays:0.#} days (the sums)");
+
+            // the trip check: a bigger drive gets there sooner for more reaction mass
+            var stock = ShipBuild.Stock(); var torch = ShipBuild.Stock(); torch.pick[(int)Slot.Drive] = 3;
+            bool t1 = career.YardTrip(stock, out string to, out double ts, out double ms), t2 = career.YardTrip(torch, out _, out double tt, out double mt);
+            Check(t1 && t2 && ts > 0 && tt < ts && mt > ms && !double.IsNaN(ms + mt),
+                $"yard: trip check {career.Docked.Name} → {to}, full burn: stock {ts / 86400:0.0} days, {ms:N0} t; torch {tt / 86400:0.0} days, {mt:N0} t");
 
             career.Build = was; career.RefitJd = 0; career.Credits = credits0; ship.Fuel = fuel0; ship.MaxG = g0;
             if (!feat0) career.Codex.Achieved.Remove("drive3");
