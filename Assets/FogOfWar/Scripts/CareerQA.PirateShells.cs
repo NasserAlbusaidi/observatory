@@ -130,7 +130,14 @@ namespace FogOfWar
             if (go) go = Guard("shells tag", () =>
             {
                 string dot = Get<string>("raiderShown");
+                // the dot can land on Vesta's bracket label; it hid the tag while the label's name row was pickable
                 Check(ship.Target == sys["Vesta"] && dot == $"on: {e.Proxy.Name} · 2 km", $"shells: with Vesta the target, the raider's dot has its tag: {dot}");
+                var pickable = new List<string>();
+                Get<VisualElement>("markers").Query().ForEach(m =>
+                {
+                    if (m.pickingMode != PickingMode.Ignore) pickable.Add(m.parent?.name + ">" + string.Join(".", m.GetClasses()));
+                });
+                Check(pickable.Count == 0, $"shells: no HUD marker takes the pointer (App.UnderPanel would read it as a panel): [{string.Join(", ", pickable)}]");
                 string rows = s.TestCardRows();
                 Check(rows.Contains("Engage") && rows.Contains("Trip") && !rows.Contains("Answers"), $"shells: with Vesta the target, the card has ENGAGE back and no answers: rows {rows}");
                 Call("SetTarget", e.Proxy);

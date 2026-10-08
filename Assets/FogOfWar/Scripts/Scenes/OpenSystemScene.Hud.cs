@@ -214,6 +214,8 @@ namespace FogOfWar
             lab.pickingMode = PickingMode.Ignore;
             lab.style.position = Position.Absolute;
             var nameRow = Ui.E(lab, "row");
+            // a pickable marker counts as a panel for App.UnderPanel and hides the world tags under it
+            nameRow.pickingMode = PickingMode.Ignore;
             mkIcon = KindIcon(nameRow);
             mkTgtName = Ui.L(nameRow, "", "t-h3", "f-cond", "accent", "glow");
             mkTgtDist = Ui.L(lab, "", "t-label", "f-mono");
