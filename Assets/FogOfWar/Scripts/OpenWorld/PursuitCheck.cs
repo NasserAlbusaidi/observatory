@@ -230,6 +230,16 @@ namespace FogOfWar.OpenWorld
                         Id = $"S3{tag}-{g:F0}g", Duration = 6 * 3600, Centre = vesta, TrackDock = true, Make = () => Braking(g, out_),
                         What = $"player braking into Vesta from 600,000 km at 100 km/s; {g:F0} g pirate at rest relative to Vesta, {out_:N0} km out on the approach line, 20,000 km along-track",
                     });
+            // #90 option (b): the S3 arrival with a 1 g pirate behind the player on its approach line, at its velocity, as far
+            // back as a rest-to-rest catch of T hours needs (d = a·T²/4)
+            foreach (var g in new[] { 1.0, 2.0 })
+                foreach (var T in new[] { 2.0, 4.0, 6.0 })
+                    list.Add(new Scenario
+                    {
+                        Id = $"S3b-{g:F0}g{T:F0}h", Duration = 8 * 3600, Centre = vesta, TrackDock = true,
+                        What = $"player braking into Vesta from 600,000 km at 100 km/s; {g:F0} g pirate behind it at its velocity, {g * 9.80665e-3 * Math.Pow(T * 3600, 2) / 4:N0} km back (a {T:F0} h catch from relative rest)",
+                        Make = () => { var i = Braking(g, 0); i.PiratePos = i.Player.Pos + ur * (g * 9.80665e-3 * Math.Pow(T * 3600, 2) / 4); i.PirateVel = i.Player.Vel; return i; },
+                    });
             foreach (var g in new[] { 1.0, 2.0, 3.0 })
                 list.Add(new Scenario { Id = $"S5-{g:F0}g", What = $"S1 with a 3 g pirate; once alongside {PreHoldS:F0} s, the player burns {g:F0} g by hand and flips every 1800 s for 6 h", Duration = 4 * 3600, BurnG = g, Make = () => Coasting(3) });
             return list;
@@ -586,6 +596,16 @@ namespace FogOfWar.OpenWorld
             Echo(log, $"  G9 far-side crossing guard non-null: {(crossing ? "PASS" : "FAIL")}");
             Echo(log, $"  G9 S4 pole guard null: {(pole ? "PASS" : "FAIL")}");
             return crossing && pole;
+        }
+
+        // #90's measurement (report only): can a raider that starts behind an arriving ship board it before the dock?
+        public static void Behind(TextWriter t)
+        {
+            var sys = SolarSystem.Build();
+            var scs = Scenarios(sys).Where(s => s.Id.StartsWith("S3b-")).ToList();
+            foreach (var sc in scs) Echo(t, $"  {sc.Id,-8} {sc.What}");
+            int n = 0;
+            foreach (var sc in scs) foreach (var h in new[] { 1.0, 5.0 }) Echo(t, Format(++n, RunOne(sys, sc, h, Plan.Pursue, null)));
         }
 
         public static int Run(TextWriter table, TextWriter raw)

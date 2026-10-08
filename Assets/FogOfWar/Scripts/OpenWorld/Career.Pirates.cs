@@ -69,7 +69,7 @@ namespace FogOfWar.OpenWorld
     // Not saved: a load drops it and says so.
     public partial class Career
     {
-        // working values [design]; the open ones are decided in GitHub issues (D1 #90)
+        // working values [design]. D1 (#90): a 1 g raider at rest with its lair; it can't board an arriving ship before the dock
         public const double PirateG = 1;                          // D1: the raider's drive, in g
         public const double RaidsPerHour = 0.2;                   // D3: k, calls per exposed hour (PirateRate)
         public const double BoardShare = 0.5, GiveUpShare = 0.25; // D5: the part of the job's pay, and of its tonnes for cargo
