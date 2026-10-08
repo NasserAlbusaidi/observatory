@@ -15,7 +15,7 @@ namespace FogOfWar
         VisualElement tcBody, tcIcon, tcRelRow, tcMoreRule, tcAnswers;
         string tcAnswersSig;
         Label tcName, tcSub, tcDist, tcRel, tcClose, tcTrip, tcBrach, tcNav, tcEngage, tcNoTarget, tcMore;
-        Label tcDrift, tcStop, tcStopNote;
+        Label tcDrift, tcStop, tcStopNote, tcJob;
         bool cardExpanded, cardHover;
 
         void BuildTargetCard(VisualElement parent)
@@ -42,6 +42,8 @@ namespace FogOfWar
             BuildBrake(tcBody);
             Ui.E(tcBody, "rule");
             tcTrip = Ui.L(tcBody, "", "t-note", "f-mono");
+            tcJob = Ui.L(tcBody, "", "t-label");
+            tcJob.style.marginTop = 3; tcJob.style.whiteSpace = WhiteSpace.Normal;
             var nrow = Ui.E(tcBody, "row");
             nrow.style.marginTop = 6;
             tcNav = Ui.L(nrow, "", "t-label", "f-condm");
@@ -119,6 +121,21 @@ namespace FogOfWar
                 Ui.SetClass(tcBrach, "warn", dvShort);
                 Ui.Text(tcTrip, d < 1 ? "Within parking distance" : TripLine(dvShort));
                 Ui.SetClass(tcTrip, "warn", dvShort);
+                // the job bound here, with the trip planner's arrival against its deadline (as the planner's cards read it)
+                var due = career == null || career.Sandbox ? null : career.Active.Find(j => career.TargetOf(j) == t);
+                Ui.Show(tcJob, due != null);
+                if (due != null)
+                {
+                    double late = jd - due.DeadlineJd;
+                    if (d >= 1)
+                    {
+                        PlanTrip(out double secs, out _, out _);
+                        late += secs / 86400 + (due.Kind == JobKind.Survey ? due.DwellNeeded / 86400 : 0);
+                    }
+                    Ui.Text(tcJob, $"{due.Title}  ·  due in {Days(Math.Max(due.DeadlineJd - jd, 0))}, " + (late > 0 ? $"{Days(late)} too late" : $"{Days(-late)} to spare"));
+                    Ui.SetClass(tcJob, "ok", late <= 0);
+                    Ui.SetClass(tcJob, "warn", late > 0);
+                }
                 Ui.Text(tcNav, ship.PlanActive ? "NAV  " + ship.Phase.ToUpperInvariant() : "NAV IDLE");
                 Ui.SetClass(tcNav, "accent", ship.PlanActive);
                 Ui.Text(tcEngage, ship.PlanActive ? "ABORT" : "ENGAGE");
