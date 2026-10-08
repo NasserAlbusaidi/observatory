@@ -27,6 +27,7 @@ namespace FogOfWar
                 Guard("signature planner", () => SigPlannerChecks(qs));
             }
             yield return SigSceneChecks();
+            yield return StealthChecks(); // 16: stowed radiators and the heat sink
         }
 
         // 15a

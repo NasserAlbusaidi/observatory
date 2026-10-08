@@ -73,10 +73,11 @@ namespace FogOfWar.OpenWorld
 
         // A trip of d km from the start to body `to` at a km/s², from rest to rest, cruising at `cap` km/s (0: a full burn),
         // held still for half the parking time (Career.ParkSeconds) at the target; a raider sees a burn and keeps its track
-        // Signature.TrackHoldS (combat Phase 2). The ship's place goes from the start's track to the target's as it covers
-        // the distance, so it moves with each end while it is slow there. The start is body `from` plus a fixed offset; with
-        // the Sun as `from` it is a fixed point, near enough for a ship that starts far from everything.
-        public static Risk Of(SolarSystem sys, Body from, D3 offset, Body to, double jd, double d, double a, double cap = 0)
+        // holdS (Signature.TrackHoldS; less with stowable radiators, combat Phase 3). The ship's place goes from the start's
+        // track to the target's as it covers the distance, so it moves with each end while it is slow there. The start is body
+        // `from` plus a fixed offset; with the Sun as `from` it is a fixed point, near enough for a ship that starts far from
+        // everything.
+        public static Risk Of(SolarSystem sys, Body from, D3 offset, Body to, double jd, double d, double a, double cap = 0, double holdS = Signature.TrackHoldS)
         {
             var r = new Risk();
             if (from == null || to == null || !(d > 1) || !(a > 0)) return r;
@@ -117,19 +118,19 @@ namespace FogOfWar.OpenWorld
             }
             // no hold at the start: the ship has not burned, so no raider sees it (W3 counted 1.5 h)
             Add(0, fast, step);                                                                  // speeding up: loud
-            if (vp < 7 * MatchKms) Add(ta, ta + Math.Min(tc, Signature.TrackHoldS), step);       // a slow coast, while the burn is tracked
+            if (vp < 7 * MatchKms) Add(ta, ta + Math.Min(tc, holdS), step);                      // a slow coast, while the burn is tracked
             Add(T - fast, T, step);                                                              // braking: loud
-            Add(T, T + Math.Min(park, Signature.TrackHoldS), park / 6);                          // held at the target, tracked
+            Add(T, T + Math.Min(park, holdS), park / 6);                                         // held at the target, tracked
             return r;
         }
 
         // the trip planner's line
-        public static string Line(Risk r)
+        public static string Line(Risk r, double holdS = Signature.TrackHoldS)
         {
             if (r.Hours < Tiers[0].Below) return "Raider risk: none on this course.";
             // #90: a raider called on arrival can't board before the dock (PursuitCheck S3b), so docking first is the answer
             string end = r.Arriving > 2 * r.Leaving ? ", most of it on arrival: dock first and a raider can't board" :r.Leaving > 2 * r.Arriving ? ", most of it on departure" : "";
-            return $"Raider risk: {r.Tier}. {r.Hours:0.0} h slow and seen (a burn, or {Signature.TrackHoldS / 3600:0} h after one), out of patrol reach in raider space{end}.";
+            return $"Raider risk: {r.Tier}. {r.Hours:0.0} h slow and seen (a burn, or {Signature.HoldText(holdS)} after one), out of patrol reach in raider space{end}.";
         }
     }
 }

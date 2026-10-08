@@ -2,10 +2,11 @@ using System;
 
 namespace FogOfWar.OpenWorld
 {
-    public enum Slot { Drive, Tank, Hold, Cabin, Sensors }
+    public enum Slot { Drive, Tank, Hold, Cabin, Sensors, Radiators }
 
     // A part the yard fits in one slot. Size is the slot's own unit: MN of thrust, tonnes of tank or hold, seats, or the
-    // sensor level (0 stock, 1 long range: scan range ×2, dwell ÷2).
+    // sensor level (0 stock, 1 long range: scan range ×2, dwell ÷2), or the radiators' cold-range factor when stowed (1:
+    // fixed, always out).
     public class Module
     {
         public Slot Slot;
@@ -74,8 +75,13 @@ namespace FogOfWar.OpenWorld
                 new Module { Slot = Slot.Sensors, Name = "Stock sensors", Size = 0, Mass = 2, Price = 10000, RefitDays = 0.5 },
                 new Module { Slot = Slot.Sensors, Name = "Long-range sensors", Size = 1, Mass = 4, Price = 37000, RefitDays = 0.5 },
             },
+            new[]
+            {
+                new Module { Slot = Slot.Radiators, Name = "Fixed radiators", Size = 1, Mass = 0, Price = 0, RefitDays = 1 },
+                new Module { Slot = Slot.Radiators, Name = "Stowable radiators", Size = 0.3, Mass = 12, Price = 60000, RefitDays = 1 },
+            },
         };
-        public static readonly int[] StockPick = { 1, 1, 1, 2, 0 };
+        public static readonly int[] StockPick = { 1, 1, 1, 2, 0, 0 };
         public const double SellBack = 0.7;
 
         public static ShipBuild Stock() => new ShipBuild { hull = Hulls[0].Name, pick = (int[])StockPick.Clone() };
@@ -111,6 +117,8 @@ namespace FogOfWar.OpenWorld
         public double HoldTonnes => this[Slot.Hold].Size;
         public int Seats => (int)this[Slot.Cabin].Size;
         public int SensorLevel => (int)this[Slot.Sensors].Size;
+        public double StowRho => this[Slot.Radiators].Size;
+        public bool Stowable => StowRho < 1;
 
         // the yard's readouts: full burn with an empty hold
         public double GFull => Thrust / (DryMass + TankCapacity) / Ship.G0;

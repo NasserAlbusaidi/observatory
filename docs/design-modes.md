@@ -94,7 +94,7 @@ This doc builds on [design-combat.md](design-combat.md) and [design-world.md](de
 | Hold | Cargo | Hold |
 | Tank | Reaction mass | Tank |
 | Drive | Thrust | Drive |
-| Radiator collar | Heat rejection, folds flat | Radiator (Phase 2) |
+| Radiator collar | Heat rejection, folds flat | Radiators (combat Phase 3) |
 
 - Each section comes in 2–3 sizes. Size sets the stats and the length.
 - **Hardpoints** sit on sections: `PDC_n`, later `Tube_n`. A section brings its own markers. Weapons can only go where a section has a mount.
