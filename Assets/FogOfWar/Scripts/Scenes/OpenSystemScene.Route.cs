@@ -1,0 +1,102 @@
+using System;
+using FogOfWar.OpenWorld;
+using FogOfWar.UI;
+using UnityEngine.UIElements;
+
+namespace FogOfWar
+{
+    // The route strip under the status box while a flip-and-burn flies: the trip's legs (burn, coast, brake) drawn to
+    // scale in time with what is flown filled in, the flip as a mark between them, and a countdown to the next event.
+    // What is flown comes from the ship's own burn and coast counters since the plan was engaged; what is left from
+    // Ship.Legs at the ship's state now, so a new coast choice mid-flight redraws the rest.
+    public partial class OpenSystemScene
+    {
+        VisualElement routeBox, routeAccel, routeCoast, routeBrake, routeFlip;
+        Label routeHead, routeNext, routeWhen, routeLegs;
+
+        // the plan being drawn and the counters when it started; routeBrakeAt is BurnSeconds when braking began (-1: not yet)
+        Body routeFor;
+        double routeBurn0, routeCoast0, routeBrakeAt = -1;
+
+        void BuildRouteStrip(VisualElement status)
+        {
+            routeBox = Ui.E(status, "route");
+            routeHead = Ui.L(routeBox, "", "t-micro", "f-condm");
+            var row = Ui.E(routeBox, "row");
+            routeNext = Ui.L(row, "", "t-label", "f-condm");
+            routeNext.style.flexGrow = 1;
+            routeWhen = Ui.L(row, "", "t-h3", "f-mono", "accent", "glow");
+            var bar = Ui.E(routeBox, "route-bar");
+            routeAccel = Leg(bar, "accel");
+            routeCoast = Leg(bar, "coast");
+            routeFlip = Ui.E(bar, "flip");
+            routeBrake = Leg(bar, "brake");
+            routeLegs = Ui.L(routeBox, "", "t-label", "f-mono");
+            routeFor = null;
+            Ui.Show(routeBox, false);
+
+            static VisualElement Leg(VisualElement bar, string kind)
+            {
+                var leg = Ui.E(bar, "leg", kind);
+                Ui.E(leg, "done");
+                return leg;
+            }
+        }
+
+        void UpdateRouteStrip()
+        {
+            if (routeBox == null) return;
+            if (!FlyingPlan) { routeFor = null; Ui.Show(routeBox, false); return; }
+            if (routeFor != ship.Target)
+            {
+                routeFor = ship.Target;
+                routeBurn0 = ship.BurnSeconds; routeCoast0 = ship.CruiseSeconds; routeBrakeAt = -1;
+            }
+            bool braking = ship.Phase == "flipped, braking";
+            if (braking && routeBrakeAt < 0) routeBrakeAt = ship.BurnSeconds;
+
+            // flown so far: every burn before the brake counts as the first leg (a clearance climb included)
+            double braked = routeBrakeAt < 0 ? 0 : ship.BurnSeconds - routeBrakeAt;
+            double accelled = Math.Max(ship.BurnSeconds - routeBurn0 - braked, 0);
+            double coasted = Math.Max(ship.CruiseSeconds - routeCoast0, 0);
+
+            // still to fly; once the brake has begun the rest is brake, whatever the guidance does near the curve
+            double d = Math.Max((sys.Pos(ship.Target, jd) - ship.Pos).Mag - Ship.Standoff(ship.Target), 0);
+            var (u, _) = ship.RelToTarget(sys, jd);
+            var (accelLeft, coastLeft, brakeLeft) = routeBrakeAt >= 0
+                ? (0.0, 0.0, Math.Max(u, 0) / (ship.AMax * Ship.BrakeShare))
+                : Ship.Legs(d, ship.AMax, u, ship.CruiseCap);
+
+            SetLeg(routeAccel, accelled, accelLeft);
+            SetLeg(routeCoast, coasted, coastLeft);
+            SetLeg(routeBrake, braked, brakeLeft);
+            Ui.SetClass(routeFlip, "on", routeBrakeAt >= 0);
+
+            bool arrived = ship.Phase == "in orbit" || ship.Phase == "circularising" || ship.Phase.Contains("station");
+            string next, when = "";
+            if (arrived) next = ship.Phase.ToUpperInvariant();
+            // a turn before anything is flown aims the drive; one after, before the brake, is the flip
+            else if (ship.Phase == "turning") next = routeBrakeAt < 0 && accelled + coasted > 0 ? "FLIPPING" : "TURNING";
+            else if (routeBrakeAt >= 0) { next = "BRAKE ENDS IN"; when = Dur(brakeLeft); }
+            else if (ship.Phase == "cruising") { next = "FLIP IN"; when = Dur(coastLeft); }
+            else if (ship.Phase == "accelerating") { next = coastLeft > 0 ? "COAST IN" : "FLIP IN"; when = Dur(accelLeft); }
+            else next = ship.Phase.ToUpperInvariant();
+            Ui.Text(routeHead, "NAV  ·  " + ship.Target.Name.ToUpperInvariant());
+            Ui.Text(routeNext, next);
+            Ui.Text(routeWhen, when);
+            Ui.Show(routeWhen, when.Length > 0);
+
+            double burn = accelled + accelLeft, coast = coasted + coastLeft, brake = braked + brakeLeft;
+            Ui.Text(routeLegs, "BURN " + Dur(burn) + (coast > 0 ? "  ·  COAST " + Dur(coast) : "") + "  ·  BRAKE " + Dur(brake));
+            Ui.Show(routeBox, true);
+
+            static void SetLeg(VisualElement leg, double done, double left)
+            {
+                double total = done + left;
+                Ui.Show(leg, total > 0);
+                leg.style.flexGrow = (float)total;
+                leg[0].style.width = Length.Percent(total > 0 ? (float)(100 * done / total) : 0);
+            }
+        }
+    }
+}

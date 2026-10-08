@@ -502,6 +502,20 @@ namespace FogOfWar
                     log.WriteLine(msg);
                 }
             }
+            // the route strip's legs: flown out, each case covers the distance, ends at rest, and holds the cap
+            const double ab = g0 * OpenWorld.Ship.BrakeShare;
+            foreach (var (d, u, cap, what) in new[] { (1.12e8, 0.0, 0.0, "full burn from rest"), (1.12e8, 0.0, 400.0, "coast at 400 km/s"),
+                (6e7, 422.0, 422.0, "mid-coast"), (5e7, -30.0, 0.0, "moving apart"), (96.0 * 96.0 / (2 * ab), 96.0, 0.0, "on the braking curve") })
+            {
+                var (ta, tc, tb) = OpenWorld.Ship.Legs(d, g0, u, cap);
+                double u0 = Math.Max(u, 0), back = u < 0 ? u * u / (2 * g0) : 0;
+                double v = u0 + g0 * Math.Max(ta - (u < 0 ? -u / g0 : 0), 0);
+                double flown = (v * v - u0 * u0) / (2 * g0) + v * tc + v * v / (2 * ab) - back;
+                bool capOk = cap <= 0 || v <= Math.Max(cap, u0) * (1 + 1e-9);
+                string msg = $"    legs, {what}: burn {ta / 3600:F1} h, coast {tc / 3600:F1} h, brake {tb / 3600:F1} h, distance error {Math.Abs(flown / d - 1):E1}";
+                if (Math.Abs(flown / d - 1) > 1e-6 || Math.Abs(v - ab * tb) > 1e-6 * Math.Max(v, 1) || !capOk) { errors++; msg += "  BAD"; }
+                log.WriteLine(msg);
+            }
         }
 
         // The intercept runner for each class in Fleet.json: post an intercept for that hull, hold beside it and look at it.

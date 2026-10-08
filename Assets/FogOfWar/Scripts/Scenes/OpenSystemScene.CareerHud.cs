@@ -14,7 +14,7 @@ namespace FogOfWar
     // Same rules and calls as the IMGUI CareerPanel in OpenSystemScene.Career.cs.
     public partial class OpenSystemScene
     {
-        VisualElement jobsBox, rmFill;
+        VisualElement jobsBox, rmFill, rmNeed;
         Label rmText, creditsLabel;
         string jobsSig;
         float jobsT, lastNoteTime;
@@ -32,6 +32,7 @@ namespace FogOfWar
             bar.style.height = 6;
             rmFill = Ui.E(bar, "fill");
             rmFill.style.backgroundColor = new Color(0.41f, 0.82f, 1f, 0.85f);
+            rmNeed = Ui.E(bar, "need");
             creditsLabel = Ui.L(status, "", "t-h3", "f-mono", "accent", "credits");
             creditsLabel.style.marginTop = 6;
         }
@@ -67,15 +68,33 @@ namespace FogOfWar
             {
                 Ui.Text(rmText, "SANDBOX: UNLIMITED");
                 rmFill.style.width = Length.Percent(100);
+                Ui.Show(rmNeed, false);
                 Ui.Text(creditsLabel, "");
             }
             else
             {
-                double frac = career.TankCapacity > 0 ? ship.Fuel / career.TankCapacity : 0;
-                Ui.Text(rmText, $"{ship.Fuel:N0} / {career.TankCapacity:N0} t");
-                rmFill.style.width = Length.Percent((float)Math.Max(0, Math.Min(1, frac)) * 100);
+                // the bar splits what is aboard: the part the trip to the target will burn (amber, with the planner's
+                // margin, as DvShort judges it) and what is spare after it (cyan). Short: the whole tank in red.
+                double cap = career.TankCapacity, need = 0;
+                bool short_ = false;
+                if (ship.Target != null && ship.Landed == null)
+                {
+                    PlanTrip(out _, out double dv, out _);
+                    need = ship.Mass * (1 - Math.Exp(-dv * DvMargin / Ship.Ve));
+                    short_ = DvShort(dv);
+                }
+                if (need < 0.05) need = 0;
+                double frac = cap > 0 ? ship.Fuel / cap : 0;
+                double spare = short_ ? 0 : Math.Max(ship.Fuel - need, 0);
+                float Pct(double t) => (float)Math.Max(0, Math.Min(1, cap > 0 ? t / cap : 0)) * 100;
+                Ui.Text(rmText, $"{ship.Fuel:N0} / {cap:N0} t" + (short_ ? "  ·  SHORT" : need > 0 ? $"  ·  TRIP {Fmt.Num(need, need < 10 ? 1 : 0)} t" : ""));
+                rmFill.style.width = Length.Percent(Pct(spare));
+                rmNeed.style.left = Length.Percent(Pct(spare));
+                rmNeed.style.width = Length.Percent(Pct(ship.Fuel) - Pct(spare));
+                Ui.Show(rmNeed, short_ || need > 0);
+                Ui.SetClass(rmNeed, "short", short_);
                 bool low = frac < 0.15;
-                Ui.SetClass(rmText, "warn", low);
+                Ui.SetClass(rmText, "warn", low || short_);
                 rmFill.style.backgroundColor = low ? new Color(1f, 0.42f, 0.37f, 0.9f) : new Color(0.41f, 0.82f, 1f, 0.85f);
                 Ui.Text(creditsLabel, $"{shownCredits:N0} CR" + (career.Docked != null ? "  ·  DOCKED " + career.Docked.Name.ToUpperInvariant() : ""));
                 Ui.SetClass(creditsLabel, "warn", career.Credits < 0);

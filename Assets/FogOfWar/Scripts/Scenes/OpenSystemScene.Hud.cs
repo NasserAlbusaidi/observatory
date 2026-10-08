@@ -82,6 +82,7 @@ namespace FogOfWar
             stLimited = Ui.L(st, "", "t-note", "warn");
             stNear = Ui.L(st, "", "t-body", "f-semi");
             stNear.style.marginTop = 6;
+            BuildRouteStrip(st);
             var stStatus = st;
             statusBox = st;
 
@@ -597,6 +598,7 @@ namespace FogOfWar
             Ui.Text(stNear, (ship.Landed != null ? "ON " : "NEAR ") + reference.Name.ToUpperInvariant() + "  ·  " + Km(alt) + (reference == sys.Sun ? " out" : " up"));
 
             UpdateTargetCard();
+            UpdateRouteStrip();
 
             // flight cluster
             var vRef = (ship.Vel - RefVel(VelRefBody)).Mag;

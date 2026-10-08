@@ -208,6 +208,22 @@
 .thr > .fill { position: absolute; left: 0; top: 0; bottom: 0; background-color: rgba(255, 181, 71, 0.85); }
 .thr > .cmd { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background-color: rgb(255, 255, 255); }
 .thr > .tick { position: absolute; top: 0; bottom: 0; width: 1px; background-color: rgba(230, 233, 245, 0.18); }
+.thr > .need { position: absolute; top: 0; bottom: 0; background-color: rgba(255, 181, 71, 0.85); border-left-width: 1px; border-color: rgb(8, 11, 20); }
+.thr > .need.short { background-color: rgba(255, 107, 94, 0.9); border-left-width: 0; }
+/* route strip (OpenSystemScene.Route.cs): legs to scale in time, the flown part filled, the flip a mark before the brake */
+.route { width: 320px; margin-top: 10px; padding: 9px 12px 8px 12px; background-color: rgba(8, 11, 20, 0.6); border-left-width: 2px; border-color: rgba(255, 181, 71, 0.8); }
+.route > .row { margin-top: 3px; }
+.route-bar { flex-direction: row; height: 8px; margin: 6px 0 5px 0; }
+.route-bar > .leg { flex-basis: 0; min-width: 3px; margin-right: 2px; }
+.route-bar > .leg > .done { position: absolute; left: 0; top: 0; bottom: 0; }
+.route-bar > .accel { background-color: rgba(255, 181, 71, 0.22); }
+.route-bar > .accel > .done { background-color: rgb(255, 181, 71); }
+.route-bar > .coast { background-color: rgba(105, 210, 255, 0.2); }
+.route-bar > .coast > .done { background-color: rgb(105, 210, 255); }
+.route-bar > .brake { background-color: rgba(255, 181, 71, 0.22); margin-right: 0; }
+.route-bar > .brake > .done { background-color: rgb(255, 181, 71); }
+.route-bar > .flip { width: 2px; height: 14px; margin: -3px 2px 0 0; background-color: rgba(230, 233, 245, 0.35); }
+.route-bar > .flip.on { background-color: rgb(230, 233, 245); }
 .right-g { width: 170px; padding-left: 14px; }
 .right-g > .t-big { font-size: 24px; }
 .pills { position: absolute; bottom: 42px; left: 0; right: 0; flex-direction: row; justify-content: center; flex-wrap: wrap; }

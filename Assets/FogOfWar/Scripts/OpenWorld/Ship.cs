@@ -679,6 +679,29 @@ namespace FogOfWar.OpenWorld
             return (Math.Sqrt(along * along + w * w), t);
         }
 
+        // The braking curve's share of the drive in Brachistochrone (vb = √(2·a·BrakeShare·d)).
+        public const double BrakeShare = 0.85;
+
+        // Time left in each leg of a brachistochrone as the guidance flies it: speed up at a (to the cruise cap, if
+        // any), coast at the cap, then brake on the BrakeShare·a curve to the standoff. d is the distance to the
+        // standoff, u the closing speed (negative: moving apart, which the first leg stops). Like Career.CruiseCap, a
+        // ship already over the cap coasts at its own speed rather than braking down to it. Drift and parking are left
+        // out (the trip planner's ETA counts them); this is for the route strip, which shows where the flip falls.
+        public static (double accel, double coast, double brake) Legs(double d, double a, double u, double cap = 0)
+        {
+            double ab = a * BrakeShare, extra = 0;
+            if (u < 0) { extra = -u / a; d += u * u / (2 * a); u = 0; }
+            if (u * u / (2 * ab) >= d) return (extra, 0, u / ab);
+            double vp = Math.Sqrt((d + u * u / (2 * a)) / (1 / (2 * a) + 1 / (2 * ab)));
+            if (cap > 0 && cap < vp)
+            {
+                double v = Math.Max(cap, u);
+                double coast = Math.Max(d - (v * v - u * u) / (2 * a) - v * v / (2 * ab), 0) / v;
+                return (extra + (v - u) / a, coast, v / ab);
+            }
+            return (extra + (vp - u) / a, 0, vp / ab);
+        }
+
         // Closing speed toward the target (negative: moving apart) and the sideways drift, both relative to it.
         public (double u, double w) RelToTarget(SolarSystem sys, double jd)
         {
