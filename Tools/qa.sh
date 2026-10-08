@@ -53,7 +53,8 @@ player() { # name report flag [extra args]: the player writes its report to <out
   name=$1; report=$2; flag=$3; shift 3
   dir="$OUT/$name"; mkdir -p "$dir"
   echo "== $name $(date +%H:%M)"
-  "$EXE" $flag "$(cygpath -w "$dir")" "$@" -logFile "$(cygpath -w "$dir/player.log")"
+  # the player prints only its boot config to stdout; the report is the file
+  "$EXE" $flag "$(cygpath -w "$dir")" "$@" -logFile "$(cygpath -w "$dir/player.log")" > /dev/null
   finish "$name" $? "$dir/$report"
 }
 
