@@ -16,5 +16,13 @@ namespace FogOfWar.OpenWorld
         public static double JetW(Ship s) => JetW(s.Mass, s.Throttle * s.AMax + s.RcsLevel * Ship.RcsAccel);   // display
         public static double RangeKm(double jetW, double baseKm = StockKm) => baseKm * System.Math.Sqrt((jetW + IdleW) / IdleW);
         public static bool Loud(double massT, double aKms2) => JetW(massT, aKms2) >= LoudW;
+
+        // Combat Phase 2b: traffic ships. Wet mass = 500 t × (L/52 m)³, the player hull's 300 t dry × 5/3 (Phase 6 rule).
+        public const double RefWetT = 500, RefLengthM = 52;                                    // [design]
+        public static double HullMassT(double lengthM) => RefWetT * System.Math.Pow(lengthM / RefLengthM, 3);
+        public static double SensorKm(int level) => level > 0 ? 2 * StockKm : StockKm;         // as Codex.SensorRange
+        public static bool RevealAll;                                                          // shots and QA only: draw every traffic ship
+        static double stockBurnW;
+        public static double StockBurnW => stockBurnW > 0 ? stockBurnW : stockBurnW = ShipBuild.Stock().JetPowerTW * 1e12; // 24.52 TW
     }
 }

@@ -49,6 +49,7 @@ namespace FogOfWar
 
         IEnumerator Start()
         {
+            FogOfWar.OpenWorld.Signature.RevealAll = true; // shots keep the full sky
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "uishots.txt")) { AutoFlush = true };
             OpenSystemScene.CheckUnattendedSaveKey(log);

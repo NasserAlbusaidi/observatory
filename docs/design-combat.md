@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is in progress (PR 2a). Phases 3–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is in progress (PR 2a is in PR #145, PR 2b is built). Phases 3–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -25,7 +25,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 |---|---|---|---|---|
 | W1–W4 | The world ([design-world.md](design-world.md)) | Factions, NPC traffic, threat map, pirates that board you | None | Built |
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
-| 2 | Signatures | Detection ranges, quiet coasts | None | In progress (2a) |
+| 2 | Signatures | Detection ranges, quiet coasts | None | In progress (2a, 2b) |
 | 3 | Stealth | A stealth corvette hull, smuggling jobs | None | — |
 | 4 | Point defense | PDCs, armor, damage | Defense only | — |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
@@ -133,7 +133,7 @@ This is fix (b) from audit #4: each purchase opens a kind of work, not only a sh
 
 ## Phase 2: signatures
 
-Code read on `main` at 77f72eb. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 2a is in progress. 2b and 2c are not built.
+Code read on `main` at 77f72eb. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 2a is in PR #145. PR 2b is built in this PR (`signature-sky`). PR 2c is not built.
 
 ### The rule
 
@@ -533,6 +533,7 @@ Ordered by size. Your list put the destroyer first.
 | `Ship.cs:34` | `Target` is a `Body` | A stand-in `Body` for the player | W4 | Built: `Pursuit.cs` (no `Ship.Target` change) |
 | `Career.Intercept.cs:77` | Scripted runner paths | Guided hostile `Ship` | W4 | Built: `Plan.Pursue`, `Career.Pirates.cs` |
 | `Career.Route.cs:43` | Raiders roll only on an active plan | Raiders roll whenever the ship is seen | 2 | In progress (2a) |
+| `Traffic.cs`, `OpenSystemScene.Traffic.cs`, `.Signature.cs`, `.Orbits.cs:61`, `.Yard.cs`, `Signature.cs`, `UiShots.cs` | Every ship in flight is drawn | Only ships the sensors see: `Trip.Seen` from `Traffic.Sense`, a Contacts row, an own-burn map ring, two yard rows | 2 | Built (2b): QA in `CareerQA.Contacts.cs` |
 | `PlayerShip.json` | `PDC_0..5` unused | PDC mounts | 4 | — |
 | `Ship.cs:19-21`, `:44` | `RcsAccel`, `AngAccel`, `MaxRate`, `Ve` are `const` | Per instance (hulls, torpedoes) | 5–6 | — |
 
