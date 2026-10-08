@@ -126,15 +126,15 @@ namespace FogOfWar
                 Ui.Show(tcJob, due != null);
                 if (due != null)
                 {
-                    double late = jd - due.DeadlineJd;
+                    double overDays = jd - due.DeadlineJd;
                     if (d >= 1)
                     {
                         PlanTrip(out double secs, out _, out _);
-                        late += secs / 86400 + (due.Kind == JobKind.Survey ? due.DwellNeeded / 86400 : 0);
+                        overDays += secs / 86400 + (due.Kind == JobKind.Survey ? due.DwellNeeded / 86400 : 0);
                     }
-                    Ui.Text(tcJob, $"{due.Title}  ·  due in {Days(Math.Max(due.DeadlineJd - jd, 0))}, " + (late > 0 ? $"{Days(late)} too late" : $"{Days(-late)} to spare"));
-                    Ui.SetClass(tcJob, "ok", late <= 0);
-                    Ui.SetClass(tcJob, "warn", late > 0);
+                    Ui.Text(tcJob, $"{due.Title}  ·  due in {Days(Math.Max(due.DeadlineJd - jd, 0))}, " + (overDays > 0 ? $"{Days(overDays)} too late" : $"{Days(-overDays)} to spare"));
+                    Ui.SetClass(tcJob, "ok", overDays <= 0);
+                    Ui.SetClass(tcJob, "warn", overDays > 0);
                 }
                 Ui.Text(tcNav, ship.PlanActive ? "NAV  " + ship.Phase.ToUpperInvariant() : "NAV IDLE");
                 Ui.SetClass(tcNav, "accent", ship.PlanActive);
