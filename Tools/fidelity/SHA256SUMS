@@ -8,3 +8,4 @@ bc2465f8fe202077358f5816a68b74b18a9cc7d7ea6dbbb38a0b235cb0e6f7df  Lunar_LRO_LOLA
 dc6c4f413e85707a29a25a9451148154554ecca2c996f84fa8f47b65ef9ff7c4  starmap_2020_8k.exr  https://web.archive.org/web/2024id_/https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/starmap_2020_8k.exr
 361d1961647af073b3b3e4aea4fca85f15b3c9d915e0c8c4befb02520dadd10a  milkyway_2020_8k.exr  https://web.archive.org/web/2024id_/https://svs.gsfc.nasa.gov/vis/a000000/a004800/a004851/milkyway_2020_8k.exr
 dbff4356479764d89f9fd7722140043eddbc2cafbad4dec5950858e2df77ac54  lroc_color_poles_16k.tif  https://web.archive.org/web/2024id_/https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_poles_16k.tif
+dd830a3641496b0ebc1c01d549b6866374e8e56bc81cc363b99063cba7c348b0  SkyOurs.png  generated: python Tools/fidelity/sky.py (Sky/MilkyWay.png + Stars/bsc5.csv), not downloaded

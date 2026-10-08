@@ -12,9 +12,9 @@ What the Unity code expects from Blender output, so art can drop in without code
 - Keep it under roughly 50k triangles per model.
 
 ## Wired as of the first art pack
-- `Sky/SkyOurs.png`, `Sky/SkyOther.png`: skyA/skyB in FOWCommon.cginc (global `_SkyA`, `_SkyB`, `_SkyRot`). Since the
-  fidelity branch, SkyOurs is NASA SVS Deep Star Maps 2020 at 8192x4096 and `Sky/MilkyWay.png` (SVS diffuse Milky Way)
-  draws behind `Gfx.Starfield`; both come from `Tools/fidelity/sky.py`.
+- `Sky/SkyOurs.png`, `Sky/SkyOther.png`: skyA/skyB in FOWCommon.cginc (global `_SkyA`, `_SkyB`, `_SkyRot`). SkyOurs is
+  the SVS Milky Way plus the Yale Bright Star Catalogue at 8192x4096, drawn like the mesh sky, and `Sky/MilkyWay.png`
+  (SVS diffuse Milky Way) draws behind `Gfx.Starfield`; both come from `Tools/fidelity/sky.py`.
 - `Stars/bsc5.csv`: `Art.Catalogue()` feeds `Gfx.Starfield` and the 1g trip.
 - `Planets/Earth/{Color,Night,Clouds,Ocean,Normal}`: Earth.shader (open world, Tides) and Ground.shader (Meteors).
   `Planets/Moon/Color`: Moon.shader. `Planets/Mars/Color` and `Planets/Mars/Height` (16-bit): Mars.shader and
