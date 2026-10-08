@@ -440,6 +440,7 @@ namespace FogOfWar
             ReadInput(dt);
             if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
             CapWarp();
+            TrackRoute();
             double simDt = Math.Min(dt * Warps[warpIdx], Math.Max(0, (QaStopJd - jd) * 86400));
             double requested = simDt;
             warpLimited = false;
