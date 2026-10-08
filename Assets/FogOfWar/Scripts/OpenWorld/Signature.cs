@@ -1,0 +1,20 @@
+namespace FogOfWar.OpenWorld
+{
+    // Combat Phase 2 (docs/design-combat.md): what a sensor sees is jet power plus a cold hull's idle, and its range grows as
+    // √P. A raider sees a ship while it is loud (seen across the raider's whole start window) and keeps the track TrackHoldS.
+    public static class Signature
+    {
+        public const double IdleW = 2e6;                          // [design] a cold hull
+        public const double StockKm = 10000;                      // [design] stock sensors see IdleW this far
+        public const double TrackHoldS = Threat.BoardingSeconds;  // [design] a raider keeps a cold ship's track this long
+        // the far edge of a raider's start window from relative rest (Career.Spawn): a·CatchMaxS²/4 = 1,143,848 km
+        public const double WindowKm = Career.PirateG * Ship.G0 * Career.CatchMaxS * Career.CatchMaxS / 4;
+        // loud: seen by stock sensors across the whole window. 26.17 GW, 0.00107 g at 500 t
+        public const double LoudW = IdleW * (WindowKm / StockKm * (WindowKm / StockKm) - 1);
+
+        public static double JetW(double massT, double aKms2) => 0.5 * massT * 1e3 * aKms2 * 1e3 * Ship.Ve * 1e3; // W
+        public static double JetW(Ship s) => JetW(s.Mass, s.Throttle * s.AMax + s.RcsLevel * Ship.RcsAccel);   // display
+        public static double RangeKm(double jetW, double baseKm = StockKm) => baseKm * System.Math.Sqrt((jetW + IdleW) / IdleW);
+        public static bool Loud(double massT, double aKms2) => JetW(massT, aKms2) >= LoudW;
+    }
+}

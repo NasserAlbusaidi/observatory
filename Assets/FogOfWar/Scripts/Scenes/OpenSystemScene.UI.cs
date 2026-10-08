@@ -373,8 +373,7 @@ namespace FogOfWar
             list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.AccelG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
             list.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
-            // Ideal exhaust kinetic power P = ½ m a vₑ (SI, displayed in TW), not onboard waste heat.
-            if (ship.Throttle > 0) list.Add(new Readout("Exhaust power (ideal, not heat)", Fmt.Num(0.5 * ship.Mass * 1e3 * ship.Throttle * ship.AMax * 1e3 * Ship.Ve * 1e3 / 1e12, 3) + " TW", Tone.Bad));
+            SignatureReadouts(list);
             if (sys.Approximate(jd)) list.Add(new Readout("Ephemeris", "approximate (JPL fits: Jul 2000 – Jun 2099)", Tone.Bad));
             if (ship.Target != null)
             {

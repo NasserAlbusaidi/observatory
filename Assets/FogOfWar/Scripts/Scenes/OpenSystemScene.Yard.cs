@@ -40,6 +40,7 @@ namespace FogOfWar
             Add("Empty tank", b => $"{b.GEmpty:0.00} g");
             Add("Speed change, full tank", b => $"{b.DvFull:N0} km/s");
             Add("Jet power, full burn", b => $"{b.JetPowerTW:0.0} TW");
+            Add("Seen at, full burn · cold", b => $"{Km(Signature.RangeKm(b.JetPowerTW * 1e12))} · {Km(Signature.RangeKm(0))}");
             Add("Tank · hold · seats", b => $"{b.TankCapacity:N0} t · {b.HoldTonnes:N0} t · {b.Seats}");
             return list;
         }

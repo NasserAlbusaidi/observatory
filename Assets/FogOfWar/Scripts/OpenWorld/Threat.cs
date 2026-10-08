@@ -29,7 +29,7 @@ namespace FogOfWar.OpenWorld
 
         public struct Risk
         {
-            public double Hours;             // exposed: slow, outside every patrol's reach, where raiders work
+            public double Hours;             // exposed: slow, seen (a burn or its track), outside every patrol's reach, where raiders work
             public double Leaving, Arriving; // of those, the hours in the first and the second half of the trip
             public string Tier { get { foreach (var t in Tiers) if (Hours < t.Below) return t.Name; return Tiers[Tiers.Length - 1].Name; } }
             public bool Serious => Hours >= Tiers[1].Below; // moderate or high
@@ -72,10 +72,10 @@ namespace FogOfWar.OpenWorld
         }
 
         // A trip of d km from the start to body `to` at a km/s², from rest to rest, cruising at `cap` km/s (0: a full burn),
-        // held still for half the parking time (Career.ParkSeconds) at each end. The ship's place goes from the start's
-        // track to the target's as it covers the distance, so it moves with each end while it is slow there. The start is
-        // body `from` plus a fixed offset; with the Sun as `from` it is a fixed point, near enough for a ship that starts far
-        // from everything.
+        // held still for half the parking time (Career.ParkSeconds) at the target; a raider sees a burn and keeps its track
+        // Signature.TrackHoldS (combat Phase 2). The ship's place goes from the start's track to the target's as it covers
+        // the distance, so it moves with each end while it is slow there. The start is body `from` plus a fixed offset; with
+        // the Sun as `from` it is a fixed point, near enough for a ship that starts far from everything.
         public static Risk Of(SolarSystem sys, Body from, D3 offset, Body to, double jd, double d, double a, double cap = 0)
         {
             var r = new Risk();
@@ -93,7 +93,7 @@ namespace FogOfWar.OpenWorld
             // e-fold of the weight
             double fast = Math.Min(ta, 7 * MatchKms / a), step = MatchKms / a / 6;
 
-            // t: seconds from departure; the hold at the start is t < 0, the hold at the target t > T
+            // t: seconds from departure; the hold at the target is t > T
             void Add(double t0, double t1, double most)
             {
                 if (!(t1 > t0)) return;
@@ -115,11 +115,11 @@ namespace FogOfWar.OpenWorld
                     if (t < T / 2) r.Leaving += h; else r.Arriving += h;
                 }
             }
-            Add(-park, 0, park / 6);                            // held at the start
-            Add(0, fast, step);                                 // speeding up
-            if (vp < 7 * MatchKms) Add(ta, ta + tc, Math.Max(tc / 48, step)); // a slow coast
-            Add(T - fast, T, step);                             // braking
-            Add(T, T + park, park / 6);                         // held at the target
+            // no hold at the start: the ship has not burned, so no raider sees it (W3 counted 1.5 h)
+            Add(0, fast, step);                                                                  // speeding up: loud
+            if (vp < 7 * MatchKms) Add(ta, ta + Math.Min(tc, Signature.TrackHoldS), step);       // a slow coast, while the burn is tracked
+            Add(T - fast, T, step);                                                              // braking: loud
+            Add(T, T + Math.Min(park, Signature.TrackHoldS), park / 6);                          // held at the target, tracked
             return r;
         }
 
@@ -129,7 +129,7 @@ namespace FogOfWar.OpenWorld
             if (r.Hours < Tiers[0].Below) return "Raider risk: none on this course.";
             // #90: a raider called on arrival can't board before the dock (PursuitCheck S3b), so docking first is the answer
             string end = r.Arriving > 2 * r.Leaving ? ", most of it on arrival: dock first and a raider can't board" :r.Leaving > 2 * r.Arriving ? ", most of it on departure" : "";
-            return $"Raider risk: {r.Tier}. {r.Hours:0.0} h slow and out of patrol reach in raider space{end}.";
+            return $"Raider risk: {r.Tier}. {r.Hours:0.0} h slow and seen (a burn, or {Signature.TrackHoldS / 3600:0} h after one), out of patrol reach in raider space{end}.";
         }
     }
 }
