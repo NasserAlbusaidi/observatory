@@ -53,7 +53,8 @@ namespace FogOfWar
                     hudShell.Toast(n.Text, $"{career.Credits:N0} cr in the bank  ·  {career.Done} {(career.Done == 1 ? "job" : "jobs")} done", 7f, "pay");
                 }
                 else if (n.What == Career.Happening.ShipOwned) hudShell.Toast(n.Text, CareerRecord(), 12f, "pay");
-                else hudShell.Toast(n.Text, null, 5f, n.Good ? null : "bad");
+                // the rest is news (cyan) or something gone wrong (red); amber stays for what needs the pilot soon
+                else hudShell.Toast(n.Text, null, 5f, n.Good ? "info" : "bad");
                 newest = Mathf.Max(newest, n.Time);
             }
             lastNoteTime = newest;
@@ -73,14 +74,13 @@ namespace FogOfWar
             }
             else
             {
-                // the bar splits what is aboard: the part the trip to the target will burn (amber, with the planner's
-                // margin, as DvShort judges it) and what is spare after it (cyan). Short: the whole tank in red.
+                // the bar splits what is aboard: the part the trip to the target will burn (amber, the trip planner's
+                // figure) and what is spare after it (cyan). Short (as DvShort judges it, with its margin): all red.
                 double cap = career.TankCapacity, need = 0;
                 bool short_ = false;
                 if (ship.Target != null && ship.Landed == null)
                 {
-                    PlanTrip(out _, out double dv, out _);
-                    need = ship.Mass * (1 - Math.Exp(-dv * DvMargin / Ship.Ve));
+                    PlanTrip(out _, out double dv, out need);
                     short_ = DvShort(dv);
                 }
                 if (need < 0.05) need = 0;

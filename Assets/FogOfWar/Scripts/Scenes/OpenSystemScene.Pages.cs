@@ -14,7 +14,7 @@ namespace FogOfWar
     public partial class OpenSystemScene
     {
         VisualElement page, pageJobs, pageCodex, firstJob, tripBox, tripLines;
-        Segmented pageSeg, cruiseSeg;
+        Segmented pageSeg;
         Label firstJobText;
         int pageView = -1; // -1 closed, 0 jobs, 1 codex
         string tripSig, lessonSeen;
@@ -100,13 +100,11 @@ namespace FogOfWar
             Ui.Show(firstJob, false);
         }
 
-        // the trip planner in the Nav tab: cruise choice, then time, Δv and reaction mass for the target with it
+        // the trip planner in the Nav tab: one card per cruise choice (time, fuel, fuel left, the deadline), click to pick
         void BuildTrip(VisualElement c)
         {
             tripBox = Ui.E(c, "col");
             Ui.Section(tripBox, "Trip planner");
-            cruiseSeg = new Segmented(CruiseNames, cruiseIdx, i => { cruiseIdx = i; tripSig = null; });
-            tripBox.Add(cruiseSeg);
             tripLines = Ui.E(tripBox, "col");
             tripSig = null;
         }
@@ -117,22 +115,46 @@ namespace FogOfWar
             Ui.Show(tripBox, on);
             Ui.Show(navEst, !on);
             if (!on) return;
-            cruiseSeg.Value = cruiseIdx;
             var sig = JobsSignature();
             if (sig == tripSig) return;
             tripSig = sig;
             tripLines.Clear();
-            PlanTrip(out double t, out double dv, out double fuel);
-            bool short_ = DvShort(dv);
-            Ui.L(tripLines, $"{PlannerLead()} {Fmt.Num(ship.AccelG, 2)} g: {Dur(t)} with parking, {fuel:N1} t of fuel of {ship.Fuel:N1} t aboard", "t-note", "f-mono", short_ ? "warn" : "dim");
-            if (short_) Ui.L(tripLines, "Not enough fuel. Coast, lower the g, or refuel.", "t-body", "warn");
+            // the first job bound for the target decides each card's deadline line
+            Contract due = career.Active.Find(j => career.TargetOf(j) == ship.Target);
+            Ui.L(tripLines, $"{PlannerLead()} {Fmt.Num(ship.AccelG, 2)} g, with parking", "t-note", "f-mono", "dim");
+            for (int i = 0; i < CruiseNames.Length; i++)
+            {
+                int k = i;
+                // the picked card while a plan flies is the plan as flown (its held cruise speed); the others are what a
+                // switch now would give
+                PlanTrip(out double ct, out double cdv, out double cfuel, FlyingPlan && i == cruiseIdx ? -1 : CruiseFracs[i]);
+                bool cshort = DvShort(cdv);
+                double late = due == null ? 0 : jd + ct / 86400 + (due.Kind == JobKind.Survey ? due.DwellNeeded / 86400 : 0) - due.DeadlineJd;
+                var card = Ui.E(tripLines, "trip-card");
+                Ui.SetClass(card, "on", i == cruiseIdx);
+                Ui.SetClass(card, "bad", cshort || late > 0);
+                card.RegisterCallback<ClickEvent>(_ => { cruiseIdx = k; tripSig = null; });
+                var head = Ui.E(card, "row");
+                var name = Ui.L(head, (i == cruiseIdx ? "● " : "") + CruiseNames[i].ToUpperInvariant(), "t-h3", "f-cond");
+                name.style.flexGrow = 1;
+                Ui.SetClass(name, "accent", i == cruiseIdx);
+                Ui.L(head, Dur(ct), "t-h3", "f-mono");
+                var stats = Ui.E(card, "row", "trip-stats");
+                Stat(stats, "FUEL", Fmt.Num(cfuel, cfuel < 10 ? 1 : 0) + " t");
+                Stat(stats, "LEFT", cshort ? "SHORT" : Fmt.Num(Math.Max(ship.Fuel - cfuel, 0), 0) + " t", cshort ? "warn" : null);
+                Stat(stats, "SPEED CHANGE", BrachSpeed(cdv));
+                if (cshort) Ui.L(card, "Not enough fuel. Lower the g, or refuel.", "t-label", "warn");
+                else if (due != null) Ui.L(card, late > 0 ? $"{Days(late)} too late" : $"{Days(-late)} to spare", "t-label", late > 0 ? "warn" : "ok");
+            }
+            PlanTrip(out double t, out _, out _);
             Ui.L(tripLines, RiskLine(), "t-body", risk.Serious ? "warn" : "dim");
             foreach (var j in career.Active)
             {
                 if (career.TargetOf(j) != ship.Target) continue;
+                // the cards carry the deadline; a second job here, and the express window, get their own lines
                 double arrive = t / 86400 + (j.Kind == JobKind.Survey ? j.DwellNeeded / 86400 : 0);
                 bool onTime = jd + arrive <= j.DeadlineJd;
-                Ui.L(tripLines, $"{j.Title}: arrives with {Days(Math.Abs(j.DeadlineJd - jd - arrive))} {(onTime ? "to spare" : "too late")}", "t-body", onTime ? "ok" : "warn");
+                if (j != due) Ui.L(tripLines, $"{j.Title}: arrives with {Days(Math.Abs(j.DeadlineJd - jd - arrive))} {(onTime ? "to spare" : "too late")}", "t-body", onTime ? "ok" : "warn");
                 // the time price: say whether this plan makes the express window, and by how much it misses
                 if (j.ExpressJd > jd)
                 {
@@ -144,6 +166,14 @@ namespace FogOfWar
             if (ship.PlanActive && ship.CruiseCap > 0) Ui.L(tripLines, $"Cruise speed {ship.CruiseCap:N0} km/s", "t-note");
             Ui.L(tripLines, "A gentler burn or a coast saves fuel, but takes longer and can miss the express bonus.", "t-note");
             Ui.Fontify(tripLines);
+
+            static void Stat(VisualElement row, string name, string value, string cls = null)
+            {
+                var col = Ui.E(row, "col", "grow");
+                Ui.L(col, name, "t-micro", "f-condm");
+                var v = Ui.L(col, value, "t-label", "f-mono");
+                if (cls != null) v.AddToClassList(cls);
+            }
         }
 
         // keys, the open page, the first-job hint and a lesson that sends the pilot to the trip planner
