@@ -25,8 +25,9 @@ namespace FogOfWar
 
         const double FlipWarnSeconds = 300; // [design] sim seconds of notice before the flip
         // [design] time compression steps down while the flip is closer than this many real seconds at the current
-        // rate: 100× under 200 s, 10× under 20 s, 1× for the last 20 s
+        // rate (1k× to 100× under 2,000 s, 100× to 10× under 200 s), down to FlipWarpFloor and no further
         const double FlipWarpRealSeconds = 2;
+        const int FlipWarpFloor = 1; // 10×: the pilot drops to 1× by hand to watch the turn
 
         void BuildRouteStrip(VisualElement status)
         {
@@ -88,7 +89,7 @@ namespace FogOfWar
                 routeWarned = true;
                 hudShell?.Toast("Flip in " + Dur(flipIn), "Time compression steps down for it. The drive turns the ship end over end and starts braking.", 8f);
             }
-            while (warpIdx > 0 && flipIn < Warps[warpIdx] * FlipWarpRealSeconds) warpIdx--;
+            while (warpIdx > FlipWarpFloor && flipIn < Warps[warpIdx] * FlipWarpRealSeconds) warpIdx--;
         }
 
         void UpdateRouteStrip()
