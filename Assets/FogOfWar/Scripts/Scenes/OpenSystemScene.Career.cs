@@ -124,7 +124,7 @@ namespace FogOfWar
             float attJets = achievedDt > 1e-6 ? Mathf.Clamp01(Mathf.Abs(rate - lastRate) / (float)achievedDt / Ship.AngAccel) : 0;
             lastAtt = ship.Att; lastRate = rate;
 
-            sound.Update(ship.Throttle, ship.Throttle * ship.MaxG, Mathf.Max(ship.RcsLevel, attJets), Mathf.Min(rate, 1f), thermal, DustHitRate());
+            sound.Update(ship.Throttle, ship.Throttle * ship.AccelG, Mathf.Max(ship.RcsLevel, attJets), Mathf.Min(rate, 1f), thermal, DustHitRate());
 
             bool landed = ship.Landed != null && ship.Crashed == null;
             if (landed && !wasLanded) sound.Touchdown(1);
@@ -207,7 +207,7 @@ namespace FogOfWar
             double peak = Math.Max(Math.Sqrt(ship.AMax * d + u * u / 2), u);
             PlanTrip(out _, out double planDv, out _);
             shortDv = DvShort(planDv);
-            return $"{Fmt.Num(ship.MaxG, 1)} g full burn: {Dur(t)}\nspeed change {BrachSpeed(dv)} · top speed {BrachSpeed(peak)}" +
+            return $"{Fmt.Num(ship.AccelG, 2)} g full burn: {Dur(t)}\nspeed change {BrachSpeed(dv)} · top speed {BrachSpeed(peak)}" +
                    (shortDv ? $"\nFUEL SHORT: plan needs ~{ship.Mass * (1 - Math.Exp(-planDv * DvMargin / Ship.Ve)):N1} t, {ship.Fuel:N1} t aboard" : "");
         }
 
@@ -281,7 +281,7 @@ namespace FogOfWar
                 return;
             }
             GUILayout.Label($"{career.Credits:N0} cr   ·   reaction mass {ship.Fuel:N1} / {career.TankCapacity:N0} t   ·   hold {career.CargoTonnes:N1} / {Career.HoldTonnes:N0} t", ui.label);
-            GUILayout.Label($"Drive rated {career.DriveRating:0} g" + (career.CarryingPassengers ? ": passengers aboard, held to 1 g" : "") +
+            GUILayout.Label($"Drive {career.Thrust:0.0} MN: {Fmt.Num(career.AccelAt(ship.Mass) / Ship.G0, 2)} g at {ship.Mass:N0} t" + (career.CarryingPassengers ? ": passengers aboard, held to 1 g" : "") +
                             $"   ·   Δv left {Career.DvLeft(ship):N0} km/s", ui.note);
             GUILayout.Label(career.OwnsShip ? "The ship is yours." : $"Ship buyout: {career.ShipPaid:N0} / {Career.ShipPrice:N0} cr paid", ui.note);
             if (!career.OwnsShip && career.Docked != null && career.Credits >= career.ShipStepNow && ui.Button($"Pay {career.ShipStepNow:N0} cr toward the ship")) career.PayTowardShip();
@@ -389,14 +389,15 @@ namespace FogOfWar
             if (career.Board.Count == 0) { GUILayout.Label("No work posted.", ui.note); return; }
             foreach (var c in career.Board.ToArray())
             {
-                // reaction mass a 1 g full burn would take, for comparison
+                // a full burn at full drive with the load aboard, for comparison
                 var dest = career.TargetOf(c);
                 double d = Math.Max((sys.Pos(dest, jd) - ship.Pos).Mag - Ship.Standoff(dest), 0);
-                Career.Trip(d, career.DriveRating * Ship.G0, 1, ship.Mass + c.Load, out double t, out _, out double fuel);
+                double a = career.AccelAt(ship.Mass + c.Load, c.Kind == JobKind.Passengers);
+                Career.Trip(d, a, 1, ship.Mass + c.Load, out double t, out _, out double fuel);
                 string what = c.Kind == JobKind.Intercept ? $"{c.Title}. Its drive peaks at {Fmt.Num(Career.RunnerPeakG(dest, c), 2)} g; its course leaves out the Sun's pull (≈ 0.0006 g at 1 AU)"
                     : c.Kind == JobKind.Survey || c.Kind == JobKind.Rescue ? c.Title
                     : c.Kind == JobKind.Passengers ? $"{c.People} × {c.Title} → {c.To} (max 1 g)" : $"{c.Tonnes:N0} t {c.Title} → {c.To}";
-                GUILayout.Label($"{what}\n{c.Pay:N0} cr   ·   {Days(c.Days)} allowed   ·   {Km(d)}   ·   full burn at {career.DriveRating:0} g: {Dur(t)} with parking, {fuel:N1} t", ui.note);
+                GUILayout.Label($"{what}\n{c.Pay:N0} cr   ·   {Days(c.Days)} allowed   ·   {Km(d)}   ·   full burn at {Fmt.Num(a / Ship.G0, 2)} g: {Dur(t)} with parking, {fuel:N1} t", ui.note);
                 bool ok = career.CanAccept(c, out string why);
                 if (ui.Buttons(ok ? "Accept" : "Accept (" + why + ")") == 0 && ok) career.Accept(c, jd);
             }
@@ -409,7 +410,7 @@ namespace FogOfWar
             int ci = ui.Buttons(Array.ConvertAll(new[] { 0, 1, 2 }, i => (cruiseIdx == i ? "● " : "") + CruiseNames[i]));
             if (ci >= 0) cruiseIdx = ci;
             PlanTrip(out double t, out double dv, out double fuel);
-            GUILayout.Label($"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", DvShort(dv) ? ui.label : ui.note);
+            GUILayout.Label($"{PlannerLead()} {Fmt.Num(ship.AccelG, 2)} g: {Dur(t)} with parking, Δv {dv:N0} km/s, reaction mass {fuel:N1} t of {ship.Fuel:N1} t", DvShort(dv) ? ui.label : ui.note);
             if (DvShort(dv)) GUILayout.Label("Not enough reaction mass. Coast, lower the g, or refuel.", ui.label);
             GUILayout.Label(RiskLine(), risk.Serious ? ui.label : ui.note);
             foreach (var c in career.Active)

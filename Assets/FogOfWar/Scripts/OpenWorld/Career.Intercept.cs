@@ -17,17 +17,17 @@ namespace FogOfWar.OpenWorld
         Ship ship;   // last seen in Tick: the ship accept checks and estimates are made for
         double jd;
 
-        // Reaction mass to reach a job's target and match it: a flip-and-burn at the drive rating, capped at a fraction
-        // f of the brachistochrone peak, plus the velocity to cancel. Rocket equation at the ship's mass with the load.
+        // Reaction mass to reach a job's target and match it: a flip-and-burn at full drive, capped at a fraction f of the
+        // brachistochrone peak, plus the velocity to cancel. Rocket equation and drive at the ship's mass with the load.
         public double NeedTonnes(Contract c, double f, double? mass = null)
         {
             var b = TargetOf(c);
             if (b == null || ship == null) return 0;
-            double a = (c.Kind == JobKind.Passengers ? Math.Min(DriveRating, PassengerG) : DriveRating) * Ship.G0;
+            double m = mass ?? ship.Mass + c.Load;
+            double a = AccelAt(m, c.Kind == JobKind.Passengers);
             double d = Math.Max((Sys.PosAt(b, jd) - ship.Pos).Mag - Ship.Standoff(b), 0);
             double match = c.Kind == JobKind.Intercept || c.Kind == JobKind.Rescue ? (ship.Vel - Rail.Vel(Sys, b, jd)).Mag : 0;
             double dv = 2 * Math.Max(0.05, Math.Min(f, 1)) * Math.Sqrt(a * d) + match;
-            double m = mass ?? ship.Mass + c.Load;
             return m * (1 - Math.Exp(-dv / Ship.Ve));
         }
 
@@ -80,15 +80,16 @@ namespace FogOfWar.OpenWorld
         public static Body MakeRunner(Contract c, SolarSystem sys) => RunnerRail(c, sys).Craft(c.To);
         internal static Rail RunnerRail(Contract c, SolarSystem sys) => new Rail(sys, sys[PortAt(c.RunFrom).Body], sys[PortAt(c.RunTo).Body], c.T0, c.T1);
 
-        // Can a flip-and-burn at the drive rating, leaving the dock now, meet the runner (position and velocity) at some
-        // time before it arrives, with the hand-over hold still to come? Each meeting time is tested in a frame moving
-        // with the runner's velocity then, where the meeting point is fixed and the trip is a stop-at-a-point problem.
+        // Can a flip-and-burn at full drive with a full tank and the load aboard, leaving the dock now, meet the runner
+        // (position and velocity) at some time before it arrives, with the hand-over hold still to come? Each meeting time
+        // is tested in a frame moving with the runner's velocity then, where the meeting point is fixed and the trip is a
+        // stop-at-a-point problem.
         public const double CatchMargin = 1.3;
 
         internal bool Catchable(Contract c, Body runner, SolarSystem sys, double jd)
         {
             var port = sys[Docked.Body];
-            double a = DriveRating * Ship.G0, end = c.T1 - CrossSeconds * 2 / 86400;
+            double a = AccelAt(DryMass + TankCapacity + c.Tonnes), end = c.T1 - CrossSeconds * 2 / 86400;
             var p0 = sys.PosAt(port, jd); var v0 = Rail.Vel(sys, port, jd);
             const int n = 64;
             for (int i = 1; i <= n; i++)

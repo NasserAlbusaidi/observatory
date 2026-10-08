@@ -124,7 +124,7 @@ namespace FogOfWar
             tripLines.Clear();
             PlanTrip(out double t, out double dv, out double fuel);
             bool short_ = DvShort(dv);
-            Ui.L(tripLines, $"{PlannerLead()} {Fmt.Num(ship.MaxG, 1)} g: {Dur(t)} with parking, {fuel:N1} t of fuel of {ship.Fuel:N1} t aboard", "t-note", "f-mono", short_ ? "warn" : "dim");
+            Ui.L(tripLines, $"{PlannerLead()} {Fmt.Num(ship.AccelG, 2)} g: {Dur(t)} with parking, {fuel:N1} t of fuel of {ship.Fuel:N1} t aboard", "t-note", "f-mono", short_ ? "warn" : "dim");
             if (short_) Ui.L(tripLines, "Not enough fuel. Coast, lower the g, or refuel.", "t-body", "warn");
             Ui.L(tripLines, RiskLine(), "t-body", risk.Serious ? "warn" : "dim");
             foreach (var j in career.Active)

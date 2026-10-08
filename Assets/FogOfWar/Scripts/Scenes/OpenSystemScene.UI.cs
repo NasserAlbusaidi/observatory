@@ -120,7 +120,7 @@ namespace FogOfWar
         {
             bool drive = !ship.Dry && ship.AMax > 0;
             a = drive ? ship.AMax : ship.Dry ? 0 : Ship.RcsAccel;
-            by = drive ? Fmt.Num(ship.MaxG, 1) + " g drive" : ship.Dry ? "no fuel" : "RCS";
+            by = drive ? Fmt.Num(ship.AccelG, 2) + " g drive" : ship.Dry ? "no fuel" : "RCS";
             double v = vr.Mag;
             t = a > 0 ? v / a : double.PositiveInfinity;
             d = a > 0 ? v * v / (2 * a) : double.PositiveInfinity;
@@ -260,7 +260,7 @@ namespace FogOfWar
             GUI.color = Color.white;
         }
 
-        internal string ClassicSpeedLine => $"DRIVE {Fmt.Num(ship.Throttle * ship.MaxG, 2)} g of {Fmt.Num(ship.MaxG, 1)} g   ·   {SpeedText((ship.Vel - RefVel(reference)).Mag)} vs {RefName(reference)}   ·   {WarpNames[warpIdx]}";
+        internal string ClassicSpeedLine => $"DRIVE {Fmt.Num(ship.Throttle * ship.AccelG, 2)} g of {Fmt.Num(ship.AccelG, 2)} g   ·   {SpeedText((ship.Vel - RefVel(reference)).Mag)} vs {RefName(reference)}   ·   {WarpNames[warpIdx]}";
         internal bool TestClassicSpeedFits(out float text, out float available)
         {
             Styles();
@@ -370,7 +370,7 @@ namespace FogOfWar
             list.Add(new Readout("Near", reference.Name + ", " + Km(alt) + (reference == sys.Sun ? " out" : " up")));
             list.Add(new Readout("Speed vs " + RefName(reference), SpeedText((ship.Vel - RefVel(reference)).Mag)));
             list.Add(new Readout("From the Sun", Fmt.Num(ship.Pos.Mag / Frame.AU, 3) + " AU"));
-            list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.MaxG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
+            list.Add(new Readout("Drive", ship.Throttle > 0 ? Fmt.Num(ship.Throttle * ship.AccelG, 2) + " g" : "off", ship.Throttle > 0 ? Tone.Hot : Tone.Normal));
             list.Add(new Readout("Rotation", Fmt.Num(ship.AngVel.magnitude * Mathf.Rad2Deg, 1) + " °/s"));
             list.Add(new Readout("Δv spent", Fmt.Num(ship.DvUsed, 3) + " km/s"));
             // Ideal exhaust kinetic power P = ½ m a vₑ (SI, displayed in TW), not onboard waste heat.

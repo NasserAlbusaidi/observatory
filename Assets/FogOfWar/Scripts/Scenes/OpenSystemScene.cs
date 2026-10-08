@@ -782,7 +782,7 @@ namespace FogOfWar
             plume.gameObject.SetActive(thr > 0.01f);
             if (thr > 0.01f)
             {
-                float L = shipLen * Mathf.Min(0.5f + 0.9f * Mathf.Sqrt(thr * (float)ship.MaxG / 3f), 1.6f);
+                float L = shipLen * Mathf.Min(0.5f + 0.9f * Mathf.Sqrt(thr * (float)ship.AccelG / 3f), 1.6f);
                 plume.localScale = new Vector3(shipLen * 0.06f, shipLen * 0.06f, L);
                 plume.localPosition = new Vector3(0, 0, -shipLen * 0.5f - L * 0.9f);
                 float behind = Mathf.Clamp01(Vector3.Dot((shipT.position - Cam.transform.position).normalized, shipT.forward));
