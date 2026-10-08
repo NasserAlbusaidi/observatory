@@ -276,9 +276,9 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
   - Where raiders work [design]: all of the main belt (2.1 to 3.3 AU, the same band as `Belt.cs`), and near a haven. Near a haven, the weight falls from 1 at the haven to 0 at 0.5 AU from it.
   - Speed: a 1 g raider matches 70.6 km/s in one boarding time [calc]. A ship's weight falls by e for each 70.6 km/s of its speed along the trip.
   - Exposure, in hours: the time a ship is in raider space, outside every patrol's reach, times the speed weight. Inside a patrol's reach, it is 0.
-  - A trip holds still for half the parking time (1.5 h) at each end. That hold counts. Where most of the hours fall, on departure or arrival, goes into the line.
+  - Only the hold at the target counts, half the parking time (1.5 h) and no more than the track hold (combat Phase 2). The hold at the start is gone. Where most of the hours fall, on departure or arrival, goes into the line.
   - Tiers [design]: under 0.1 h none, under 1 h low, under 3 h moderate, else high. Moderate and high show as a warning.
-  - Both trip planners show one line. Example: "Raider risk: high. 3.5 h slow and out of patrol reach in raider space, most of it on arrival."
+  - Both trip planners show one line. Example: "Raider risk: high. 3.5 h slow and seen (a burn, or 2 h after one), out of patrol reach in raider space, most of it on arrival: dock first and a raider can't board."
   - The map: a ring for each patrol's reach in its owner's colour, a red ring for each haven's zone, and faint red rings at the belt's edges. The haven and belt rings fade in close views, as the orbits do.
   - A patrol ring is under a pixel at the map's opening zoom (381,000 km seen from 6 AU). It shows when you zoom in on a port. The rings keep their true size.
   - The Raiders join the faction list. They own no port, so no board and no standing line shows them.
@@ -318,7 +318,7 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
   - Boarding takes part of the hold. A patrol in reach makes the pirate break off. After the encounter, the pirate goes back on rails, and the saved list of changed ships starts here.
 - **Built:**
   - `Career.Pirates.cs`: the encounter. It holds the pirate (`Pursuit`, on `Plan.Pursue`) and a proxy body in `sys.Bodies`, so the target card, `SetTarget` and Divert see the pirate as a craft. The proxy has no gravity and is no obstacle. The scene flies the pirate over each span that the player's substep used.
-  - The call: raiders strike at 0.2 calls per exposed hour [design] × the W3 presence × e^(−v / 70.6 km/s), v the ship's speed against the port the pirate waits at. The rate is 0 in a patrol's reach. The approach cut-off of the other calls does not apply. One encounter at a time, and no other call during a chase. Jobs: cargo, passengers and survey.
+  - The call: raiders strike at 0.2 calls per exposed hour [design] (combat Phase 2: per hour while the ship is seen, hand-flown or not) × the W3 presence × e^(−v / 70.6 km/s), v the ship's speed against the port the pirate waits at. The rate is 0 in a patrol's reach. The approach cut-off of the other calls does not apply. One encounter at a time, and no other call during a chase. Jobs: cargo, passengers and survey.
   - The start: at rest with a port, the job's target on the second half of the trip and its posting port on the first. It is on the line from that port through the ship, as near the port as the catch time allows. The catch time, from a closed form, is 2 to 6 h [design]. The start is out of every patrol's reach and at least 500 km (the intercept range) from the ship. If no start fits, no call comes.
   - The answers: Run (the card closes, and the chase goes on). Divert (the Fast plan to the patrolled port that the ship reaches first at full burn). Give up 25 % of the job's pay, and of its tonnes for cargo [design]. After Run, Divert and Give up stay on the job's card and in the classic panel.
   - Boarding: 2 h alongside takes 50 % [design]. Alongside is the intercept rule (500 km and 0.1 km/s, at any throttle), and any break resets the clock. No standing change, and the job stays on.
@@ -344,7 +344,7 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
 - **Open:**
   - #141: a pirate that overshoots at speed can pass inside Vesta (149 to 257 km under the surface in PR 140's S6 runs). The surface guard misses a fast run-out.
   - #92: final faction names (decision 2).
-  - Not decided (#90, first comment): a pilot with the autopilot off is never raided, because the roll needs an active plan (`Career.Route.cs:43`). Combat Phase 2 (signatures) must settle this.
+  - Not decided (#90, first comment): a pilot with the autopilot off is never raided, because the roll needs an active plan (`Career.Route.cs:43`). Combat Phase 2 (signatures) settles it in PR 2a: raiders see the burn, not the autopilot.
 
 ### Risks
 
