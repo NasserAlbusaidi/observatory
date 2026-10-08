@@ -789,7 +789,7 @@ namespace FogOfWar
 
             PlaceRings(sunW);
             DrawOrbits();
-            beltView.Draw(jd, camW, ship.Pos, sunW, Cam, Map);
+            beltView.Draw(jd, camW, ship.Pos, sunW, Cam, Map, MapView);
             LateCareer();
         }
 

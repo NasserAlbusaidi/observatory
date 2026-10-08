@@ -1,5 +1,7 @@
-// Distant asteroids as GPU-instanced camera-facing dots. Per-instance matrix: translation = render position,
-// uniform scale = dot radius in render units. Per-instance colour (rgb display, a = intensity). Additive.
+// Distant asteroids as GPU-instanced camera-facing dots, with the same point shape and colour rule as the stars
+// (Stars.shader). Per-instance matrix: translation = render position, uniform scale = half the dot width in render
+// units. Per-instance colour: rgb = display colour (only its hue counts: the shader makes it unit luminance),
+// a = linear peak at the centre. Additive.
 Shader "FogOfWar/BeltDot"
 {
     SubShader
@@ -36,8 +38,8 @@ Shader "FogOfWar/BeltDot"
             {
                 float r2 = dot(i.uv, i.uv);
                 if (r2 > 1.0) discard;
-                float a = exp(-r2 * 3.0) * i.col.a;
-                return float4(displayToOutput(i.col.rgb) * a, 1.0);
+                float3 c = unitLuma(i.col.rgb) * (i.col.a * exp(-4.0 * r2));
+                return float4(linearToOutput(c), 1.0);
             }
             ENDCG
         }
