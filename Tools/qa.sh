@@ -4,29 +4,18 @@
 # Each suite's process exits 0 when clean, 1 on failed checks or logged errors, 2 when it did not finish.
 # The script stops at the first nonzero exit and returns it. Reports land in <outdir>/<suite>/.
 # QA_NOBUILD=1 reuses the last build. QA_EXE=<path> runs another player (default Builds/Windows/FogOfWar.exe).
-# QA_UIRES=<w>x<h>,... sets the UI shot sizes. UNITY=<path> names the editor (default from ProjectVersion.txt).
-# Holds the shared Unity lock (space sim/UNITY.lock.d) for the whole run: other sessions build and run suites too.
+# QA_UIRES=<w>x<h>,... sets the UI shot sizes. The editor and the lock come from Tools/unity-env.sh.
+# Holds the shared Unity lock for the whole run: other sessions build and run suites too.
 set -u
 cd "$(dirname "$0")/.."
 OUT="${1:?usage: Tools/qa.sh <outdir> [suite ...]}"; shift
 SUITES="${*:-career legacy uishots qa}"
 PROJ="$(pwd -W)"
-VER="$(sed -n 's/^m_EditorVersion: //p' ProjectSettings/ProjectVersion.txt | tr -d '\r')"
-UNITY="${UNITY:-/d/Unity/Editors/$VER/Editor/Unity.exe}"
 EXE="${QA_EXE:-./Builds/Windows/FogOfWar.exe}"
 UIRES="${QA_UIRES:-1920x1080,1440x2560}"
-LOCK="/c/Users/nasse/OneDrive/Desktop/Projects/space sim/UNITY.lock.d"
+. ./Tools/unity-env.sh
 mkdir -p "$OUT" Logs
-
-until mkdir "$LOCK" 2>/dev/null; do
-  # stale after 45 minutes
-  if [ -f "$LOCK/owner.txt" ] && [ $(( $(date +%s) - $(stat -c %Y "$LOCK/owner.txt") )) -gt 2700 ]; then
-    echo "removing stale lock: $(cat "$LOCK/owner.txt")"; rm -rf "$LOCK"; continue
-  fi
-  sleep 15
-done
-echo "qa.sh $PROJ $(date -u +%FT%TZ)" > "$LOCK/owner.txt"
-trap 'rm -rf "$LOCK"' EXIT
+unity_lock "qa.sh $PROJ"
 
 if [ -z "${QA_NOBUILD:-}" ]; then
   echo "== build $(date +%H:%M)"

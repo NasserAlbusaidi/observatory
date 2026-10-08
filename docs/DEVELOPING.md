@@ -177,7 +177,7 @@ The **Build … review copy** menu items build the same game under another name,
 
 ## Unattended test runs
 
-`Tools/qa.sh <dir>` builds the Windows game and runs the suites a PR reports, in order: `career`, `legacy` (the career run in the classic shell), `uishots` and `qa`. It stops at the first nonzero exit and leaves each report under `<dir>/<suite>/`. Name suites to run a subset, or add `audio`, `tour`, `physics`, `regression` or `gpu`. `QA_NOBUILD=1` reuses the last build.
+`Tools/qa.sh <dir>` builds the Windows game and runs the suites a PR reports, in order: `career`, `legacy` (the career run in the classic shell), `uishots` and `qa`. It stops at the first nonzero exit and leaves each report under `<dir>/<suite>/`. Name suites to run a subset, or add `audio`, `tour`, `physics`, `regression` or `gpu`. `QA_NOBUILD=1` reuses the last build. The scripts find the editor under the Unity Hub folder and keep one build or suite running at a time with a lock in the temp folder; `Tools/unity-env.sh` names the variables (`UNITY_EDITORS`, `FOW_UNITY_LOCK`) and the gitignored `Tools/unity.local` that can set them.
 
 The built game takes these flags. Each run writes its report and screenshots to `<dir>`, then quits. A suite that checks something (`-fowqa`, `-fowtour`, `-fowcareer`, `-fowaudioqa`, `-fowuishots`, `-fowbhshots`) exits 0 when the run is clean, 1 on a failed check or a logged error, and 2 when the run did not finish (a hang guard or an exception), so a script can gate on the exit code and not on the report. `-fowshipshots` and `-fowfidelity` only capture, and always exit 0.
 

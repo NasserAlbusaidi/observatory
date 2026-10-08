@@ -5,7 +5,7 @@ These gates exercise production C# and native HLSL. They separate integration er
 Run from the repository root in PowerShell, supplying the installed Unity editor:
 
 ```powershell
-$editor = 'D:\Unity\Editors\6000.6.4f1\Editor\Unity.exe'
+$editor = 'C:\Program Files\Unity\Hub\Editor\6000.6.4f1\Editor\Unity.exe'
 & $editor -batchmode -nographics -projectPath (Get-Location).Path -executeMethod FogOfWar.EditorTools.FogOfWarPhysicsCheck.Run -logFile Logs/physics-editor.log
 & $editor -batchmode -force-d3d11 -projectPath (Get-Location).Path -executeMethod FogOfWar.EditorTools.FogOfWarGpuCheck.Run -logFile Logs/gpu-editor.log
 ```
