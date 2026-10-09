@@ -236,6 +236,7 @@ namespace FogOfWar
             planWasActive = ship.PlanActive;
             planTarget = ship.Target;
             planCruiseIdx = cruiseIdx;
+            DevMoney();
             career.Tick(sys, ship, jd, simDt);
             if (careerTicks < 2) careerTicks++;
             // #99: a save made mid-chase would not hold it (D8), so it waits for the chase to end

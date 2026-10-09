@@ -23,6 +23,7 @@ namespace FogOfWar
             ship.RotInput = live ? new Vector3(Ctl.Axis(A.PitchUp, A.PitchDown), Ctl.Axis(A.YawLeft, A.YawRight), Ctl.Axis(A.RollRight, A.RollLeft)) : Vector3.zero;
             ship.RcsInput = live ? new Vector3(Ctl.Axis(A.RcsLeft, A.RcsRight), Ctl.Axis(A.RcsDown, A.RcsUp), Ctl.Axis(A.RcsBack, A.RcsForward)) : Vector3.zero;
             if (!live) return;
+            DevInput();
 
             double th = ship.ThrottleCmd;
             if (Ctl.Held(A.ThrottleUp)) th += dt * 0.5;
