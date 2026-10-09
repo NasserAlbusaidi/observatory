@@ -174,9 +174,9 @@ The player cannot be a pirate before weapons exist. The W phases build the law, 
   - Change the flip time.
   - Divert into a patrol bubble.
   - Dock before the pirate can match.
-    - A docked ship is safe [design]. W3 counts the 1.5 h hold at each end of a trip as exposure, so its line counts more arrival risk than W4 gives.
+    - A docked ship is safe [design]. W3 counts the 1.5 h hold at each end of a trip as exposure, so its line counts more arrival risk than W4 gives. Since #162 the planner counts no hold at a port.
     - Measured in PR 5a, for a pirate that waits at rest ahead of a ship that brakes into Vesta: a 1 g pirate cannot board before the dock, from any distance. A 2 g pirate can, from far enough out. A pirate that starts behind, already at the ship's speed, does not board before the dock either: 1 g from 2, 4 or 6 h of catch time, and 2 g from 4 or 6 h. Only a 2 g pirate from 2 h out gets alongside, for 3,578 s, which is less than a boarding (PR 134).
-    - So with 1 g pirates, W3's arrival warning points at a risk that the tested starts cannot make. 5b uses 1 g as a working value and starts the pirate at rest with the port (PR 5b, "Built"). Issue #90 is decided: raiders stay 1 g and wait at rest with their lair, so boardings happen mid-route. The arrival line now says "dock first and a raider can't board" (`Threat.cs:130-131`, PR 134).
+    - So with 1 g pirates, W3's arrival warning points at a risk that the tested starts cannot make. 5b uses 1 g as a working value and starts the pirate at rest with the port (PR 5b, "Built"). Issue #90 is decided: raiders stay 1 g and wait at rest with their lair, so boardings happen mid-route. The arrival line now says "dock first and a raider can't board" (`Threat.cs:133-134`, PR 134).
 - **Or the player gives up.** The call card offers part of the hold, and the pirate leaves.
 - If a patrol can reach you within the boarding time, the pirate breaks off.
 - Pirates work the far tier. Far runs pay more because they are riskier. Risk joins time and mass as a price.
@@ -276,14 +276,14 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
   - Where raiders work [design]: all of the main belt (2.1 to 3.3 AU, the same band as `Belt.cs`), and near a haven. Near a haven, the weight falls from 1 at the haven to 0 at 0.5 AU from it.
   - Speed: a 1 g raider matches 70.6 km/s in one boarding time [calc]. A ship's weight falls by e for each 70.6 km/s of its speed along the trip.
   - Exposure, in hours: the time a ship is in raider space, outside every patrol's reach, times the speed weight. Inside a patrol's reach, it is 0.
-  - Only the hold at the target counts, half the parking time (1.5 h) and no more than the track hold (combat Phase 2). The hold at the start is gone. Where most of the hours fall, on departure or arrival, goes into the line.
+  - Only the hold at the target counts, half the parking time (1.5 h) and no more than the track hold (combat Phase 2), and only at a body with no port: a port docks the ship at once (#162). The hold at the start is gone. Where most of the hours fall, on departure or arrival, goes into the line.
   - Tiers [design]: under 0.1 h none, under 1 h low, under 3 h moderate, else high. Moderate and high show as a warning.
-  - Both trip planners show one line. Example: "Raider risk: high. 3.5 h slow and seen (a burn, or 2 h after one), out of patrol reach in raider space, most of it on arrival: dock first and a raider can't board."
+  - Both trip planners show one line. Example: "Raider risk: moderate. 2.0 h slow and seen (a burn, or 2 h after one), out of patrol reach in raider space, most of it on arrival: dock first and a raider can't board."
   - The map: a ring for each patrol's reach in its owner's colour, a red ring for each haven's zone, and faint red rings at the belt's edges. The haven and belt rings fade in close views, as the orbits do.
   - A patrol ring is under a pixel at the map's opening zoom (381,000 km seen from 6 AU). It shows when you zoom in on a port. The rings keep their true size.
   - The Raiders join the faction list. They own no port, so no board and no standing line shows them.
-  - QA [measured], all at 1 g unless stated. Mars orbit to Vesta: 3.50 h, high, all on arrival. Earth to Luna: 0. Mars orbit to Ceres (a 2 g patrol): 0.75 h, low. Mars orbit to Vesta at 3 g: 2.17 h, moderate.
-  - Of the 3.5 h to Vesta, 1.5 h is the hold at Vesta. A harder burn cuts only the rest. A patrol at Vesta would cut both.
+  - QA [Luna and Ceres measured; the two Vesta numbers derived as old minus the 1.5 h hold, to confirm at the gate], all at 1 g unless stated. Mars orbit to Vesta: 2.00 h, moderate, all on arrival. Earth to Luna: 0. Mars orbit to Ceres (a 2 g patrol): 0.75 h, low. Mars orbit to Vesta at 3 g: 0.67 h, low. (Before #162: 3.50 h high and 2.17 h moderate, with the 1.5 h hold at the Vesta port.)
+  - The planner counts no hold at a port: the ship docks as it parks. A body with no port, such as a survey target, still counts it. A harder burn cuts the braking hours. A patrol at Vesta would cut them all.
 
 ### PR 5: `pirates` (W4)
 
