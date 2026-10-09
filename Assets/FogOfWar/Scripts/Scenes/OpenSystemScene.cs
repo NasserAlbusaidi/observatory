@@ -237,6 +237,7 @@ namespace FogOfWar
             lighting = null;
             Bloom.Enable(Cam, false);
             RecorderClose();
+            DropRaiderModel(); // its materials are the chase's, not the scene's
         }
 
         // ---------------------------------------------------------------- simulation

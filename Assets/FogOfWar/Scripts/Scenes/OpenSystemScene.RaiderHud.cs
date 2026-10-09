@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FogOfWar.OpenWorld;
 using FogOfWar.UI;
 using UnityEngine;
@@ -93,21 +94,70 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- the view and the map
 
-        string raiderShown = "none"; // review checks: what DrawRaider did last
+        string raiderShown = "none"; // review checks: what DrawRaider did last (the tag; the dot is raiderDot)
+        bool raiderDot;              // review checks: whether DrawRaider drew the dot last
         GUIStyle raiderStyle;
+
+        // 4c (D12): the raider flies as the courier's hull, with no art of its own, at its Fleet.json length
+        const string RaiderModel = "CourierShip";
+        // As a body's label goes once its disc is 40 px (DrawLabels): a hull that long reads as a ship. Shorter, the dot stays
+        // on it: nose on (12 m across) or on its unlit side, a 46 m hull at 2 km is a few dim pixels.
+        const float RaiderDotPx = 40;
+        Transform raiderT, raiderPlume, raiderGlow;
+        Renderer[] raiderHull;        // the model's renderers, for its box on screen
+        Rect raiderTag;               // review checks: where DrawRaider put the tag last
+        Encounter raiderFor;          // the chase the model belongs to: a new one spawns its own
+        float raiderLen = 1, raiderKm = TorchKm;
+        readonly List<UnityEngine.Object> raiderMade = new List<UnityEngine.Object>();
+
+        // The pirate Ship's model, from LateCareer: at its position and attitude, its plume while it thrusts. Spawned when a
+        // chase starts and destroyed, with every material and mesh made for it, when it ends by any path (EndContact,
+        // DropContact, a load, a new career) or another starts: each frame compares the career's encounter to raiderFor.
+        void LateRaider()
+        {
+            var e = career?.Encounter;
+            if (raiderT != null && e != raiderFor) DropRaiderModel();
+            if (e == null) return;
+            if (raiderT == null)
+            {
+                DropRaiderModel(); // a scene rebuild destroyed the holder: free what it left
+                var f = FleetModel(RaiderModel);
+                bool own = f != null && Resources.Load<GameObject>("Models/" + f.model) != null;
+                raiderKm = own ? f.lengthM / 1000f : TorchKm;
+                raiderT = SpawnCraft("Raider", own ? f.model : "TorchShip", own, raiderMade, out raiderLen, out raiderGlow, out raiderPlume);
+                raiderHull = raiderT.GetChild(0).GetComponentsInChildren<Renderer>(true);
+                raiderFor = e;
+            }
+            raiderT.localPosition = Map(e.Pirate.Pos, out double k);
+            raiderT.localRotation = e.Pirate.Att;
+            raiderT.localScale = Vector3.one * (float)(raiderKm * k / raiderLen);
+            CraftDrive(raiderPlume, raiderGlow, raiderLen, (float)(e.Pirate.Throttle * e.Pirate.AccelG));
+        }
+
+        void DropRaiderModel()
+        {
+            if (raiderT != null) { raiderT.gameObject.SetActive(false); Gfx.Destroy(raiderT.gameObject); }
+            foreach (var o in raiderMade) Gfx.Destroy(o);
+            raiderMade.Clear();
+            raiderT = raiderPlume = raiderGlow = null;
+            raiderHull = null;
+            raiderFor = null;
+        }
 
         // After DrawTraffic, the same way, in the Raiders' colour and a little larger. The tag is a button that targets it,
         // as a body's label is (T also cycles to it, CycleTarget); a button only as wide as its text and only where it is
         // clear of the panels, so a click or a drag-to-look there is not taken from a control under it. With the raider as
         // the target in the UI Toolkit HUD only the dot: its bracket names it, and the tag would lie over that name. The
-        // classic panel and -fowlegacyui mark the target with a bracket that has no name, so there the tag stays.
+        // classic panel and -fowlegacyui mark the target with a bracket that has no name, so there the tag stays. Near enough
+        // that its model is longer than RaiderDotPx on screen, the model takes the dot's place and the tag clears its hull.
         void DrawRaider()
         {
             var e = career?.Encounter;
+            raiderDot = false;
             if (e == null) { raiderShown = "none"; return; }
             float ui = App.UiScale;
             var w = sys.Pos(e.Proxy, jd);
-            var p = Map(w, out _);
+            var p = Map(w, out double k);
             float dist = p.magnitude;
             var sp = Cam.WorldToScreenPoint(p);
             if (dist < 1e-6f || sp.z <= 0 || !CockpitShows(sp)) { raiderShown = "out of view"; return; }
@@ -117,16 +167,41 @@ namespace FogOfWar
             var col = FactionColours[(int)Faction.Raiders];
             if (raiderStyle == null) raiderStyle = new GUIStyle(labelStyle) { normal = { textColor = col } };
             string tag = $"{e.Proxy.Name} · {Km((w - ship.Pos).Mag)}";
-            GUI.color = col;
-            GUI.DrawTexture(new Rect(g.x - 2.5f, g.y - 2.5f, 5, 5), Texture2D.whiteTexture);
-            GUI.color = Color.white;
+            float pxPerRad = UnityEngine.Screen.height / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
+            float modelPx = raiderT != null && raiderT.gameObject.activeInHierarchy ? (float)(raiderKm * k) / dist * pxPerRad / ui : 0;
+            raiderDot = modelPx <= RaiderDotPx;
+            if (raiderDot)
+            {
+                GUI.color = col;
+                GUI.DrawTexture(new Rect(g.x - 2.5f, g.y - 2.5f, 5, 5), Texture2D.whiteTexture);
+                GUI.color = Color.white;
+            }
             if (ship.Target == e.Proxy && HasHud && App.ShellActive) { raiderShown = "dot only, the target: " + tag; return; }
-            var r = new Rect(g.x + 6, g.y - 8, raiderStyle.CalcSize(new GUIContent(tag)).x, 16);
+            var r = new Rect((raiderDot ? g.x : HullRight(g.x, ui)) + 6, g.y - 8, raiderStyle.CalcSize(new GUIContent(tag)).x, 16);
+            raiderTag = r;
             bool clear = !App.UnderPanel(new Vector2(r.xMax, r.yMin)) && !App.UnderPanel(new Vector2(r.xMax, r.yMax))
                          && !(App.ShellActive && UiShell.Instance.PointerOverMouse);
             if (!clear) GUI.Label(r, tag, raiderStyle);
             else if (GUI.Button(r, tag, raiderStyle)) SetTarget(e.Proxy);
             raiderShown = "on: " + tag;
+        }
+
+        // The right edge, in GUI px, of the model's box on screen (its world box's corners in front of the camera), and
+        // never left of x: the tag goes past it, not over the hull
+        float HullRight(float x, float ui)
+        {
+            // only the renderers shown: the Engine glow is off while the raider coasts, and an inactive one has no box
+            bool any = false;
+            var b = new Bounds();
+            foreach (var h in raiderHull)
+                if (h.gameObject.activeInHierarchy) { if (any) b.Encapsulate(h.bounds); else { b = h.bounds; any = true; } }
+            if (!any) return x;
+            for (int i = 0; i < 8; i++)
+            {
+                var c = Cam.WorldToScreenPoint(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
+                if (c.z > 0) x = Mathf.Max(x, c.x / ui);
+            }
+            return x;
         }
 
         // ---------------------------------------------------------------- the flight log
