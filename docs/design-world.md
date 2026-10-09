@@ -354,11 +354,11 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
 ## Decisions for you
 
 1. **When the torch drive arrived.** Decided: about 40 years ago [design].
-2. **Final faction names.** Decided: Cislunar Guard, Tharsis Company, Ice Compact and Raiders (#92). They are original names, not Expanse names or real organisations. "raider" stays as a common noun in player text.
+2. **Final faction names.** Decided: Cislunar Guard, Tharsis Company, Ice Compact and Raiders (#92). They are original names, not Expanse names or real organizations. "raider" stays as a common noun in player text.
 3. **Mars as a company town.** Decided: yes. It makes Mars different from Earth, from the Compact, and from the Expanse.
 4. **Boarding time.** Decided: 2 h (#91). It sets the size of every safe zone (`Threat.BoardingSeconds`).
 5. **Traffic count.** Proposal: about 100 ships in flight [design], after a frame-cost check. W2b runs 108 to 117, inside the frame budget [measured].
 
 6. **How a pirate brakes.** Today it brakes on the spare drive that the target's present thrust leaves it. A ship that cuts its drive or flips near the pirate makes it fly past, and it must come back (PR 5a). The other choice: brake as if the target could cut its drive at any time. Then nothing flies past, but a 1 g pirate brakes at 1 g, not 1.85 g, against a ship that brakes into port. Decided: keep today's law (#89). "Change the flip time" is one of the player's answers in W4.
 
-W1 started with the working names. The final names are set (decision 2, #92), and W4's call card names the Raiders. Decisions 1 to 4 and 6 are decided (#91, #89, and the accepted proposals). Decision 5 is measured. The combat doc's Phase 1 (the shipyard) followed W4.
+W1 started with the working names. The final names are set (decision 2, #92), and W4's call card names the Raiders. Decisions 1 to 4 and 6 are decided (decision 4 in #91, decision 6 in #89). Decision 5 is measured. The combat doc's Phase 1 (the shipyard) followed W4.
