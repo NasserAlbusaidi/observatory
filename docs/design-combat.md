@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built in this PR. 4b and 4c are not built. Phases 5–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built in this PR. 4c is not built. Phases 5–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -27,7 +27,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
 | 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f (#188) (the corvette's own model). Phase 3 is complete |
-| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built in this PR; 4b and 4c not built |
+| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built (#190); 4b (`pdc-mounts`) built in this PR; 4c not built |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
 
@@ -848,7 +848,7 @@ PR 3a depends on D1-D6 and D11. Each has a safe default, the recommendation, so 
 
 ## Phase 4: point defense and damage
 
-Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), and so is the raider's model (4c, part 1, `raider-model`); 4b and the rest of 4c are not built. D1-D15 below are agreed as recommended. The 4a build notes under the build plan list where the code goes past or differs from this text.
+Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), the raider's model (4c, part 1) is built (#191), and PR 4b (`pdc-mounts`) is built in this PR; the rest of 4c is not built. D1-D15 below are agreed as recommended. The 4a and 4b build notes under the build plan list where the code goes past or differs from this text.
 
 ### The rule
 
@@ -1072,7 +1072,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - **The classic Repair button** is read by `UiShots`' classic yard shot (docked at Earth), which runs only with `-fowclassicshots` (it needs a visible window). CareerQA reads the UI Toolkit row; the Missiles and Damage rows run in both shells.
 
 **PR 4b: `pdc`** (needs new art: no. The markers exist)
-- Status: the math, the mount table and its QA are built first on branch `pdc-mounts` (`OpenWorld/PointDefense.cs`, `Hull.Mounts`, `CareerQA.PointDefense.cs`, 17p-17t); the slot, hits and boarding follow 4a.
+- Status: built in this PR, on branch `pdc-mounts`. Part 1 is the math, the mount table and its QA (`OpenWorld/PointDefense.cs`, `Hull.Mounts`, `CareerQA.PointDefense.cs`, 17p-17t). Part 2 is the slot, the kill roll, the PDC hit, the boarding rule, the rows and the yard (17u-17w).
 - Adds: `Slot.PointDefense` (D4), `Hull.Mounts`, the arc test, the pass integral, the PDC hit, the boarding rule and `BreakOff.Repelled`, the bearing count in the Missiles row, the `ART-CONTRACT.md` zenith rule.
 - Touches: `OpenWorld/ShipBuild.cs`, `OpenWorld/Career.Damage.cs`, `OpenWorld/Career.Pirates.cs` (`Contacts`, `OffNote`), the yard and HUD in both shells, `CareerQA.Defense.cs`, `CareerQA.HullArt.cs` (mount vectors against the FBX).
 - QA:
@@ -1083,6 +1083,15 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - An empty magazine and 1 h unboarded gives "PDCs: the raider breaks off".
   - The 6 mount vectors match the FBX markers within 1°.
 - The player notices: PDC mounts in the yard. Missiles die in the last 2 km. A raider cannot board past a working mount.
+- **Built (4b notes).** The code is in `OpenWorld/Career.Damage.cs` (`Strike`, `Hit`, repairs), `OpenWorld/Career.Pirates.cs` (`Contacts`) and `OpenWorld/ShipBuild.cs`; QA 17u-17w is in `CareerQA.PointDefense.cs`, run from `DefenseChecks` after 17j, and `UiShots` shoots the yard's PDC row (06y-yard-pdc). Where the code goes past or differs from the text above:
+  - **No kill draw with no mount bearing.** `Strike` draws the kill only when m > 0. So a ship without PDCs draws 2 a missile, as in 4a (17i's 12 draws hold), and one with a mount bearing draws 1 more.
+  - **The boarding clock holds while a mount bears; it does not reset.** A break of the alongside rule (500 km, 0.1 km/s) still resets it. The bearing test has no range limit: alongside is 500 km, the PDC envelope 5 km, and the raider holds 2.05 km off.
+  - **The repel clock** counts sim time only while the raider is alongside, a working mount bears on it, its magazine is spent and none is in flight. It resets when the raider leaves alongside or the boarding clock runs. So a ship without PDCs is never repelled, and W4's boarding holds. It has no 30 s cap a step, which the boarding clock has.
+  - **The PDC hit** takes the working mount whose zenith is nearest the approach, bearing or not; on a tie (the frigate's `PDC_1` and `PDC_4` share a zenith) the lower index. The note is "Hit: a PDC mount, n of m working". With no working mount it is the hull's.
+  - **A refit that changes the hull** clears the dead mounts too: the new hull's fit mask differs. A save's mask is clamped to the fitted mounts.
+  - **Notes and events.** New `Happening.MissileKilled` for "PDCs killed a missile", a good (cyan) note. The break-off reads "PDCs: the raider breaks off, back to <haven>", as the other break-offs do.
+  - **Rows.** The Missiles row ends "; n mounts bear" (the working mounts that bear on the nearest missile at the attitude now) only with mounts fitted, so a stock ship's row is 4a's. The Damage row says "n of m PDC mounts out". The yard's row is headed "PDCs"; a fit reads "2 PDC mounts, 6 t: one bearing kills 42 % of missiles".
+  - **Flight log.** `killed`, `bear_raider` and `bear_missile` next to the missile fields (with mounts fitted), `dmg_mounts` in the damage fields, and the missiles state adds "n killed".
 
 **PR 4c: `pdc-fx`** (needs new art: no. It reuses `CourierShip`)
 - The raider's model ships first, on its own (`raider-model`, built in this PR). The missile flares, tracers, flashes and the 1× cap follow 4a.
@@ -1177,8 +1186,8 @@ Ordered by size. Your list put the destroyer first.
 | `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built (#150); 3d built (#184) |
 | `ShipBuild.cs:18-26,43-45,90-94,108,128-129`, `Career.Yard.cs:9-40`, `Career.cs:14,76-79`, `Career.Heat.cs`, `Career.Signature.cs`, `Career.Pirates.cs:261`, `OpenSystemScene.cs:489`, `.Hud.cs:24`, `.CareerHud.cs:230-246`, `.Signature.cs`, `.Yard.cs`, `OpenSystemScene.Hull.cs` (new) | One hull; the cold range and hold are hull-blind | Per-hull stock, price and facet (`OutRho`, `DarkRho`, `OutHoldS`); `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | Built (#185) |
 | `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The corvette's own model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Built (#188) |
-| `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | 4a built (#190: missiles, armor, damage, repairs); 4b not built |
-| `OpenSystemScene.RaiderHud.cs:104-131`, `OpenSystemScene.Career.cs` (`LateRunner`) | The raider is a 5 px dot and a tag | `LateRaider`: the pirate `Ship` as `CourierShip` (`Fleet.json`, 45.63 m), spawned and destroyed with the chase; the spawn shared with `LateRunner` (`SpawnCraft`) | 4 (4c, part 1) | Built (`raider-model`): QA in `CareerQA.RaiderModel.cs` |
+| `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | 4a built (#190: missiles, armor, damage, repairs); 4b built in this PR (PDC mounts, kills, mount hits, boarding rule) |
+| `OpenSystemScene.RaiderHud.cs:104-131`, `OpenSystemScene.Career.cs` (`LateRunner`) | The raider is a 5 px dot and a tag | `LateRaider`: the pirate `Ship` as `CourierShip` (`Fleet.json`, 45.63 m), spawned and destroyed with the chase; the spawn shared with `LateRunner` (`SpawnCraft`) | 4 (4c, part 1) | Built (#191): QA in `CareerQA.RaiderModel.cs` |
 | `Ship.cs:19-21`, `:44` | `RcsAccel`, `AngAccel`, `MaxRate`, `Ve` are `const` | Per instance (hulls, torpedoes) | 5–6 | — |
 
 ## Decisions (agreed 2026-10-06)
@@ -1188,4 +1197,4 @@ Ordered by size. Your list put the destroyer first.
 3. **Where stealth goes.** Right after Phase 2, as in the table. It needs signatures only.
 4. **Where the yards are.** Every port refits. Only big yards sell hulls: Earth, Mars, Ceres [design]. Phase 1 has one hull, so the hull rule waits for the second hull (Phase 3).
 
-Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built (#188). Phase 3 is complete. Phase 4 is designed and its decisions are agreed. PR 4a is built in this PR.
+Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built (#188). Phase 3 is complete. Phase 4 is designed and its decisions are agreed. PR 4a is built (#190). PR 4b is built in this PR.
