@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is designed below. PR 3a is built in this PR (`stealth-sink`). PRs 3b–3f are not built. Phases 4–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is designed below. PR 3a (#148, `stealth-sink`) is built. PR 3b (`stealth-lost`) is built in this PR. PRs 3c–3f are not built. Phases 4–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -26,7 +26,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | W1–W4 | The world ([design-world.md](design-world.md)) | Factions, NPC traffic, threat map, pirates that board you | None | Built |
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
-| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Designed; 3a built in this PR, 3b–3f not built |
+| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Designed; 3a (#148) built, 3b built in this PR, 3c–3f not built |
 | 4 | Point defense | PDCs, armor, damage | Defense only | — |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
@@ -412,7 +412,7 @@ PR 2a depends on decisions 1 to 7.
 13. **[2b] Sensor tiers:** the two that exist, ×2, prices unchanged. A third tier waits for Phase 3. Recommend.
 14. **Radiator moves to Phase 3.** Recommend.
 15. **Light delay** is omitted. A card readout comes only if PR 2c is built. Recommend.
-16. **No lose-the-raider rule.** A raider that saw the burn keeps the vector, and the chase does not change. Recommend. Phase 3 can revisit this.
+16. **No lose-the-raider rule.** A raider that saw the burn keeps the vector, and the chase does not change. Recommend. Phase 3 can revisit this. Revisited and built in 3b (D7): a dark-ready hull can lose the raider.
 17. **PR 2c is optional.** Recommend deciding after playing 2b.
 18. **Housekeeping, outside this scope.** `MODEL-FIDELITY.md:29` has been stale since #130 (`Ship.cs:71` now limits by thrust). Fix it in a separate PR.
 
@@ -427,7 +427,7 @@ Pirates that board you moved to [design-world.md](design-world.md), phase W4.
 
 ## Phase 3: stealth
 
-This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a is built in this PR (`stealth-sink`). PRs 3b–3f are not built.
+This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a (#148, `stealth-sink`) is built. PR 3b (`stealth-lost`) is built in this PR. PRs 3c–3f are not built.
 
 ### The rule
 
@@ -435,7 +435,7 @@ This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at 
 - **A raider's track decays.** After a loud moment, a raider holds the track for `HoldS`. Phase 2 sets 2 h for every hull (`Signature.cs:9`).
 - **Stowed radiators shorten the hold.** A hull with stowable radiators puts its waste heat into its own reaction mass (water) and stows its radiators. It is cold to a fraction ρ of the normal range. A raider then loses it in ρ × 2 h.
 - **The sink is the cost.** The water warms. A full sink puts the radiators out, and the hold goes back to 2 h. Only a port or a tender of cold water empties it.
-- **A raider that has lost you breaks off** (PR 3b). This is the first lose-the-raider rule (it revisits decision 16). It works only for a hull with stowable radiators.
+- **A raider that has lost you breaks off** (PR 3b, built). This is the first lose-the-raider rule (it revisits decision 16). It works only for a hull with stowable radiators.
 
 **Why the hold scales with ρ.** In Phase 2 a raider's fix goes stale at u = 10,000 km / 7,200 s = 1.389 km/s [calc]. When the stale area is wider than the raider's reach on a cold hull, it has lost the ship. Stock reach is 10,000 km, so it is lost in 7,200 s, the Phase 2 value. A stowed hull is seen to ρ × 10,000 km, so it is lost in ρ × 7,200 s. u is a game value. It stands for small unseen trims and tracking error, which the game does not model. `MODEL-FIDELITY.md` says so.
 
@@ -564,6 +564,7 @@ Example [calc]. The last loud moment is 30 min before a 3,600 s update. Stock: t
   if ((jd - Math.Max(e.FixJd, ship.LastLoudJd)) * 86400 >= HoldS(ship))
   { EndContact(Happening.RaiderGone, OffNote(BreakOff.Lost, null, Haven()), true, jd); return; }
   ```
+- As built, the test is the public helper `Career.LoseInS(ship, jd)`. It returns the seconds until the raider loses the ship, or NaN while the raider holds the track (no chase, not dark-ready, or inside the stowed reach). `Contacts` refreshes `FixJd` on NaN and ends the chase at 0 or less. The scene's Raider track row reads the same helper.
 - A fixed-radiator ship refreshes the fix every update, so decision 16 holds as it is for it. `CareerQA.Signature.cs:219` and the coast control (`CareerQA.Pirates.cs:621`) stay valid.
 - Alongside is 500 km (`Career.Intercept.cs:13`), inside 3,000 km. So a boarding is never lost.
 - A full sink or a dry tank ends the escape: the ship is not dark-ready, and the fix refreshes.
@@ -694,7 +695,7 @@ All text comes from shared functions, so the classic panel, `-fowlegacyui` and t
 
 Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
 
-**PR 3a: `stealth-sink`** (needs new art: no. Built in this PR)
+**PR 3a: `stealth-sink`** (needs new art: no. Built, #148)
 - Adds:
   - `Slot.Radiators` with "Fixed radiators" (stock: ρ 1, 0 t, 0 cr, 1 day) and "Stowable radiators" (ρ 0.3, 12 t, 60,000 cr, 1 day);
   - `Career.SinkK`, soaked once per tick in the 2 h window after a loud moment;
@@ -717,14 +718,14 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - A full sink brings the 2 h back. Any dock empties it.
   - The stock ship plays as in Phase 2.
 
-**PR 3b: `stealth-lost`** (needs new art: no)
+**PR 3b: `stealth-lost`** (needs new art: no. Built in this PR)
 - Adds:
   - `Encounter.FixJd`, the lose rule, `BreakOff.Lost` and its note;
   - the chase stow: `Career.Stowed` and `Soak` gain `Encounter != null` (stowed for the quiet seconds of a chase);
   - the "Raider track" row;
-  - one call-card sentence when dark-ready: "Or go dark: cut the drive and coast {hold} out of its sight."
-- In 3a nothing reads a stowed state during a chase (`RaiderWatch` returns `None`, and `RouteTick` returns at `Career.Route.cs:43`). So the chase stow waits for 3b, and a 3a chase does not spend the sink.
-- Touches: `OpenWorld/Career.Pirates.cs` (`:17-19`, `:194`, `:204-211`, between `:239` and `:240`, `:298`, `:305-308`), `Scenes/OpenSystemScene.Signature.cs`, `CareerQA.Stealth.cs` (16i), `CareerQA.PirateShells.cs:409-416`, `CareerQA.Pirates.cs:656`.
+  - one call-card sentence when dark-ready and the sink outlasts the hold (`SinkLeftS >= HoldS`; a chase soaks every quiet second, so a nearly full sink would fill first): "Or go dark: cut the drive and coast {hold} out of its sight."
+- In 3a nothing reads a stowed state during a chase (`RaiderWatch` returns `None`, and `RouteTick` returns at `Career.Route.cs:43`). So the chase stow waits for 3b, and a 3a chase does not spend the sink. 3b adds the chase stow. `Career.Stowed` also holds while `Encounter != null`. `Soak` then counts the update's quiet seconds: `simDt` less its loud seconds. A chase keeps no fill date.
+- Touches: `OpenWorld/Career.Pirates.cs` (`:17-19`, `:194`, `:204-211`, between `:239` and `:240`, `:298`, `:305-308`), `OpenWorld/Career.Heat.cs` (`Stowed`, `Soak`), `Scenes/OpenSystemScene.Signature.cs`, `CareerQA.Stealth.cs` (16c fix, 16i, 16i scene), `CareerQA.PirateShells.cs:409-416`, `CareerQA.Pirates.cs:656`.
 - QA:
   - A dark-ready bench with a raider 100,000 km off is still chased at 2,100 s and is lost at 2,200 s with "Track lost: the raider breaks off".
   - The draw count is 0 in the next update (`RouteGapDays`).
@@ -808,7 +809,7 @@ PR 3a depends on D1-D6 and D11. Each has a safe default, the recommendation, so 
 10. **[3d] D9. The smuggling grade** is 1.25 × e^(−Exposure/0.5), posted pay × 1.5, on routes with ≥ 1 h of risk. Recommend. "Caught by the Guard" waits for a patrol-sensor PR.
 11. **Carry-forward, decision 13. The third sensor tier is not built in Phase 3.** Recommend. No stealthy NPC exists for it to find, and raiders use stock sensors by rule (decision 6). It would only push traffic contacts out. Revisit it with the patrol-sensor PR or Phase 6 raider hulls.
 12. **Carry-forward, decision 14. Radiators are built in 3a.** Recommend.
-13. **Carry-forward, decision 16. Revisited in 3b** (D7).
+13. **Carry-forward, decision 16. Revisited in 3b** (D7). Built in 3b.
 14. **Carry-forward, ghost track memory.** The raider's memory is `Encounter.FixJd` (3b). The traffic ghost waits for Phase 4 `SensorPicture`, and it fades in real time. Recommend.
 15. **[3e] D10. Hull money and rules.** The corvette costs 400,000 cr and the frigate hull counts as 0. The swap takes 7 days, needs `OwnsShip`, and is sold only at Earth, Mars and Ceres (`Port.HullSale`, agreed Decision 4). Picks reset to the hull's stock, and `ShipPaid` does not change. Recommend. Alternative: let a swap happen before the buyout.
 16. **[3e] D12. Corvette stats:** 350.25 t structure, `Rated(3)`, facet 1/3, stock {1,2,0,0,0,1}. Recommend, or give your own.
@@ -911,7 +912,7 @@ Ordered by size. Your list put the destroyer first.
 | `Traffic.cs`, `OpenSystemScene.Traffic.cs`, `.Signature.cs`, `.Orbits.cs:61`, `.Yard.cs`, `Signature.cs`, `UiShots.cs` | Every ship in flight is drawn | Only ships the sensors see: `Trip.Seen` from `Traffic.Sense`, a Contacts row, an own-burn map ring, two yard rows | 2 | Built (2b): QA in `CareerQA.Contacts.cs` |
 | `ShipBuild.cs:5,44-78`, `Career.Heat.cs` (new), `Career.cs:46-61,182-220,630-635` | No heat state. No radiator part | `Slot.Radiators` (fixed or stowable); `Career.SinkK`, soaked once per tick and saved | 3 (3a) | Built (3a) |
 | `Signature.cs:17`, `Career.Signature.cs:15,46,55`, `Threat.cs:79,120,122,132` | One cold range (10,000 km) and one 2 h hold | `RangeKm(jetW, baseKm, coldW)`; `Career.HoldS` = ρ × 2 h for a dark-ready hull | 3 (3a) | Built (3a) |
-| `Career.Pirates.cs:10-19,204-246,298-308` | No lose-the-raider rule (D16) | `Encounter.FixJd`, `BreakOff.Lost`, for stowable hulls only | 3 (3b) | — |
+| `Career.Pirates.cs:10-19,204-246,298-308` | No lose-the-raider rule (D16) | `Encounter.FixJd`, `BreakOff.Lost`, for stowable hulls only | 3 (3b) | Built (3b) |
 | `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | — |
 | `ShipBuild.cs:17-39,81,95-102`, `Career.Yard.cs:11-40`, `Career.cs:8-14,71-74`, `OpenSystemScene.cs:778`, `.Hud.cs:24`, `.CareerHud.cs:234`, `OpenSystemScene.Hull.cs` (new) | One hull | Per-hull stock, price and facet; `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | — |
 | `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The user's Blender model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Needs art |
@@ -925,4 +926,4 @@ Ordered by size. Your list put the destroyer first.
 3. **Where stealth goes.** Right after Phase 2, as in the table. It needs signatures only.
 4. **Where the yards are.** Every port refits. Only big yards sell hulls: Earth, Mars, Ceres [design]. Phase 1 has one hull, so the hull rule waits for the second hull (Phase 3).
 
-Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is designed, and PR 3a is built in this PR.
+Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is designed. PR 3a (#148) is built, and PR 3b is built in this PR.

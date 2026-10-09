@@ -18,24 +18,26 @@ namespace FogOfWar.OpenWorld
         // stowable radiators, water aboard and room in the sink: a raider's hold is StowRho of TrackHoldS
         public bool DarkReady(Ship ship) => !Sandbox && Build.Stowable && ship.Fuel > 0 && SinkK < SinkMaxK;
         public double HoldS(Ship ship) => DarkReady(ship) ? Signature.TrackHoldS * Build.StowRho : Signature.TrackHoldS;
-        // the radiators are stowed now: dark-ready, not docked, quiet, and inside the 2 h window (PR 3b adds: or a chase is on)
-        public bool Stowed(Ship ship, double jd) => DarkReady(ship) && Docked == null && !LoudNow(ship) && (jd - ship.LastLoudJd) * 86400 < Signature.TrackHoldS;
+        // the radiators are stowed now: dark-ready, not docked, quiet, and inside the 2 h window or a chase is on
+        public bool Stowed(Ship ship, double jd) => DarkReady(ship) && Docked == null && !LoudNow(ship) && ((jd - ship.LastLoudJd) * 86400 < Signature.TrackHoldS || Encounter != null);
         public double ColdW(Ship ship, double jd) => Stowed(ship, jd) ? Signature.ColdW(Build.StowRho) : Signature.IdleW;
         public double SinkLeftS(Ship ship) => ship.Fuel > 0 ? Math.Max(0, SinkMaxK - SinkK) * WaterC * ship.Fuel * 1000 / SinkLoadW : 0;
 
         // Once per Tick, after the dock test and before the roll. The stowed seconds are this update's overlap with the 2 h
         // after the last loud moment: the tail SeenSeconds counts, at TrackHoldS. It holds no loud seconds by definition.
-        // (PR 3b adds the chase: with Encounter on, s = simDt − this update's loud seconds.)
+        // With a chase on, they are all the update's quiet seconds: simDt less its loud seconds. No fill date is kept then:
+        // RouteTick and RaiderWatch read none while the chase lasts.
         void Soak(Ship ship, double simDt)
         {
             fillJd = double.NaN;
             if (Docked != null) { SinkK = 0; return; }                     // the port's loop takes the heat
             if (!Build.Stowable || simDt <= 0 || !spanOk) return;
             if (ship.Fuel <= 0) { SinkK = SinkMaxK; return; }               // no water, no sink: radiators out
-            double s = (Math.Min(jd, ship.LastLoudJd + Signature.TrackHoldS / 86400) - Math.Max(spanJd, ship.LastLoudJd)) * 86400;
+            double s = Encounter != null ? simDt - Math.Max(0, ship.LoudSeconds - spanLoud)
+                                         : (Math.Min(jd, ship.LastLoudJd + Signature.TrackHoldS / 86400) - Math.Max(spanJd, ship.LastLoudJd)) * 86400;
             s = Math.Max(0, Math.Min(s, simDt));
             double toFullS = (SinkMaxK - SinkK) * WaterC * ship.Fuel * 1000 / SinkLoadW;
-            if (SinkK < SinkMaxK && toFullS <= s) fillJd = Math.Max(spanJd, ship.LastLoudJd) + toFullS / 86400;
+            if (Encounter == null && SinkK < SinkMaxK && toFullS <= s) fillJd = Math.Max(spanJd, ship.LastLoudJd) + toFullS / 86400;
             SinkK = Math.Min(SinkMaxK, SinkK + SinkLoadW * s / (WaterC * ship.Fuel * 1000));
         }
 

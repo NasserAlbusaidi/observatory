@@ -9,10 +9,10 @@ namespace FogOfWar
 {
     // 16. Stowable radiators and the heat sink (Career.Heat.cs, docs/design-combat.md Phase 3a): the constants, the yard rows
     // and the build, the soak of one update, the heat paths (burn, dry, tender, dock), what the raider sees, the planner's
-    // hold, the save and the call's cost, then in the scene the Signature, Heat sink and Raiders rows and the SEEN and DARK
-    // pills (the rows alone under -fowlegacyui). Headless parts run on a system of their own at the pursuit check's date,
-    // the planner at the scene's date as 15 does. Every [calc] number was worked by hand and never run: every check logs
-    // what it measured.
+    // hold, the save and the call's cost, the raider that loses a dark hull (3b), then in the scene the Signature, Heat sink,
+    // Raiders and Raider track rows and the SEEN and DARK pills (the rows alone under -fowlegacyui). Headless parts run on a
+    // system of their own at the pursuit check's date, the planner at the scene's date as 15 does. Every [calc] number was
+    // worked by hand and never run: every check logs what it measured.
     public partial class CareerQA
     {
         IEnumerator StealthChecks()
@@ -27,6 +27,7 @@ namespace FogOfWar
                 Guard("stealth seen", () => StealthSeenChecks(qs));
                 Guard("stealth planner", () => StealthPlannerChecks(qs));
                 Guard("stealth save", () => StealthSaveChecks(qs));
+                Guard("stealth lost", () => StealthLostChecks(qs));
             }
             yield return StealthSceneChecks();
         }
@@ -150,11 +151,12 @@ namespace FogOfWar
             never.Tick(3600);
             Check(Near(never.C.SinkK, 0, 1e-12), $"stealth: never burned, 3,600 s soak {never.C.SinkK:0.000000000000} K (0)");
 
-            // 3a: a chase heats nothing; 3b turns this case into 8.6001 K
+            // 3b: a chase is quiet time too: it soaks (3a: 0 K), and 100,000 km off the raider is lost in the same update
             var ch = Dark(qs, at, vel);
             var e = ch.C.StartContact(ch.Job, qs, ch.Ship, ch.Jd, at - at.Norm * 1e5, vel);
             ch.Tick(3600);
-            Check(Near(ch.C.SinkK, 0, 1e-12), $"stealth: a chase on ({(ch.C.Encounter == e ? "same" : ch.C.Encounter == null ? "gone" : "other")}) with no loud moment, 3,600 s soak {ch.C.SinkK:0.000000000000} K (0 in 3a; 3b makes it 8.6001 ± 1e-3), {Kind(ch)}");
+            Check(Near(ch.C.SinkK, 8.6001, 1e-3) && ch.C.Encounter == null,
+                $"stealth: a chase on with no loud moment, one update of 3,600 s: {ch.C.SinkK:0.000000} K (8.6001 ± 1e-3), chase {(ch.C.Encounter == e ? "same" : ch.C.Encounter == null ? "gone" : "other")} (gone: held 3,600 s ≥ 2,160), {Kind(ch)}");
             ch.C.DropContact();
 
             var full = Dark(qs, at, vel);
@@ -326,6 +328,102 @@ namespace FogOfWar
             Perf(ms < 50, $"stealth: {N:N0} calls of Soak and {N:N0} of HoldS take {ms:0.0} ms (under 50 ms; {acc / N:0.0} s hold)");
         }
 
+        // 16i: a chasing raider loses a dark hull (Career.Pirates.cs LoseInS, docs/design-combat.md Phase 3b). The headless raider
+        // never moves (Tick does not advance it), and that is what holds the range cases. Ticks are 100 s, as the Fly loop steps.
+        void StealthLostChecks(SolarSystem qs)
+        {
+            var (_, at, vel) = Belt(qs);
+            var live = new List<Bench>();
+            Bench Keep(Bench b) { live.Add(b); return b; }
+            Encounter Chase(Bench b, double km) => b.C.StartContact(b.Job, qs, b.Ship, b.Jd, at - at.Norm * km, vel);
+            void Ticks(Bench b, int n, double dt = 100) { for (int i = 0; i < n; i++) b.Tick(dt); }
+            string State(Bench b, Encounter e) => b.C.Encounter == e ? "on" : b.C.Encounter == null ? "gone" : "other";
+            string Lose(Bench b) { double l = b.C.LoseInS(b.Ship, b.Jd); return double.IsNaN(l) ? "NaN" : $"{l:0.0} s"; }
+            string Why(Bench b) => $"; MakeCall found no raider at the Belt point (patrol {Threat.PatrolAt(qs, b.Ship.Pos, b.Jd)?.Name ?? "-"}, call {(b.C.Call == null ? "none" : b.C.Call.Kind.ToString())})";
+            try
+            {
+                string note = Career.OffNote(Career.BreakOff.Lost, null, "Pallas");
+                Check(note == "Track lost: the raider breaks off, back to Pallas", $"stealth: the lost-track note reads \"{note}\" (Track lost: the raider breaks off, back to Pallas)");
+
+                // 2,160 s of hold, a raider 100,000 km off (outside the 3,000 km stowed reach), never burned
+                var lb = Keep(Dark(qs, at, vel));
+                var le = Chase(lb, 1e5);
+                Ticks(lb, 21);
+                string on21 = State(lb, le), lose21 = Lose(lb);
+                Ticks(lb, 1);
+                string said = lb.Said.Count > 0 ? lb.Said[lb.Said.Count - 1].Text : "-";
+                Check(on21 == "on" && State(lb, le) == "gone" && lb.Heard(Career.Happening.RaiderGone, "Track lost: the raider breaks off") && Near(lb.C.SinkK, 5.2556, 1e-3),
+                    $"stealth: a Dark hull, raider 100,000 km off, never burned: after 2,100 s the chase is {on21} (on; {lose21} left, 60), after 2,200 s {State(lb, le)} (gone), heard \"{said}\"; sink {lb.C.SinkK:0.000000} K (5.2556 ± 1e-3, 2,200 quiet chase seconds)");
+                var roll = SigRoll(lb);
+                lb.Tick(3600);
+                Check(roll.Draws == 0 && lb.C.Call == null && lb.C.Encounter == null,
+                    $"stealth: one update of 3,600 s after the loss, the roll that always hits: {roll.Draws} draws (0; the gap holds for 0.5 d), call {(lb.C.Call == null ? "none" : lb.C.Call.Kind.ToString())} (none), chase {State(lb, le)} (gone)");
+
+                // a stock hull has fixed radiators: nothing to hide, the raider keeps the track
+                var sb = Keep(SigBench(qs, at, vel));
+                var se = Chase(sb, 1e5);
+                Ticks(sb, 8, 3600);
+                Check(State(sb, se) == "on" && Near(sb.C.SinkK, 0, 1e-12) && double.IsNaN(sb.C.LoseInS(sb.Ship, sb.Jd)),
+                    $"stealth: a stock hull, raider 100,000 km off, 8 updates of 3,600 s: chase {State(sb, se)} (on), sink {sb.C.SinkK:0.000000000000} K (0), loses in {Lose(sb)} (NaN)");
+
+                // inside the stowed reach (3,000 km) the raider sees the hull whatever it does
+                var cb = Keep(Dark(qs, at, vel));
+                var ce = Chase(cb, 2000);
+                Ticks(cb, 30);
+                Check(State(cb, ce) == "on" && double.IsNaN(cb.C.LoseInS(cb.Ship, cb.Jd)),
+                    $"stealth: a Dark hull, raider 2,000 km off, 3,000 s: chase {State(cb, ce)} (on), range {ce.Range:N0} km (2,000), loses in {Lose(cb)} (NaN), sink {cb.C.SinkK:0.000000} K");
+
+                // a burn is a loud moment: 60 loud seconds at 1,000 s restart the clock, and that update soaks nothing
+                var bb = Keep(Dark(qs, at, vel));
+                var be = Chase(bb, 1e5);
+                Ticks(bb, 10);
+                bb.Ship.LoudSeconds += 60; bb.Ship.LastLoudJd = bb.Jd + 60 / 86400.0;
+                bb.Tick(60);
+                double sink1060 = bb.C.SinkK;
+                Ticks(bb, 21);
+                string on3160 = State(bb, be), lose3160 = Lose(bb);
+                Ticks(bb, 1);
+                Check(Near(sink1060, 2.3889, 1e-3) && on3160 == "on" && State(bb, be) == "gone",
+                    $"stealth: a burn ending at 1,060 s: the loud update soaks 0 (sink {sink1060:0.000000} K after 1,000 quiet seconds, 2.3889 ± 1e-3); at 3,160 s (2,100 s after the burn) the chase is {on3160} (on; {lose3160} left, 60), at 3,260 s {State(bb, be)} (gone); sink {bb.C.SinkK:0.000000} K");
+
+                // a full sink puts the radiators out: the raider keeps the fix
+                var fb = Keep(Dark(qs, at, vel));
+                fb.C.SinkK = 100;
+                var fe = Chase(fb, 1e5);
+                Ticks(fb, 22);
+                Check(State(fb, fe) == "on" && double.IsNaN(fb.C.LoseInS(fb.Ship, fb.Jd)) && Near(fb.C.SinkK, 100, 1e-12),
+                    $"stealth: a Dark hull with the sink full, raider 100,000 km off, 2,200 s: chase {State(fb, fe)} (on), loses in {Lose(fb)} (NaN), sink {fb.C.SinkK:0.000000000000} K (100)");
+
+                // the sink fills inside the chase (50 t, 99 K: full after 104.65 s): from then the raider has the fix
+                var xb = Keep(Dark(qs, at, vel));
+                xb.Ship.Fuel = 50;
+                xb.C.SinkK = 99;
+                var xe = Chase(xb, 1e5);
+                Ticks(xb, 22);
+                Check(State(xb, xe) == "on" && double.IsNaN(xb.C.LoseInS(xb.Ship, xb.Jd)) && Near(xb.C.SinkK, 100, 1e-12) && Near((xb.Jd - xe.FixJd) * 86400, 0, 1e-3),
+                    $"stealth: a Dark hull at 50 t from 99 K, raider 100,000 km off, 2,200 s: chase {State(xb, xe)} (on), loses in {Lose(xb)} (NaN), sink {xb.C.SinkK:0.000000000000} K (100), fix {(xb.Jd - xe.FixJd) * 86400:0.000} s old (0: refreshed on every update since the fill)");
+
+                // the call card offers the dark option to a hull that can take it
+                const string dark = "Or go dark: cut the drive and coast 36 min out of its sight.";
+                var db = Keep(Dark(qs, at, vel));
+                bool dMade = db.C.MakeCall(Career.RouteKind.Pirate, db.Job, qs, db.Ship, db.Jd);
+                string dText = db.C.Call?.Text;
+                string dWhy = dMade ? "" : Why(db);
+                db.C.DropContact();
+                var kb = Keep(MakeBench(qs, at, vel));
+                bool kMade = kb.C.MakeCall(Career.RouteKind.Pirate, kb.Job, qs, kb.Ship, kb.Jd);
+                string kText = kb.C.Call?.Text;
+                string kWhy = kMade ? "" : Why(kb);
+                kb.C.DropContact();
+                bool hasDark = dText != null && dText.Contains(dark), noThey = dText != null && !System.Text.RegularExpressions.Regex.IsMatch(dText, @"\b[Tt]hey\b");
+                Check(dMade && hasDark && noThey,
+                    $"stealth: the Dark hull's call card has the dark sentence {hasDark} (True) and no \"they\" {noThey} (True): \"{SigPart(dText, "Or go dark")}\"" + dWhy);
+                bool noDark = kText != null && !kText.Contains("go dark");
+                Check(kMade && noDark, $"stealth: the stock hull's call card has no \"go dark\" {noDark} (True): \"{SigPart(kText, "Run:")}\"" + kWhy);
+            }
+            finally { foreach (var b in live) b.C.DropContact(); }
+        }
+
         // 16h: the ship 1,000,000 km out from Vesta at rest with it, a cargo job aboard, the stowable radiators fitted
         IEnumerator StealthSceneChecks()
         {
@@ -414,8 +512,37 @@ namespace FogOfWar
                     $"stealth: the sink full, 40 min after the burn: Raiders \"{raid}\" ({SigTone(rows, "Raiders")}; tracking you), Heat sink \"{sink}\" ({SigTone(rows, "Heat sink")}; full), Signature \"{sig}\" (2 MW idle)");
             });
 
+            // 3b: a chase on the stowed hull, a raider 100,000 km off: the raider's clock, then the sink full and the clock gone
+            if (go) go = Guard("stealth lost start", () =>
+            {
+                ship.ThrottleCmd = 0; ship.Throttle = 0;
+                career.SinkK = 0;
+                ship.LastLoudJd = double.NegativeInfinity;
+                career.StartContact(job, sys, ship, jd, ship.Pos - ship.Pos.Norm * 1e5, ship.Vel);
+                s.TestWatchNow();
+            });
+            for (int i = 0; go && i < 3; i++) yield return null;
+            if (go) go = Guard("stealth lost clock", () =>
+            {
+                var rows = SigRows();
+                string track = SigVal(rows, "Raider track"), raid = SigVal(rows, "Raiders"), darkPill = pills ? s.TestDarkPill() : "-";
+                bool pillOk = !pills || darkPill.StartsWith("DARK ", StringComparison.Ordinal);
+                Check(track.StartsWith("it loses you in", StringComparison.Ordinal) && SigTone(rows, "Raider track") == Tone.Cold && SigAt(rows, "Raiders") < 0 && pillOk,
+                    $"stealth: a chase on the dark hull: Raider track \"{track}\" ({SigTone(rows, "Raider track")}; it loses you in m:ss if you stay dark, Cold), Raiders row \"{raid}\" (absent: -), DARK pill \"{darkPill}\" (DARK h:mm); range {(career.Encounter?.Range ?? double.NaN):N0} km, sink {career.SinkK:0.0000} K");
+                career.SinkK = 100;
+            });
+            for (int i = 0; go && i < 3; i++) yield return null;
+            if (go) go = Guard("stealth lost full", () =>
+            {
+                var rows = SigRows();
+                string track = SigVal(rows, "Raider track");
+                Check(track == "it has your track" && SigTone(rows, "Raider track") == Tone.Bad,
+                    $"stealth: the same chase with the sink full: Raider track \"{track}\" ({SigTone(rows, "Raider track")}; it has your track, Bad); sink {career.SinkK:0.0000} K, chase {(career.Encounter != null ? "on" : "gone")} (on)");
+            });
+
             Guard("stealth cleanup", () =>
             {
+                career.DropContact();
                 ship.ThrottleCmd = 0; ship.Throttle = 0;
                 if (build0 != null) { career.Build = build0; career.SinkK = sink0; }
                 if (job != null) career.Active.Remove(job);

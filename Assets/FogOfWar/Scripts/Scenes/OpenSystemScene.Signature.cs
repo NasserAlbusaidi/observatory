@@ -49,6 +49,15 @@ namespace FogOfWar
             if (watch == Career.Watch.Loud) list.Add(new Readout("Raiders", "can see your burn", Tone.Bad));
             else if (watch == Career.Watch.Tracked) list.Add(new Readout("Raiders", $"tracking you, {Dur(watchLeft)} left", Tone.Bad));
             else if (watch == Career.Watch.Cold) list.Add(new Readout("Raiders", "no track: cold for over " + Signature.HoldText(career.HoldS(ship)), Tone.Cold));
+            if (career != null && career.Encounter != null)
+            {
+                // the raider's clock (D7). It holds the track on NaN (no dark-ready hull, or inside the stowed reach), while the
+                // drive is loud (LoseInS counts from the burn's end then) and when the sink fills before the clock runs out
+                double lose = career.LoseInS(ship, jd);
+                bool holds = double.IsNaN(lose) || p > 0 || career.SinkLeftS(ship) < lose;
+                list.Add(holds ? new Readout("Raider track", "it has your track", Tone.Bad)
+                                       : new Readout("Raider track", $"it loses you in {Math.Floor(Math.Max(0, lose) / 60):0}:{Math.Floor(Math.Max(0, lose) % 60):00} if you stay dark", Tone.Cold));
+            }
             if (traffic != null) list.Add(new Readout("Contacts", $"sensed: {traffic.SeenCount} of {traffic.Flying.Count} in flight"));
         }
 

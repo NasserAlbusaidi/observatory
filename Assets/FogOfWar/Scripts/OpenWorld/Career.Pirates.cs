@@ -16,6 +16,7 @@ namespace FogOfWar.OpenWorld
         public readonly double CatchSeconds; // the closed-form catch time at the start (Career.CatchSeconds)
         public double Dwell;                 // the boarding clock: seconds alongside, reset on any break
         public double Hopeless;              // seconds the catch has stayed out of reach (#98), reset when it comes back
+        public double FixJd;                 // 3b: the raider's last fix on the ship: the call, then every update it can see the hull (not saved)
         public double Range, Vrel;           // from the player at the last career update
         internal readonly SolarSystem Sys;   // the system the proxy is in
         D3 pos, vel, acc;
@@ -192,6 +193,7 @@ namespace FogOfWar.OpenWorld
                        $" At {PirateG:0} g it can be alongside in " +
                        $"about {Span(catchS / 86400)}, and {Span(Threat.BoardingSeconds / 86400)} alongside is a boarding: it takes {takes}. " +
                        "Run: burn hard, or dock first. " +
+                       (DarkReady(ship) && SinkLeftS(ship) >= HoldS(ship) ? $"Or go dark: cut the drive and coast {Signature.HoldText(HoldS(ship))} out of its sight. " : "") +
                        (port != null ? $"Divert: {port.Name} is {Span(divertS / 86400)} away at full burn, in the {Factions[(int)port.Owner].Name} patrol's reach. " : "") +
                        $"Or give up {GiveUpShare * 100:0} % now and it leaves.",
                 Yes = giveUp, No = "Run",
@@ -206,6 +208,7 @@ namespace FogOfWar.OpenWorld
             DropContact();
             string hull = RaiderHulls[Math.Abs(job.Id) % RaiderHulls.Length];
             Encounter = new Encounter(sys, job, lair, hull, $"{hull} ({Raiders})", jd, pos, vel, PirateG, ship, catchS);
+            Encounter.FixJd = jd; // the call is a fix
             sys.Bodies.Add(Encounter.Proxy);
             return Encounter;
         }
@@ -237,12 +240,26 @@ namespace FogOfWar.OpenWorld
                 if (e.Hopeless >= GiveUpS) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Outrun, null, Haven()), true, jd); return; }
             }
             else e.Hopeless = 0;
+            // 3b (D7): a dark-ready hull out of the raider's stowed reach for HoldS since its last fix or burn is lost
+            double lose = LoseInS(ship, jd);
+            if (double.IsNaN(lose)) e.FixJd = jd;
+            else if (lose <= 0) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Lost, null, Haven()), true, jd); return; }
             if (!alongside) { e.Dwell = 0; return; }
             e.Dwell += Math.Min(simDt, 30);
             if (e.Dwell < Threat.BoardingSeconds) return;
             var (t, pay) = Take(e.Job, BoardShare);
             DropWarp = true;
             EndContact(Happening.Boarded, BoardedNote(t, pay, Haven()), false, jd);
+        }
+
+        // 3b: the seconds until a chasing raider loses a dark ship: HoldS after its last fix or the last loud moment. NaN while
+        // it holds the track: no chase, not dark-ready, or inside the stowed range (Range from the last update; a NaN range
+        // counts as inside).
+        public double LoseInS(Ship ship, double jd)
+        {
+            var e = Encounter;
+            if (e == null || !DarkReady(ship) || !(e.Range >= Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(Build.StowRho)))) return double.NaN;
+            return HoldS(ship) - (jd - Math.Max(e.FixJd, ship.LastLoudJd)) * 86400;
         }
 
         // Run closes the card; Divert flies to the patrolled port on the card (or the nearest now, once the card is gone);
@@ -295,7 +312,7 @@ namespace FogOfWar.OpenWorld
             return (vp - u) / a1 + vp / a2 + w / a2;
         }
 
-        internal enum BreakOff { Docked, Landed, JobOver, Patrol, Outrun }
+        internal enum BreakOff { Docked, Landed, JobOver, Patrol, Outrun, Lost }
         internal const string DryNote = "Can't divert: the tank is dry", NavNote = "Can't divert: the nav computer would not engage";
         internal static string RunNote => $"Running: burn hard, or dock first. Time is held to {ChaseWarp:N0}×";
         internal static string DivertNote(Port p) => $"Diverting to {p.Name}, into the {Factions[(int)p.Owner].Name} patrol's reach";
@@ -304,7 +321,7 @@ namespace FogOfWar.OpenWorld
         internal static string GaveUpNote(double t, double pay, string haven) => $"Gave up {Loot(t, pay)}: the raider " + (haven != null ? "goes back to " + haven : "leaves");
         internal static string OffNote(BreakOff why, string where, string haven) =>
             (why == BreakOff.Docked ? $"Docked at {where}" : why == BreakOff.Landed ? $"Landed on {where}" : why == BreakOff.Patrol ? $"{where} patrol in reach"
-                : why == BreakOff.Outrun ? "Outrun" : "The job is over") +
+                : why == BreakOff.Outrun ? "Outrun" : why == BreakOff.Lost ? "Track lost" : "The job is over") +
             ": the raider breaks off" + Back(haven);
         static string Back(string haven) => haven != null ? ", back to " + haven : "";
         static string Loot(double t, double pay) => (t > 0 ? $"{t:N1} t and " : "") + $"{pay:N0} cr";
