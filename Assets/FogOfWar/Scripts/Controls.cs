@@ -67,7 +67,7 @@ namespace FogOfWar
         public static KeyCode Get(Action a, int slot) => bind[a][slot];
 
         // Keys with a fixed job that the rebindable actions can't take (#21): 1–9 attitude holds in flight (1–8 pick a
-        // scene in the Observatory), Esc menu, F2 hide panels, F7 test money (OpenSystemScene.Dev.cs), F11 fullscreen.
+        // scene in the Observatory), Esc menu, F2 hide panels, F7 the dev menu (OpenSystemScene.Dev.cs), F11 fullscreen.
         public static string FixedUse(KeyCode k)
         {
             if (k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9) return "attitude holds";
@@ -75,7 +75,7 @@ namespace FogOfWar
             {
                 case KeyCode.Escape: return "the menu";
                 case KeyCode.F2: return "hiding the panels";
-                case KeyCode.F7: return "test money";
+                case KeyCode.F7: return "the dev menu";
                 case KeyCode.F11: return "fullscreen";
             }
             return null;

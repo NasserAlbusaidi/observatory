@@ -91,11 +91,19 @@ namespace FogOfWar.OpenWorld
                 if (Strike(ship, p)) e.Killed++;
             }
             if (e.Missiles.Count > 0 || e.Magazine <= 0 || !(e.Range < FireKm) || !Active.Contains(e.Job)) return;
+            Fire(e, ship);
+        }
+
+        // a salvo from where the raider is now; the count fired
+        int Fire(Encounter e, Ship ship)
+        {
             int n = Math.Min(Salvo, e.Magazine);
+            if (n <= 0) return 0;
             e.Magazine -= n;
             var from = e.Pirate.Pos - ship.Pos;
             for (int i = 0; i < n; i++) e.Missiles.Add(new Missile { P = from });
             Say(Happening.MissileFired, FiredNote(n, from.Mag / MissileKms), false);
+            return n;
         }
 
         // One missile at the ship from direction `from`: the PDCs, the plating, then the aspect's system. True when the PDCs

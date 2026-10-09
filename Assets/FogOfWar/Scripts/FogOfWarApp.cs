@@ -54,6 +54,7 @@ namespace FogOfWar
         public void NewGame() => Restart(GameIndex);
         public void ContinueGame() { Activate(GameIndex); (current as OpenSystemScene)?.LoadGame(); }
         public bool SaveGame() => (current as OpenSystemScene)?.SaveGame() ?? false;
+        public void PanelToTop() => panelScroll = Vector2.zero;
 
         readonly PanelUI ui = new PanelUI();
         readonly List<Readout> readouts = new List<Readout>();

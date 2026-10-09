@@ -1042,6 +1042,19 @@ A new slot, `Slot.Armor` [design]. It goes through `DryMass` (`ShipBuild.cs:121`
 - Every check uses `Check(ok, msg)` (`CareerQA.cs:48`) and logs what it measured.
 - Run `-fowcareer` in the UI Toolkit shell and with `-fowlegacyui`.
 
+### Testing by hand: the dev menu
+
+F7 opens the dev menu in the editor and in a build started with `-fowdev` (and under `-fowcareer`). Other builds ignore the key. It is a panel on the UI Toolkit HUD, and a section at the top of the classic panel. Code: `OpenSystemScene.Dev.cs`, `OpenSystemScene.DevMenu.cs`, `Career.Dev.cs`. QA: section 19, `CareerQA.DevMenu.cs`.
+
+- Test money (credits topped up, ship bought out), reveal all traffic, and seeded combat draws (each test chase starts from seed 1).
+- A raider at 300, 2,000 or 10,000 km, at rest with the ship: it closes at 1 g on its own. With no job aboard, a "Test cargo" run to Ceres is added. Refused when docked, landed or in a patrol's reach, since the chase would end at once.
+- Fire a salvo now (any range, missiles in flight or not) and refill the magazine.
+- A hit on the drive, sensors, tank, radiators or a PDC mount, through `Career.Hit`. Radiators need stowable ones fitted, a PDC hit a working mount. Free repair.
+- Fill the tank (the new water cools the sink, as a purchase does). Empty or fill the heat sink (not docked).
+- +1 h and +1 day by warp to a stop (10k×, 100k×), not a date jump: a jump would leave the ship behind while the bodies move. A chase or a crossing caps the warp; a drop to 1× stops the skip.
+- Not in the menu: dock at the nearest port. There is no instant dock: `Docked` comes from the orbit each update, so it would need a teleport into a parking orbit.
+- Each entry posts a note. A save made with test money on keeps the money: test on a new game.
+
 ### Build plan
 
 Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
