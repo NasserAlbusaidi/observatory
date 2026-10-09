@@ -40,7 +40,7 @@ namespace FogOfWar.OpenWorld
         public double BurnSeconds;               // sim seconds with the drive firing (career scan time leaves these out)
         public double CruiseSeconds;             // accumulated plan coast, even when a whole coast fits in one frame
         public double LoudSeconds, LastLoudJd = double.NegativeInfinity; // Signature.Loud time, and the date it last was (not saved)
-        // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
+        // Reaction mass. vₑ is D–He³ class (docs/MODEL-FIDELITY.md, Spacecraft decisions); every burn and RCS puff spends mass by the rocket
         // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
         public const double Ve = 10000;          // km/s
         public double DryMass = 300, Fuel = 200, Cargo;

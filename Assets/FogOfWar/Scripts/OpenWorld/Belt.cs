@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace FogOfWar.OpenWorld
 {
-    // A procedural asteroid population on Keplerian orbits, following PHYSICS-REVIEW.md §3:
+    // A procedural asteroid population on Keplerian orbits:
     // main belt 2.1–3.3 AU with the Kirkwood gaps carved in semi-major axis (4:1, 3:1, 5:2, 7:3, 2:1 with Jupiter),
     // five collisional families, Hungarias, Hildas held in the 3:2 resonance (they trace a triangle in Jupiter's
     // rotating frame), and Trojans librating about L4/L5 (L4 ≈ 1.4× L5). S-types dominate inside 2.5 AU, C-types
