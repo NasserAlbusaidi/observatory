@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built (#192). PR 4c is built: the raider's model (#191) and the rest (`pdc-fx`) in this PR. Phases 5–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built (#192). PR 4c is built: the raider's model (#191) and the rest (#193, `pdc-fx`). Phases 5–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -27,7 +27,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
 | 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f (#188) (the corvette's own model). Phase 3 is complete |
-| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built (#190); 4b (`pdc-mounts`) built (#192); 4c built (the raider's model #191; `pdc-fx` in this PR) |
+| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built (#190); 4b (`pdc-mounts`) built (#192); 4c built (the raider's model #191; `pdc-fx` #193) |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
 
@@ -848,7 +848,7 @@ PR 3a depends on D1-D6 and D11. Each has a safe default, the recommendation, so 
 
 ## Phase 4: point defense and damage
 
-Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), the raider's model (4c, part 1) is built (#191), PR 4b is built (#192), and the rest of 4c (`pdc-fx`: the missile flares, the tracers, the kill and hit flashes and the 1× hold) is built in this PR. D1-D15 below are agreed as recommended. The 4a, 4b and 4c build notes under the build plan list where the code goes past or differs from this text.
+Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), the raider's model (4c, part 1) is built (#191), PR 4b is built (#192), and the rest of 4c (`pdc-fx`: the missile flares, the tracers, the kill and hit flashes and the 1× hold) is built (#193). D1-D15 below are agreed as recommended. The 4a, 4b and 4c build notes under the build plan list where the code goes past or differs from this text.
 
 ### The rule
 
@@ -1059,7 +1059,7 @@ F7 opens the dev menu in the editor and in a build started with `-fowdev` (and u
 
 Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
 
-**PR 4a: `raider-missiles`** (needs new art: no. Built in this PR)
+**PR 4a: `raider-missiles`** (needs new art: no. Built: #190)
 - Adds: the missile struct and the raider's fire rule; the aspect hit table; the damage effects and floors; `Slot.Armor`; the Repair row; `CareerSave.damage`; the notes and rows in both shells; the combat rng; recorder fields.
 - Touches: `OpenWorld/Career.Pirates.cs` (fire, drop), new `OpenWorld/Career.Damage.cs`, `OpenWorld/ShipBuild.cs` (slot, catalog, stock picks), `OpenWorld/Career.cs` (`Apply`, save, cabin fail), `OpenWorld/Career.Yard.cs` (repair), `OpenWorld/Signature.cs`, `OpenWorld/Codex.cs`, `OpenWorld/Career.Heat.cs` (jam), `Scenes/OpenSystemScene.Yard.cs`, `.CareerHud.cs`, `.Recorder.cs`, new `CareerQA.Defense.cs`.
 - QA:
@@ -1210,7 +1210,7 @@ Ordered by size. Your list put the destroyer first.
 | `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The corvette's own model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Built (#188) |
 | `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | 4a built (#190: missiles, armor, damage, repairs); 4b built (#192: PDC mounts, kills, mount hits, boarding rule) |
 | `OpenSystemScene.RaiderHud.cs:104-131`, `OpenSystemScene.Career.cs` (`LateRunner`) | The raider is a 5 px dot and a tag | `LateRaider`: the pirate `Ship` as `CourierShip` (`Fleet.json`, 45.63 m), spawned and destroyed with the chase; the spawn shared with `LateRunner` (`SpawnCraft`) | 4 (4c, part 1) | Built (#191): QA in `CareerQA.RaiderModel.cs` |
-| `Career.Pirates.cs` (`WarpCap`), `OpenSystemScene.cs` (`TickInner`), `.Pirates.cs` (`CapWarp`), `OpenSystemScene.Missiles.cs` (new) | Missiles and PDCs are rows and notes only; the chase holds 100× to the impact | The flares, the tracers, the hit and kill flashes; 1× for the last 20 s before an impact | 4 (4c, part 2) | Built in this PR (`pdc-fx`): QA in `CareerQA.MissileFx.cs` |
+| `Career.Pirates.cs` (`WarpCap`), `OpenSystemScene.cs` (`TickInner`), `.Pirates.cs` (`CapWarp`), `OpenSystemScene.Missiles.cs` (new) | Missiles and PDCs are rows and notes only; the chase holds 100× to the impact | The flares, the tracers, the hit and kill flashes; 1× for the last 20 s before an impact | 4 (4c, part 2) | Built (#193, `pdc-fx`): QA in `CareerQA.MissileFx.cs` |
 | `Ship.cs:19-21`, `:44` | `RcsAccel`, `AngAccel`, `MaxRate`, `Ve` are `const` | Per instance (hulls, torpedoes) | 5–6 | — |
 
 ## Decisions (agreed 2026-10-06)
@@ -1220,4 +1220,4 @@ Ordered by size. Your list put the destroyer first.
 3. **Where stealth goes.** Right after Phase 2, as in the table. It needs signatures only.
 4. **Where the yards are.** Every port refits. Only big yards sell hulls: Earth, Mars, Ceres [design]. Phase 1 has one hull, so the hull rule waits for the second hull (Phase 3).
 
-Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built (#188). Phase 3 is complete. Phase 4 is designed and its decisions are agreed. PR 4a is built (#190). PR 4b is built in this PR.
+Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built (#188). Phase 3 is complete. Phase 4 is designed and its decisions are agreed. PR 4a is built (#190). PR 4b is built (#192). PR 4c is built (#191, #193).
