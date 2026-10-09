@@ -27,6 +27,7 @@ namespace FogOfWar
             string what = s == Slot.Drive ? $"{m.Name} {m.Size:0.0} MN, {m.Mass:0.#} t" + (m.Size > ShipBuild.Rated(3) ? " (juice: fictional)" : "")
                 : s == Slot.Sensors ? m.Name + (m.Size > 0 ? ": ×2 scan and contact range, ½ scan time" : "")
                 : s == Slot.Radiators ? m.Name + (m.Size < 1 ? $", {m.Mass:0.#} t: stowed after a burn, cold at {Km(Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(m.Size * (yardDraft ?? career.Build).Hull.Facet)))}" : ": always out")
+                : s == Slot.Armor ? m.Name + (m.Size > 0 ? $", {m.Mass:0.#} t: stops {m.Size * 100:0} % of missile hits" : "")
                 : m.Name + (m.Mass > 0 ? $", {m.Mass:0.#} t" : "");
             return what + (career.Build.pick[(int)s] == i ? " (fitted)" : "");
         }
@@ -83,6 +84,14 @@ namespace FogOfWar
             if (career.RefitTo(ship, d)) yardDraft = null;
         }
 
+        // combat 4a: the Repair row while anything is damaged: every hit at once, its cost and days, or why not; null with none
+        string RepairLine(out bool can)
+        {
+            can = career.CanRepair(out string why, out double cost, out double days);
+            if (why == "no damage") return null;
+            return $"Repair all: {cost:N0} cr, {Days(days)} in the yard" + (can ? "" : $": {why}");
+        }
+
         // ---------------------------------------------------------------- classic panel
 
         void YardPanel(PanelUI ui)
@@ -92,6 +101,13 @@ namespace FogOfWar
             ui.Section("Yard");
             if (Event.current.type == EventType.Repaint) { classicYardY = GUILayoutUtility.GetLastRect().y; classicYardFrame = Time.frameCount; }
             if (YardLine() is string yard) GUILayout.Label(yard, ui.label);
+            classicRepair = "-";
+            if (RepairLine(out bool canFix) is string fix)
+            {
+                GUILayout.Label("Damage: " + career.DamageText(), ui.label);
+                classicRepair = canFix ? fix : fix + " (can't)";
+                if (ui.Button(classicRepair) && canFix) career.Repair(ship);
+            }
             if (career.Docked?.HullSale == true)
             {
                 var hulls = ShipBuild.Hulls;
@@ -126,7 +142,8 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- shell
 
-        Label yardHead;
+        Label yardHead, repairBtn;
+        string classicRepair = "-"; // review checks: the Repair button the classic panel drew last
         // review shots: where the classic panel drew the yard's head (scroll content space) and in which frame
         float classicYardY = -1;
         int classicYardFrame = -1;
@@ -137,6 +154,13 @@ namespace FogOfWar
             if (d == null) return;
             yardHead = Ui.Section(c, "Yard");
             if (YardLine() is string yard) Ui.L(c, yard, "t-body", "warn");
+            repairBtn = null;
+            if (RepairLine(out bool canFix) is string fix)
+            {
+                Ui.L(c, "Damage: " + career.DamageText(), "t-body", "warn").style.marginTop = 4;
+                repairBtn = Ui.B(c, fix, () => { career.Repair(ship); jobsT = 0; }, "small", canFix ? "primary" : "disabled");
+                repairBtn.style.alignSelf = Align.FlexStart; repairBtn.style.marginTop = 4;
+            }
             if (career.Docked?.HullSale == true)
             {
                 var hulls = ShipBuild.Hulls;
@@ -177,6 +201,16 @@ namespace FogOfWar
             d.pick[(int)Slot.Drive] = 3; d.pick[(int)Slot.Tank] = 0;
         }
         public void TestYardScroll() { if (yardHead != null && pageJobs is ScrollView sv) sv.scrollOffset = new Vector2(0, yardHead.worldBound.y - sv.contentContainer.worldBound.y); }
+        // review shots: one drive hit (combat 4a), so the yard shows the Repair row; false repairs it for free
+        public void TestDamage(bool on)
+        {
+            career.Damage = on ? new ShipDamage { drive = 1 } : new ShipDamage();
+            career.Apply(ship);
+            jobsT = 0;
+        }
+        // review checks: the Repair button in the UI Toolkit yard (- when not shown) and in the classic panel
+        public string TestRepairReport() => repairBtn?.panel != null ? repairBtn.text : "-";
+        public string TestClassicRepairReport() => classicRepair;
         public string TestYardReport() => yardDraft == null ? "no draft (not docked?)" : YardReportText() + $" | shown {yardHead?.panel != null}";
         // the classic panel: drawn in this frame or the one before, and the head's y in the panel's scroll content
         public string TestClassicYardReport(out float headY)

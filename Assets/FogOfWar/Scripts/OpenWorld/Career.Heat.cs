@@ -19,8 +19,8 @@ namespace FogOfWar.OpenWorld
 
         // how long a raider keeps the track with the radiators out
         public double OutHoldS => Signature.TrackHoldS * Build.OutRho;
-        // stowable radiators, water aboard and room in the sink: a raider's hold is DarkRho of TrackHoldS
-        public bool DarkReady(Ship ship) => !Sandbox && Build.Stowable && ship.Fuel > 0 && SinkK < SinkMaxK;
+        // stowable radiators not jammed out (4a), water aboard and room in the sink: a raider's hold is DarkRho of TrackHoldS
+        public bool DarkReady(Ship ship) => !Sandbox && Build.Stowable && !Damage.radiators && ship.Fuel > 0 && SinkK < SinkMaxK;
         public double HoldS(Ship ship) => DarkReady(ship) ? Signature.TrackHoldS * Build.DarkRho : OutHoldS;
         // the radiators are stowed now: dark-ready, not docked, quiet, and inside the OutHoldS window or a chase is on
         public bool Stowed(Ship ship, double jd) => DarkReady(ship) && Docked == null && !LoudNow(ship) && ((jd - ship.LastLoudJd) * 86400 < OutHoldS || Encounter != null);
@@ -37,7 +37,7 @@ namespace FogOfWar.OpenWorld
         {
             fillJd = double.NaN;
             if (Docked != null) { SinkK = 0; return; }                     // the port's loop takes the heat
-            if (!Build.Stowable || simDt <= 0 || !spanOk) return;
+            if (!Build.Stowable || Damage.radiators || simDt <= 0 || !spanOk) return; // jammed out (4a): they reject the load, as fixed ones do
             if (ship.Fuel <= 0) { SinkK = SinkMaxK; return; }               // no water, no sink: radiators out
             double s = Encounter != null ? simDt - Math.Max(0, ship.LoudSeconds - spanLoud)
                                          : (Math.Min(jd, ship.LastLoudJd + OutHoldS / 86400) - Math.Max(spanJd, ship.LastLoudJd)) * 86400;

@@ -18,6 +18,8 @@ namespace FogOfWar.OpenWorld
         public double Hopeless;              // seconds the catch has stayed out of reach (#98), reset when it comes back
         public double FixJd;                 // 3b: the raider's last fix on the ship: the call, then every update it can see the hull (not saved)
         public double Range, Vrel;           // from the player at the last career update
+        public readonly List<Missile> Missiles = new List<Missile>(); // 4a: in flight (Career.Damage.cs); the chase's end drops them
+        public int Magazine = Career.MagazineSize;                     // 4a: missiles it has left
         internal readonly SolarSystem Sys;   // the system the proxy is in
         D3 pos, vel, acc;
         double at;
@@ -192,6 +194,7 @@ namespace FogOfWar.OpenWorld
                 Text = $"The {Raiders} had a ship, the {hull}, waiting {(pos - sys.Pos(lair, jd)).Mag:N0} km off {lair.Name}." + SeenLine(ship, pos, jd) +
                        $" At {PirateG:0} g it can be alongside in " +
                        $"about {Span(catchS / 86400)}, and {Span(Threat.BoardingSeconds / 86400)} alongside is a boarding: it takes {takes}. " +
+                       $"It carries {MagazineSize} missiles to cripple the drive. " +
                        "Run: burn hard, or dock first. " +
                        (DarkReady(ship) && SinkLeftS(ship) >= HoldS(ship) ? $"Or go dark: cut the drive and coast {Signature.HoldText(HoldS(ship))} out of its sight. " : "") +
                        (port != null ? $"Divert: {port.Name} is {Span(divertS / 86400)} away at full burn, in the {Factions[(int)port.Owner].Name} patrol's reach. " : "") +
@@ -213,9 +216,9 @@ namespace FogOfWar.OpenWorld
             return Encounter;
         }
 
-        // Each update: a docked or landed ship is safe, a patrol in reach drives the raider off, and one alongside boards at
-        // Threat.BoardingSeconds. Alongside is Career.Intercept's rule (InterceptKm and InterceptKms, any throttle, at most
-        // 30 s a frame), and any break resets the clock.
+        // Each update: a docked or landed ship is safe, a patrol in reach drives the raider off, its missiles fly (4a,
+        // Volley), and one alongside boards at Threat.BoardingSeconds. Alongside is Career.Intercept's rule (InterceptKm and
+        // InterceptKms, any throttle, at most 30 s a frame), and any break resets the clock.
         void Contacts(SolarSystem sys, Ship ship, double jd, double simDt)
         {
             // D8: a load dropped a chase (FromSave, LostContact)
@@ -244,6 +247,9 @@ namespace FogOfWar.OpenWorld
             double lose = LoseInS(ship, jd);
             if (double.IsNaN(lose)) e.FixJd = jd;
             else if (lose <= 0) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Lost, null, Haven()), true, jd); return; }
+            Volley(e, ship, jd, simDt);
+            // a cabin hit failed the chase's passenger job
+            if (!Active.Contains(e.Job)) { EndContact(Happening.RaiderGone, OffNote(BreakOff.JobOver, null, Haven()), true, jd); return; }
             if (!alongside) { e.Dwell = 0; return; }
             e.Dwell += Math.Min(simDt, 30);
             if (e.Dwell < Threat.BoardingSeconds) return;

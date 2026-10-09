@@ -63,6 +63,7 @@ namespace FogOfWar.OpenWorld
         public ShipBuild build;          // the yard's build; saves made before it have none: drive, tank and sensors stand for it
         public double refitJd;           // in the yard until this date; 0 = not
         public double sinkK;             // the heat sink, K above port water (combat Phase 3); 0 for older saves
+        public ShipDamage damage;        // missile hits not yet repaired (combat Phase 4); null for older saves: none
     }
 
     // The trucker career: credits, reaction mass, ports, contracts and upgrades. Plain data and rules, no UI; the scene
@@ -134,7 +135,8 @@ namespace FogOfWar.OpenWorld
 
         public double TankCapacity => Build.TankCapacity;
         public double DryMass => Build.DryMass;
-        public double Thrust => Build.Thrust;
+        // the drive as it works now: the fitted thrust less its missile hits (combat Phase 4). The yard reads the build
+        public double Thrust => Build.Thrust * DriveFactor;
         public double HoldTonnes => Build.HoldTonnes;
         public int PeopleAboard { get { int n = 0; foreach (var c in Active) if (c.Kind == JobKind.Passengers) n += c.People; return n; } }
         public bool CarryingPassengers => Active.Exists(c => c.Kind == JobKind.Passengers);
@@ -149,7 +151,7 @@ namespace FogOfWar.OpenWorld
 
         // Gameplay events for sound and HUD hooks: (what happened, the notice text). Fired on the main thread from Tick or a
         // player action. Docked/Undocked/TankDry carry the port name or an empty string.
-        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned, Standing, Boarded, RaiderGone }
+        public enum Happening { JobAccepted, JobPaid, JobFailed, Visited, Scanned, Achievement, FuelBought, EmergencyTender, Upgrade, Docked, Undocked, TankDry, RescueDone, SurveyDone, InterceptDone, RouteCall, ShipPayment, ShipOwned, Standing, Boarded, RaiderGone, MissileFired, MissileHit }
         public event Action<Happening, string> OnEvent;
 
         void Say(Happening what, string text, bool good = true)
@@ -175,6 +177,7 @@ namespace FogOfWar.OpenWorld
         {
             ship.UnlimitedFuel = Sandbox;
             Codex.SensorLevel = Build.SensorLevel;
+            Codex.SensorFactor = SensorFactor;
             ship.InYard = InYard;
             if (Sandbox) { ship.Cargo = 0; ship.Thrust = 0; return; }
             ship.Thrust = Thrust;
@@ -698,7 +701,7 @@ namespace FogOfWar.OpenWorld
 
         public CareerSave ToSave(Ship ship) => new CareerSave
         {
-            credits = Credits, earned = Earned, fuel = ship.Fuel, build = Build.Clone(), refitJd = RefitJd, sinkK = SinkK, nextId = nextId,
+            credits = Credits, earned = Earned, fuel = ship.Fuel, build = Build.Clone(), refitJd = RefitJd, sinkK = SinkK, damage = Damage.Clone(), nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
             shipPaid = ShipPaid, startJd = StartJd, standing = (int[])this.standing.Clone(),
             taken = new List<string>(this.taken),
@@ -727,6 +730,7 @@ namespace FogOfWar.OpenWorld
             Fill(Codex.Visited, s.visited); Fill(Codex.Scanned, s.scanned); Fill(Codex.Achieved, s.achieved); Fill(Codex.DockedAt, s.dockedAt);
             ship.Fuel = s.fuel;
             SinkK = double.IsNaN(s.sinkK) ? 0 : Math.Max(0, Math.Min(SinkMaxK, s.sinkK));
+            Damage = Cleaned(s.damage, Build);
             Apply(ship);
         }
     }

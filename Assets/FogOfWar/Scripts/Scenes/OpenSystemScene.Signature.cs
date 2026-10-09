@@ -41,6 +41,7 @@ namespace FogOfWar
             {
                 double k = career.SinkK, left = career.SinkLeftS(ship);
                 if (career.Docked != null) list.Add(new Readout("Heat sink", "0 of 100 K: the port takes the heat"));
+                else if (career.Damage.radiators) list.Add(new Readout("Heat sink", $"radiators jammed out: tracked {Signature.HoldText(career.OutHoldS)} after a burn", Tone.Bad));
                 else if (!career.DarkReady(ship)) list.Add(new Readout("Heat sink", $"full: radiators out, tracked {Signature.HoldText(career.OutHoldS)} after a burn", Tone.Bad));
                 else if (career.Stowed(ship, jd)) list.Add(new Readout("Heat sink", $"{k:0} of 100 K, radiators stowed, {Dur(left)} dark left", Tone.Cold));
                 else list.Add(new Readout("Heat sink", $"{k:0} of 100 K, radiators out, {Dur(left)} dark left"));
@@ -58,6 +59,15 @@ namespace FogOfWar
                 list.Add(holds ? new Readout("Raider track", "it has your track", Tone.Bad)
                                        : new Readout("Raider track", $"it loses you in {Math.Floor(Math.Max(0, lose) / 60):0}:{Math.Floor(Math.Max(0, lose) % 60):00} if you stay dark", Tone.Cold));
             }
+            // combat 4a: the salvo in flight (it closes at MissileKms, so the nearest hits first) and what the hits have taken
+            if (career?.Encounter is Encounter en && en.Missiles.Count > 0)
+            {
+                double km = double.MaxValue;
+                foreach (var m in en.Missiles) km = Math.Min(km, m.P.Mag);
+                double t = km / Career.MissileKms;
+                list.Add(new Readout("Missiles", $"{en.Missiles.Count} inbound, impact in {Math.Floor(t / 60):0}:{Math.Floor(t % 60):00}; {en.Magazine} left aboard the raider", Tone.Bad));
+            }
+            if (career != null && career.DamageText() is string dmg) list.Add(new Readout("Damage", dmg + ": any port repairs it", Tone.Bad));
             if (traffic != null) list.Add(new Readout("Contacts", $"sensed: {traffic.SeenCount} of {traffic.Flying.Count} in flight"));
         }
 

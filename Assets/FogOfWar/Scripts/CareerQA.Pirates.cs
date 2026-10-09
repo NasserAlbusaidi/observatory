@@ -469,9 +469,11 @@ namespace FogOfWar
                 $"pirates: a chase that comes in reach of the Ceres patrol breaks off ({c.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
         }
 
-        // the pirate kept alongside by hand: off the ship, matched (or dvel along off), after the ship's own 30 s step
+        // the pirate kept alongside by hand: off the ship, matched (or dvel along off), after the ship's own 30 s step. Its
+        // magazine is empty: these are W4's boarding checks, and 4a's missiles are section 17's (CareerQA.Defense.cs)
         static void Alongside(Bench b, Encounter e, D3 off, double dvel = 0)
         {
+            e.Magazine = 0;
             b.Ship.Step(b.Sys, b.Jd, 30, b.Sys.Sun);
             e.Pirate.Pos = b.Ship.Pos + off; e.Pirate.Vel = b.Ship.Vel + off.Norm * dvel;
             b.Tick(30);

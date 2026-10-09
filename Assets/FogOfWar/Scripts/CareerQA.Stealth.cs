@@ -111,16 +111,16 @@ namespace FogOfWar
             var stock = ShipBuild.Stock();
             var st = ShipBuild.Stock();
             st.pick[(int)Slot.Radiators] = 1;
-            Check(ShipBuild.StockPick.Length == 6 && ShipBuild.StockPick[5] == 0 && !stock.Stowable && Near(stock.DryMass, 300, 1e-9),
-                $"stealth: the stock pick has {ShipBuild.StockPick.Length} slots (6), radiators pick {ShipBuild.StockPick[ShipBuild.StockPick.Length - 1]} (0), stock stowable {stock.Stowable} (False), dry {stock.DryMass:0.000000000} t (300 ± 1e-9)");
+            Check(ShipBuild.StockPick.Length == 7 && ShipBuild.StockPick[5] == 0 && !stock.Stowable && Near(stock.DryMass, 300, 1e-9),
+                $"stealth: the stock pick has {ShipBuild.StockPick.Length} slots (7 with 4a's armor), radiators pick {ShipBuild.StockPick[(int)Slot.Radiators]} (0), stock stowable {stock.Stowable} (False), dry {stock.DryMass:0.000000000} t (300 ± 1e-9)");
             Check(Near(st.DryMass, 312, 1e-9) && Near(st.GFull, 0.9765625, 1e-9) && Near(st.GEmpty, 1.6026, 1e-4) && Near(st.DvFull, 4953.2, 0.1) && Near(st.StowRho, 0.3, 1e-12) && st.Stowable,
                 $"stealth: the stowable build is {st.DryMass:0.000000000} t dry (312 ± 1e-9), {st.GFull:0.0000000000} g full (0.9765625 ± 1e-9), {st.GEmpty:0.000000} g empty (1.6026 ± 1e-4), {st.DvFull:0.000} km/s (4,953.2 ± 0.1), rho {st.StowRho} (0.3), stowable {st.Stowable}");
 
             var old = JsonUtility.FromJson<CareerSave>("{\"build\":{\"hull\":\"FWO-052 light frigate\",\"pick\":[1,1,1,2,0]}}");
             var c = new Career { Sys = sys };
             c.FromSave(old, new Ship());
-            Check(c.Build.pick.Length == 6 && c.Build.pick[5] == 0 && !c.Build.Stowable && c.Build.Hull == ShipBuild.Hulls[0],
-                $"stealth: an old 5-pick build loads as {c.Build.pick.Length} picks ({string.Join(",", c.Build.pick)}), radiators pick {c.Build.pick[c.Build.pick.Length - 1]} (0), stowable {c.Build.Stowable} (False)");
+            Check(c.Build.pick.Length == 7 && c.Build.pick[5] == 0 && !c.Build.Stowable && c.Build.Hull == ShipBuild.Hulls[0],
+                $"stealth: an old 5-pick build loads as {c.Build.pick.Length} picks ({string.Join(",", c.Build.pick)}), radiators pick {c.Build.pick[(int)Slot.Radiators]} (0), stowable {c.Build.Stowable} (False)");
         }
 
         // 16c: updates on a Dark bench, the last loud moment set by hand
@@ -407,6 +407,7 @@ namespace FogOfWar
                 // inside the stowed reach (3,000 km) the raider sees the hull whatever it does
                 var cb = Keep(Dark(qs, at, vel));
                 var ce = Chase(cb, 2000);
+                ce.Magazine = 0; // at FireKm: no salvo here, 4a's missiles are section 17's
                 Ticks(cb, 30);
                 Check(State(cb, ce) == "on" && double.IsNaN(cb.C.LoseInS(cb.Ship, cb.Jd)),
                     $"stealth: a Dark hull, raider 2,000 km off, 3,000 s: chase {State(cb, ce)} (on), range {ce.Range:N0} km (2,000), loses in {Lose(cb)} (NaN), sink {cb.C.SinkK:0.000000} K");

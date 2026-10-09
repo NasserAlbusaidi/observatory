@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below (D1-D15 not agreed yet). Phases 4–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built in this PR. 4b and 4c are not built. Phases 5–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -27,7 +27,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
 | 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f (#188) (the corvette's own model). Phase 3 is complete |
-| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | Designed; not built. Build plan 4a-4c |
+| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built in this PR; 4b and 4c not built |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
 
@@ -848,7 +848,7 @@ PR 3a depends on D1-D6 and D11. Each has a safe default, the recommendation, so 
 
 ## Phase 4: point defense and damage
 
-Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: design only. Nothing in Phase 4 is built. D1-D15 below are not agreed yet.
+Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a (`raider-missiles`) is built in this PR; 4b and 4c are not built. D1-D15 below are agreed as recommended. The 4a build notes under the build plan list where the code goes past or differs from this text.
 
 ### The rule
 
@@ -1045,7 +1045,7 @@ A new slot, `Slot.Armor` [design]. It goes through `DryMass` (`ShipBuild.cs:121`
 
 Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
 
-**PR 4a: `raider-missiles`** (needs new art: no)
+**PR 4a: `raider-missiles`** (needs new art: no. Built in this PR)
 - Adds: the missile struct and the raider's fire rule; the aspect hit table; the damage effects and floors; `Slot.Armor`; the Repair row; `CareerSave.damage`; the notes and rows in both shells; the combat rng; recorder fields.
 - Touches: `OpenWorld/Career.Pirates.cs` (fire, drop), new `OpenWorld/Career.Damage.cs`, `OpenWorld/ShipBuild.cs` (slot, catalog, stock picks), `OpenWorld/Career.cs` (`Apply`, save, cabin fail), `OpenWorld/Career.Yard.cs` (repair), `OpenWorld/Signature.cs`, `OpenWorld/Codex.cs`, `OpenWorld/Career.Heat.cs` (jam), `Scenes/OpenSystemScene.Yard.cs`, `.CareerHud.cs`, `.Recorder.cs`, new `CareerQA.Defense.cs`.
 - QA:
@@ -1058,6 +1058,17 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - `routeRng`'s draw count does not change (5c). Board keys do not move.
   - A save round trip keeps the damage. An old save loads with none.
 - The player notices: a raider that closes now fires. Hits slow the ship and cost water. Plating helps. Any dock repairs.
+- **Built (4a notes).** The code is in `OpenWorld/Career.Damage.cs`; QA is section 17 in `CareerQA.Defense.cs` (17a-17l), chained after the pirate checks in `CareerQA.Start`. Where the code goes past or differs from the text above:
+  - **Hits that count are capped at 2 when they land**, for the drive and the sensors. A third drive hit says "thrust 25 %" and adds nothing to the repair bill. The save clamps to 0-2.
+  - **A repair takes each hit's days**, summed: two drive hits and a jam are 3 days.
+  - **A refit that replaces a damaged part clears its hits** (a new drive is undamaged). The text did not say.
+  - **A tank hit with a dry tank is the hull's.** The empty-system list above leaves the tank out.
+  - **The hold hit** takes from the chase's cargo job, else from the largest cargo job aboard. **The cabin hit** fails the chase's passenger job, else the first one aboard, with a JobFailed note, a failure and the standing loss. When that was the chase's job, the chase ends in the same update ("The job is over").
+  - **Jammed radiators stop the soak** as well as `DarkReady`: they are out, so they reject the load as fixed radiators do. The Heat sink row says "radiators jammed out".
+  - **Readers of the drive.** Damaged (the ship as it flies now): `Career.Thrust` and so `Apply`/`ship.Thrust`, `ship.AMax` (planner, trip card, `CatchNow`, `NearestPatrol`, the route's burn yardstick), `TopG`/`MaxG` (the drive-limit buttons), `AccelAt` (board trip lines, intercept checks) and the HUD's drive lines. As fitted: the yard's `ShipBuild` readouts, `YardTrip`, `ExpressReport` and the "Hard burn" feat (`Codex`, reads `Build.Thrust`). `Apply` only lowers the pilot's limit, so after a repair the pilot raises it again, as after carrying passengers.
+  - **Readers of the sensors.** Damaged: `Codex.SensorRange` (scan range) and `Signature.SensorKm(level, factor)` from the traffic sense. As fitted: the yard's rows. The dwell speed (`Codex.ScanSeconds`, `Career.cs` survey dwell) does not change.
+  - **Notes and events.** New `Happening.MissileFired` and `MissileHit`. "Hit: the plating took it" is a good (cyan) note. The Missiles row reads "2 inbound, impact in m:ss; n left aboard the raider" (4b adds the mounts that bear).
+  - **The classic Repair button** is read by `UiShots` (the classic yard shot, docked at Earth). CareerQA reads the UI Toolkit row; the rows run in both shells.
 
 **PR 4b: `pdc`** (needs new art: no. The markers exist)
 - Adds: `Slot.PointDefense` (D4), `Hull.Mounts`, the arc test, the pass integral, the PDC hit, the boarding rule and `BreakOff.Repelled`, the bearing count in the Missiles row, the `ART-CONTRACT.md` zenith rule.
@@ -1079,7 +1090,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
 
 ### Decisions
 
-None of these is agreed yet. Each has a recommendation.
+All are agreed as recommended.
 
 1. **[4a] D1. What shoots at the player in Phase 4.** Recommend: raiders fire disabling missiles. Alternatives: (a) PDCs only keep a boarder off, with no missiles and no damage (small, but damage waits for Phase 5); (b) a `-fowbattle` arena first (`design-modes.md`, B2), with career play unchanged until later.
 2. **[4a] D2. Missile numbers:** 2,000 km fire range, salvos of 2, a magazine of 6, 2 km/s closing, 20 g jink to 200 m. Recommend, and tune after play.
@@ -1162,7 +1173,7 @@ Ordered by size. Your list put the destroyer first.
 | `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built (#150); 3d built (#184) |
 | `ShipBuild.cs:18-26,43-45,90-94,108,128-129`, `Career.Yard.cs:9-40`, `Career.cs:14,76-79`, `Career.Heat.cs`, `Career.Signature.cs`, `Career.Pirates.cs:261`, `OpenSystemScene.cs:489`, `.Hud.cs:24`, `.CareerHud.cs:230-246`, `.Signature.cs`, `.Yard.cs`, `OpenSystemScene.Hull.cs` (new) | One hull; the cold range and hold are hull-blind | Per-hull stock, price and facet (`OutRho`, `DarkRho`, `OutHoldS`); `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | Built (#185) |
 | `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The corvette's own model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Built (#188) |
-| `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | Designed (4a-4c) |
+| `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | 4a built in this PR (missiles, armor, damage, repairs); 4b and 4c not built |
 | `Ship.cs:19-21`, `:44` | `RcsAccel`, `AngAccel`, `MaxRate`, `Ve` are `const` | Per instance (hulls, torpedoes) | 5–6 | — |
 
 ## Decisions (agreed 2026-10-06)
@@ -1172,4 +1183,4 @@ Ordered by size. Your list put the destroyer first.
 3. **Where stealth goes.** Right after Phase 2, as in the table. It needs signatures only.
 4. **Where the yards are.** Every port refits. Only big yards sell hulls: Earth, Mars, Ceres [design]. Phase 1 has one hull, so the hull rule waits for the second hull (Phase 3).
 
-Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built (#188). Phase 3 is complete. Phase 4 is designed; its decisions are not agreed yet.
+Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built (#188). Phase 3 is complete. Phase 4 is designed and its decisions are agreed. PR 4a is built in this PR.

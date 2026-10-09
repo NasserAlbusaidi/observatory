@@ -31,7 +31,8 @@ namespace FogOfWar.OpenWorld
         public double ScanProgress;                  // seconds on the current scan target
         public string ScanTarget;
 
-        public double SensorRange => SensorLevel > 0 ? 2 : 1;
+        public double SensorFactor = 1;              // missile hits on the sensors (Career.Apply, combat Phase 4): the ranges, not the dwell
+        public double SensorRange => (SensorLevel > 0 ? 2 : 1) * SensorFactor;
         public double ScanSeconds => Career.DwellSeconds / (SensorLevel > 0 ? 2 : 1);
         public double ScanRange(Body b) => Career.ScanRange(b) * SensorRange;
 
@@ -147,7 +148,7 @@ namespace FogOfWar.OpenWorld
             Earn("scan10", Scanned.Count >= 10);
             Earn("scan50", Scanned.Count >= 50);
             Earn("rich", c.Credits >= 100000);
-            Earn("drive3", c.Thrust >= ShipBuild.Rated(3) - 1e-9);
+            Earn("drive3", c.Build.Thrust >= ShipBuild.Rated(3) - 1e-9); // the drive fitted, hits or not
             Earn("landed", ship.Landed != null && ship.Crashed == null); // QA-055: a crash isn't a touchdown
             Earn("fumes", c.Docked != null && ship.Fuel < 5);
             Earn("icarus", au < 0.3);
