@@ -569,8 +569,6 @@ namespace FogOfWar.OpenWorld
                 c.People = 2 + rng.Next(39);
                 c.Title = Riders[rng.Next(Riders.Length)];
                 c.Pay = RefPay(d, c.Load, out c.Days, slack) * 1.5;
-                // passengers ride at 1 g or less: give them the time a 1 g ship needs at least
-                c.Days = Math.Max(c.Days, (1.15 * 2 * Math.Sqrt(d / (PassengerG * Ship.G0)) + 43200) / 86400);
             }
             c.Pay = Math.Round(c.Pay / 100) * 100;
             c.ExpressDays = ExpressDaysFor(d, 0, c.Days);
