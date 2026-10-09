@@ -308,6 +308,47 @@ namespace FogOfWar
                 yield return null;
             }
 
+            // 6d. a board job taken and dropped stays off the day's board through a save and a load (it came back when the
+            // load kept only the active jobs' slots); a save from before the slot list loads as then, and posts it again
+            {
+                var keep = JsonUtility.ToJson(career.ToSave(ship));
+                var posted = career.Board.ConvertAll(b => b.Key);
+                var pick = career.Board.Find(b => career.CanAccept(b, out _));
+                if (pick == null)
+                    Check(false, $"a board job to take at {career.Docked?.Name ?? "no port"}: none of {career.Board.Count} can be accepted ({career.Active.Count} active, {career.CargoTonnes:N0} t aboard)");
+                else
+                {
+                    string key = pick.Key;
+                    career.Accept(pick, jd);
+                    bool took = career.Active.Contains(pick);
+                    career.Abandon(pick);
+                    var sj = JsonUtility.ToJson(career.ToSave(ship));
+                    career.FromSave(JsonUtility.FromJson<CareerSave>(sj), ship);
+                    yield return null;
+                    var after = career.Board.ConvertAll(b => b.Key);
+                    bool off = !after.Contains(key) && after.Count == posted.Count - 1 && after.TrueForAll(posted.Contains);
+                    Check(career.Docked != null && took && off && sj.Contains("\"taken\""),
+                        $"{pick.Title} ({key}) taken and abandoned at {career.Docked?.Name ?? "-"}, saved and loaded: {(off ? "off the board" : "on the board again")}, {after.Count} of {posted.Count} jobs posted");
+                    // a slot from a past day, and one that is not a board slot, go at the next board: the list does not grow
+                    var cs = career.ToSave(ship);
+                    string stale = $"{career.Docked?.Name}/{(long)Math.Floor(jd) - 3}/0";
+                    cs.taken.Add(stale); cs.taken.Add("route/1");
+                    career.FromSave(cs, ship);
+                    yield return null;
+                    var slots = career.ToSave(ship).taken;
+                    Check(slots.Contains(key) && !slots.Contains(stale) && !slots.Contains("route/1"), $"slots kept after the next board: {string.Join(", ", slots)}");
+                    var old = System.Text.RegularExpressions.Regex.Replace(sj, "\"taken\":\\[[^\\]]*\\],", "");
+                    career.FromSave(JsonUtility.FromJson<CareerSave>(old), ship);
+                    yield return null;
+                    // jobs taken here earlier today may come back too: the old save has no slots but the active jobs'
+                    bool back = posted.TrueForAll(k => career.Board.Exists(b => b.Key == k));
+                    Check(back && !old.Contains("\"taken\""), $"a save from before the slot list loads: {career.Board.Count} of {posted.Count} jobs posted, the dropped job {(back ? "posted again" : "missing")}");
+                }
+                career.FromSave(JsonUtility.FromJson<CareerSave>(keep), ship);
+                career.Notes.Clear();
+                yield return null;
+            }
+
         }
     }
 }
