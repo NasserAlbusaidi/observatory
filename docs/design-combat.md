@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built in this PR. Phase 3 is complete. Phases 4–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below (D1-D15 not agreed yet). Phases 4–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -26,8 +26,8 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | W1–W4 | The world ([design-world.md](design-world.md)) | Factions, NPC traffic, threat map, pirates that board you | None | Built |
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
-| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f built in this PR (the corvette's own model). Phase 3 is complete |
-| 4 | Point defense | PDCs, armor, damage | Defense only | — |
+| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f (#188) (the corvette's own model). Phase 3 is complete |
+| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | Designed; not built. Build plan 4a-4c |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
 
@@ -427,7 +427,7 @@ Pirates that board you moved to [design-world.md](design-world.md), phase W4.
 
 ## Phase 3: stealth
 
-This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`) is built in this PR. Phase 3 is complete.
+This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`) is built (#188). Phase 3 is complete.
 
 ### The rule
 
@@ -622,7 +622,7 @@ Example [calc]. The last loud moment is 30 min before a 3,600 s update. Stock: t
 - Built: `Career.Smuggle.cs` holds `ContrabandPayFactor`, `CleanBonus`, `ExposureScale`, `ContrabandGoods`, `Grade`, `ContrabandLine`, `Expose` and `Smuggle`. The goods titles read through `InSentence` on the raider card. The card line reads "pays ×1.25 of the posted pay now" at exposure 0. It shows the grade, not a multiple of plain pay. `Haul` takes `nextId++` for each slot-9 job, so later `Id` values can shift at a posting port. Keys do not move. `Expose` charges each contraband job its own `PirateRate`, but the roll draws one job (`RaidJob`). So the match is exact when the contraband job is the one `RaidJob` returns.
 - **"Caught by the Guard"** (`design-world.md:136`) is not built in Phase 3. Phase 3 has no patrol sensor model. A follow-up can add one: a port with `PatrolG > 0` sees the ship within `RangeKm(P, StockKm, coldW)` of the port body. Then the stowed range matters to a second observer. That PR also adds `ChangeStanding(Faction, int)` (`Career.Factions.cs:57`).
 
-### The hull (3e, last gameplay PR, built, #185) and the art (3f, built in this PR)
+### The hull (3e, last gameplay PR, built, #185) and the art (3f, built, #188)
 
 **The corvette** (3e, built) [design]:
 - Name: "FWO-060 stealth corvette". Length 60 m.
@@ -671,7 +671,7 @@ The frigate keeps `Facet = 1` and price 0, so every pin holds.
   - The camera floor `0.045f` (`OpenSystemScene.Hud.cs:24`) scales by `HullKm() / 0.052f`.
   - `shipLen` comes from the model's bounds (`OpenSystemScene.cs:199`), so the plume scales too.
   - `Model` waited for 3f. 3e added no `Hull.Model` field, because nothing would read it.
-- 3f (built in this PR) is the drop-in for the corvette's own model. It removed "(placeholder model)" from the yard hull row. It added new art:
+- 3f (built, #188) is the drop-in for the corvette's own model. It removed "(placeholder model)" from the yard hull row. It added new art:
   - `Resources/Models/StealthShip.fbx` and its atlas, `Models/StealthShip/StealthShip_{Albedo,Normal,Mask,Emission}.png`.
   - Markers: `Nose`, `Engine`, `Cockpit`, `RCS_<Fore|Aft>_<Up|Down|Left|Right>`, optional `PDC_n`, and new `Radiator_0..3`, modelled deployed with the pivot at the hinge.
   - `Hull.Model = "StealthShip"`.
@@ -814,7 +814,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - A swap with equal picks redraws the Jobs page.
 - The player notices: after the buyout, a 400,000 cr hull at Earth, Mars or Ceres that loses a raider in 12 min. It looks like the frigate, stretched 15 %, until the art lands (3f).
 
-**PR 3f: `stealth-corvette-art`** (needs new art: yes, the corvette's own model. Built in this PR)
+**PR 3f: `stealth-corvette-art`** (needs new art: yes, the corvette's own model. Built, #188)
 - Adds: the model drop-in, `RefreshHullModel()`, the radiator fold, and the `ART-CONTRACT.md` entry.
 - QA:
   - The model loads by name, and every marker is found.
@@ -848,39 +848,254 @@ PR 3a depends on D1-D6 and D11. Each has a safe default, the recommendation, so 
 
 ## Phase 4: point defense and damage
 
+Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: design only. Nothing in Phase 4 is built. D1-D15 below are not agreed yet.
+
+### The rule
+
+- **Raiders shoot to cripple, not to kill.** A raider wants the prize whole. In its last 2,000 km it fires short-range missiles at the ship. A hit takes thrust, water, sensors, a mount or a job. It never destroys the ship.
+- **The player only defends.** PDCs kill missiles in their last 5 km. Armor stops some of the missiles that get through. Attitude sets which mounts bear and which part of the ship a missile meets. The player's own weapons wait for Phase 5.
+- **No hit points.** Damage is a lost part of a system, as in the table below. Any dock repairs it, for credits and days.
+- **PDCs keep a boarder off.** A raider does not hold alongside a working mount that bears on it. When its magazine is empty and it still cannot board, it breaks off.
+- **Every new part is mass.** PDC mounts and armor cost g and fuel on every trip (Decision 1).
+
+**Why raider missiles (D1).** The table says each phase is playable alone. Phase 4 gives the player defense only, so something else must shoot. Today raiders only board (`Career.Pirates.cs:219-253`). Phase 5 gives the *player* missiles. So the hostile missile is Phase 4 code, and Phase 5 reuses it. Alternatives are in D1.
+
+### Corrections to the 2026-10-06 sketch
+
+- **`TransferInProgress` does not drop to 1×.** It caps warp at 100× (`OpenSystemScene.Career.cs:253`). `DropWarp` sets 1×, but the scene reads it after the frame has run (`OpenSystemScene.Career.cs:252`, called from `OpenSystemScene.cs:331`). A Phase 4 cap must act before `simDt` is set, as `CapWarp` does (`OpenSystemScene.Pirates.cs:18-22`, called at `OpenSystemScene.cs:274`).
+- **The F8 recorder does not replay.** It writes a text log and, on F8, the last 10 s and a screenshot (`OpenSystemScene.Recorder.cs:189,231-238`). It logs no other body's position. Phase 4 adds fields to it (D14). It does not add a replay.
+- **`Rails.FirstCrossing` is not the helper.** It needs a gravitating focus (it divides by `mu`, `Rails.cs:90`). A missile pass has none. The pass integral below has its own closed form.
+- **A step can be 5 km long.** The substep floor under a plan is 0.5 s (`OpenSystemScene.Coast.cs:139`). At 10 km/s that is the whole PDC envelope. So the pass is not sampled per step. It is integrated once, at impact (see "The pass").
+- **Passengers cannot dodge.** The 1 g cap is a hard clamp every tick (`Career.cs:143,184`). No job fails for g today. D7 keeps the clamp.
+
+### The missile
+
+A light struct, not a `Ship` (`design-modes.md:162`). It lives in the `Encounter`, so it is not saved, as the chase is not (`Career.cs:706,711`).
+
+| Item | Value | Tag |
+|---|---|---|
+| Fire range `FireKm` | 2,000 km from the ship | [design] |
+| Salvo | 2 missiles. A new salvo only when the last one has resolved | [design] |
+| Magazine | 6 missiles a raider | [design] |
+| Closing speed V | 2 km/s against the ship | [design] |
+| Flight time | 2,000 / 2 = 1,000 s = 16.7 min from `FireKm` | [calc] |
+| Jink | 20 g, random, until 200 m out; then straight to the hit | [design] |
+| Cross-section A | 0.5 m² (what a PDC round must hit to kill it) | [design] |
+
+- **The flight is in the ship's frame.** The missile keeps a position p relative to the ship. Each update moves it V·dt toward the ship. Its own 20 g covers the ship's thrust (5 g at most, `Rated(5)`). So the ship cannot outrun a missile once it is fired [calc].
+- **Impact** is the update where |p| ≤ V·dt. The approach direction is p̂ at that update. It goes into the ship's body frame through `ship.Att` (`Ship.cs:24`, render frame, `Ship.cs:15`).
+- **The raider fires** while the chase is on, the range is under `FireKm`, its magazine is not empty and no salvo is in flight. It needs no aim choice: what it hits depends on the aspect (see Damage).
+- **The chase ends, the missiles go.** `EndContact` and `DropContact` drop missiles in flight (`Career.Pirates.cs:367-387`). Docked, landed, patrol, lost, outrun and boarded all end the chase.
+- **Kzinti's lesson waits** (D13). A lit drive does not burn missiles in Phase 4.
+
 ### PDCs
 
-- Mounts go on the `PDC_0..5` markers of `PlayerShip.json`. Each mount has an arc. Ship attitude sets which mounts bear.
-- **Position spread:** r = ½·a·t², where t = range / round speed.
-- With 2 km/s rounds and a torpedo that jinks at 20 g [design], the spread is [calc]:
-  - 25 m at 1 km.
-  - 98 m at 2 km.
-  - 613 m at 5 km.
-- So a PDC is a weapon for the last 2 km.
-- **Do not simulate rounds.** Use a kill rate: λ = rounds/s × target area / (π·r²), and P_survive = exp(−∫λ dt).
-- **Integrate each pass in closed form.** At 10 km/s closing, the last 5 km take 0.5 s. Per-frame samples miss passes. This is the same problem as issue #6 (`Rails.FirstCrossing`, `Rails.cs:84`).
-- **The torpedo has a choice:** jink to survive the PDCs, or fly straight to hit.
+**Mounts.** A PDC part fits 2, 4 or 6 mounts on the hull's `PDC_n` markers (D4).
+
+| Fit | Markers | Mass | Price | Days |
+|---|---|---|---|---|
+| No PDCs (stock) | none | 0 t | 0 cr | 0.5 |
+| 2 mounts | `PDC_1`, `PDC_5` | 6 t | 60,000 cr | 2 |
+| 4 mounts | + `PDC_2`, `PDC_3` | 12 t | 120,000 cr | 2 |
+| 6 mounts | all six | 18 t | 180,000 cr | 2 |
+
+- 3 t a mount: a 1.5 t gun and a 1.5 t magazine [design].
+- On the frigate `PDC_1` is dorsal fore and `PDC_5` ventral aft. So two mounts cover both sides [code: the FBX markers, read by the search; see the arc note].
+- **Arcs.** Each mount covers a hemisphere about its zenith, the marker's local +Y axis [design]. A mount bears on direction d when zenith · d > 0. The hull does not block in Phase 4 [design].
+- **The arc table is data, not a scene read.** `Career` runs headless in QA. So each `Hull` gets `Mounts`: the six zenith vectors in the body frame. A QA check compares them with the FBX markers (as 16o checks the corvette's markers, `CareerQA.HullArt.cs:92`).
+- **Art contract.** `ART-CONTRACT.md` gets the rule: a `PDC_n` empty's +Y is the turret's zenith. The frigate's `PDC_1` and `PDC_4` have no rotation, so they point up. The search read the FBX axes but did not confirm the up axis. 4b checks it.
+
+**Position spread.** r = r₀ + ½·a·t², t = range / u.
+
+| Item | Value | Tag |
+|---|---|---|
+| Round speed u | 2 km/s | [design] |
+| Rate n | 100 rounds/s a mount | [design] |
+| Aim floor r₀ | 2 m | [design] |
+| Spread at 20 g jink | 6.1 m at 500 m, 24.5 m at 1 km, 98 m at 2 km, 613 m at 5 km (plus r₀) | [calc] |
+
+- So a PDC is a weapon for the last 2 km, as the sketch said.
+- **No ammunition count in Phase 4** [design]. A pass takes 250 rounds a mount (2.5 s × 100) [calc]. Munitions become the money sink in Phase 5 (audit #4).
+
+**The pass.** Do not simulate rounds. Use a kill rate λ = n × A / (π·r²). Then P_survive = exp(−∫λ dt) over the last 5 km.
+
+- At a closing speed V, dt = dx / V. With r = r₀ + c·x² and c = a / (2·u²), the integral has a closed form [calc]:
+  - ∫ dx / (r₀ + c·x²)² = x / (2·r₀·(r₀ + c·x²)) + atan(x·√(c/r₀)) / (2·r₀·√(r₀·c)).
+- The jink runs from 5 km to 200 m. The last 200 m are straight, so r = r₀ there, and the integral is 200 / r₀².
+- With m mounts bearing, the exponent is m × n·A / (π·V) × (I_jink + I_straight).
+- One draw per missile, at impact. The pass takes 2.5 s, so the ship's attitude at impact stands for the whole pass [design].
+
+| Mounts bearing | P(kill) per missile, V = 2 km/s, 20 g jink | Of a 6-missile magazine, missiles through |
+|---|---|---|
+| 0 | 0 | 6 |
+| 1 | 0.42 | 3.5 |
+| 2 | 0.66 | 2.0 |
+| 3 | 0.80 | 1.2 |
+
+[calc] The exponent per mount is 0.139 for the jink and 0.398 for the straight part, 0.537 in all. It is linear in n / V, so the rate and the speed are the tuning knobs.
 
 ### Damage: no hit points
 
-A hit takes fuel, g or a system.
+A missile that gets through hits the ship. Armor rolls first (see Armor). If the armor does not stop it, the aspect picks the system.
 
-| Hit | Effect |
-|---|---|
-| Tank | Reaction mass leaks. The rocket equation does the rest. |
-| Drive | Thrust drops. The planner says you are late. |
-| PDC mount | That arc is open. |
-| Sensors | Detection range drops. |
-| Cabin | Passengers are hurt. The job fails. |
+**Aspect.** The approach direction in the body frame. Fore: within 45° of the nose. Aft: within 45° of the tail. Broadside: the rest [design].
 
-- **Armor is mass.** With Decision 1, it costs g and fuel on every trip.
-- **Passengers cap the ship at 1 g** (`Career.cs:77`). A 5 g dodge with passengers aboard fails the job.
+| System hit | Fore | Broadside | Aft | Effect | Repair |
+|---|---|---|---|---|---|
+| Drive | 0 % | 10 % | 60 % | Thrust × 0.5. Two hits at most: the floor is 25 %, never 0 | 25 % of the drive's price, 1 day |
+| Tank | 20 % | 30 % | 20 % | 20 % of the water aboard vents at once. The rocket equation does the rest | none |
+| Hold | 20 % | 20 % | 0 % | With cargo aboard: 20 % of the cargo and of its pay, as `Take` (`Career.Pirates.cs:357-362`) | none |
+| Cabin | 20 % | 10 % | 0 % | With passengers aboard: they are hurt and the job fails | none |
+| Sensors | 30 % | 10 % | 0 % | Sensor range × 0.5, floor 25 % | 25 % of the part's price, 0.5 day |
+| PDC mount | 10 % | 15 % | 10 % | The working mount nearest the approach is off. Its arc is open | 25 % of a mount's price, 1 day |
+| Radiators | 0 % | 5 % | 10 % | Stowable radiators jam out: not dark-ready | 25 % of the part's price, 1 day |
+
+- **A hit on an empty system hits the hull** [design]. No cargo, no passengers, no mount left, or fixed radiators: a note says "the hull took it", and nothing changes.
+- **Drive.** `Career.Apply` sets `ship.Thrust` from the build (`Career.cs:180`). The drive factor multiplies it there. So the planner and `CatchNow` (`Career.Pirates.cs:307`, through `ship.AMax`) see it. The yard readouts show the build as fitted. The Repair row shows the damage.
+- **Sensors.** The factor goes in `Signature.SensorKm` (`Signature.cs:26`) and `Codex.SensorRange` (`Codex.cs:34`). `Career.cs:431` and `Codex.cs:35` re-derive the level-1 doubling. They must read the same factor.
+- **Cabin.** The passenger job fails as an expired one does (`Career.cs:446-449`): `Failed++`, the job goes, no pay.
+- **Radiators.** `DarkReady` reads the jam (`Career.Heat.cs:23`). So a raider that hits them can no longer be lost (3b).
+- **The raider takes no damage.** It flies with `UnlimitedFuel` and is not saved (`Pursuit.cs:32`). The player has no weapon against it until Phase 5 (D15).
+
+### Armor
+
+A new slot, `Slot.Armor` [design]. It goes through `DryMass` (`ShipBuild.cs:121`), so it costs g on every trip.
+
+| Fit | Mass | Price | Days | Stops a hit |
+|---|---|---|---|---|
+| No armor (stock) | 0 t | 0 cr | 0.5 | 0 % |
+| Light plating | 15 t | 40,000 cr | 2 | 50 % |
+| Heavy plating | 40 t | 100,000 cr | 3 | 80 % |
+
+- Plating does not wear out in Phase 4 [design].
+- **The cost in g** [calc], stock frigate with a 200 t tank:
+
+| Fit | Dry | g full | g empty | Δv |
+|---|---|---|---|---|
+| Stock | 300 t | 1.000 | 1.667 | 5,108 km/s |
+| Light plating | 315 t | 0.971 | 1.587 | 4,916 km/s |
+| Heavy plating | 340 t | 0.926 | 1.471 | 4,626 km/s |
+| 4 mounts | 312 t | 0.977 | 1.603 | 4,953 km/s |
+| 4 mounts, light plating | 327 t | 0.949 | 1.529 | 4,772 km/s |
+| 6 mounts, heavy plating | 358 t | 0.896 | 1.397 | 4,438 km/s |
+
+- **Hits from a full magazine** [calc]: no PDCs and no armor, 6. Three mounts bearing, 1.2 through; with light plating 0.6, with heavy 0.24.
+
+### Repairs
+
+- **Any dock repairs** (Decision 4: every port refits). The yard gets a Repair row: "Repair all", with the cost and the days.
+- Each hit costs 25 % of its part's price, and its days, as in the damage table [design]. The stock drive is 7,500 cr a hit [calc].
+- Days in the yard add to `RefitJd`, as a refit does (`Career.Yard.cs:42`).
+- The sandbox takes no damage: `Tick` returns before the chase (`Career.cs:195`).
+
+### Boarding with PDCs
+
+- The boarding clock runs only while no working mount bears on the raider [design]. The raider holds about 2.05 km off (`Ship.Pursue.cs:25`), inside the PDC envelope.
+- So a ship with working mounts cannot be boarded. The raider's missiles try to change that: PDC hits open arcs, and a turn of the ship can too.
+- **A raider with an empty magazine** that cannot board for `RepelS` = 1 h [design] breaks off: `BreakOff.Repelled`, "PDCs: the raider breaks off".
+- A ship with no PDCs is boarded as in W4. The missiles still cut its thrust, so running is harder.
 
 ### Time warp
 
-- The approach runs at warp: contacts, reach bubbles, plan changes.
-- Drop to 1× only for the last minutes. `DropWarp` and `TransferInProgress` already do this for hand-overs (`Career.Intercept.cs:36-37`).
-- The F8 flight recorder replays the fight.
+- **Missiles resolve in closed form at any warp.** The cap is for the eyes, not for the result.
+- The chase already caps warp at 100× inside 10,000 km (`Career.Pirates.cs:78,104`). So a 1,000 s flight is about 10 s of real time. That is time to turn the ship.
+- **1× for the last 20 s before an impact** [design], through `WarpCap` (`Career.Pirates.cs:97-106`) and `CapWarp`, before `simDt` is set. At 2 km/s the missile is then 40 km out [calc].
+- A route call still drops to 1× (`Career.Route.cs:117`).
+
+### What the player sees
+
+**Notes** (short, one line, as `Career.Pirates.cs:293-296` asks):
+- "Missiles: 2 fired, impact in 17 min"
+- "PDCs killed a missile"
+- "Hit: drive, thrust 50 %" / "Hit: the plating took it" / "Hit: the hull took it"
+- "PDCs: the raider breaks off"
+
+**Rows** in both shells:
+- A Missiles row during a salvo: inbound count, time to impact, mounts that bear.
+- A Damage row when anything is hit: the systems and their factors.
+- Yard: the PDC row, the Armor row, the readouts, and the Repair row.
+- The call card adds one sentence: "It carries 6 missiles to cripple the drive."
+
+**In the scene** (4c):
+- **The raider gets a model.** It is a 5 px dot today (`OpenSystemScene.RaiderHud.cs:104-131`). At 2 km a 46 m hull spans 1.3° [calc], so a dot reads wrong. Use `CourierShip` from `Fleet.json` (45.6 m) [design]. No new art.
+- Missiles: a small flare and its 20 g plume.
+- Tracers from each bearing mount in the last 2.5 s. A kill flash or a hit flash.
+
+### Per-frame cost
+
+- At most 2 missiles. Each update: one vector step each, and 6 dot products for the arcs. The pass integral runs once a missile, at impact. Negligible against traffic (0.59 ms a frame at 1M×, combat-phase2 QA).
+
+### Rng
+
+- Combat draws from its own `System.Random` [design]. `routeRng`'s draw count is checked by QA 5c (`Career.Route.cs:51`). The board's rng is seeded by the dock and the day (`Career.cs:509`). Neither may move.
+
+### Save
+
+- `CareerSave.damage`: the drive and sensor hit counts, the jammed radiators and the mask of dead mounts. A missing field reads as no damage, with the `sinkK` pattern (`Career.cs:65,701,729`).
+- Missiles are not saved. The chase is not saved (`Career.cs:706,711`).
+- The new slots load through `Checked()` (`ShipBuild.cs:109-115`): a 6-pick save gets stock PDC and armor picks.
+
+### QA
+
+- Section 17, in a new partial `CareerQA.Defense.cs`, chained after the pirate checks (14). 16o is the last label today (`CareerQA.HullArt.cs:10`).
+- Every check uses `Check(ok, msg)` (`CareerQA.cs:48`) and logs what it measured.
+- Run `-fowcareer` in the UI Toolkit shell and with `-fowlegacyui`.
+
+### Build plan
+
+Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
+
+**PR 4a: `raider-missiles`** (needs new art: no)
+- Adds: the missile struct and the raider's fire rule; the aspect hit table; the damage effects and floors; `Slot.Armor`; the Repair row; `CareerSave.damage`; the notes and rows in both shells; the combat rng; recorder fields.
+- Touches: `OpenWorld/Career.Pirates.cs` (fire, drop), new `OpenWorld/Career.Damage.cs`, `OpenWorld/ShipBuild.cs` (slot, catalog, stock picks), `OpenWorld/Career.cs` (`Apply`, save, cabin fail), `OpenWorld/Career.Yard.cs` (repair), `OpenWorld/Signature.cs`, `OpenWorld/Codex.cs`, `OpenWorld/Career.Heat.cs` (jam), `Scenes/OpenSystemScene.Yard.cs`, `.CareerHud.cs`, `.Recorder.cs`, new `CareerQA.Defense.cs`.
+- QA:
+  - A raider inside 2,000 km fires 2. The impact is 1,000 s ± one update later. A 6-missile magazine fires 3 salvos.
+  - The aspect table: 10,000 seeded hits per aspect land within 2 % of the weights.
+  - Each effect: thrust 0.5 then 0.25, and a third drive hit stays 0.25; the tank vents 20 %; cargo and pay lose 20 %; a cabin hit fails the passenger job; sensors 0.5; jammed radiators are not dark-ready.
+  - Light plating stops 50 % of 10,000 seeded hits, heavy 80 % (± 2 %).
+  - Repair cost and days equal the formula. A repaired ship has no damage.
+  - Docked or lost ends the chase and drops the missiles.
+  - `routeRng`'s draw count does not change (5c). Board keys do not move.
+  - A save round trip keeps the damage. An old save loads with none.
+- The player notices: a raider that closes now fires. Hits slow the ship and cost water. Plating helps. Any dock repairs.
+
+**PR 4b: `pdc`** (needs new art: no. The markers exist)
+- Adds: `Slot.PointDefense` (D4), `Hull.Mounts`, the arc test, the pass integral, the PDC hit, the boarding rule and `BreakOff.Repelled`, the bearing count in the Missiles row, the `ART-CONTRACT.md` zenith rule.
+- Touches: `OpenWorld/ShipBuild.cs`, `OpenWorld/Career.Damage.cs`, `OpenWorld/Career.Pirates.cs` (`Contacts`, `OffNote`), the yard and HUD in both shells, `CareerQA.Defense.cs`, `CareerQA.HullArt.cs` (mount vectors against the FBX).
+- QA:
+  - The pass integral against a numeric sum of λ·dt (1e5 steps): within 0.1 %.
+  - P(kill) for 1, 2 and 3 mounts is 0.42, 0.66 and 0.80 (± 0.01). 10,000 seeded passes agree within 2 %.
+  - The bearing count for set attitudes: nose on, tail on, broadside, top. Logged for both hulls.
+  - A bearing mount stops the boarding clock. A dead or turned-away mount lets it run.
+  - An empty magazine and 1 h unboarded gives "PDCs: the raider breaks off".
+  - The 6 mount vectors match the FBX markers within 1°.
+- The player notices: PDC mounts in the yard. Missiles die in the last 2 km. A raider cannot board past a working mount.
+
+**PR 4c: `pdc-fx`** (needs new art: no. It reuses `CourierShip`)
+- Adds: the raider's model, the missile flares, the tracers, the kill and hit flashes, and the 1× cap in the last 20 s.
+- Touches: `Scenes/OpenSystemScene.RaiderHud.cs`, new `Scenes/OpenSystemScene.Missiles.cs`, `OpenWorld/Career.Pirates.cs` (`WarpCap`), `Capture/UiShots.cs`.
+- QA: the cap is 1× from 20 s before an impact and lifts after it. Screenshots in both shells: the raider at 2 km, a salvo in flight, tracers.
+- The player notices: the fight is on screen at 1×.
+
+### Decisions
+
+None of these is agreed yet. Each has a recommendation.
+
+1. **[4a] D1. What shoots at the player in Phase 4.** Recommend: raiders fire disabling missiles. Alternatives: (a) PDCs only keep a boarder off, with no missiles and no damage (small, but damage waits for Phase 5); (b) a `-fowbattle` arena first (`design-modes.md`, B2), with career play unchanged until later.
+2. **[4a] D2. Missile numbers:** 2,000 km fire range, salvos of 2, a magazine of 6, 2 km/s closing, 20 g jink to 200 m. Recommend, and tune after play.
+3. **[4b] D3. PDC numbers:** 2 km/s rounds, 100 rounds/s, 0.5 m² target, 2 m floor, hemisphere arcs, no hull blocking, no ammunition count. That gives 0.42, 0.66 and 0.80 for 1, 2 and 3 mounts. Recommend.
+4. **[4b] D4. The PDC part:** 2, 4 or 6 mounts at 3 t and 30,000 cr each, 2 days. Recommend. Alternative: one pick per marker (six yard rows).
+5. **[4a] D5. Armor:** a new slot. Light 15 t, 40,000 cr, stops 50 %; heavy 40 t, 100,000 cr, stops 80 %. No wear. Recommend.
+6. **[4a] D6. Damage effects:** the table above. The drive never goes below 25 %, so no hit strands the ship. The tank vents once, with no lasting leak (no new state). Recommend. Alternative: a leak that runs until a dock.
+7. **[4a] D7. Passengers:** keep the 1 g clamp. A cabin hit fails the job. Recommend. Alternative: allow a dodge over 1 g, and hurt the passengers for it.
+8. **[4a] D8. Repairs:** any dock, 25 % of the part's price a hit, and the part's days. Recommend.
+9. **[4b] D9. Boarding:** a bearing working mount stops the boarding clock. An empty magazine and 1 h without a boarding is a break-off. Recommend.
+10. **[4a] D10. Combat rng** is its own `System.Random`. Recommend: the route and board draws do not move.
+11. **[4c] D11. Warp:** closed form at any warp. 1× for the last 20 s before an impact, for the eyes. Recommend.
+12. **[4c] D12. The raider's model** is `CourierShip` from `Fleet.json`. Recommend. Alternative: a new raider hull (new art, can wait for Phase 6).
+13. **[–] D13. Kzinti's lesson** (a lit drive burns what is behind it) waits for Phase 5. Recommend.
+14. **[4a] D14. The F8 recorder** gets missile and hit fields. No replay. Recommend.
+15. **[–] D15. The raider takes no damage** in Phase 4. Recommend: the player has no weapon until Phase 5.
 
 ## Phase 5: missiles and torpedoes
 
@@ -946,8 +1161,8 @@ Ordered by size. Your list put the destroyer first.
 | `Career.Pirates.cs:10-19,204-246,298-308` | No lose-the-raider rule (D16) | `Encounter.FixJd`, `BreakOff.Lost`, for stowable hulls only | 3 (3b) | Built (3b) |
 | `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built (#150); 3d built (#184) |
 | `ShipBuild.cs:18-26,43-45,90-94,108,128-129`, `Career.Yard.cs:9-40`, `Career.cs:14,76-79`, `Career.Heat.cs`, `Career.Signature.cs`, `Career.Pirates.cs:261`, `OpenSystemScene.cs:489`, `.Hud.cs:24`, `.CareerHud.cs:230-246`, `.Signature.cs`, `.Yard.cs`, `OpenSystemScene.Hull.cs` (new) | One hull; the cold range and hold are hull-blind | Per-hull stock, price and facet (`OutRho`, `DarkRho`, `OutHoldS`); `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | Built (#185) |
-| `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The corvette's own model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Built in this PR |
-| `PlayerShip.json` | `PDC_0..5` unused | PDC mounts | 4 | — |
+| `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The corvette's own model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Built (#188) |
+| `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | Designed (4a-4c) |
 | `Ship.cs:19-21`, `:44` | `RcsAccel`, `AngAccel`, `MaxRate`, `Ve` are `const` | Per instance (hulls, torpedoes) | 5–6 | — |
 
 ## Decisions (agreed 2026-10-06)
@@ -957,4 +1172,4 @@ Ordered by size. Your list put the destroyer first.
 3. **Where stealth goes.** Right after Phase 2, as in the table. It needs signatures only.
 4. **Where the yards are.** Every port refits. Only big yards sell hulls: Earth, Mars, Ceres [design]. Phase 1 has one hull, so the hull rule waits for the second hull (Phase 3).
 
-Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built in this PR. Phase 3 is complete.
+Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is built. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) and PR 3e (#185) are built, with follow-ups #186 and #187. PR 3f is built (#188). Phase 3 is complete. Phase 4 is designed; its decisions are not agreed yet.
