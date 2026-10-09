@@ -1165,6 +1165,54 @@ All are agreed as recommended.
   - Bounty: catch a runner, kill its drive, dock, take the hold.
   - Escort: take one of the six `Fleet.json` hulls through a threat bubble.
 
+### Encounter flow (added 2026-10-09)
+
+From a review of an outside combat audit. Not agreed. Code read on `pdc-design` at e741ea7.
+
+**1. The warp cap follows time, not range.**
+- Today the chase caps warp by range: `ChaseWarp` 1,000×, then `CloseWarp` 100× inside `CloseKm` = 10,000 km (`Career.Pirates.cs:78,104`) [code]. That works for a 1 g raider at matched velocity, which closes slowly.
+- A 50 g torpedo from rest crosses 10,000 km in 202 s [calc]. A range rule does not see it in time.
+- **Rule:** cap = clamp(t / 10 s, 1, `ChaseWarp`). t is the time to the next event [design]. So the next event is always 10 s of real time away or more.
+- **Events:** an impact; a raider at `FireKm`; a target inside a weapon's reach; the player's own planned burn or flip; the end of a transfer.
+- Phase 4 falls out of it: a 1,000 s missile flight gives 100× [calc], the same as `CloseWarp`. D11 keeps its 1× floor for the last 20 s.
+- The cap sets the frame size only. Every result resolves in closed form, as the Phase 4 missile does.
+
+**2. A warp drop is a decision.**
+- Today a cap only slows the clock. The player learns why from the notes.
+- When a new event lowers the cap by a step or more, the scene drops to 1× and shows a card, as a route call does (`Career.Route.cs:117`) [code]. New events: a launch, a new contact, a target's change of burn.
+- The card has four parts:
+  - What: "Torpedo launch, 2 inbound."
+  - When: "Impact in 3 min 20 s."
+  - The plan: "Intercept still feasible" or "Intercept lost".
+  - Answers: Continue; Evade (turn for the most bearing mounts, or burn away); Revise (open the planner).
+- Only events the ship's sensors see. A hidden launch gives no card (Phase 2: hidden means absent).
+
+**3. The board shows the fight before the player takes it.**
+- Intercept jobs already post only what the ship can catch (`Catchable`, `Career.Intercept.cs:89`). They give the reaction mass (`NeedTonnes`, `:22`) [code].
+- Bounty and escort jobs reuse both and add:
+  - The time to the rendezvous with the current build.
+  - The water left after the rendezvous.
+  - The threat: hull class, missiles if known, PDC mounts.
+  - The track age: "Last burn seen 12 min ago" (Phase 3 track memory).
+- So a player who wants a fight takes one from the board. They do not wait for a raider call.
+
+**4. The gear must pay for itself.**
+- Two free answers beat a raider today: go dark (Phase 3 calls 36 min dark "cheap") and dock first.
+- Phase 4 gear costs 60,000–180,000 cr for PDCs and 40,000–100,000 cr for plating. It also costs g and fuel on every trip.
+- If the free answers always win, nobody fits the gear. The jobs that pay well must close the free answers:
+  - Escort: the charge cannot go dark and cannot dock early.
+  - Bounty: the player must catch the runner. Hiding does not help.
+- **Check before Phase 5 is agreed:** in a normal career, compare the raider calls per trip × the expected loss (`BoardShare`, 50 % of the pay) with the price of a PDC fit. Use a `-fowcareer` report line or a playtest log.
+
+**5. NPCs have different goals.** New goals need no new hulls. They fly `Fleet.json` hulls.
+
+| Doctrine | Wants | Fights when | Breaks off when |
+|---|---|---|---|
+| Raider (W4, Phase 4) | The prize, whole | It closes to `FireKm` | Repelled, magazine empty, or `GiveUpS` |
+| Escort | Its charge to arrive | A threat comes near the charge | Never more than 10,000 km from the charge [design] |
+| Interceptor (navy, hunter) | To keep the player from a place | It is between the player and the place | The player leaves its zone |
+| Runner (bounty target) | To reach a port | It is caught | It docks |
+
 ## Phase 6: the hull ladder
 
 Ordered by size. Your list put the destroyer first.
