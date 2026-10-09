@@ -890,20 +890,19 @@ A light struct, not a `Ship` (`design-modes.md:162`). It lives in the `Encounter
 
 ### PDCs
 
-**Mounts.** A PDC part fits 2, 4 or 6 mounts on the hull's `PDC_n` markers (D4).
+**Mounts.** A PDC part fits 2, 4 or 6 mounts on the hull's `PDC_n` markers (D4). Each hull fits them in its own order, `Hull.MountFit` [design]. Each 2-mount pair has opposite zeniths.
 
-| Fit | Markers | Mass | Price | Days |
-|---|---|---|---|---|
-| No PDCs (stock) | none | 0 t | 0 cr | 0.5 |
-| 2 mounts | `PDC_1`, `PDC_5` | 6 t | 60,000 cr | 2 |
-| 4 mounts | + `PDC_2`, `PDC_3` | 12 t | 120,000 cr | 2 |
-| 6 mounts | all six | 18 t | 180,000 cr | 2 |
+| Fit | Frigate markers | Corvette markers | Mass | Price | Days |
+|---|---|---|---|---|---|
+| No PDCs (stock) | none | none | 0 t | 0 cr | 0.5 |
+| 2 mounts | `PDC_1`, `PDC_5` | `PDC_2`, `PDC_5` | 6 t | 60,000 cr | 2 |
+| 4 mounts | + `PDC_2`, `PDC_3` | + `PDC_3`, `PDC_4` | 12 t | 120,000 cr | 2 |
+| 6 mounts | all six | all six | 18 t | 180,000 cr | 2 |
 
 - 3 t a mount: a 1.5 t gun and a 1.5 t magazine [design].
-- On the frigate `PDC_1` is dorsal fore and `PDC_5` ventral aft, their zeniths opposite. So two mounts cover both sides, except on the ship's horizontal plane: dead ahead, dead astern or square on a beam, neither bears [code: the FBX markers, measured by QA 17t and 17s].
-- **On the corvette `PDC_1` + `PDC_5` do not cover both sides.** `PDC_1` is dorsal aft and `PDC_5` points to starboard, 28.8° below the beam. A missile from port, or from port and low, meets neither. The corvette's opposite pairs are `PDC_2` + `PDC_5` and `PDC_3` + `PDC_4` (0.2° from opposite). The slot (4b, part 2) must pick the 2-mount markers per hull [code: QA 17s, 17t].
-- **No zenith on either hull leans fore or aft.** So on exactly the nose or the tail no mount bears, in any fit (zenith · d = 0). At 10° off the axis, 4 of 6 bear from above and 2 from below on both hulls [code: QA 17s].
-- **Arcs.** Each mount covers a hemisphere about its zenith, the marker's local +Y axis [design]. A mount bears on direction d when zenith · d > 0. The hull does not block in Phase 4 [design].
+- **The 2-mount pairs.** On the frigate `PDC_1` is dorsal fore and `PDC_5` ventral aft, their zeniths opposite. The corvette has no ventral marker: its `PDC_1` is dorsal aft and its `PDC_5` points to starboard, 28.8° below the beam. So its pair is `PDC_2` (port, 29° above the beam) and `PDC_5`, 0.2° from opposite [code: the FBX markers, measured by QA 17t; checked by 17s].
+- **Arcs.** Each mount covers 100° about its zenith, the marker's local +Y axis: a hemisphere and 10° more (`PointDefense.ArcDeg`) [design]. A mount bears on direction d when zenith · d > −sin 10° (−0.1736). The hull does not block in Phase 4 [design].
+- **Why 100°.** No zenith on either hull leans fore or aft. With a bare hemisphere, a missile dead on the nose or the tail is on every mount's horizon and none bears. With 100°, all fitted mounts bear there. A 2-mount pair then always has at least one mount bearing, and both bear within 10° of the plane square to the pair (the frigate's horizontal plane; the corvette's is tilted 29°) [code: QA 17s].
 - **The arc table is data, not a scene read.** `Career` runs headless in QA. So each `Hull` gets `Mounts`: the six zenith vectors in the body frame. A QA check compares them with the FBX markers (as 16o checks the corvette's markers, `CareerQA.HullArt.cs:92`).
 - **Art contract.** `ART-CONTRACT.md` gets the rule: a `PDC_n` empty's +Y is the turret's zenith. The frigate's `PDC_1` and `PDC_4` have no rotation, so they point up. QA 17t confirms the up axis on both hulls: each marker's +Y matches `Hull.Mounts` within 0.04°.
 
@@ -1099,8 +1098,8 @@ All are agreed as recommended.
 
 1. **[4a] D1. What shoots at the player in Phase 4.** Recommend: raiders fire disabling missiles. Alternatives: (a) PDCs only keep a boarder off, with no missiles and no damage (small, but damage waits for Phase 5); (b) a `-fowbattle` arena first (`design-modes.md`, B2), with career play unchanged until later.
 2. **[4a] D2. Missile numbers:** 2,000 km fire range, salvos of 2, a magazine of 6, 2 km/s closing, 20 g jink to 200 m. Recommend, and tune after play.
-3. **[4b] D3. PDC numbers:** 2 km/s rounds, 100 rounds/s, 0.5 m² target, 2 m floor, hemisphere arcs, no hull blocking, no ammunition count. That gives 0.42, 0.66 and 0.80 for 1, 2 and 3 mounts. Recommend.
-4. **[4b] D4. The PDC part:** 2, 4 or 6 mounts at 3 t and 30,000 cr each, 2 days. Recommend. Alternative: one pick per marker (six yard rows).
+3. **[4b] D3. PDC numbers:** 2 km/s rounds, 100 rounds/s, 0.5 m² target, 2 m floor, 100° arcs (a hemisphere and 10°), no hull blocking, no ammunition count. That gives 0.42, 0.66 and 0.80 for 1, 2 and 3 mounts. Recommend.
+4. **[4b] D4. The PDC part:** 2, 4 or 6 mounts at 3 t and 30,000 cr each, 2 days, in each hull's own fit order (`Hull.MountFit`). Recommend. Alternative: one pick per marker (six yard rows).
 5. **[4a] D5. Armor:** a new slot. Light 15 t, 40,000 cr, stops 50 %; heavy 40 t, 100,000 cr, stops 80 %. No wear. Recommend.
 6. **[4a] D6. Damage effects:** the table above. The drive never goes below 25 %, so no hit strands the ship. The tank vents once, with no lasting leak (no new state). Recommend. Alternative: a leak that runs until a dock.
 7. **[4a] D7. Passengers:** keep the 1 g clamp. A cabin hit fails the job. Recommend. Alternative: allow a dodge over 1 g, and hurt the passengers for it.

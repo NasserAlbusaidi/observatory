@@ -27,6 +27,7 @@ namespace FogOfWar.OpenWorld
         // PDC_0..5's zeniths (PointDefense.Bears). Body frame, as Ship.Att's: x right, y up, z the nose (Heading = Att·forward).
         // Each is the marker's local +Y with the model placed as the scene places it (RefreshHullModel aligns Nose to +Z).
         public UnityEngine.Vector3[] Mounts;
+        public int[] MountFit;     // the order a PDC part fits the markers in: its first 2, 4 or 6. Each 2-mount pair is opposite
     }
 
     // The ship as the yard sees it: one hull and one module in each slot (combat design, Phase 1). Every module is mass,
@@ -57,12 +58,15 @@ namespace FogOfWar.OpenWorld
             new UnityEngine.Vector3(-0.87462f, 0.48481f, 0), new UnityEngine.Vector3(0.87462f, 0.48481f, 0),
             new UnityEngine.Vector3(-0.8767f, -0.4811f, 0), new UnityEngine.Vector3(0.8767f, -0.4811f, 0),
         };
+        // [design] dorsal and ventral first on the frigate; on the corvette PDC_2 and PDC_5 (0.2° from opposite: no marker
+        // there is straight down), then PDC_3 and PDC_4
+        static readonly int[] FrigateFit = { 1, 5, 2, 3, 0, 4 }, CorvetteFit = { 2, 5, 3, 4, 0, 1 };
 
         public static readonly Hull[] Hulls =
         {
-            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0 }, Model = "PlayerShip", Mounts = FrigateMounts },
+            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0 }, Model = "PlayerShip", Mounts = FrigateMounts, MountFit = FrigateFit },
             // [calc] structure 228 × (60/52)³ = 350.25 t; [design] no Torch drive, a third of the frigate's cold range, 400k cr
-            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0 }, Model = "StealthShip", Mounts = CorvetteMounts },
+            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0 }, Model = "StealthShip", Mounts = CorvetteMounts, MountFit = CorvetteFit },
         };
 
         // Prices [design]: an upgrade from stock costs what it did as a counter (drive 50k and 150k more, tank 35k a step,

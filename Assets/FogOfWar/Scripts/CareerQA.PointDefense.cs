@@ -104,53 +104,59 @@ namespace FogOfWar
             Check(ok, $"pdc: {passes:N0} seeded passes a fit agree with the closed form within 0.02: {string.Join("; ", got)}");
         }
 
-        // 17s: the mounts that bear on set approach directions (body frame, from the ship toward the missile), all six fitted,
-        // and with the 2 and 4 mount fits (PDC_1, PDC_5; + PDC_2, PDC_3). The counts are worked by hand from the zeniths.
-        // Exactly on the horizontal plane (nose, tail, a broadside) the frigate's dorsal and ventral mounts are on their
-        // horizon and do not bear (zenith · d > 0 is strict); 10° up or down they do.
+        // 17s: each hull's 2-mount pair is opposite; then the mounts that bear on set approach directions (body frame, from the
+        // ship toward the missile) for the 6, 2 and 4 mount fits read from Hull.MountFit. The counts are worked by hand from
+        // the zeniths and the 100° arc. Dead on the nose or the tail every mount is on its horizon and bears; 10° off the axis
+        // is the arc's edge for a mount square above or below, so the cases sit at 5° (inside it) and 15° (past it).
         void PdcBearingChecks()
         {
-            float s10 = Mathf.Sin(10 * Mathf.Deg2Rad), c10 = Mathf.Cos(10 * Mathf.Deg2Rad);
+            Vector3 Pitched(float deg, float z) => new Vector3(0, Mathf.Sin(deg * Mathf.Deg2Rad), z * Mathf.Cos(deg * Mathf.Deg2Rad));
             var dirs = new (string Name, Vector3 D)[]
             {
                 ("nose", Vector3.forward), ("tail", Vector3.back), ("starboard", Vector3.right), ("port", Vector3.left),
                 ("top", Vector3.up), ("bottom", Vector3.down),
-                ("nose 10° high", new Vector3(0, s10, c10)), ("nose 10° low", new Vector3(0, -s10, c10)),
-                ("tail 10° high", new Vector3(0, s10, -c10)), ("tail 10° low", new Vector3(0, -s10, -c10)),
+                ("nose 5° high", Pitched(5, 1)), ("nose 5° low", Pitched(-5, 1)), ("nose 15° high", Pitched(15, 1)), ("nose 15° low", Pitched(-15, 1)),
+                ("tail 15° high", Pitched(15, -1)), ("tail 15° low", Pitched(-15, -1)),
                 ("port low", new Vector3(-0.53f, -0.848f, 0).normalized),
             };
-            const int two = 0x22, four = 0x2E;
             var want = new Dictionary<string, int[][]>
             {
                 // by fit (6, 2, 4), in the order of dirs
                 [FrigateName] = new[]
                 {
-                    new[] { 0, 0, 1, 1, 4, 2, 4, 2, 4, 2, 3 },
-                    new[] { 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1 },
-                    new[] { 0, 0, 1, 1, 3, 1, 3, 1, 3, 1, 2 },
+                    new[] { 6, 6, 5, 5, 4, 2, 6, 6, 4, 4, 4, 4, 3 },
+                    new[] { 2, 2, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1 },
+                    new[] { 4, 4, 3, 3, 3, 1, 4, 4, 3, 3, 3, 3, 2 },
                 },
                 [CorvetteName] = new[]
                 {
-                    new[] { 0, 0, 2, 2, 4, 2, 4, 2, 4, 2, 2 },
-                    new[] { 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0 },
-                    new[] { 0, 0, 2, 1, 3, 1, 3, 1, 3, 1, 1 },
+                    new[] { 6, 6, 4, 4, 4, 2, 6, 6, 6, 4, 6, 4, 3 },
+                    new[] { 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2 },
+                    new[] { 4, 4, 2, 2, 2, 2, 4, 4, 4, 4, 4, 4, 3 },
                 },
             };
             foreach (var h in ShipBuild.Hulls)
             {
                 if (!want.TryGetValue(h.Name, out var w)) { Check(false, $"pdc bearing: no hand counts for \"{h.Name}\""); continue; }
-                var fits = new[] { (PointDefense.AllMounts, "6 mounts"), (two, "2 mounts (PDC_1, PDC_5)"), (four, "4 mounts (+ PDC_2, PDC_3)") };
-                for (int f = 0; f < fits.Length; f++)
+                bool table = h.Mounts != null && h.Mounts.Length == 6 && h.MountFit != null && h.MountFit.Length == 6;
+                var order = new List<int>();
+                for (int i = 0; table && i < 6; i++) { table &= h.MountFit[i] >= 0 && h.MountFit[i] < 6 && !order.Contains(h.MountFit[i]); order.Add(h.MountFit[i]); }
+                float pair = table ? Vector3.Angle(h.Mounts[h.MountFit[0]], h.Mounts[h.MountFit[1]]) : 0;
+                Check(table && pair >= 179,
+                    $"pdc bearing: {h.Name} fits PDC_{string.Join(", PDC_", order)} in that order (each marker once); its 2-mount pair's zeniths are {pair:0.00}° apart (≥ 179: opposite)");
+                if (!table) continue;
+                foreach (var (f, n) in new[] { (0, 6), (1, 2), (2, 4) })
                 {
+                    int mask = PointDefense.FitMask(h, n);
                     var got = new List<string>();
-                    bool ok = h.Mounts != null && h.Mounts.Length == 6;
-                    for (int i = 0; ok && i < dirs.Length; i++)
+                    bool ok = true;
+                    for (int i = 0; i < dirs.Length; i++)
                     {
-                        int b = PointDefense.Bearing(h, fits[f].Item1, dirs[i].D);
+                        int b = PointDefense.Bearing(h, mask, dirs[i].D);
                         ok &= b == w[f][i];
                         got.Add($"{dirs[i].Name} {b} ({w[f][i]})");
                     }
-                    Check(ok, $"pdc bearing: {h.Name}, {fits[f].Item2}: {string.Join(", ", got)}");
+                    Check(ok, $"pdc bearing: {h.Name}, {n} mounts (mask 0x{mask:X2}), arc {PointDefense.ArcDeg}°: {string.Join(", ", got)}");
                 }
             }
         }

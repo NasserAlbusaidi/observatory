@@ -63,8 +63,8 @@ Adopts the art side's `OPEN-WORLD-ART.md` naming. The code is the source of trut
 - Wired. The code aligns `Nose` to the direction of thrust, scales to `lengthM` (52 m), pulses `Engine` from its
   origin at the nozzle, and draws the drive plume behind it. `Cockpit`, `RCS_*` and `PDC_*` are reserved for the
   cockpit camera, RCS puffs and point-defence turrets.
-- `PDC_0..5` are empties. Each one's local +Y (as Unity imports it) is the turret's zenith, and the mount covers the
-  hemisphere above it (zenith · d > 0; the hull blocks nothing). `Hull.Mounts` in `ShipBuild.cs` holds the six zeniths
+- `PDC_0..5` are empties. Each one's local +Y (as Unity imports it) is the turret's zenith, and the mount covers 100°
+  about it, a hemisphere and 10° more (zenith · d > −sin 10°; the hull blocks nothing). `Hull.Mounts` in `ShipBuild.cs` holds the six zeniths
   in the ship's body frame (x starboard, y up, z nose); QA 17t checks them against the model within 1°, so a moved or
   turned `PDC_n` needs that table changed with it.
 - Textured (ship-visuals branch): `Models/PlayerShip/PlayerShip_{Albedo,Normal,Mask,Emission}.png`, 4096 (emission
