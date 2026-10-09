@@ -24,6 +24,9 @@ namespace FogOfWar.OpenWorld
         public double Facet;       // the hull's own factor on the cold range, out or stowed: 1 for an ordinary hull
         public int[] StockPick;    // by Slot, as ShipBuild.pick
         public string Model;       // Resources/Models/<Model>.fbx and its texture set Models/<Model>/; not saved (the hull's name is)
+        // PDC_0..5's zeniths (PointDefense.Bears). Body frame, as Ship.Att's: x right, y up, z the nose (Heading = Att·forward).
+        // Each is the marker's local +Y with the model placed as the scene places it (RefreshHullModel aligns Nose to +Z).
+        public UnityEngine.Vector3[] Mounts;
     }
 
     // The ship as the yard sees it: one hull and one module in each slot (combat design, Phase 1). Every module is mass,
@@ -39,11 +42,27 @@ namespace FogOfWar.OpenWorld
         public const double RatedMass = 500;
         public static double Rated(double g) => g * Ship.G0 * RatedMass; // MN
 
+        // [code: the FBX markers, checked in the scene by QA 17t] the frigate's PDC_1 and PDC_4 are dorsal, PDC_0 and PDC_5
+        // ventral, PDC_2 and PDC_3 the flanks tilted 68.2° from the dorsal; the corvette's PDC_0 and PDC_1 are dorsal, PDC_2
+        // and PDC_3 61° and PDC_4 and PDC_5 118.76° from it
+        static readonly UnityEngine.Vector3[] FrigateMounts =
+        {
+            new UnityEngine.Vector3(0, -1, 0), new UnityEngine.Vector3(0, 1, 0),
+            new UnityEngine.Vector3(-0.92849f, 0.37137f, 0), new UnityEngine.Vector3(0.92849f, 0.37137f, 0),
+            new UnityEngine.Vector3(0, 1, 0), new UnityEngine.Vector3(0, -1, 0),
+        };
+        static readonly UnityEngine.Vector3[] CorvetteMounts =
+        {
+            new UnityEngine.Vector3(0, 1, 0), new UnityEngine.Vector3(0, 1, 0),
+            new UnityEngine.Vector3(-0.87462f, 0.48481f, 0), new UnityEngine.Vector3(0.87462f, 0.48481f, 0),
+            new UnityEngine.Vector3(-0.8767f, -0.4811f, 0), new UnityEngine.Vector3(0.8767f, -0.4811f, 0),
+        };
+
         public static readonly Hull[] Hulls =
         {
-            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0 }, Model = "PlayerShip" },
+            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0 }, Model = "PlayerShip", Mounts = FrigateMounts },
             // [calc] structure 228 × (60/52)³ = 350.25 t; [design] no Torch drive, a third of the frigate's cold range, 400k cr
-            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0 }, Model = "StealthShip" },
+            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0 }, Model = "StealthShip", Mounts = CorvetteMounts },
         };
 
         // Prices [design]: an upgrade from stock costs what it did as a counter (drive 50k and 150k more, tank 35k a step,

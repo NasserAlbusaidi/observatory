@@ -41,6 +41,7 @@ namespace FogOfWar
             Guard("stealth hull yard", StealthHullShellChecks);
             Guard("stealth hull art files", HullArtFileChecks);
             yield return HullArtSceneChecks(); // 16o (CareerQA.HullArt.cs)
+            yield return PointDefenseChecks(); // 17p-17t: the PDC pass and the mount table (CareerQA.PointDefense.cs)
             yield return StealthLineChecks(); // 16k and 16l (CareerQA.StealthLines.cs)
         }
 
