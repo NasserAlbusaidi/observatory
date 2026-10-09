@@ -206,7 +206,9 @@ namespace FogOfWar.OpenWorld
                     Say(Happening.JobFailed, "Tank dry: " + c.Title + " failed", false);
                     ChangeStanding(c, -StandingLoss);
                 }
-                Say(Happening.TankDry, $"Out of fuel. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
+                Say(Happening.TankDry, Docked == null
+                    ? $"Out of fuel. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel."
+                    : $"Out of fuel. The port sells up to {EmergencyTonnes:N0} t on credit in the Jobs panel.", false);
             }
             wasDry = dry;
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
