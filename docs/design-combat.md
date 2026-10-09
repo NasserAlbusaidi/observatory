@@ -1167,7 +1167,7 @@ All are agreed as recommended.
 
 ### Encounter flow (added 2026-10-09)
 
-From a review of an outside combat audit. Not agreed. Code read on `pdc-design` at e741ea7.
+Points 1-5 come from a review of an outside combat audit. Points 6-9 come from the follow-up. Not agreed. Code read on `pdc-design` at e741ea7.
 
 **1. The warp cap follows time, not range.**
 - Today the chase caps warp by range: `ChaseWarp` 1,000×, then `CloseWarp` 100× inside `CloseKm` = 10,000 km (`Career.Pirates.cs:78,104`) [code]. That works for a 1 g raider at matched velocity, which closes slowly.
@@ -1212,6 +1212,36 @@ From a review of an outside combat audit. Not agreed. Code read on `pdc-design` 
 | Escort | Its charge to arrive | A threat comes near the charge | Never more than 10,000 km from the charge [design] |
 | Interceptor (navy, hunter) | To keep the player from a place | It is between the player and the place | The player leaves its zone |
 | Runner (bounty target) | To reach a port | It is caught | It docks |
+
+**6. Ambush at the destination.**
+- Every flip-and-burn ends in a braking burn toward a known port. The burn is long, loud and predictable.
+- Raiders already use this. A raider waits at the job's target on the second half of a trip (`Career.Pirates.cs:108`) [code].
+- The player gets the same move as a bounty mode. The bounty gives the runner's destination. The player goes dark near it (Phase 3) and waits.
+- The runner's braking burn shows it to the sensors. Its course is then known for hours. So the player gets a firing solution without a chase.
+- **The limit is heat.** The sink sets how long the player stays dark (Phase 3). A wait that starts too early fails.
+- **The geometry.** A braking ship points its plume at its destination. When D13's plume lands, the ambusher must wait off the axis [design].
+- The runner's answers: brake early or late, burn off the axis, or divert to another port (Runner doctrine, point 5).
+
+**7. The torpedo is the chase weapon.**
+- A torpedo reaches about 86,000 km against a 1 g ship (see above) [calc]. A missile reaches 2,000 km (Phase 4).
+- So the torpedo is the only weapon that acts before the close. It puts decisions into the long approach, which is empty today.
+- A launch gives a decision card (point 2). The target must choose: burn away and spend Δv, turn its mounts to bear, or hold its course.
+- **Order inside Phase 5** [design]: first bounty jobs, torpedoes and the ambush (point 6); then player missiles and escort jobs.
+
+**8. The saturation readout.**
+- Before a salvo, show the expected hits: salvo × (1 − P(kill)) × (1 − armor stop).
+- P(kill) comes from the Phase 4 pass integral, with the target's mounts that bear on the launch aspect.
+- Example [calc]: 4 missiles at a ship with 2 mounts bearing give 4 × 0.34 = 1.36 hits. With light plating it is 0.68.
+- While the target's fit is unknown, show the best and the worst case: no mounts, and 3 mounts bearing (4 × 0.20 = 0.8 hits).
+- This is the main missile decision: a salvo large enough to get through, against a finite magazine.
+
+**9. The after-action card.**
+- When an encounter ends (`EndContact`, `Career.Pirates.cs:367`) [code], one card lists what happened, in order, with the cause:
+  - "2 missiles from 2,000 km. 2 mounts bore. PDCs killed 1."
+  - "Hit from aft: drive, thrust 50 %. Your tail faced it, 14 s after the flip."
+  - "The raider broke off: magazine empty, PDCs held."
+- Data: the Phase 4 notes, plus the aspect and the bearing count at each impact. The D14 recorder fields already carry them.
+- **Purpose:** the player can say why the fight went as it did, and what to change next time.
 
 ## Phase 6: the hull ladder
 
