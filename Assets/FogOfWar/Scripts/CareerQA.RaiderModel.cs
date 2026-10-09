@@ -56,8 +56,14 @@ namespace FogOfWar
                 return Get<float>("raiderLen") * t.localScale.x / t.localPosition.magnitude * pxPerRad / app.UiScale;
             }
             object Nested(string type, int v) => Enum.ToObject(s.GetType().GetNestedType(type, BindingFlags.NonPublic), v);
-            // the chase from now on, d km off the ship along dir, at rest with it
-            Encounter Start(D3 dir, double d) => career.StartContact(job, sys, ship, jd, ship.Pos + dir.Norm * d, ship.Vel);
+            // the chase from now on, d km off the ship along dir, at rest with it; inside FireKm: no salvo here, 4a's missiles
+            // are section 17's
+            Encounter Start(D3 dir, double d)
+            {
+                var e = career.StartContact(job, sys, ship, jd, ship.Pos + dir.Norm * d, ship.Vel);
+                e.Magazine = 0;
+                return e;
+            }
 
             bool go = Guard("raider model setup", () =>
             {
