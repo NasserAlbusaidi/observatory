@@ -207,10 +207,10 @@ The stock and Torch rows match the doc's 0.23 and 0.52 AU.
 
 | Phase | W3 today | Phase 2 |
 |---|---|---|
-| Held at the start (`:118`) | counted, 1.5 h | **dropped**: no burn, no track |
-| Speeding up (`:119`) | counted | counted: loud |
-| Slow coast (`:120`) | whole coast | **first 2 h only**: the departure burn's track |
-| Braking (`:121`) | counted | counted: loud |
+| Held at the start (`:119`) | counted, 1.5 h | **dropped**: no burn, no track |
+| Speeding up (`:120`) | counted | counted: loud |
+| Slow coast (`:121`) | whole coast | **first 2 h only**: the departure burn's track |
+| Braking (`:122`) | counted | counted: loud |
 | Held at the target (`:125`) | 1.5 h | 1.5 h at a body with no port; **dropped** at a port (#162, decision 9) |
 
 Exposed hours (presence, patrol reach and e^(−v/70.6 km/s) unchanged). Chance at 0.2 calls/h [calc]:
