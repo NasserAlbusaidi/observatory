@@ -198,7 +198,7 @@ Other flags:
 - `-fowqa` runs the career in sandbox: unlimited reaction mass and no contracts, so the physics tests keep working.
 - `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fowprof` logs frame time every 2 s. `-fownobloom` turns bloom off. `-fowlegacyui` uses the old IMGUI shell.
 - `-fowspawnrunner <class>` (courier, packet, liner, freighter, tanker or hauler) starts a new game, accepts an intercept for that runner and holds the ship 2 km beside it, camera on it, for filming. It accepts a real job, so use it with `-fowsavekey`.
-- `-fowterrain <dir>` loads the terrain pack from that folder only. Without the flag the game looks for a `Terrain` folder next to the exe, then `D:\SpaceSimArtSrc\terrain`. `-fowterrain none` runs on the 8K global maps, as a player without the pack does. `-fowqaterrain` runs only the terrain low passes of `-fowqa`.
+- `-fowterrain <dir>` loads the terrain pack from that folder only. Without the flag the game looks in the folder that the `FOW_TERRAIN_DIR` environment variable names, then for a `Terrain` folder next to the exe (or the project). `-fowterrain none` runs on the 8K global maps, as a player without the pack does. `-fowqaterrain` runs only the terrain low passes of `-fowqa`.
 
 ## Repository layout
 

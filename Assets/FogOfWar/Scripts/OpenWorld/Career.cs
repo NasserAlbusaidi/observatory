@@ -208,7 +208,9 @@ namespace FogOfWar.OpenWorld
                     Say(Happening.JobFailed, "Tank dry: " + c.Title + " failed", false);
                     ChangeStanding(c, -StandingLoss);
                 }
-                Say(Happening.TankDry, $"Out of fuel. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel.", false);
+                Say(Happening.TankDry, Docked == null
+                    ? $"Out of fuel. Call the emergency tender ({EmergencyTonnes:N0} t, {EmergencyCost:N0} cr) in the Jobs panel."
+                    : $"Out of fuel. The port sells up to {EmergencyTonnes:N0} t on credit in the Jobs panel.", false);
             }
             wasDry = dry;
             Soak(ship, simDt);
@@ -578,8 +580,6 @@ namespace FogOfWar.OpenWorld
                 c.People = 2 + rng.Next(39);
                 c.Title = Riders[rng.Next(Riders.Length)];
                 c.Pay = RefPay(d, c.Load, out c.Days, slack) * 1.5;
-                // passengers ride at 1 g or less: give them the time a 1 g ship needs at least
-                c.Days = Math.Max(c.Days, (1.15 * 2 * Math.Sqrt(d / (PassengerG * Ship.G0)) + 43200) / 86400);
             }
             c.Pay = Math.Round(c.Pay / 100) * 100;
             c.ExpressDays = ExpressDaysFor(d, 0, c.Days);

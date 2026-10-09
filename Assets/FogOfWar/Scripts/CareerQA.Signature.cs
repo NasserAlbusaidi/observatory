@@ -237,14 +237,15 @@ namespace FogOfWar
             var vesta3 = Trip("Mars", "Vesta", 3);
             var ceres = Trip("Mars", "Ceres", 1);
             var luna = Trip("Earth", "Moon", 1);
-            Check(Math.Abs(vesta.Hours - 3.50) <= 0.05 && vesta.Tier == "high" && vesta.Arriving >= 3.45, $"signature: Mars orbit → Vesta at 1 g: {R(vesta)} (3.50 ± 0.05, high, arriving ≥ 3.45)");
-            Check(Math.Abs(vesta3.Hours - 2.17) <= 0.05, $"signature: Mars orbit → Vesta at 3 g: {R(vesta3)} (2.17 ± 0.05)");
+            Check(Math.Abs(vesta.Hours - 2.00) <= 0.05 && vesta.Tier == "moderate" && vesta.Arriving >= 1.95, $"signature: Mars orbit → Vesta at 1 g: {R(vesta)} (2.00 ± 0.05, moderate, arriving ≥ 1.95; no hold at the Vesta port)");
+            Check(Math.Abs(vesta3.Hours - 0.67) <= 0.05, $"signature: Mars orbit → Vesta at 3 g: {R(vesta3)} (0.67 ± 0.05)");
             Check(Math.Abs(ceres.Hours - 0.75) <= 0.05, $"signature: Mars orbit → Ceres at 1 g: {R(ceres)} (0.75 ± 0.05)");
             Check(luna.Hours == 0, $"signature: Earth → Luna: {R(luna)} (0)");
 
             // the hold at the start is gone: all the hours are on the way out
             var back = Trip("Vesta", "Mars", 1);
             Check(Math.Abs(back.Hours - 2.00) <= 0.05 && back.Arriving <= 0.05, $"signature: Vesta → Mars orbit at 1 g: {R(back)} (2.00 ± 0.05, all leaving; W3 gave 3.50)");
+            Check(Math.Abs(vesta.Hours - back.Hours) <= 0.1, $"signature: a port at either end adds no hold: Mars orbit → Vesta {vesta.Hours:0.00} h, Vesta → Mars orbit {back.Hours:0.00} h (equal ± 0.1)");
 
             // a belt hop of 1.5e7 km at 1 g: a slow cruise is the quiet choice now
             var vFrom = qs["Vesta"];
@@ -255,7 +256,7 @@ namespace FogOfWar
             var quarter = Threat.Of(qs, vFrom, D3.Zero, vTo, j0, d1, a1, cap / 4);
             bool hop = Math.Abs(full.Hours - 5.48) <= 0.1 && Math.Abs(half.Hours - 5.37) <= 0.1 && Math.Abs(quarter.Hours - 4.99) <= 0.1 && quarter.Hours <= full.Hours;
             Check(hop,
-                $"signature: Vesta → Pallas, 1.5e7 km at 1 g: full burn {full.Hours:0.00} h (5.48), cruise cap {cap / 2:0.0} km/s {half.Hours:0.00} h (5.37), cap {cap / 4:0.0} km/s {quarter.Hours:0.00} h (4.99), each ± 0.1, and the quarter no worse than the full burn; W3 gave 6.98, 7.81 and 16.45");
+                $"signature: Vesta → Pallas, 1.5e7 km at 1 g: full burn {full.Hours:0.00} h (5.48), cruise cap {cap / 2:0.0} km/s {half.Hours:0.00} h (5.37), cap {cap / 4:0.0} km/s {quarter.Hours:0.00} h (4.99), each ± 0.1, and the quarter no worse than the full burn; Pallas has no port, so its hold still counts; W3 gave 6.98, 7.81 and 16.45");
             if (!hop)
             {
                 log.WriteLine($"    along the line Vesta → Pallas at {j0:F2} (presence, patrol; the slow parts are the ends):");

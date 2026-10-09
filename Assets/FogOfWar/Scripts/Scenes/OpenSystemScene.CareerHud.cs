@@ -301,7 +301,7 @@ namespace FogOfWar
             }
             if (ship.Fuel < 1)
             {
-                Ui.L(c, career.Docked == null ? "The tank is dry. You are adrift." : $"The tank is dry. The port sells up to {Career.EmergencyTonnes:N0} t on credit.", "t-body", "warn").style.marginTop = 6;
+                Ui.L(c, DryLine(career.Docked != null), "t-body", "warn").style.marginTop = 6;
                 if (career.Docked == null)
                     Ui.B(c, $"Call an emergency tender ({Career.EmergencyTonnes:N0} t, {Career.EmergencyCost:N0} cr)", () => career.EmergencyDrop(ship), "danger");
             }

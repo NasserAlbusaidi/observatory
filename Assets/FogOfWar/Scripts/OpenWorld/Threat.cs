@@ -72,11 +72,11 @@ namespace FogOfWar.OpenWorld
         }
 
         // A trip of d km from the start to body `to` at a km/s², from rest to rest, cruising at `cap` km/s (0: a full burn),
-        // held still for half the parking time (Career.ParkSeconds) at the target; a raider sees a burn and keeps its track
-        // holdS (Signature.TrackHoldS; less with stowable radiators, combat Phase 3). The ship's place goes from the start's
-        // track to the target's as it covers the distance, so it moves with each end while it is slow there. The start is body
-        // `from` plus a fixed offset; with the Sun as `from` it is a fixed point, near enough for a ship that starts far from
-        // everything.
+        // held still for half the parking time (Career.ParkSeconds) at a target with no port (a port docks the ship at once);
+        // a raider sees a burn and keeps its track holdS (Signature.TrackHoldS; less with stowable radiators, combat Phase 3).
+        // The ship's place goes from the start's track to the target's as it covers the distance, so it moves with each end
+        // while it is slow there. The start is body `from` plus a fixed offset; with the Sun as `from` it is a fixed point, near
+        // enough for a ship that starts far from everything.
         public static Risk Of(SolarSystem sys, Body from, D3 offset, Body to, double jd, double d, double a, double cap = 0, double holdS = Signature.TrackHoldS)
         {
             var r = new Risk();
@@ -120,7 +120,9 @@ namespace FogOfWar.OpenWorld
             Add(0, fast, step);                                                                  // speeding up: loud
             if (vp < 7 * MatchKms) Add(ta, ta + Math.Min(tc, holdS), step);                      // a slow coast, while the burn is tracked
             Add(T - fast, T, step);                                                              // braking: loud
-            Add(T, T + Math.Min(park, holdS), park / 6);                                         // held at the target, tracked
+            // FindDock docks a ship at a port as soon as it parks: only a body with no port holds it in the open (#162)
+            if (!Array.Exists(Career.Ports, p => p.Body == to.Name))
+                Add(T, T + Math.Min(park, holdS), park / 6);                                     // held at the target, tracked
             return r;
         }
 

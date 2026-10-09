@@ -356,12 +356,16 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- readouts
 
+        // QA-025: under a 2 % shortfall the frame budget costs nothing worth a note
+        const double WarpLimitedShare = 0.98;
+        internal bool WarpLimitedShown => Time.realtimeSinceStartup - limitedAt < 2f && effectiveWarp < Warps[warpIdx] * WarpLimitedShare;
+
         public override void Readouts(List<Readout> list)
         {
             CareerReadouts(list);
             var date = Frame.UtcFromTdb(jd);
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
-            bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
+            bool limited = WarpLimitedShown;
             list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Flight model", FlightModel, Tone.Normal));
             if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, ship.Landed != null ? Tone.Normal : Tone.Bad));
@@ -386,8 +390,8 @@ namespace FogOfWar
                 }
                 if (ship.Target.Name == "Titan") list.Add(new Readout("Titan surface", "shown faintly through the haze (938 nm map)", Tone.Bad));
                 list.Add(new Readout("Distance", Km(r.Mag - ship.Target.Radius)));
-                list.Add(new Readout("Relative speed", Fmt.Num(vr.Mag, 3) + " km/s"));
-                list.Add(new Readout("Closing speed", Fmt.Num(closing, 3) + " km/s", closing > 0 ? Tone.Cold : Tone.Normal));
+                list.Add(new Readout("Relative speed", SpeedText(vr.Mag)));
+                list.Add(new Readout("Closing speed", SpeedText(closing), closing > 0 ? Tone.Cold : Tone.Normal));
                 list.Add(new Readout("Sideways drift", Spd((vr - r.Norm * closing).Mag)));
                 StopEstimate(vr, out var aStop, out var tStop, out var dStop, out var by);
                 bool late = closing > 0 && dStop > r.Mag - ship.Target.Radius;

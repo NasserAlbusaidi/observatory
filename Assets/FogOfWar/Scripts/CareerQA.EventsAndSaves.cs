@@ -17,6 +17,7 @@ namespace FogOfWar
 
         IEnumerable<object> EventAndSaveChecks()
         {
+            DryTankChecks(); // 5a: #151, #152 the dry tank at a port
             // 5. a dry tank cuts the drive; the tender refills it
             ship.Plan = Plan.None; ship.Fuel = 0; ship.ThrottleCmd = 1;
             var v0 = ship.Vel;
@@ -41,6 +42,21 @@ namespace FogOfWar
                 int n = 0, bad = 0;
                 foreach (var b in career.Board) if (b.Kind != JobKind.Intercept) { n++; if (!(b.ExpressDays > 0 && b.ExpressDays <= b.Days)) bad++; }
                 Check(bad == 0, $"every board job but an intercept has an express window inside its deadline ({n - bad} of {n})");
+
+                // what the old passenger floor promised: a deadline gives a 1 g ship (the most passengers allow) its full-burn
+                // time with a 15 % margin. RefPay's least slack gives 29 %, which also covers the planets' drift since posting.
+                int pn = 0, pShort = 0;
+                foreach (var b in career.Board)
+                {
+                    if (b.Kind != JobKind.Passengers) continue;
+                    Port pFrom = Career.PortAt(b.From), pTo = Career.PortAt(b.To);
+                    if (pFrom == null || pTo == null || sys[pFrom.Body] == null || sys[pTo.Body] == null) continue;
+                    pn++;
+                    double pd = (sys.Pos(sys[pTo.Body], jd) - sys.Pos(sys[pFrom.Body], jd)).Mag;
+                    double pNeed = 1.15 * 2 * Math.Sqrt(pd / (Career.PassengerG * Ship.G0)) + 43200;
+                    if (b.Days * 86400 < pNeed) pShort++;
+                }
+                Check(pn > 0 && pShort == 0, $"every board passenger job gives a 1 g ship its full-burn time with a 15 % margin ({pn - pShort} of {pn})");
             }
 
             // 5c. route events: calls in flight about a job (a test cargo run to Mars, removed afterwards)

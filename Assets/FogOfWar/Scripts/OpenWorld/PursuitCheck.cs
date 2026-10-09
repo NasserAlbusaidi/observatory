@@ -122,7 +122,10 @@ namespace FogOfWar.OpenWorld
             " JOB 4 AMENDMENT: G9 is committed before its first run. S4guard is a 1 g inward plunge at Pallas; h=1 and 5 s must",
             "     stay at altitude >= 0.1 R + 20 km (the guard safe radius minus R) and enter climbing >=1 time. No old gate changes.",
             "     Call-level guard checks require non-null for a braking segment through the far side, and null for S4's safe pole geometry.",
-            " VERDICT pass if G1-G9 all hold, else fail. Exit code 0 on pass, 1 on fail. Gameplay choices #89-92 remain open; braking margin stays .85.",
+            " #141 AMENDMENT: G10 is committed before its first run. S6-1h, S6-2h, S6-4h at h=1 and 5 s: the pirate's least altitude over",
+            "     Vesta before the player docks, sampled inside every pirate step, >= 0.1 R + 20 km (G9's floor), and the player docks.",
+            "     No old gate changes; the in-step sampling can only lower G9's measured minimum.",
+            " VERDICT pass if G1-G10 all hold, else fail. Exit code 0 on pass, 1 on fail. Gameplay choices #89-92 remain open; braking margin stays .85.",
             " Report only: S2b-cut and S2b-flip (under 10,000 km the player cuts the drive, or flips and burns at the pirate: the pass and the run-out),",
             " S3 (S3m-2g, 375,000 km out, tests the 2 g boarding band), S5 (S5-1g also at 1/60 s, S5-2g",
             " also at 1/60 and 0.05 s), and S1 on Plan.Brachistochrone (first alongside and hold against the spike's).",
@@ -306,16 +309,11 @@ namespace FogOfWar.OpenWorld
             return chunk;
         }
 
-        // Least distance between the pirate (on the quadratic through its step's ends) and the player (on the stand-in's
-        // path) over one pirate step of h seconds that starts t seconds into the span; skipped when it cannot beat `best`.
-        // speed: the relative speed at that point, when it beats `best`.
-        static double Closest(Pursuit pu, double t, double h, D3 pp, D3 vp, D3 pp1, double best, out double speed)
+        // Least |r0 + w0 s + ar s²/2| over s in [0, h]: 16 samples, then a golden-section search round the best one.
+        // s: where it is.
+        static double Least(D3 r0, D3 w0, D3 ar, double h, out double s)
         {
-            speed = double.NaN;
-            D3 r0 = pp - pu.PlayerPos(t), w0 = vp - pu.PlayerVel(t);
-            D3 ar = (pp1 - pp - vp * h) * (2 / (h * h)) - pu.StandIn.PathAccel(0);
-            if (r0.Mag - w0.Mag * h - 0.5 * ar.Mag * h * h > best) return best;
-            double R2(double s) => (r0 + w0 * s + ar * (0.5 * s * s)).Sqr;
+            double R2(double x) => (r0 + w0 * x + ar * (0.5 * x * x)).Sqr;
             const int K = 16;
             int bi = 0; double bv = R2(0);
             for (int i = 1; i <= K; i++) { double v = R2(h * i / K); if (v < bv) { bv = v; bi = i; } }
@@ -325,7 +323,21 @@ namespace FogOfWar.OpenWorld
                 double m1 = lo + (hi - lo) * 0.382, m2 = lo + (hi - lo) * 0.618;
                 if (R2(m1) < R2(m2)) hi = m2; else lo = m1;
             }
-            double sm = 0.5 * (lo + hi), vm = R2(sm), s = bv <= vm ? h * bi / K : sm, d = Math.Sqrt(Math.Min(bv, vm));
+            double sm = 0.5 * (lo + hi), vm = R2(sm);
+            s = bv <= vm ? h * bi / K : sm;
+            return Math.Sqrt(Math.Min(bv, vm));
+        }
+
+        // Least distance between the pirate (on the quadratic through its step's ends) and the player (on the stand-in's
+        // path) over one pirate step of h seconds that starts t seconds into the span; skipped when it cannot beat `best`.
+        // speed: the relative speed at that point, when it beats `best`.
+        static double Closest(Pursuit pu, double t, double h, D3 pp, D3 vp, D3 pp1, double best, out double speed)
+        {
+            speed = double.NaN;
+            D3 r0 = pp - pu.PlayerPos(t), w0 = vp - pu.PlayerVel(t);
+            D3 ar = (pp1 - pp - vp * h) * (2 / (h * h)) - pu.StandIn.PathAccel(0);
+            if (r0.Mag - w0.Mag * h - 0.5 * ar.Mag * h * h > best) return best;
+            double d = Least(r0, w0, ar, h, out double s);
             if (d >= best) return best;
             speed = (w0 + ar * s).Mag;
             return d;
@@ -429,6 +441,15 @@ namespace FogOfWar.OpenWorld
                             double m = Closest(pu, tj, hp, pp, vp, pi.Pos, res.MinRange, out var sp);
                             if (m < res.MinRange) { res.MinRange = m; res.MinRangeT = t - t0 + tj; res.MinRangeVrel = sp; }
                             if (ev == 1) { double me = Closest(pu, tj, hp, pp, vp, pi.Pos, evMin, out var se); if (me < evMin) { evMin = me; evMinV = se; } }
+                            if (sc.Centre != null)
+                            {
+                                // #141: the least altitude inside the step, not at the span's end; PosAt keeps the span's date cache
+                                D3 cb0 = sys.PosAt(sc.Centre, j), cb1 = sys.PosAt(sc.Centre, j2), wb = vp - sys.Vel(sc.Centre, j);
+                                D3 qb = pp - cb0, ab = (pi.Pos - cb1 - qb - wb * hp) * (2 / (hp * hp));
+                                double altStep = Least(qb, wb, ab, hp, out double sAlt) - sc.Centre.Radius;
+                                res.MinAlt = Math.Min(res.MinAlt, altStep);
+                                if (sc.TrackDock && res.DockT < 0 && altStep < res.MinAltPreDock) { res.MinAltPreDock = altStep; res.MinAltPreDockT = t - t0 + tj + sAlt; }
+                            }
                             res.Phases.TryGetValue(pi.Phase, out var ph);
                             res.Phases[pi.Phase] = ph + hp;
                             if (pi.Phase.StartsWith("climbing") && !ph0.StartsWith("climbing")) res.ClimbIn++;
@@ -496,9 +517,6 @@ namespace FogOfWar.OpenWorld
                     if (sc.Centre != null)
                     {
                         var cp = sys.Pos(sc.Centre, jd);
-                        double alt = (pi.Pos - cp).Mag - sc.Centre.Radius;
-                        res.MinAlt = Math.Min(res.MinAlt, alt);
-                        if (sc.TrackDock && res.DockT < 0 && alt < res.MinAltPreDock) { res.MinAltPreDock = alt; res.MinAltPreDockT = tm; }
                         if (sc.TrackDock && res.DockT < 0 && pl.Throttle == 0)
                         {
                             // Career.FindDock's rule, applied to the scenario's body
@@ -606,26 +624,36 @@ namespace FogOfWar.OpenWorld
                 $"c{r.ClimbIn}/t{r.TurnIn}", ph, r.Note);
         }
 
-        // Direct production call: distinguish a far-side crossing from S4's safe off-axis stopping segment.
+        // Direct production call: the #141 run-out dodge, the far-side braking segment and S4's safe off-axis stopping segment.
         public static bool ClearanceCalls(SolarSystem sys, TextWriter log)
         {
             var b = sys["Pallas"]; var pc = sys.Pos(b, Jd0); var vc = sys.Vel(b, Jd0);
             var rad = (pc.Norm - b.Pole * D3.Dot(pc.Norm, b.Pole)).Norm;
+            var guard = typeof(Ship).GetMethod("PursueClearance", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            double safe = 1.1 * b.Radius + 20;
+            // run-out: 12 km/s straight in from 20 R cannot stop before the body, so the guard pushes sideways
             var probe = new Ship { MaxG = 1, Pos = pc + rad * (20 * b.Radius), Vel = vc - rad * 12 };
             probe.Obstacles.Add(b);
-            var guard = typeof(Ship).GetMethod("PursueClearance", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            bool crossing = guard.Invoke(probe, new object[] { sys, Jd0 }) != null;
-            double safe = 1.1 * b.Radius + 20;
-            double stop = 12 * 12 / (2 * Ship.PursueMargin * (probe.AMax - b.GM / Math.Pow(20 * b.Radius, 2)));
-            crossing &= stop > 20 * b.Radius + safe; // the endpoint is beyond the far side, not merely inside the body
+            bool runOut = guard.Invoke(probe, new object[] { sys, Jd0 }) != null;
+            // far side: 11.7 km/s straight in from 30 R stops (full drive) before the clear sphere, but the 0.85 stop ends past the far side
+            double r30 = 30 * b.Radius, v30 = 11.7, clear = 1.1 * safe;
+            probe = new Ship { MaxG = 1, Pos = pc + rad * r30, Vel = vc - rad * v30 };
+            probe.Obstacles.Add(b);
+            double net30 = probe.AMax - b.GM / (r30 * r30);
+            bool farSide = v30 * v30 / (2 * net30) <= r30 - clear; // not a run-out
+            farSide &= v30 * v30 / (2 * Ship.PursueMargin * net30) > r30 + safe; // the endpoint is beyond the far side, not merely inside the body
+            var push = guard.Invoke(probe, new object[] { sys, Jd0 }) as D3?;
+            // the braking-segment push is mostly radial, outward; the run-out dodge would be at right angles to the velocity
+            farSide &= push.HasValue && D3.Dot(push.Value.Norm, rad) > 0.9;
             var target = rad * Ship.Standoff(b);
             var direction = (target - b.Pole * 50000).Norm;
             probe.Pos = pc + target * 0.9 + b.Pole * 5000; // point on S4's original pole-to-orbit line
             probe.Vel = vc + direction * 12;
             bool pole = guard.Invoke(probe, new object[] { sys, Jd0 }) == null;
-            Echo(log, $"  G9 far-side crossing guard non-null: {(crossing ? "PASS" : "FAIL")}");
+            Echo(log, $"  G9 run-out dodge guard non-null: {(runOut ? "PASS" : "FAIL")}");
+            Echo(log, $"  G9 far-side braking guard non-null, radial push: {(farSide ? "PASS" : "FAIL")}");
             Echo(log, $"  G9 S4 pole guard null: {(pole ? "PASS" : "FAIL")}");
-            return crossing && pole;
+            return runOut && farSide && pole;
         }
 
         // #90's measurement (report only): can a raider that starts behind an arriving ship board it before the dock?
@@ -662,6 +690,7 @@ namespace FogOfWar.OpenWorld
             foreach (var h in new[] { 0.05 }.Concat(Hs)) runs.Add(("S2b", h, Plan.Pursue));
             foreach (var id in new[] { "S2b-cut", "S2b-flip", "S4v", "S4r", "S4guard", "S3n-1g", "S3n-2g", "S3l-1g", "S3l-2g", "S3m-2g", "S5-1g", "S5-2g", "S5-3g" })
                 foreach (var h in Hs) runs.Add((id, h, Plan.Pursue));
+            foreach (var id in new[] { "S6-1h", "S6-2h", "S6-4h" }) foreach (var h in Hs) runs.Add((id, h, Plan.Pursue));
             runs.Add(("S5-1g", SmallHs[0], Plan.Pursue));
             foreach (var h in SmallHs) runs.Add(("S5-2g", h, Plan.Pursue));
             foreach (var h in Hs) runs.Add(("S1", h, Plan.Brachistochrone));
@@ -731,7 +760,11 @@ namespace FogOfWar.OpenWorld
             double floor = 0.1 * SolarSystem.Build()["Pallas"].Radius + 20;
             bool g9 = guardCalls && guardRuns.Count == 2 && guardRuns.All(r => r.MinAlt >= floor && r.ClimbIn >= 1);
             Echo(t, $"  G9 S4guard: {Each(guardRuns, r => $"min altitude {r.MinAlt:F3} >= {floor:F3} km; climb entries {r.ClimbIn} >= 1")}: {(g9 ? "PASS" : "FAIL")}");
-            bool pass = g1 && g2 && g3 && g4 && g5 && g6 && g7 && g8 && g9;
+            var s6 = rs.Where(r => r.Id.StartsWith("S6-") && r.Plan == Plan.Pursue).ToList();
+            double floorV = 0.1 * SolarSystem.Build()["Vesta"].Radius + 20;
+            bool g10 = s6.Count == 6 && s6.All(r => r.MinAltPreDock < double.MaxValue && r.MinAltPreDock >= floorV && r.DockT >= 0);
+            Echo(t, $"  G10 S6: {Each(s6, r => $"{r.Id} min altitude before the dock {r.MinAltPreDock:F1} >= {floorV:F1} km at {r.MinAltPreDockT:F0} s, dock {r.DockT:F0} s, climb entries {r.ClimbIn}")}: {(g10 ? "PASS" : "FAIL")}");
+            bool pass = g1 && g2 && g3 && g4 && g5 && g6 && g7 && g8 && g9 && g10;
             Echo(t, $"  VERDICT: {(pass ? "pass" : "fail")}");
             return pass ? 0 : 1;
         }
