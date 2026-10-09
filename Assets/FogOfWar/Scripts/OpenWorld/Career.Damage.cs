@@ -72,8 +72,9 @@ namespace FogOfWar.OpenWorld
         }
 
         // Each update of a chase (Contacts): the missiles close and hit, then the raider fires if it can. The approach is p̂
-        // at the impact update; the flight is straight in the ship's frame, so it is the side the raider fired from.
-        void Volley(Encounter e, Ship ship, double jd, double simDt)
+        // at the impact update; the flight is straight in the ship's frame, so it is the side the raider fired from. No
+        // salvo once a cabin hit has failed the chase's job: the chase ends in this update.
+        void Volley(Encounter e, Ship ship, double simDt)
         {
             if (!(simDt > 0)) return;
             double step = MissileKms * simDt;
@@ -84,7 +85,7 @@ namespace FogOfWar.OpenWorld
                 e.Missiles.RemoveAt(i);
                 Strike(ship, p);
             }
-            if (e.Missiles.Count > 0 || e.Magazine <= 0 || !(e.Range < FireKm)) return;
+            if (e.Missiles.Count > 0 || e.Magazine <= 0 || !(e.Range < FireKm) || !Active.Contains(e.Job)) return;
             int n = Math.Min(Salvo, e.Magazine);
             e.Magazine -= n;
             var from = e.Pirate.Pos - ship.Pos;

@@ -247,7 +247,7 @@ namespace FogOfWar.OpenWorld
             double lose = LoseInS(ship, jd);
             if (double.IsNaN(lose)) e.FixJd = jd;
             else if (lose <= 0) { EndContact(Happening.RaiderGone, OffNote(BreakOff.Lost, null, Haven()), true, jd); return; }
-            Volley(e, ship, jd, simDt);
+            Volley(e, ship, simDt);
             // a cabin hit failed the chase's passenger job
             if (!Active.Contains(e.Job)) { EndContact(Happening.RaiderGone, OffNote(BreakOff.JobOver, null, Haven()), true, jd); return; }
             if (!alongside) { e.Dwell = 0; return; }
