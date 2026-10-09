@@ -135,12 +135,14 @@ namespace FogOfWar
                 $"traffic: of {n} courses the cheap test passed, the full clearance test refuses {sunFail} near the Sun and {Count(missed)} through a body" + (missed.Count > 0 ? $" ({string.Join(", ", miss)})" : ""));
             stepped.Clear(); fresh.Clear();
 
-            // Reset enumerates whole departure days: a 25-day lookback can retain a nearly 26-day-old trip.
-            // Cross that day boundary before reset, then advance exactly six game hours.
-            // The independent reference enumerates 40 days directly, rather than sharing Reset's lookback bug.
-            Check(longest != null && longest.Arr - longest.Dep > 26, "traffic: fixed fixture contains a valid trip longer than 26 days");
-            if (longest == null || longest.Arr - longest.Dep <= 26) { yield return ContactsChecks(); yield break; }
-            double sceneStart = Math.Floor(longest.Dep) + 26.05;
+            // Regression for the old 25-day reset lookback (a143ceb), now Traffic.LookbackDays. Reset enumerates whole
+            // departure days, so starting the scene 1.05 days past the old lookback after the fixture's departure day
+            // puts that day outside a 25-day reset but inside the current one. Then advance exactly six game hours.
+            // The independent reference enumerates 40 days directly, so it does not depend on LookbackDays.
+            const double OldLookbackDays = 25;
+            Check(longest != null && longest.Arr - longest.Dep > OldLookbackDays + 1, $"traffic: fixed fixture contains a valid trip longer than {OldLookbackDays + 1:0} days");
+            if (longest == null || longest.Arr - longest.Dep <= OldLookbackDays + 1) { yield return ContactsChecks(); yield break; }
+            double sceneStart = Math.Floor(longest.Dep) + OldLookbackDays + 1.05;
             double sceneEnd = sceneStart + 0.25;
             Check(sceneEnd < longest.Arr, "traffic: long-trip fixture remains active throughout the six-hour scene interval");
             if (sceneEnd >= longest.Arr) { yield return ContactsChecks(); yield break; }
