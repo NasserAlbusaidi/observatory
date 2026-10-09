@@ -35,13 +35,13 @@ namespace FogOfWar
             double p = Signature.JetW(ship), coldW = career?.ColdW(ship, jd) ?? Signature.IdleW, r = Signature.RangeKm(p, Signature.StockKm, coldW);
             // P = ½ m a vₑ of the main drive and RCS: ideal exhaust power, not onboard waste heat
             list.Add(p > 0 ? new Readout("Signature", $"{Fmt.Num(p / 1e12, 1)} TW exhaust (ideal, not heat), seen at {Km(r)}", Tone.Hot)
-                           : new Readout("Signature", coldW < Signature.IdleW ? $"cold, radiators stowed ({coldW / 1e6:0.00} MW), seen at {Km(r)}"
-                                                                              : $"cold ({Signature.IdleW / 1e6:0} MW idle), seen at {Km(r)}"));
+                           : new Readout("Signature", career != null && career.Stowed(ship, jd) ? $"cold, radiators stowed ({coldW / 1e6:0.00} MW), seen at {Km(r)}"
+                                                                                                    : $"cold ({coldW / 1e6:0.##} MW idle), seen at {Km(r)}"));
             if (career != null && !career.Sandbox && career.Build.Stowable)
             {
                 double k = career.SinkK, left = career.SinkLeftS(ship);
                 if (career.Docked != null) list.Add(new Readout("Heat sink", "0 of 100 K: the port takes the heat"));
-                else if (!career.DarkReady(ship)) list.Add(new Readout("Heat sink", "full: radiators out, tracked 2 h after a burn", Tone.Bad));
+                else if (!career.DarkReady(ship)) list.Add(new Readout("Heat sink", $"full: radiators out, tracked {Signature.HoldText(career.OutHoldS)} after a burn", Tone.Bad));
                 else if (career.Stowed(ship, jd)) list.Add(new Readout("Heat sink", $"{k:0} of 100 K, radiators stowed, {Dur(left)} dark left", Tone.Cold));
                 else list.Add(new Readout("Heat sink", $"{k:0} of 100 K, radiators out, {Dur(left)} dark left"));
             }

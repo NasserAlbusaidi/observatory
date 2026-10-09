@@ -3,9 +3,10 @@ using System;
 namespace FogOfWar.OpenWorld
 {
     // Combat Phase 3 (docs/design-combat.md): stowable radiators put the hull's waste heat into its own reaction mass
-    // (water) while a raider could hold its track, the 2 h after a loud moment or a chase. Stowed, the hull is cold to
-    // StowRho of the normal range and a raider loses it in StowRho × TrackHoldS. SinkK is the water's rise in K above
-    // port water: intensive, so water that is burned, vented or sold takes its heat with it. Gameplay values.
+    // (water) while a raider could hold its track, OutHoldS after a loud moment or a chase (2 h on the frigate). Stowed,
+    // the hull is cold to DarkRho of the normal range and a raider loses it in DarkRho × TrackHoldS; the hull's facet
+    // (Hull.Facet) scales both that and the radiators-out range. SinkK is the water's rise in K above port water:
+    // intensive, so water that is burned, vented or sold takes its heat with it. Gameplay values.
     public partial class Career
     {
         public const double WaterC = 4186;         // J/kg·K [calc]
@@ -16,16 +17,18 @@ namespace FogOfWar.OpenWorld
         public double SinkK;
         double fillJd = double.NaN;                // the date the sink filled inside this update, else NaN: SeenSeconds reads it
 
-        // stowable radiators, water aboard and room in the sink: a raider's hold is StowRho of TrackHoldS
+        // how long a raider keeps the track with the radiators out
+        public double OutHoldS => Signature.TrackHoldS * Build.OutRho;
+        // stowable radiators, water aboard and room in the sink: a raider's hold is DarkRho of TrackHoldS
         public bool DarkReady(Ship ship) => !Sandbox && Build.Stowable && ship.Fuel > 0 && SinkK < SinkMaxK;
-        public double HoldS(Ship ship) => DarkReady(ship) ? Signature.TrackHoldS * Build.StowRho : Signature.TrackHoldS;
-        // the radiators are stowed now: dark-ready, not docked, quiet, and inside the 2 h window or a chase is on
-        public bool Stowed(Ship ship, double jd) => DarkReady(ship) && Docked == null && !LoudNow(ship) && ((jd - ship.LastLoudJd) * 86400 < Signature.TrackHoldS || Encounter != null);
-        public double ColdW(Ship ship, double jd) => Stowed(ship, jd) ? Signature.ColdW(Build.StowRho) : Signature.IdleW;
+        public double HoldS(Ship ship) => DarkReady(ship) ? Signature.TrackHoldS * Build.DarkRho : OutHoldS;
+        // the radiators are stowed now: dark-ready, not docked, quiet, and inside the OutHoldS window or a chase is on
+        public bool Stowed(Ship ship, double jd) => DarkReady(ship) && Docked == null && !LoudNow(ship) && ((jd - ship.LastLoudJd) * 86400 < OutHoldS || Encounter != null);
+        public double ColdW(Ship ship, double jd) => Stowed(ship, jd) ? Signature.ColdW(Build.DarkRho) : Signature.ColdW(Build.OutRho);
         public double SinkLeftS(Ship ship) => ship.Fuel > 0 ? Math.Max(0, SinkMaxK - SinkK) * WaterC * ship.Fuel * 1000 / SinkLoadW : 0;
 
-        // Once per Tick, after the dock test and before the roll. The stowed seconds are this update's overlap with the 2 h
-        // after the last loud moment: the tail SeenSeconds counts, at TrackHoldS. It holds no loud seconds by definition.
+        // Once per Tick, after the dock test and before the roll. The stowed seconds are this update's overlap with the OutHoldS
+        // window after the last loud moment: the tail SeenSeconds counts, at OutHoldS. It holds no loud seconds by definition.
         // With a chase on, they are all the update's quiet seconds: simDt less its loud seconds. No fill date is kept then:
         // RouteTick and RaiderWatch read none while the chase lasts.
         void Soak(Ship ship, double simDt)
@@ -35,7 +38,7 @@ namespace FogOfWar.OpenWorld
             if (!Build.Stowable || simDt <= 0 || !spanOk) return;
             if (ship.Fuel <= 0) { SinkK = SinkMaxK; return; }               // no water, no sink: radiators out
             double s = Encounter != null ? simDt - Math.Max(0, ship.LoudSeconds - spanLoud)
-                                         : (Math.Min(jd, ship.LastLoudJd + Signature.TrackHoldS / 86400) - Math.Max(spanJd, ship.LastLoudJd)) * 86400;
+                                         : (Math.Min(jd, ship.LastLoudJd + OutHoldS / 86400) - Math.Max(spanJd, ship.LastLoudJd)) * 86400;
             s = Math.Max(0, Math.Min(s, simDt));
             double toFullS = (SinkMaxK - SinkK) * WaterC * ship.Fuel * 1000 / SinkLoadW;
             if (Encounter == null && SinkK < SinkMaxK && toFullS <= s) fillJd = Math.Max(spanJd, ship.LastLoudJd) + toFullS / 86400;

@@ -8,7 +8,7 @@ namespace FogOfWar.OpenWorld
     {
         // Seconds of this update a raider could see the ship: its loud seconds, plus the time after its last loud moment, up
         // to HoldS. Gaps between two burns inside one update are left out (at most one frame). If the sink filled inside the
-        // update, the stowed hold counts up to the fill and TrackHoldS from it on: what one tick per frame would have counted.
+        // update, the stowed hold counts up to the fill and OutHoldS from it on: what one tick per frame would have counted.
         internal double SeenSeconds(Ship ship, double jd, double simDt)
         {
             if (!spanOk || simDt <= 0) return 0;
@@ -17,8 +17,8 @@ namespace FogOfWar.OpenWorld
             if (double.IsNaN(fillJd)) tail = (Math.Min(jd, l + HoldS(ship) / 86400) - from) * 86400;
             else
             {
-                double stowEnd = l + Signature.TrackHoldS * Build.StowRho / 86400;
-                tail = (Math.Max(0, Math.Min(jd, stowEnd) - from) + Math.Max(0, Math.Min(jd, l + Signature.TrackHoldS / 86400) - Math.Max(from, Math.Max(fillJd, stowEnd)))) * 86400;
+                double stowEnd = l + Signature.TrackHoldS * Build.DarkRho / 86400;
+                tail = (Math.Max(0, Math.Min(jd, stowEnd) - from) + Math.Max(0, Math.Min(jd, l + OutHoldS / 86400) - Math.Max(from, Math.Max(fillJd, stowEnd)))) * 86400;
             }
             return Math.Min(simDt, loud + Math.Max(0, tail));
         }

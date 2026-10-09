@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is designed below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (`stealth-contraband`) is built in this PR. PRs 3e–3f are not built. Phases 4–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is designed below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) is built. PR 3e (`stealth-corvette`) is built in this PR, on the placeholder model. PR 3f is not built: it needs the user's model. Phases 4–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -26,7 +26,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | W1–W4 | The world ([design-world.md](design-world.md)) | Factions, NPC traffic, threat map, pirates that board you | None | Built |
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
-| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Designed; 3a (#148), 3b (#149) and 3c (#150) built, 3d built in this PR, 3e–3f not built |
+| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Designed; 3a (#148), 3b (#149) and 3c (#150) built, 3d (#184) built, 3e built in this PR on the placeholder model, 3f not built (needs the user's model) |
 | 4 | Point defense | PDCs, armor, damage | Defense only | — |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
@@ -427,7 +427,7 @@ Pirates that board you moved to [design-world.md](design-world.md), phase W4.
 
 ## Phase 3: stealth
 
-This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (`stealth-contraband`) is built in this PR. PRs 3e–3f are not built.
+This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) is built. PR 3e (`stealth-corvette`) is built in this PR, on the placeholder model. PR 3f is not built: it needs the user's model.
 
 ### The rule
 
@@ -597,7 +597,7 @@ Example [calc]. The last loud moment is 30 min before a 3,600 s update. Stock: t
   - **Days and express include the hold.** The posted days and the express window add the 2 h hold (`Signature.TrackHoldS`) to the dwell. The dwell starts only after the arrival burn's hold. So a stock hull can still earn the express bonus. The planner arrival lines still leave out the hold wait. That is a later fix.
 - Built: `Career.Scout.cs` holds `ReconBody`, `QuietLine`, `QuietSeconds` and `Recon`. `Recon` draws no rng at other ports, and only the roll and the slack at Ceres and Vesta. It takes `nextId++` only when it posts a job, so contracts made after this board can get a different `Id`. Keys do not move.
 
-**Smuggling (3d, built in this PR): contraband cargo.**
+**Smuggling (3d, built, #184): contraband cargo.**
 - A Cargo job with `Contract.Contraband = true`. It keeps every Cargo gate (`RaidJob`, `PirateCall`, route events, the hand bonus), so it needs no new `JobKind`.
 - Posted at Tharsis and Compact ports (Mars, Vesta, Ceres, Ganymede, Callisto, Titan, Enceladus) in slot k = 9, with a 0.5 roll. The loop becomes `k < 10`. Slot 9 draws last, and draws nothing at a Guard port. So the jobs and keys of slots 0–8 do not move.
 - **It is posted only if the route's planner risk is at least 1 h:** `Threat.Of(...).Hours ≥ 1` at the posting date. The call costs about 1 ms and runs once per port-day (`RefreshBoard`, `Career.cs:485`).
@@ -622,9 +622,9 @@ Example [calc]. The last loud moment is 30 min before a 3,600 s update. Stock: t
 - Built: `Career.Smuggle.cs` holds `ContrabandPayFactor`, `CleanBonus`, `ExposureScale`, `ContrabandGoods`, `Grade`, `ContrabandLine`, `Expose` and `Smuggle`. The goods titles read through `InSentence` on the raider card. The card line reads "pays ×1.25 of the posted pay now" at exposure 0. It shows the grade, not a multiple of plain pay. `Haul` takes `nextId++` for each slot-9 job, so later `Id` values can shift at a posting port. Keys do not move. `Expose` charges each contraband job its own `PirateRate`, but the roll draws one job (`RaidJob`). So the match is exact when the contraband job is the one `RaidJob` returns.
 - **"Caught by the Guard"** (`design-world.md:136`) is not built in Phase 3. Phase 3 has no patrol sensor model. A follow-up can add one: a port with `PatrolG > 0` sees the ship within `RangeKm(P, StockKm, coldW)` of the port body. Then the stowed range matters to a second observer. That PR also adds `ChangeStanding(Faction, int)` (`Career.Factions.cs:57`).
 
-### The hull (3e, last gameplay PR) and the art (3f)
+### The hull (3e, last gameplay PR, built in this PR) and the art (3f, not built)
 
-**The corvette** [design]:
+**The corvette** (3e, built) [design]:
 - Name: "FWO-060 stealth corvette". Length 60 m.
 - Structure: 228 × (60/52)³ = 350.25 t [calc] (Phase 6 rule, `design-combat.md:501`).
 - `MaxThrust = Rated(3)` = 14.71 MN, so no Torch drive.
@@ -639,27 +639,38 @@ Corvette numbers [calc]:
 
 The frigate keeps `Facet = 1` and price 0, so every pin holds.
 
-**The multi-hull seam:**
-- `Hull` gains `Price`, `Facet`, `Model`, `int[] StockPick` (`ShipBuild.cs:17-21`). Append the corvette to `Hulls[]` (`:36-39`). Never rename or reorder hull 0. Its name is the save key.
-- `Stock(Hull h)`. Keep a no-argument `Stock()` that returns hull 0, for `Signature.StockBurnW` (`Signature.cs:26`), `Career.ExpressReport.cs:18` and QA.
-- `Checked()` (`:95-102`) sets `hull` first, then starts from that hull's stock pick.
-- `Career.Yard.cs:11-23`. A hull change counts as a change.
-  - It costs `to.Hull.Price − Build.Hull.Price × 0.7`, plus the per-slot module differences. It takes 7 days [design].
-  - It is refused with "buy out the ship first" while `!OwnsShip` (`Career.cs:105`).
+**The multi-hull seam** (3e, built):
+- `Hull` gains `Price`, `Facet` and `int[] StockPick` (`ShipBuild.cs:18-26`). `Model` is not added: 3f adds it with its first reader. The corvette is appended to `Hulls[]` (`:43-45`). Never rename or reorder hull 0. Its name is the save key.
+- `ShipBuild.StockPick` is now a property, `Hulls[0].StockPick`. Hull 0's `StockPick` stays the one source. A separate static field would duplicate it, and a `Hulls` initializer that read a field declared below it would see null (C# runs static initializers in text order).
+- `Stock(Hull h)` is new. The no-argument `Stock()` stays and returns hull 0, for `Signature.StockBurnW` (`Signature.cs:29`), `Career.ExpressReport.cs:18` and QA.
+- `Checked()` (`:108`) finds the hull first (an unknown name gives hull 0), starts from that hull's `Stock(h)`, then copies the valid picks.
+- `Career.Yard.cs` (`CanRefitTo`). A hull change counts as a change.
+  - It costs `to.Hull.Price − Build.Hull.Price × 0.7`, plus the per-slot module differences. It takes `HullRefitDays` = 7 days [design], plus the days of each changed slot. The existing rule sums the days.
+  - It is refused with "buy out the ship first" while `!OwnsShip` (`Career.cs:110`).
   - It is refused with "only Earth, Mars and Ceres sell hulls" where `!Docked.HullSale`.
-  - `Port.HullSale` is true for Earth orbit, Mars orbit and Ceres (`Career.cs:71,73,74`). This is agreed Decision 4. The check runs only on a hull change. Every port still refits parts.
+  - `Port.HullSale` (`Career.cs:14`) is true for Earth orbit, Mars orbit and Ceres (`:76,78,79`). This is agreed Decision 4. The check runs only on a hull change. Every port still refits parts.
+  - Both refusals come after "fitted" and before "too big for the hull". `RefitTo` puts the new hull's name first in the fitted list.
+  - Example [calc]: stock frigate to stock corvette. Hull: 400,000 − 0. Tank 1 to 2: 55,000 − 30,000 × 0.7 = 34,000. Hold 1 to 0: 10,000 − 14,000 = −4,000. Cabin 2 to 0: 0 − 10,500 = −10,500. Radiators 0 to 1: 60,000. Total 479,500 cr. Days: 7 + 1 + 1 + 0.5 + 1 = 10.5.
 - In the yard draft, picking a hull resets the picks to that hull's stock.
 - `ShipPaid` does not change with a hull swap. The new hull is paid in cash.
-- Both yard shells get a hull row before the slot loop: `YardPanel` (`Scenes/OpenSystemScene.Yard.cs:78`) and `BuildYard` (`:111`). It shows only at a hull-sale port. `JobsSignature` (`Scenes/OpenSystemScene.CareerHud.cs:234`) adds `Build.hull` and `yardDraft?.hull`. Without them, a swap with equal picks does not redraw.
-- `HoldS` and the cold power multiply by `Hull.Facet`. 3a already routes every reader through `HoldS`, so 3e adds no new call sites.
+- Both yard shells get a hull row before the slot loop: `YardPanel` (`Scenes/OpenSystemScene.Yard.cs:82`) and `BuildYard` (`:118`). It shows only at a hull-sale port. `JobsSignature` (`Scenes/OpenSystemScene.CareerHud.cs:230-246`) adds `Build.hull` and `yardDraft?.hull`. Without them, a swap with equal picks does not redraw.
+- **The facet.** It multiplies the hull's cold-range factor, always. With the radiators out, ρ_out = `Facet` (`ShipBuild.OutRho`). Stowed, ρ_dark = `StowRho × Facet` (`ShipBuild.DarkRho`). `Stowable` stays `StowRho < 1`: it is a property of the part, not of the hull. The frigate has `Facet = 1`, so every multiply is by 1.0, which is exact. `ColdW(1)` is `IdleW` exactly. Every frigate number is bit-identical.
+- **The readers.** The first draft said 3a routes every reader through `HoldS`, so 3e adds no new call sites. That was wrong. These readers change in 3e:
+  - `Career.Heat.cs`: new `OutHoldS` (`TrackHoldS × OutRho`, the hold with the radiators out). `HoldS` is `TrackHoldS × DarkRho` when dark-ready, else `OutHoldS`. `Stowed` and `Soak` use the `OutHoldS` window. `ColdW` is `Signature.ColdW(DarkRho)` stowed, else `Signature.ColdW(OutRho)`.
+  - `Career.Signature.cs` (`SeenSeconds`): the stowed hold uses `DarkRho`, and the tail after the fill uses `OutHoldS`.
+  - `Career.Pirates.cs` (`LoseInS`): `ColdW(StowRho)` becomes `ColdW(DarkRho)`.
+  - `Scenes/OpenSystemScene.Signature.cs`: the cold text tested `coldW < IdleW` to mean stowed. That is wrong for a corvette with the radiators out (0.222 MW). It tests `career.Stowed(ship, jd)` and prints the out power. It prints "cold (2 MW idle)" for the frigate, as before. The full-sink line prints `Signature.HoldText(career.OutHoldS)`, not the fixed "2 h".
+  - `Scenes/OpenSystemScene.Yard.cs`: the radiators label and the yard readouts take the facet (`PartLabel`, `YardReadouts`).
+  - Not changed, on purpose: `Career.Scout.cs` and `Career.Smuggle.cs` use the 2 h hold. A poster does not know the buyer's hull. `Threat.cs` keeps its defaults.
 
 **What ships without new art:**
 - 3a, 3b, 3c and 3d need no model, marker or texture. The radiators are a yard part, HUD text and a pill.
 - 3e uses a **placeholder: the existing `PlayerShip` model scaled to 60 m.** It looks like the frigate, 15.4 % longer (60/52) [calc]. The yard hull row says "(placeholder model)". The code change:
-  - `float realLen = 0.052f;` at `OpenSystemScene.cs:778` becomes `float realLen = HullKm();`. The file stays at 803 lines.
+  - `float realLen = 0.052f;` at `OpenSystemScene.cs:489` becomes `float realLen = HullKm();`. It is one line.
   - `HullKm()` goes in a new partial, `Scenes/OpenSystemScene.Hull.cs`.
   - The camera floor `0.045f` (`OpenSystemScene.Hud.cs:24`) scales by `HullKm() / 0.052f`.
-  - `shipLen` comes from the model's bounds (`OpenSystemScene.cs:356`), so the plume scales too.
+  - `shipLen` comes from the model's bounds (`OpenSystemScene.cs:199`), so the plume scales too.
+  - `Model` waits for 3f. 3e adds no `Hull.Model` field, because nothing would read it.
 - 3f is the drop-in for the user's Blender model. It needs new art:
   - `Resources/Models/StealthShip.fbx` and its atlas, `Models/StealthShip/StealthShip_{Albedo,Normal,Mask,Emission}.png`.
   - Markers: `Nose`, `Engine`, `Cockpit`, `RCS_<Fore|Aft>_<Up|Down|Left|Right>`, optional `PDC_n`, and new `Radiator_0..3`, modelled deployed with the pivot at the hinge.
@@ -687,7 +698,7 @@ All text comes from shared functions, so the classic panel, `-fowlegacyui` and t
 - 3b: one `sqrt` per update, only while a chase is on.
 - 3c: one `SeenSeconds` per quiet survey update (O(1)).
 - 3d: `PirateRate` (it allocates through `Threat.Presence`) only when `seenS > 0`, the same as the roll. `Threat.Of` once per port-day per slot.
-- 3e: none per frame.
+- 3e: none per frame. `HullKm()` runs per frame, but `ShipBuild.Hull` is a plain loop over the hull table, with no closure. The other new readers only multiply by a field.
 
 ### Save
 
@@ -701,7 +712,7 @@ All text comes from shared functions, so the classic panel, `-fowlegacyui` and t
 ### QA
 
 - Section 16 is in a new partial, `CareerQA.Stealth.cs`, chained at the end of `SignatureChecks` (`CareerQA.Signature.cs:29`). `CareerQA.cs` (827 lines) is not touched.
-- 3e adds `CareerQA.Hulls.cs`, chained from the end of `StealthChecks`.
+- 3e adds `CareerQA.Hulls.cs`, chained in `StealthChecks` after the smuggle checks (headless) and after the smuggle lines (scene), before `StealthLineChecks`.
 - Every check uses `Check(ok, msg)` and logs what it measured.
 - Run `-fowcareer` in the UI Toolkit shell and with `-fowlegacyui`. Toolkit-only parts log a SKIP line, as `CareerQA.Signature.cs:290` does.
 
@@ -765,7 +776,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - Both shells show the line.
 - The player notices: a high-pay watch on Pallas that counts only unseen time.
 
-**PR 3d: `stealth-contraband`** (needs new art: no. Built in this PR)
+**PR 3d: `stealth-contraband`** (needs new art: no. Built, #184)
 - Adds: `Contract.Contraband` and `Exposure`, slot k = 9 at Tharsis and Compact ports where the route risk is ≥ 1 h, the exposure sum, and the pay grade in `PayAt` (used by `Complete`).
 - [design] choices, as in the Smuggling section above: pick the destination, then test the route; a 1 g full-burn yardstick with the 2 h hold; exposure that accrues apart from calls, the gap and a chase; a grade that multiplies the express, late and spoiled pay, with the hand bonus left on the posted pay.
 - Touches:
@@ -781,25 +792,27 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - A save round trip keeps `Exposure`.
 - The player notices: a high-pay job that pays most for a quiet run.
 
-**PR 3e: `stealth-corvette`** (needs new art: no. It ships on the placeholder model and says so)
-- Adds: the multi-hull seam, the corvette, `Port.HullSale`, the hull swap rules, the yard hull row in both shells, `Hull.Facet` in `HoldS` and `ColdW`, `HullKm()`.
+**PR 3e: `stealth-corvette`** (needs new art: no. It ships on the placeholder model and says so. Built in this PR)
+- Adds: the multi-hull seam, the corvette, `Port.HullSale`, the hull swap rules (`HullRefitDays` = 7 plus the slot days), the yard hull row in both shells, the facet through `OutRho`, `DarkRho` and `OutHoldS` in every reader (see the hull section), `HullKm()`.
 - Touches:
-  - `OpenWorld/ShipBuild.cs`, `OpenWorld/Career.Yard.cs`, `OpenWorld/Career.cs` (`:8-14`, `:71-74`);
-  - `Scenes/OpenSystemScene.Yard.cs`, `.CareerHud.cs:234`;
-  - `OpenSystemScene.cs:778` (one line);
+  - `OpenWorld/ShipBuild.cs`, `OpenWorld/Career.Yard.cs`, `OpenWorld/Career.cs` (`:14`, `:76-79`);
+  - `OpenWorld/Career.Heat.cs`, `OpenWorld/Career.Signature.cs`, `OpenWorld/Career.Pirates.cs` (`:261`, one line);
+  - `Scenes/OpenSystemScene.Yard.cs`, `.Signature.cs`, `.CareerHud.cs:230-246`;
+  - `OpenSystemScene.cs:489` (one line);
   - `.Hud.cs:24`;
   - new `Scenes/OpenSystemScene.Hull.cs`;
   - new `CareerQA.Hulls.cs`.
 - QA:
   - `Hulls[0]` keeps its name. A 5-pick save loads the frigate. A corvette save round trips.
   - A swap is refused when unowned and at Luna, and allowed at Earth, Mars and Ceres.
-  - The swap cost equals the formula.
+  - The swap cost equals the formula. The stock frigate to the stock corvette costs 479,500 cr and 10.5 days.
+  - The corvette's hold is 720 s dark-ready and 2,400 s with the radiators out. Its cold power is 0.02 MW stowed and 0.222 MW out. The frigate's 2,160 s, 7,200 s and 2 MW do not change.
   - A Torch drive on the corvette is "too big for the hull".
   - The corvette is 433.25 t dry and 0.682 g, with a 17.44 h sink, 1,000 km and 12 min stowed, 3,333 km out.
   - Its Fast burn range is 0.4054 AU.
   - `realLen` is 0.060.
   - A swap with equal picks redraws the Jobs page.
-- The player notices: after the buyout, a 400,000 cr hull at Earth, Mars or Ceres that loses a raider in 12 min. It looks like the frigate, stretched 15 %, until the art lands.
+- The player notices: after the buyout, a 400,000 cr hull at Earth, Mars or Ceres that loses a raider in 12 min. It looks like the frigate, stretched 15 %, until the art lands (3f).
 
 **PR 3f: `stealth-corvette-art`** (needs new art: yes, the user's Blender model)
 - Adds: the model drop-in, `RefreshHullModel()`, the radiator fold, and the `ART-CONTRACT.md` entry.
@@ -930,8 +943,8 @@ Ordered by size. Your list put the destroyer first.
 | `ShipBuild.cs:5,44-78`, `Career.Heat.cs` (new), `Career.cs:46-61,182-220,630-635` | No heat state. No radiator part | `Slot.Radiators` (fixed or stowable); `Career.SinkK`, soaked once per tick and saved | 3 (3a) | Built (3a) |
 | `Signature.cs:17`, `Career.Signature.cs:15,46,55`, `Threat.cs:79,120,122,132` | One cold range (10,000 km) and one 2 h hold | `RangeKm(jetW, baseKm, coldW)`; `Career.HoldS` = ρ × 2 h for a dark-ready hull | 3 (3a) | Built (3a) |
 | `Career.Pirates.cs:10-19,204-246,298-308` | No lose-the-raider rule (D16) | `Encounter.FixJd`, `BreakOff.Lost`, for stowable hulls only | 3 (3b) | Built (3b) |
-| `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built (#150); 3d built in this PR |
-| `ShipBuild.cs:17-39,81,95-102`, `Career.Yard.cs:11-40`, `Career.cs:8-14,71-74`, `OpenSystemScene.cs:778`, `.Hud.cs:24`, `.CareerHud.cs:234`, `OpenSystemScene.Hull.cs` (new) | One hull | Per-hull stock, price and facet; `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | — |
+| `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built (#150); 3d built (#184) |
+| `ShipBuild.cs:18-26,43-45,90-94,108,128-129`, `Career.Yard.cs:9-40`, `Career.cs:14,76-79`, `Career.Heat.cs`, `Career.Signature.cs`, `Career.Pirates.cs:261`, `OpenSystemScene.cs:489`, `.Hud.cs:24`, `.CareerHud.cs:230-246`, `.Signature.cs`, `.Yard.cs`, `OpenSystemScene.Hull.cs` (new) | One hull; the cold range and hold are hull-blind | Per-hull stock, price and facet (`OutRho`, `DarkRho`, `OutHoldS`); `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | Built in this PR (placeholder model) |
 | `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The user's Blender model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Needs art |
 | `PlayerShip.json` | `PDC_0..5` unused | PDC mounts | 4 | — |
 | `Ship.cs:19-21`, `:44` | `RcsAccel`, `AngAccel`, `MaxRate`, `Ve` are `const` | Per instance (hulls, torpedoes) | 5–6 | — |
@@ -943,4 +956,4 @@ Ordered by size. Your list put the destroyer first.
 3. **Where stealth goes.** Right after Phase 2, as in the table. It needs signatures only.
 4. **Where the yards are.** Every port refits. Only big yards sell hulls: Earth, Mars, Ceres [design]. Phase 1 has one hull, so the hull rule waits for the second hull (Phase 3).
 
-Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is designed. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d is built in this PR. PRs 3e–3f are not built.
+Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is designed. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d (#184) is built. PR 3e is built in this PR, on the placeholder model. PR 3f is not built: it needs the user's model.

@@ -258,7 +258,7 @@ namespace FogOfWar.OpenWorld
         public double LoseInS(Ship ship, double jd)
         {
             var e = Encounter;
-            if (e == null || !DarkReady(ship) || !(e.Range >= Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(Build.StowRho)))) return double.NaN;
+            if (e == null || !DarkReady(ship) || !(e.Range >= Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(Build.DarkRho)))) return double.NaN;
             return HoldS(ship) - (jd - Math.Max(e.FixJd, ship.LastLoudJd)) * 86400;
         }
 
