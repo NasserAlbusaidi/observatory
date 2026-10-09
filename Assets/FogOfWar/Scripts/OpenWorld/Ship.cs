@@ -40,7 +40,7 @@ namespace FogOfWar.OpenWorld
         public double BurnSeconds;               // sim seconds with the drive firing (career scan time leaves these out)
         public double CruiseSeconds;             // accumulated plan coast, even when a whole coast fits in one frame
         public double LoudSeconds, LastLoudJd = double.NegativeInfinity; // Signature.Loud time, and the date it last was (not saved)
-        // Reaction mass. vₑ is D–He³ class (PHYSICS-REVIEW §3); every burn and RCS puff spends mass by the rocket
+        // Reaction mass. vₑ is D–He³ class (docs/MODEL-FIDELITY.md, Spacecraft decisions); every burn and RCS puff spends mass by the rocket
         // equation. Sandbox and QA runs keep UnlimitedFuel. Masses in tonnes.
         public const double Ve = 10000;          // km/s
         public double DryMass = 300, Fuel = 200, Cargo;
@@ -534,24 +534,54 @@ namespace FogOfWar.OpenWorld
         // Pursuit has an active braking curve, so a ballistic periapsis alone does not predict an impact. Its guard
         // checks the segment to the stopping point along the velocity, plus a bounded turn margin. Radial stopping
         // distance alone falsely treats an off-axis moon-orbit approach as a plunge. The player's Climb is unchanged.
+        // #141: a run-out too fast to stop before the body is pushed sideways off its line instead, and is looked for as
+        // far out as a sideways burn needs. Inside 40 R alone, a 1 g pirate overshooting the player at 30-130 km/s
+        // flew through Vesta: its braking was what Pursue already gave, and 0.2 g sideways came too late.
+        const double BodySpeedBound = 100; // km/s; no body moves faster round the Sun (Mercury peaks at 59)
+
         D3? PursueClearance(SolarSystem sys, double jd)
         {
             foreach (var b in Obstacles)
             {
                 if (b == null || b == sys.Sun || b == Target || b.GM < 1) continue;
                 var r = Pos - sys.Pos(b, jd); double rm = r.Mag;
-                if (rm > 40 * b.Radius) continue;
-                var outward = r / Math.Max(rm, 1e-9); var v = Vel - sys.Vel(b, jd);
                 // Avoid still bends the path outside 1.5 R + 200 km. This last-resort braking guard protects the
                 // physical surface, rather than repeatedly ejecting a safe approach from that wider routing margin.
-                double inward = -D3.Dot(v, outward), safe = b.Radius * 1.1 + 20;
+                double safe = b.Radius * 1.1 + 20;
+                // a dodge under way pushes on to 1.2 safe, so Pursue's pull back toward the line does not toggle it
+                double clear = safe * (guardBody == b && Phase.StartsWith("climbing") ? 1.2 : 1.1);
+                double lead = 2 * Math.Sqrt(2 * clear / Math.Max(AMax, 1e-9));
+                bool near = rm <= 40 * b.Radius;
+                if (!near && rm > clear + (Vel.Mag + BodySpeedBound) * lead) continue; // cheap cut before the velocity lookup
+                var outward = r / Math.Max(rm, 1e-9); var v = Vel - sys.Vel(b, jd);
+                double speed = v.Mag;
+                if (!near && rm > clear + speed * lead) continue;
+                double inward = -D3.Dot(v, outward);
                 double net = Math.Max(AMax - b.GM / (rm * rm), 1e-9);
-                double speed = v.Mag, stop = speed * speed / (2 * PursueMargin * net);
+                var direction = speed > 0 ? v / speed : D3.Zero;
+                double ahead = -D3.Dot(r, direction);
+                if (rm > safe && ahead > 0)
+                {
+                    var miss = r + direction * ahead; double m = miss.Mag;
+                    double entry = ahead - Math.Sqrt(Math.Max(0, clear * clear - m * m)), stopFull = speed * speed / (2 * net);
+                    if (m < clear && entry > 0 && stopFull > entry)
+                    {
+                        double te = entry / speed, side = 0.5 * AMax * te * te;
+                        if (side / (clear - m) > entry / stopFull)
+                        {
+                            guardBody = b;
+                            var away = m > 1e-6 * clear ? miss / m : D3.Cross(b.Pole, direction);
+                            if (away.Sqr < 1e-12) away = D3.Cross(new D3(1, 0, 0), direction);
+                            return away.Norm * AMax;
+                        }
+                    }
+                }
+                if (!near) continue;
+                double stop = speed * speed / (2 * PursueMargin * net);
                 double turnMargin = Math.Min(0.05 * safe, speed * 5);
                 // The minimum radius on the whole braking segment, not just the radius of its endpoint: a stop
                 // beyond the far side of the body must still trigger the guard. A safe pole approach misses it.
-                var direction = speed > 0 ? v / speed : D3.Zero;
-                double along = Math.Max(0, Math.Min(stop + turnMargin, -D3.Dot(r, direction)));
+                double along = Math.Max(0, Math.Min(stop + turnMargin, ahead));
                 double closest = (r + direction * along).Mag;
                 if (rm > safe && (inward <= 0 || closest > safe)) continue;
                 guardBody = b;

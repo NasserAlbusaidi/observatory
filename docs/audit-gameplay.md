@@ -133,7 +133,7 @@ At 10k× a Mars run (≈ 3.7 game-days) takes about 30 s of real time. Waiting i
   - The tender button shows only when undocked (`OpenSystemScene.CareerHud.cs:127`).
 - **Wrong text:** `OpenSystemScene.Hud.cs:467` says hand flying drops to 10×. The code drops to 1×.
 - **Pip count:** the tutorial ARRIVAL card shows 7 pips after 11 steps (`OpenSystemScene.TutorialHud.cs:226`).
-- **Dead code:** the passenger deadline floor at `Career.cs:448` never applies.
+- **Dead code (fixed, #153):** the passenger deadline floor never applied. It is removed; `CareerQA.EventsAndSaves.cs` 5b checks the 1 g margin on the board's passenger jobs.
 
 ## Suggested order
 

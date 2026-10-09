@@ -279,8 +279,13 @@ namespace FogOfWar
             double d = (qs.PosAt(to, j0) - qs.PosAt(from, j0)).Mag - Ship.Standoff(to);
             var full = Threat.Of(qs, from, D3.Zero, to, j0, d, Ship.G0);
             var dark = Threat.Of(qs, from, D3.Zero, to, j0, d, Ship.G0, 0, 2160);
-            Check(Near(full.Hours, 3.50, 0.05) && dark.Hours < full.Hours && dark.Hours > 0,
-                $"stealth: Mars orbit → Vesta at 1 g: {full.Hours:0.00} h with the default hold ({full.Leaving:0.00} leaving, {full.Arriving:0.00} arriving; 3.50 ± 0.05), {dark.Hours:0.00} h with a hold of 2,160 s ({dark.Leaving:0.00} leaving, {dark.Arriving:0.00} arriving; fewer, above 0)");
+            // #162: a port docks the ship at once, so the hold does not reach Vesta; Pallas has no port and holds it in the open
+            Body pallas = qs["Pallas"];
+            double dp = (qs.PosAt(pallas, j0) - qs.PosAt(from, j0)).Mag - Ship.Standoff(pallas);
+            var fullP = Threat.Of(qs, from, D3.Zero, pallas, j0, dp, Ship.G0);
+            var darkP = Threat.Of(qs, from, D3.Zero, pallas, j0, dp, Ship.G0, 0, 2160);
+            Check(Near(full.Hours, 2.00, 0.05) && Near(dark.Hours, full.Hours, 1e-9) && darkP.Hours < fullP.Hours && darkP.Hours > 0,
+                $"stealth: Mars orbit → Vesta at 1 g: {full.Hours:0.00} h with the default hold, {dark.Hours:0.00} h with a hold of 2,160 s (2.00 ± 0.05, the same: no hold at a port); Mars orbit → Pallas: {fullP.Hours:0.00} h against {darkP.Hours:0.00} h ({fullP.Arriving:0.00} and {darkP.Arriving:0.00} arriving; fewer, above 0)");
             string stock = Threat.Line(full), short_ = Threat.Line(full, 2160);
             Check(stock.Contains("2 h after one") && short_.Contains("36 min after one"),
                 $"stealth: the planner line reads \"{stock}\" and, for a hold of 2,160 s, \"{short_}\"");

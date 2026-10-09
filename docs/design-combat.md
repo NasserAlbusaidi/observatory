@@ -203,22 +203,22 @@ The stock and Torch rows match the doc's 0.23 and 0.52 AU.
 
 ### Raiders: the planner predicts it (PR 2a)
 
-`Threat.Of` (`Threat.cs:79-124`) keeps its signature. Three lines change:
+`Threat.Of` (`Threat.cs:80-127`) keeps its signature. Three lines change:
 
 | Phase | W3 today | Phase 2 |
 |---|---|---|
-| Held at the start (`:118`) | counted, 1.5 h | **dropped**: no burn, no track |
-| Speeding up (`:119`) | counted | counted: loud |
-| Slow coast (`:120`) | whole coast | **first 2 h only**: the departure burn's track |
-| Braking (`:121`) | counted | counted: loud |
-| Held at the target (`:122`) | 1.5 h | 1.5 h: within 2 h of the braking burn |
+| Held at the start (`:119`) | counted, 1.5 h | **dropped**: no burn, no track |
+| Speeding up (`:120`) | counted | counted: loud |
+| Slow coast (`:121`) | whole coast | **first 2 h only**: the departure burn's track |
+| Braking (`:122`) | counted | counted: loud |
+| Held at the target (`:125`) | 1.5 h | 1.5 h at a body with no port; **dropped** at a port (#162, decision 9) |
 
 Exposed hours (presence, patrol reach and e^(−v/70.6 km/s) unchanged). Chance at 0.2 calls/h [calc]:
 
 | Case | W3 today | Phase 2 |
 |---|---|---|
-| Mars orbit → Vesta, 1 g | 3.50 h, high (50 %) | 3.50 h, high (50 %) |
-| Mars orbit → Vesta, 3 g | 2.17 h | 2.17 h |
+| Mars orbit → Vesta, 1 g | 3.50 h, high (50 %) | 3.50 h, high (50 %); **2.00 h, moderate** since #162 |
+| Mars orbit → Vesta, 3 g | 2.17 h | 2.17 h; **0.67 h** since #162 |
 | Mars orbit → Ceres (2 g patrol) | 0.75 h | 0.75 h |
 | Earth → Luna | 0 | 0 |
 | Vesta → Mars orbit, 1 g | 3.50 h (1.5 h hold + 2.0 h burn) | **2.00 h** |
@@ -228,13 +228,13 @@ Exposed hours (presence, patrol reach and e^(−v/70.6 km/s) unchanged). Chance 
 | Survey dwell after the braking burn, 2 h | 33.0 % | 33.0 % |
 | Hand-flown trip, any | 0 % (gate) | as the planned trip |
 
-- Every W3 number and every check at `CareerQA.Threat.cs:31-34` stays as it is. The "dock first" clause (`Threat.cs:131`) stays.
+- Every W3 check at `CareerQA.Threat.cs:31-34` stays as it is. The "dock first" clause (`Threat.cs:134`) stays. #162 later dropped the port hold (decision 9), which moves the two Mars orbit → Vesta numbers.
 - **The third axis is real for cruise.**
   - Today a ¼ cruise counts 2.4× the risk of a full burn.
   - In Phase 2 it is the quietest of the three. The long coast goes cold 2 h after the departure burn.
   - At full thrust the drive choice moves only the time spent burning: Δv / a.
-- **Known pessimism, unchanged.** `FindDock` (`Career.cs:253-270`) docks a ship as soon as it is inside `DockRange`, bound, with the drive off. `RouteTick` then returns. So the 1.5 h port hold is never live exposure. It is live only at a survey body. See decision 9.
-- **The line** (`Threat.cs:132`) reads: "Raider risk: high. 3.5 h slow and seen (a burn, or 2 h after one), out of patrol reach in raider space, most of it on arrival: dock first and a raider can't board."
+- **Port hold dropped (#162).** `FindDock` (`Career.cs:253-270`) docks a ship as soon as it is inside `DockRange`, bound, with the drive off, so the 1.5 h hold at a port was never live exposure. `Threat.Of` now counts the hold only at a body with no port, such as a survey target. See decision 9.
+- **The line** (`Threat.cs:135`) reads: "Raider risk: moderate. 2.0 h slow and seen (a burn, or 2 h after one), out of patrol reach in raider space, most of it on arrival: dock first and a raider can't board."
 
 ### What the player sees and does not see
 
@@ -405,7 +405,7 @@ PR 2a depends on decisions 1 to 7.
 6. **[2a] Baselines:** 2 MW idle for every hull, 10,000 km for stock sensors, raiders on stock sensors. Add the labelled `MODEL-FIDELITY.md:32` line: signature = jet power (RCS included) + idle, not waste heat. Recommend confirming the doc values.
 7. **[2a] The Signature row replaces the exhaust-power row**, with RCS now included. One formula (`Signature.JetW`) serves the HUD, the yard and the roll. Recommend.
 8. **Keep `RaidsPerHour` 0.2 and the tiers (0.1 / 1 / 3 h).** All W3 numbers stay. Recommend. Measure the calls per trip once hand fliers are raided, then tune.
-9. **Planner port hold.** The 1.5 h hold at a port is never live exposure: `FindDock` docks the ship at once. Recommend: keep it in 2a (the dock-first clause explains it). A later one-line PR can count it only at survey bodies, which moves Mars→Vesta from 3.50 h to 2.00 h.
+9. **Planner port hold. Done (#162).** The 1.5 h hold at a port is never live exposure: `FindDock` docks the ship at once. The planner now counts the hold only at a body with no port. Mars orbit → Vesta moves from 3.50 h to 2.00 h at 1 g, and from 2.17 h to 0.67 h at 3 g.
 10. **Frame-end speed.** `PirateRate` reads `ship.Vel` at the end of the update. At 1M× a whole brake can end near v = 0 inside one frame, so the roll can overcount. Recommend: a manual planned-vs-flown check at 100k× and 1M× in 2a. If it drifts, weight by the span mean (e^(−v0/V) + e^(−v1/V))/2 using `spanVel`.
 11. **[2b] Traffic mass** = 500 t × (L/52 m)³ wet, 2 MW idle. Recommend.
 12. **[2b] Sky** shows seen traffic only. `Signature.RevealAll` is for shots and QA only, with no player setting. Recommend, and judge it on the measured counts. The fallback is a const flag that keeps the other ships as dim dots.

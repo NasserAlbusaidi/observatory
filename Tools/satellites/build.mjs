@@ -1,7 +1,7 @@
 // Builds Resources/Ephem/Satellites.json for the Open System from JPL SSD tables:
 //   https://ssd.jpl.nasa.gov/sats/elem/      mean elements referred to the local Laplace planes
 //   https://ssd.jpl.nasa.gov/sats/phys_par/  GM and mean radius (where measured)
-// The tables round each period to 4-5 digits, which would drift resonant moons by degrees per year (PHYSICS-REVIEW #1).
+// The tables round each period to 4-5 digits, which would drift resonant moons by degrees per year.
 // So for moons with periods under 100 days, the mean motion n and the mean longitude at J2000 are re-fitted to JPL
 // Horizons positions over 2000-2100. The script then checks the Io-Europa-Ganymede Laplace angle.
 //

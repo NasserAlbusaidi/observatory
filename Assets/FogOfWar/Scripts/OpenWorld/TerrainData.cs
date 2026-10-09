@@ -9,8 +9,8 @@ namespace FogOfWar.OpenWorld
     // DEM, level 0 = the product's own samples, each level above it box-averaged 2×. Heights are metres above a sphere
     // of RefRadiusKm. Tiles load on demand from any thread and are kept in an LRU cache.
     //
-    // The pack is not in the build: the game looks for -fowterrain <dir>, then a Terrain folder next to the exe (or the
-    // project). Without it, bodies fall back to their 8K global maps.
+    // The pack is not in the build: the game looks for -fowterrain <dir>, then the FOW_TERRAIN_DIR environment variable,
+    // then a Terrain folder next to the exe (or the project). Without it, bodies fall back to their 8K global maps.
     public class TerrainData
     {
         public const int T = 256;
@@ -49,8 +49,10 @@ namespace FogOfWar.OpenWorld
                 if (i >= 0 && i + 1 < args.Length) tries.Add(args[i + 1]);
                 else
                 {
+                    // a machine with the pack elsewhere names it once in its environment
+                    var env = Environment.GetEnvironmentVariable("FOW_TERRAIN_DIR");
+                    if (!string.IsNullOrWhiteSpace(env)) tries.Add(env.Trim());
                     tries.Add(Path.Combine(Path.GetDirectoryName(Application.dataPath) ?? ".", "Terrain"));
-                    tries.Add(@"D:\SpaceSimArtSrc\terrain"); // the dev machine's pack
                 }
                 foreach (var t in tries) if (Directory.Exists(t)) { root = t; break; }
                 Debug.Log("Fog of War: terrain pack " + (root ?? "not found (8K globals only)"));
