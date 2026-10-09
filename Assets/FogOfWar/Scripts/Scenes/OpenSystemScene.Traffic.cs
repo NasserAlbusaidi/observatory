@@ -29,7 +29,7 @@ namespace FogOfWar
             if (Prof) swTraffic.Start();
             if (traffic == null) traffic = new Traffic(sys);
             traffic.Update(jd);
-            traffic.Sense(ship.Pos, jd, Signature.SensorKm(career?.Codex.SensorLevel ?? 0));
+            traffic.Sense(ship.Pos, jd, Signature.SensorKm(career?.Codex.SensorLevel ?? 0, career?.Codex.SensorFactor ?? 1));
             if (Prof) swTraffic.Stop();
         }
 

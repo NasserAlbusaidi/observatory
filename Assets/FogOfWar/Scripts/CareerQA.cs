@@ -390,6 +390,7 @@ namespace FogOfWar
             yield return ThreatChecks();
             yield return PursuitChecks();
             yield return PirateChecks();
+            yield return DefenseChecks(); // 17: raider missiles, damage, armor and repairs (CareerQA.Defense.cs)
 
             State("end");
             Finish();

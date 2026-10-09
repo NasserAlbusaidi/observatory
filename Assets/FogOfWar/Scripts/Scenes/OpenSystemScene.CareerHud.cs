@@ -231,7 +231,8 @@ namespace FogOfWar
         {
             var sb = new StringBuilder();
             sb.Append(career.Sandbox).Append('|').Append(Math.Round(career.Credits)).Append('|').Append(Math.Round(ship.Fuel, 1)).Append('|')
-              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(string.Join(",", career.Build.pick)).Append(career.InYard).Append(yardDraft == null ? "" : string.Join(",", yardDraft.pick)).Append(career.Build.hull).Append(yardDraft?.hull).Append('|').Append(ship.Target?.Name).Append('|')
+              .Append(career.Docked?.Name).Append('|').Append(career.ShipPaid).Append('|').Append(lesson).Append(ship.Landed != null).Append('|').Append(string.Join(",", career.Build.pick)).Append(career.InYard).Append(yardDraft == null ? "" : string.Join(",", yardDraft.pick)).Append(career.Build.hull).Append(yardDraft?.hull).Append('|')
+              .Append(career.Damage.drive).Append(career.Damage.sensors).Append(career.Damage.radiators).Append('|').Append(ship.Target?.Name).Append('|')
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             for (int i = 1; i < Career.Factions.Length; i++) sb.Append('s').Append(career.Standing((Faction)i));
             // pay and tonnes too: a raider's boarding or give-up changes them on a job that stays on

@@ -354,7 +354,9 @@ namespace FogOfWar
                     if (!own.Contains("owned True") || !own.Contains("cr earned")) { errors++; log.WriteLine("    ERROR 06o-ship-owned: expected the ship owned and the record"); }
                     os.TestBuyoutUndo();
                     os.OpenPage(0);
-                    // the yard with a courier draft: every readout fitted → draft, the trip check and the refit price
+                    // the yard with a courier draft: every readout fitted → draft, the trip check and the refit price; a drive
+                    // hit (combat 4a) puts the Repair row on top
+                    os.TestDamage(true);
                     os.TestYardDraft(true);
                     yield return Wait(0.6f);
                     os.TestYardScroll();
@@ -364,7 +366,11 @@ namespace FogOfWar
                     log.WriteLine($"    06y-yard: {yard}");
                     if (!yard.Contains("->") || !yard.Contains("Mars") || !yard.Contains("shown True") || yard.Contains("NaN") || yard.Contains("∞"))
                     { errors++; log.WriteLine("    ERROR 06y-yard: expected the draft's readouts, a trip check to Mars and the yard on screen"); }
+                    string repair = os.TestRepairReport();
+                    log.WriteLine($"    06y-yard repair: {repair}");
+                    if (!repair.StartsWith("Repair all: ")) { errors++; log.WriteLine("    ERROR 06y-yard: expected the Repair button for a drive hit"); }
                     os.TestYardDraft(false);
+                    os.TestDamage(false);
                 }
                 os?.OpenPage(1);
                 yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
@@ -664,6 +670,7 @@ namespace FogOfWar
             var nf = BindingFlags.Instance | BindingFlags.NonPublic;
             var scroll = typeof(FogOfWarApp).GetField("panelScroll", nf);
             var panel = typeof(FogOfWarApp).GetField("panelRect", nf);
+            os.TestDamage(true);
             os.TestYardDraft(true);
             yield return Wait(0.6f); // the panel lays out and draws the yard
             os.TestClassicYardReport(out float head);
@@ -676,12 +683,15 @@ namespace FogOfWar
             string yard = os.TestClassicYardReport(out head);
             float top = head - ((Vector2)scroll.GetValue(app)).y, view = ((Rect)panel.GetValue(app)).height;
             bool sized = tex.width == size.x && tex.height == size.y;
-            log.WriteLine($"  {tag}: {yard} | head at {top:F0} of {view:F0} in the panel, captured {tex.width}x{tex.height}");
+            string repair = os.TestClassicRepairReport();
+            log.WriteLine($"  {tag}: {yard} | head at {top:F0} of {view:F0} in the panel, captured {tex.width}x{tex.height} | repair: {repair}");
+            if (!repair.StartsWith("Repair all: ")) { errors++; log.WriteLine($"    ERROR {tag}: expected the classic panel's Repair button for a drive hit"); }
             if (!yard.Contains("->") || !yard.Contains("Mars") || !yard.Contains("drawn True") || yard.Contains("NaN") || yard.Contains("∞")
                 || head < 0 || top < -2 || top > view * 0.5f || !sized)
             { errors++; log.WriteLine($"    ERROR {tag}: expected the draft's readouts, a trip check to Mars and the yard's head in the panel's top half"); }
             Destroy(tex);
             os.TestYardDraft(false);
+            os.TestDamage(false);
             scroll.SetValue(app, Vector2.zero);
         }
 

@@ -88,6 +88,7 @@ namespace FogOfWar
                 // the raider 2 km off and matched, half the boarding time alongside: the next frame's card reads it
                 var off = (ship.Pos - sys.Pos(sys["Vesta"], jd)).Norm;
                 e.Pirate.Pos = ship.Pos - off * 2; e.Pirate.Vel = ship.Vel;
+                e.Magazine = 0; // inside FireKm: no salvo here, 4a's missiles are section 17's
                 e.Dwell = Threat.BoardingSeconds / 2;
                 Call("SetTarget", e.Proxy);
                 s.TestAimTargetAt(0.35f); // the raider in the open, left of the right-hand column
@@ -238,6 +239,7 @@ namespace FogOfWar
                 Put("classicClick", Array.FindIndex(call.Answers, a => a.What == Career.RouteAnswer.Run));
                 // the raider 2 km off as the target: this shell's target bracket has no name, so the tag stays
                 e.Pirate.Pos = ship.Pos - (ship.Pos - sys.Pos(sys["Vesta"], jd)).Norm * 2; e.Pirate.Vel = ship.Vel;
+                e.Magazine = 0; // inside FireKm: no salvo here, 4a's missiles are section 17's
                 Call("SetTarget", e.Proxy);
                 s.TestAimTargetAt(0.5f);
             });
@@ -357,6 +359,7 @@ namespace FogOfWar
                 // the raider 2 km off as the target: this shell's target bracket has no name, so the tag stays
                 if (!labelsWas) GameSettings.ShowLabels = true;
                 e.Pirate.Pos = ship.Pos - (ship.Pos - sys.Pos(sys["Vesta"], jd)).Norm * 2; e.Pirate.Vel = ship.Vel;
+                e.Magazine = 0; // inside FireKm: no salvo here, 4a's missiles are section 17's
                 Call("SetTarget", e.Proxy);
                 s.TestAimTargetAt(0.5f);
             });

@@ -139,6 +139,13 @@ namespace FogOfWar
             return e.Proxy.Name + (e.Dwell > 0 ? " alongside" : e.Range < Career.CloseKm ? " close" : " chasing");
         }
 
+        // combat 4a: the missiles in flight and left; changes only on a salvo or a hit
+        string RecMissiles()
+        {
+            var e = career?.Encounter;
+            return e == null ? "-" : $"{e.Missiles.Count} in flight, {e.Magazine} left";
+        }
+
         // ---------------------------------------------------------------- review checks
 
         // a ClickEvent sent straight to the call card's button i, so its click handler runs; no pointer picking, so a layer

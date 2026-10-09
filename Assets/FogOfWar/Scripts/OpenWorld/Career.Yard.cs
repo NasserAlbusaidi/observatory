@@ -38,6 +38,7 @@ namespace FogOfWar.OpenWorld
             foreach (Slot s in Enum.GetValues(typeof(Slot)))
                 if (to.pick[(int)s] != Build.pick[(int)s]) fitted.Add(to[s].Name);
             Credits -= cost;
+            ClearReplaced(to);
             Build = to.Clone();
             RefitJd = Math.Max(RefitJd, jd) + days;
             double spill = ship.Fuel - TankCapacity, refund = spill > 0 ? spill * Docked.FuelPrice : 0;
