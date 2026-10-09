@@ -848,7 +848,7 @@ PR 3a depends on D1-D6 and D11. Each has a safe default, the recommendation, so 
 
 ## Phase 4: point defense and damage
 
-Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), the raider's model (4c, part 1) is built (#191), and PR 4b (`pdc-mounts`) is built in this PR; the rest of 4c is not built. D1-D15 below are agreed as recommended. The 4a and 4b build notes under the build plan list where the code goes past or differs from this text.
+Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), the raider's model (4c, part 1) is built (#191), PR 4b is built (#192), and the rest of 4c (`pdc-fx`: the missile flares, the tracers, the kill and hit flashes and the 1× hold) is built in this PR. D1-D15 below are agreed as recommended. The 4a, 4b and 4c build notes under the build plan list where the code goes past or differs from this text.
 
 ### The rule
 
@@ -1100,6 +1100,13 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
 - Touches: `Scenes/OpenSystemScene.RaiderHud.cs`, new `Scenes/OpenSystemScene.Missiles.cs`, `OpenWorld/Career.Pirates.cs` (`WarpCap`), `Capture/UiShots.cs`.
 - QA: the cap is 1× from 20 s before an impact and lifts after it. Screenshots in both shells: the raider at 2 km, a salvo in flight, tracers.
 - The player notices: the fight is on screen at 1×.
+- **Built (4c part 2 notes)** (`pdc-fx`). The missile flares and the 1× hold. Tracers and kill flashes wait for 4b's PDCs.
+  - **The hold.** `Career.ImpactInS` is the nearest missile's |P| / `MissileKms`. `WarpCap` returns 1 when it is 20 s (`ImpactHoldS`) or less. The scene also ends a frame where the hold starts (`TickInner`), so no warp or frame time steps over it. Volley is unchanged, so the hit lands on the same update at any warp.
+  - **The warp comes back after the impact.** `CapWarp` keeps the warp the hold lowered and gives it back when the hold lifts, in the same chase. A `DropWarp`, a call card or the end of the chase cancels that. The text did not say; the raider fires again at once, and its next flight is up to 1,000 s.
+  - **The flares** (`Scenes/OpenSystemScene.Missiles.cs`). One holder per missile at `ship.Pos + P`, nose on the ship: an additive flare and a 100 m plume on the `Plume` shader. Under 14 px on screen the plume is drawn larger, and the flare is never under 4 px, so a missile reads at 40 km. While it is drawn larger, a 3 px dot and a tag ("Missile · 30 km · 15 s") in the Raiders' colour mark it. A salvo's two missiles fly on one line (4a), so they draw as one.
+  - **The hit flash.** On `MissileHit`, and on the cabin hit's `JobFailed` "Hit:" note. It swells and fades at the hull on the side the missile came in on, over 0.6 s of real time, and is freed after.
+  - Flares, materials and meshes are freed when the chase ends, and in `Teardown`. The recorder's missiles field adds "held 1×" during the hold.
+  - QA 18a-18f in `CareerQA.MissileFx.cs`, after 17x-17z. The salvo is put in flight by hand, astern, with an empty magazine. Shots of the salvo at 30 km and 1 km and of the hit, in both shells. The damage the hits do is undone after.
 
 ### Decisions
 

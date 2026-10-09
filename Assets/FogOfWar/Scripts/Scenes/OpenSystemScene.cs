@@ -238,6 +238,7 @@ namespace FogOfWar
             Bloom.Enable(Cam, false);
             RecorderClose();
             DropRaiderModel(); // its materials are the chase's, not the scene's
+            DropMissileFx();
         }
 
         // ---------------------------------------------------------------- simulation
@@ -275,6 +276,10 @@ namespace FogOfWar
             CapWarp();
             TrackRoute();
             double simDt = Math.Min(dt * Warps[warpIdx], Math.Max(0, (QaStopJd - jd) * 86400));
+            // combat 4c (D11): a frame at any warp or frame time ends where the 1× hold before an impact starts, so the hold
+            // is never stepped over; the missiles' result does not depend on it (Career.Volley)
+            double toHold = career.ImpactInS - Career.ImpactHoldS;
+            if (toHold > Career.ImpactSlackS) simDt = Math.Min(simDt, toHold);
             double requested = simDt;
             warpLimited = false;
             // only bodies the ship could reach this frame get per-substep collision checks; craft (a derelict, the practice

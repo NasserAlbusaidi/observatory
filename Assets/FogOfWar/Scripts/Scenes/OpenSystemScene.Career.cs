@@ -48,6 +48,7 @@ namespace FogOfWar
         void WatchCareer(bool fresh)
         {
             autosaveArmed = !fresh; autosaveDue = false; autosaveNote = null; homePort = null; careerTicks = 0;
+            career.OnEvent += MissileEvent; // the hit flash (OpenSystemScene.Missiles.cs), in the sandbox too
             if (career.Sandbox) return;
             career.OnEvent += (what, port) =>
             {
@@ -249,7 +250,7 @@ namespace FogOfWar
                 autosaveNote = null;
             }
             // QA-041: a job ending out there, or a dry tank, drops time compression; a crossing caps it at 100×
-            if (career.DropWarp) { warpIdx = 0; career.DropWarp = false; }
+            if (career.DropWarp) { warpIdx = 0; heldFrom = -1; career.DropWarp = false; }
             if (career.TransferInProgress && warpIdx > 2) warpIdx = 2;
             CapWarp(); // a call this update starts a chase
             // a finished job's ship is gone from the system: stop flying toward it
@@ -499,7 +500,7 @@ namespace FogOfWar
         const float WreckKm = 0.038f;                                        // 38 m container hauler
         static readonly Vector3 WreckTumble = new Vector3(1.1f, 0.4f, 2.3f); // deg/s, from the art's Derelict.json
 
-        void LateCareer() { LateWreck(); LateRunner(); LateRaider(); }
+        void LateCareer() { LateWreck(); LateRunner(); LateRaider(); LateMissiles(); }
 
         // ---------------------------------------------------------------- the ship under thrust on an intercept job
 

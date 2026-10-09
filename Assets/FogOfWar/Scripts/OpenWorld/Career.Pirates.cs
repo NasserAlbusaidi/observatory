@@ -96,15 +96,35 @@ namespace FogOfWar.OpenWorld
         public Func<Body, bool> Divert;
         bool contactLost; // a load dropped an encounter: the note waits for a tick, which knows the date and the ship
 
+        public const double ImpactHoldS = 20; // [design] D11 (combat 4c): 1× for the last 20 s before an impact, 40 km out
+        // A frame cut to end at the hold lands within jd's 40 µs grid of it, so the hold takes that frame's end as in: the
+        // scene would otherwise cut a frame of nothing, and time would stop
+        public const double ImpactSlackS = 0.01;
+
+        // The seconds to the next missile impact: the flight is straight in the ship's frame at MissileKms, so |P| / MissileKms
+        // (Volley). Infinite with none in flight, and in the sandbox, whose tick flies no missiles.
+        public double ImpactInS
+        {
+            get
+            {
+                var e = Encounter;
+                double t = double.PositiveInfinity;
+                if (e == null || Sandbox) return t;
+                foreach (var m in e.Missiles) t = Math.Min(t, m.P.Mag / MissileKms);
+                return t;
+            }
+        }
+
         // The time compression the scene must hold to while a raider gives chase (0: none). The range is taken now, not at
         // the last update, so the scene's cap before a frame's sim time is set is that frame's. A chase the raider can't win
-        // ends after GiveUpS (#98).
+        // ends after GiveUpS (#98). 4c: 1× from ImpactHoldS before an impact; the scene ends the frame before it there.
         public double WarpCap
         {
             get
             {
                 var e = Encounter;
                 if (e == null) return 0;
+                if (ImpactInS <= ImpactHoldS + ImpactSlackS) return 1;
                 double range = ship != null ? (e.Pirate.Pos - ship.Pos).Mag : e.Range;
                 return range < CloseKm || e.Dwell > 0 ? CloseWarp : ChaseWarp;
             }
