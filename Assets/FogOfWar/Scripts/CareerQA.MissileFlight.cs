@@ -9,7 +9,7 @@ namespace FogOfWar
     // starts at the raider's closing speed, burns 30 g until it has added 10 km/s, then coasts, straight at the ship in the
     // ship's frame. 17m: a raider closing at 5 km/s fires at 1,999 km; the salvo hits at the closed form (144.6 s, 15 km/s)
     // and the raider never passes it. 17n: a raider at rest 2,000 km off, at updates the length of a 1×, a 100× and a 1,000×
-    // frame: the hit on the update that holds 216.9 s, the burn's end on the one that holds 34.0 s, 10 km/s at the coast, and
+    // frame: the hit on the update that holds 217.0 s, the burn's end on the one that holds 34.0 s, 10 km/s at the coast, and
     // the kill roll at 10 km/s. 17o: the kill roll takes the impact speed mid-burn and from a closing raider too. The kill
     // roll is read through set draws: the first missile's draw is just under KillChance(m, V), the second's just over, so
     // one kill means the chance used was V's within 1e-7. Flight is worked here, apart from Missile's own closed form.
@@ -76,7 +76,7 @@ namespace FogOfWar
                 Check(Near(s0, 5, 1e-9) && Near(from, 1999, 1e-6) && Near(want, 144.6, 0.1) && flight >= want - 1e-6 && flight < want + 1 && Near(kms, wantKms, 1e-6) && Near(wantKms, 15, 1e-9)
                       && ahead > 0 && gap > 0 && note == Career.FiredNote(2, want),
                     $"defense 17m: a raider closing at 5 km/s fires at {from:N1} km (1,999), its missiles starting at {s0:0.000000} km/s (5): they hit {flight:0} s later (the 1 s update that holds {want:0.00} s, 144.6), " +
-                    $"closing at {kms:0.000000} km/s over the last whole update ({wantKms:0}); the raider is then {ahead:N0} km out on the side it fired from (> 0) and was never past its salvo (the least lead {gap:N0} km, > 0); " +
+                    $"closing at {kms:0.000000} km/s over the last whole update ({wantKms:0}); the raider is then {ahead:N0} km out on the side it fired from (> 0) and was never past its salvo (the least lead {gap:N3} km, > 0, one update after it fired); " +
                     $"at the old 2 km/s it would have hit {from / 2:0} s after firing, with the raider by then past the ship; note \"{note}\"");
             }
             finally { b.C.DropContact(); }
@@ -92,6 +92,7 @@ namespace FogOfWar
             {
                 var d = Frame.FromU(dir);
                 var e = b.C.StartContact(b.Job, b.Sys, b.Ship, b.Jd, b.Ship.Pos + d * km, b.Ship.Vel - d * closing);
+                e.Magazine = Career.Salvo; // inside FireKm the raider would fire again on the update its salvo hits
                 var (T, V) = Flight(closing, km);
                 int bear = b.C.MountsBearing(b.Ship, d);
                 double p = PointDefense.KillChance(bear, V);
@@ -131,8 +132,8 @@ namespace FogOfWar
                 got.Add($"{warp:N0}×: {one}");
             }
             var (T, V) = Flight(0, Career.FireKm);
-            Check(ok && Near(T, 216.9, 0.1) && Near(V, 10, 1e-9),
-                $"defense 17n: a raider at rest {Career.FireKm:N0} km off, from the top (1 mount bears): {T:0.0} s (216.9) at {V:0} km/s (10), at updates of a 1×, a 100× and a 1,000× frame: {string.Join("; ", got)}");
+            Check(ok && Near(T, 217.0, 0.05) && Near(V, 10, 1e-9),
+                $"defense 17n: a raider at rest {Career.FireKm:N0} km off, from the top (1 mount bears): {T:0.000} s (217.0) at {V:0} km/s (10), at updates of a 1×, a 100× and a 1,000× frame: {string.Join("; ", got)}");
         }
 
         // 17o

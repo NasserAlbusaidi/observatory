@@ -348,9 +348,11 @@ namespace FogOfWar
                 s.QaFreeze = false;
             }
 
-            // from rest: 2,000 km is the fire range's 216.9 s; 250 km is 42.0 s, the burn ending 80 km out, in the hold
+            // from rest: 2,000 km is the fire range's 217.0 s; 250 km is 42.0 s, the burn ending 80 km out, in the hold
             if (go) yield return RunHold("1000x", 3, 12000, Career.FireKm, false);
             if (go) go = Guard("missile fx camera", () => { career.DropContact(); Look(true); });
+            // 18a's hit flash fades first: 18b's burn shot comes 0.2 s of real time after its start
+            for (float t0 = Time.unscaledTime; go && Time.unscaledTime - t0 < 0.8f;) yield return null;
             if (go) yield return RunHold("100x", 2, 300, 250, true);
             if (go) yield return TracerRun(false);
             if (go) yield return TracerRun(true);

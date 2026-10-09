@@ -73,10 +73,10 @@ namespace FogOfWar
             Check(shape && sums.TrueForAll(t => t == 100) && Career.HitWeights[0][(int)Career.HitSystem.Drive] == 0 && Career.HitWeights[2][(int)Career.HitSystem.Drive] == 60,
                 $"defense 17a: the hit table has 3 aspects of {systems} systems ({shape}), rows sum to {string.Join(", ", sums)} (100 each); drive fore {Career.HitWeights[0][0]} % (0), aft {Career.HitWeights[2][0]} % (60)");
             double fromRest = FlightS(0, Career.FireKm);
-            Check(Career.FireKm == 2000 && Career.MissileG == 30 && Career.MissileDvKms == 10 && Near(Career.BurnS, 33.99, 0.01) && Near(fromRest, 216.9, 0.1)
+            Check(Career.FireKm == 2000 && Career.MissileG == 30 && Career.MissileDvKms == 10 && Near(Career.BurnS, 33.99, 0.01) && Near(fromRest, 217.0, 0.05)
                   && Career.Salvo == 2 && Career.MagazineSize == 6 && Career.MaxHits == 2 && Career.HitFactor == 0.5
                   && Career.VentShare == 0.2 && Career.HoldShare == 0.2 && Career.RepairShare == 0.25,
-                $"defense 17a: fire {Career.FireKm:N0} km, {Career.MissileG} g to add {Career.MissileDvKms} km/s ({Career.BurnS:0.00} s, 33.99; from rest {fromRest:0.0} s from the fire range, 216.9), salvo {Career.Salvo}, magazine {Career.MagazineSize}, {Career.MaxHits} hits at ×{Career.HitFactor}, vent {Career.VentShare}, hold {Career.HoldShare}, repair {Career.RepairShare}");
+                $"defense 17a: fire {Career.FireKm:N0} km, {Career.MissileG} g to add {Career.MissileDvKms} km/s ({Career.BurnS:0.00} s, 33.99; from rest {fromRest:0.000} s from the fire range, 217.0), salvo {Career.Salvo}, magazine {Career.MagazineSize}, {Career.MaxHits} hits at ×{Career.HitFactor}, vent {Career.VentShare}, hold {Career.HoldShare}, repair {Career.RepairShare}");
             var armor = ShipBuild.Catalog[(int)Slot.Armor];
             string rows = string.Join("; ", Array.ConvertAll(armor, m => $"{m.Name} {m.Mass} t {m.Price:N0} cr {m.RefitDays} d stops {m.Size}"));
             Check((int)Slot.Armor == 6 && armor.Length == 3 && armor[0].Name == "No armor" && armor[0].Mass == 0 && armor[0].Price == 0 && armor[0].RefitDays == 0.5 && armor[0].Size == 0
