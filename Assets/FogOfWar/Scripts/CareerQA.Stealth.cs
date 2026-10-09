@@ -41,6 +41,7 @@ namespace FogOfWar
             Guard("stealth hull yard", StealthHullShellChecks);
             Guard("stealth hull art files", HullArtFileChecks);
             yield return HullArtSceneChecks(); // 16o (CareerQA.HullArt.cs)
+            yield return PointDefenseChecks(); // 17p-17t: the PDC pass and the mount table (CareerQA.PointDefense.cs)
             yield return StealthLineChecks(); // 16k and 16l (CareerQA.StealthLines.cs)
         }
 
@@ -111,15 +112,15 @@ namespace FogOfWar
             var stock = ShipBuild.Stock();
             var st = ShipBuild.Stock();
             st.pick[(int)Slot.Radiators] = 1;
-            Check(ShipBuild.StockPick.Length == 7 && ShipBuild.StockPick[5] == 0 && !stock.Stowable && Near(stock.DryMass, 300, 1e-9),
-                $"stealth: the stock pick has {ShipBuild.StockPick.Length} slots (7 with 4a's armor), radiators pick {ShipBuild.StockPick[(int)Slot.Radiators]} (0), stock stowable {stock.Stowable} (False), dry {stock.DryMass:0.000000000} t (300 ± 1e-9)");
+            Check(ShipBuild.StockPick.Length == 8 && ShipBuild.StockPick[5] == 0 && !stock.Stowable && Near(stock.DryMass, 300, 1e-9),
+                $"stealth: the stock pick has {ShipBuild.StockPick.Length} slots (8 with 4a's armor and 4b's PDCs), radiators pick {ShipBuild.StockPick[(int)Slot.Radiators]} (0), stock stowable {stock.Stowable} (False), dry {stock.DryMass:0.000000000} t (300 ± 1e-9)");
             Check(Near(st.DryMass, 312, 1e-9) && Near(st.GFull, 0.9765625, 1e-9) && Near(st.GEmpty, 1.6026, 1e-4) && Near(st.DvFull, 4953.2, 0.1) && Near(st.StowRho, 0.3, 1e-12) && st.Stowable,
                 $"stealth: the stowable build is {st.DryMass:0.000000000} t dry (312 ± 1e-9), {st.GFull:0.0000000000} g full (0.9765625 ± 1e-9), {st.GEmpty:0.000000} g empty (1.6026 ± 1e-4), {st.DvFull:0.000} km/s (4,953.2 ± 0.1), rho {st.StowRho} (0.3), stowable {st.Stowable}");
 
             var old = JsonUtility.FromJson<CareerSave>("{\"build\":{\"hull\":\"FWO-052 light frigate\",\"pick\":[1,1,1,2,0]}}");
             var c = new Career { Sys = sys };
             c.FromSave(old, new Ship());
-            Check(c.Build.pick.Length == 7 && c.Build.pick[5] == 0 && !c.Build.Stowable && c.Build.Hull == ShipBuild.Hulls[0],
+            Check(c.Build.pick.Length == 8 && c.Build.pick[5] == 0 && !c.Build.Stowable && c.Build.Hull == ShipBuild.Hulls[0],
                 $"stealth: an old 5-pick build loads as {c.Build.pick.Length} picks ({string.Join(",", c.Build.pick)}), radiators pick {c.Build.pick[(int)Slot.Radiators]} (0), stowable {c.Build.Stowable} (False)");
         }
 

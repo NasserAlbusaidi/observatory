@@ -63,6 +63,10 @@ Adopts the art side's `OPEN-WORLD-ART.md` naming. The code is the source of trut
 - Wired. The code aligns `Nose` to the direction of thrust, scales to `lengthM` (52 m), pulses `Engine` from its
   origin at the nozzle, and draws the drive plume behind it. `Cockpit`, `RCS_*` and `PDC_*` are reserved for the
   cockpit camera, RCS puffs and point-defence turrets.
+- `PDC_0..5` are empties. Each one's local +Y (as Unity imports it) is the turret's zenith, and the mount covers 100°
+  about it, a hemisphere and 10° more (zenith · d > −sin 10°; the hull blocks nothing). `Hull.Mounts` in `ShipBuild.cs` holds the six zeniths
+  in the ship's body frame (x starboard, y up, z nose); QA 17t checks them against the model within 1°, so a moved or
+  turned `PDC_n` needs that table changed with it.
 - Textured (ship-visuals branch): `Models/PlayerShip/PlayerShip_{Albedo,Normal,Mask,Emission}.png`, 4096 (emission
   2048), from `Blender/ship_pbr.py`. One UV atlas on the hull mesh; `Engine` keeps its glow material. Albedo and
   emission sRGB; **Normal is object space in Blender axes** (all three channels, BC7, not BC5; ShipPBR converts with
@@ -76,7 +80,7 @@ Adopts the art side's `OPEN-WORLD-ART.md` naming. The code is the source of trut
   or a new career). Same frame as the player ship (x from -0.60 nozzle exit to +0.50 nose, 1.1 model units), scaled to
   the hull's `lengthM` (60 m). Markers: `Nose`, `Engine` (origin at the bell throat), `Cockpit`, the eight
   `RCS_<Fore|Aft>_<Up|Down|Left|Right>`, `PDC_0..5`, and `Radiator_0..3`. `Cockpit`, `RCS_*` and `PDC_*` are reserved,
-  as on the player ship.
+  as on the player ship, and the `PDC_n` zenith rule is the same.
 - `Radiator_0..3` are separate objects with their origin on the hinge and local X from hinge to tip (never apply their
   transforms). While the radiators are stowed (`Career.Stowed`) each one's local X scale eases to 0.05 of its import
   value over 1.5 s of real time, and back when they come out. The FBX axis conversion swaps the panel's local Y and Z;

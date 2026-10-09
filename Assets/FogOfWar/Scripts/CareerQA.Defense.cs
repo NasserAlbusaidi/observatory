@@ -16,7 +16,8 @@ namespace FogOfWar
     // missiles (17h); the route and board draws (17i); the save (17j); then in the scene the Missiles and Damage rows (both
     // shells) and the yard's Repair row (UI Toolkit; UiShots -fowclassicshots reads the classic one), and the notes against the
     // classic note strip (17l). Headless parts run on benches of their own at the pursuit check's date (CareerQA.Pirates.cs).
-    // 4b goes on from 17p. Every [calc] number was worked by hand: every check logs what it measured.
+    // 4b's math is 17p-17t; its part in play is 17u-17w (CareerQA.PointDefense.cs), run here. Every [calc] number was worked
+    // by hand: every check logs what it measured.
     public partial class CareerQA
     {
         sealed class CountingRng : System.Random
@@ -41,8 +42,12 @@ namespace FogOfWar
                 Guard("defense ends", () => DefenseEndChecks(qs));
                 Guard("defense rng", () => DefenseRngChecks(qs));
                 Guard("defense save", () => DefenseSaveChecks(qs));
+                Guard("pdc fit", () => PdcFitChecks(qs));
+                Guard("pdc strike", () => PdcStrikeChecks(qs));
+                Guard("pdc boarding", () => PdcBoardingChecks(qs));
             }
             yield return DefenseSceneChecks();
+            yield return PdcSceneChecks();
             yield return DefenseNoteChecks(qs);
         }
 
@@ -73,8 +78,8 @@ namespace FogOfWar
             Check((int)Slot.Armor == 6 && armor.Length == 3 && armor[0].Name == "No armor" && armor[0].Mass == 0 && armor[0].Price == 0 && armor[0].RefitDays == 0.5 && armor[0].Size == 0
                   && armor[1].Name == "Light plating" && armor[1].Mass == 15 && armor[1].Price == 40000 && armor[1].RefitDays == 2 && armor[1].Size == 0.5
                   && armor[2].Name == "Heavy plating" && armor[2].Mass == 40 && armor[2].Price == 100000 && armor[2].RefitDays == 3 && armor[2].Size == 0.8
-                  && Array.TrueForAll(ShipBuild.Hulls, h => h.StockPick.Length == 7 && h.StockPick[(int)Slot.Armor] == 0),
-                $"defense 17a: Slot.Armor is index {(int)Slot.Armor} (6); {rows}; every hull's stock pick has 7 slots and no armor");
+                  && Array.TrueForAll(ShipBuild.Hulls, h => h.StockPick.Length == 8 && h.StockPick[(int)Slot.Armor] == 0),
+                $"defense 17a: Slot.Armor is index {(int)Slot.Armor} (6); {rows}; every hull's stock pick has 8 slots and no armor");
             var light = ShipBuild.Stock(); light.pick[(int)Slot.Armor] = 1;
             var heavy = ShipBuild.Stock(); heavy.pick[(int)Slot.Armor] = 2;
             Check(Near(light.DryMass, 315, 1e-9) && Near(light.GFull, 0.971, 0.0005) && Near(light.GEmpty, 1.587, 0.0005) && Near(light.DvFull, 4916, 1)
@@ -446,7 +451,7 @@ namespace FogOfWar
             old.FromSave(JsonUtility.FromJson<CareerSave>("{\"credits\":1000,\"fuel\":100,\"build\":{\"hull\":\"FWO-052 light frigate\",\"pick\":[1,1,1,2,0,1]}}"), new Ship());
             var bad = new Career { Sys = qs };
             bad.FromSave(JsonUtility.FromJson<CareerSave>("{\"credits\":1000,\"damage\":{\"drive\":9,\"sensors\":-3,\"radiators\":true}}"), new Ship());
-            Check(!old.Damage.Any && old.DriveFactor == 1 && old.Build.pick.Length == 7 && old.Build.pick[(int)Slot.Armor] == 0 && old.Build.Stowable
+            Check(!old.Damage.Any && old.DriveFactor == 1 && old.Build.pick.Length == 8 && old.Build.pick[(int)Slot.Armor] == 0 && old.Build.Stowable
                   && bad.Damage.drive == 2 && bad.Damage.sensors == 0 && !bad.Damage.radiators,
                 $"defense 17j: an old save with a 6-pick build and no damage field loads with no damage ({!old.Damage.Any}), picks {Picks(old.Build)} (no armor, stowable kept); a save with drive 9, sensors −3 and jammed fixed radiators loads as {bad.Damage.drive}, {bad.Damage.sensors}, {bad.Damage.radiators} (2, 0, False)");
         }
@@ -530,6 +535,9 @@ namespace FogOfWar
             bool go = Guard("defense notes setup", () =>
             {
                 texts.Add(Career.FiredNote(2, 999.9)); texts.Add(Career.FiredNote(2, 59)); texts.Add(Career.PlatingNote); texts.Add(Career.HullNote);
+                // 4b's: the kill, a mount lost of 6, the break-off with the longer haven's name
+                texts.Add(Career.KillNote); texts.Add(Career.MountNote(5, 6));
+                foreach (string haven in Threat.Havens) texts.Add(Career.OffNote(Career.BreakOff.Repelled, null, haven));
                 var (_, at, vel) = Belt(qs);
                 var b = MakeBench(qs, at, vel);
                 b.Job.Tonnes = 99.9 / Career.HoldShare; b.Job.Pay = 9999999 / Career.HoldShare;
@@ -567,7 +575,7 @@ namespace FogOfWar
                     if (widths[i] > strip) over.Add($"{widths[i]:F0} px \"{texts[i]}\"");
                 }
                 Check(over.Count == 0 && texts.Count >= 16,
-                    $"defense 17l: the 4a notes fit the classic note strip: {texts.Count} texts (every hit, each rider's cabin hit, 99.9 t and 9,999,999 cr, the repair), the widest {widths[widest]:F0} of {strip:F0} px: \"{texts[widest]}\"" +
+                    $"defense 17l: the 4a and 4b notes fit the classic note strip: {texts.Count} texts (every hit, each rider's cabin hit, 99.9 t and 9,999,999 cr, the repair), the widest {widths[widest]:F0} of {strip:F0} px: \"{texts[widest]}\"" +
                     (over.Count > 0 ? $"; {over.Count} too wide: " + string.Join("; ", over) : ""));
             });
         }

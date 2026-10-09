@@ -37,7 +37,7 @@ namespace FogOfWar
             var stock = ShipBuild.Stock();
             Check(f.Name == FrigateName && f.LengthM == 52 && f.Structure == 228 && f.MaxThrust == ShipBuild.Rated(5) && f.Facet == 1 && f.Price == 0,
                 $"hulls: hull 0 is \"{f.Name}\" ({FrigateName}), {f.LengthM} m (52), structure {f.Structure} t (228), max thrust {f.MaxThrust:0.000} MN ({ShipBuild.Rated(5):0.000}), facet {f.Facet:R} (1), price {f.Price:N0} cr (0)");
-            const string want = "1,1,1,2,0,0,0";
+            const string want = "1,1,1,2,0,0,0,0";
             string sp = string.Join(",", ShipBuild.StockPick), hp = string.Join(",", f.StockPick), st = Picks(stock);
             Check(sp == want && hp == want && st == want && stock.hull == FrigateName && Near(stock.DryMass, 300, 1e-9) && Near(stock.GFull, 1, 1e-9),
                 $"hulls: ShipBuild.StockPick {sp}, hull 0's stock pick {hp}, Stock() {st} ({want}), Stock() hull \"{stock.hull}\", dry {stock.DryMass:0.000000000} t (300 ± 1e-9), {stock.GFull:0.0000000000} g full (1 ± 1e-9)");
@@ -47,8 +47,8 @@ namespace FogOfWar
             var cs = ShipBuild.Stock(c);
             cs.pick[0] = 3; // a copy: the hull's own stock pick must not move
             string cp = string.Join(",", c.StockPick);
-            Check(c.LengthM == 60 && Near(c.Structure, 350.25, 0.005) && c.MaxThrust == ShipBuild.Rated(3) && Near(c.Facet, 1.0 / 3, 1e-15) && c.Price == 400000 && cp == "1,2,0,0,0,1,0" && cs.hull == CorvetteName && !c.Name.Contains("oud"),
-                $"hulls: \"{c.Name}\": {c.LengthM} m (60), structure {c.Structure:0.0000} t (350.25 ± 0.005), max thrust {c.MaxThrust:0.000} MN ({ShipBuild.Rated(3):0.000}, no Torch drive), facet {c.Facet:R} (1/3), price {c.Price:N0} cr (400,000), stock pick {cp} (1,2,0,0,0,1,0) after a copy of it was edited; no \"oud\" in the name");
+            Check(c.LengthM == 60 && Near(c.Structure, 350.25, 0.005) && c.MaxThrust == ShipBuild.Rated(3) && Near(c.Facet, 1.0 / 3, 1e-15) && c.Price == 400000 && cp == "1,2,0,0,0,1,0,0" && cs.hull == CorvetteName && !c.Name.Contains("oud"),
+                $"hulls: \"{c.Name}\": {c.LengthM} m (60), structure {c.Structure:0.0000} t (350.25 ± 0.005), max thrust {c.MaxThrust:0.000} MN ({ShipBuild.Rated(3):0.000}, no Torch drive), facet {c.Facet:R} (1/3), price {c.Price:N0} cr (400,000), stock pick {cp} (1,2,0,0,0,1,0,0) after a copy of it was edited; no \"oud\" in the name");
         }
 
         // 16n-2: the corvette's numbers, the stock pick of its hull
@@ -180,13 +180,13 @@ namespace FogOfWar
             var corv = HullNamed(CorvetteName);
             if (corv == null) { Check(false, $"hulls: no hull named \"{CorvetteName}\""); return; }
             var old = JsonUtility.FromJson<ShipBuild>("{\"hull\":\"" + FrigateName + "\",\"pick\":[1,1,1,2,0]}").Checked();
-            Check(old.Hull == ShipBuild.Hulls[0] && old.pick.Length == 7 && old.pick[5] == 0 && old.pick[6] == 0 && !old.Stowable,
-                $"hulls: a 5-pick frigate build checks to {old.hull} with picks {Picks(old)} (1,1,1,2,0,0,0), stowable {old.Stowable} (False)");
+            Check(old.Hull == ShipBuild.Hulls[0] && old.pick.Length == 8 && old.pick[5] == 0 && old.pick[6] == 0 && old.pick[7] == 0 && !old.Stowable,
+                $"hulls: a 5-pick frigate build checks to {old.hull} with picks {Picks(old)} (1,1,1,2,0,0,0,0), stowable {old.Stowable} (False)");
 
             string cj = JsonUtility.ToJson(ShipBuild.Stock(corv));
             var back = JsonUtility.FromJson<ShipBuild>(cj).Checked();
-            Check(back.hull == CorvetteName && Picks(back) == "1,2,0,0,0,1,0" && back.Hull == corv && !cj.Contains("oud"),
-                $"hulls: a corvette build goes through JsonUtility ({cj.Length} chars: {cj}) and checks to {back.hull} with picks {Picks(back)} (1,2,0,0,0,1,0); no \"oud\" in it");
+            Check(back.hull == CorvetteName && Picks(back) == "1,2,0,0,0,1,0,0" && back.Hull == corv && !cj.Contains("oud"),
+                $"hulls: a corvette build goes through JsonUtility ({cj.Length} chars: {cj}) and checks to {back.hull} with picks {Picks(back)} (1,2,0,0,0,1,0,0); no \"oud\" in it");
 
             var nameless = JsonUtility.FromJson<ShipBuild>("{\"hull\":\"no such hull\"}").Checked();
             var strange = JsonUtility.FromJson<ShipBuild>("{\"hull\":\"no such hull\",\"pick\":[9,-1]}").Checked();
@@ -199,8 +199,8 @@ namespace FogOfWar
             string json = JsonUtility.ToJson(b.C.ToSave(b.Ship));
             var c = new Career { Sys = qs };
             c.FromSave(JsonUtility.FromJson<CareerSave>(json), new Ship());
-            Check(c.Build.hull == CorvetteName && Picks(c.Build) == "1,2,0,0,0,1,0" && Near(c.DryMass, 433.25, 0.005) && !json.Contains("oud"),
-                $"hulls: a career save with the corvette fitted ({json.Length} chars) loads as {c.Build.hull} (corvette) with picks {Picks(c.Build)} (1,2,0,0,0,1,0), {c.DryMass:0.0000} t dry (433.25 ± 0.005); the save holds no \"oud\" ({!json.Contains("oud")})");
+            Check(c.Build.hull == CorvetteName && Picks(c.Build) == "1,2,0,0,0,1,0,0" && Near(c.DryMass, 433.25, 0.005) && !json.Contains("oud"),
+                $"hulls: a career save with the corvette fitted ({json.Length} chars) loads as {c.Build.hull} (corvette) with picks {Picks(c.Build)} (1,2,0,0,0,1,0,0), {c.DryMass:0.0000} t dry (433.25 ± 0.005); the save holds no \"oud\" ({!json.Contains("oud")})");
         }
 
         // a career docked at a port by the real path, with no job aboard, credits in hand and the ship owned or not
@@ -411,8 +411,8 @@ namespace FogOfWar
         // 16n, the yard's hull pick: both shells call OpenSystemScene.PickHull(draft, hull, fitted build) from their hull row.
         // This checks that helper alone, not either shell's wiring to it (the GUILayout row, the UI Toolkit Segmented).
         // The method is static, so it runs on builds made here and reaches no scene state; nothing is changed, nothing to put back.
-        // The picks are the slot order of Slot: drive, tank, hold, cabin, sensors, radiators, armor. [calc] by hand from the table:
-        // frigate stock 1,1,1,2,0,0,0; corvette stock 1,2,0,0,0,1,0; the fitted frigate has the 400 t tank (tank 3): 1,3,1,2,0,0,0.
+        // The picks are the slot order of Slot: drive, tank, hold, cabin, sensors, radiators, armor, PDCs. [calc] by hand from the table:
+        // frigate stock 1,1,1,2,0,0,0,0; corvette stock 1,2,0,0,0,1,0,0; the fitted frigate has the 400 t tank (tank 3): 1,3,1,2,0,0,0,0.
         void StealthHullPickChecks(Hull corv)
         {
             var frig = ShipBuild.Hulls[0];
@@ -428,8 +428,8 @@ namespace FogOfWar
             string toCorv = $"{d.hull} {Picks(d)}";
             d.pick[(int)Slot.Drive] = 0;
             string tableAfter = string.Join(",", corv.StockPick), fittedAfter = Picks(fitted);
-            Check(toCorv == CorvetteName + " 1,2,0,0,0,1,0" && tableAfter == "1,2,0,0,0,1,0" && fittedAfter == "1,3,1,2,0,0,0",
-                $"hulls yard pick: a draft of the fitted frigate (picks {Picks(fitted)}) that picks the corvette reads \"{toCorv}\" (\"{CorvetteName} 1,2,0,0,0,1,0\", its stock pick, not the frigate's 1,3,1,2,0,0,0); editing the draft's drive left the corvette's table at {tableAfter} (1,2,0,0,0,1,0) and the fitted build at {fittedAfter} (1,3,1,2,0,0,0)");
+            Check(toCorv == CorvetteName + " 1,2,0,0,0,1,0,0" && tableAfter == "1,2,0,0,0,1,0,0" && fittedAfter == "1,3,1,2,0,0,0,0",
+                $"hulls yard pick: a draft of the fitted frigate (picks {Picks(fitted)}) that picks the corvette reads \"{toCorv}\" (\"{CorvetteName} 1,2,0,0,0,1,0,0\", its stock pick, not the frigate's 1,3,1,2,0,0,0,0); editing the draft's drive left the corvette's table at {tableAfter} (1,2,0,0,0,1,0,0) and the fitted build at {fittedAfter} (1,3,1,2,0,0,0,0)");
 
             // 2: the fitted hull again gives back the fitted picks, not its stock pick; a pick made on the other hull is gone
             d = fitted.Clone();
@@ -440,8 +440,8 @@ namespace FogOfWar
             string back = $"{d.hull} {Picks(d)}";
             d.pick[(int)Slot.Hold] = 2;
             string fittedKept = Picks(fitted);
-            Check(onCorv == "1,2,0,0,1,1,0" && back == FrigateName + " 1,3,1,2,0,0,0" && fittedKept == "1,3,1,2,0,0,0",
-                $"hulls yard pick: on the corvette with long-range sensors the picks read {onCorv} (1,2,0,0,1,1,0); the fitted frigate picked again reads \"{back}\" (\"{FrigateName} 1,3,1,2,0,0,0\": the fitted picks, not the stock 1,1,1,2,0,0,0; the sensor pick is gone); editing the hold of that draft left the fitted build at {fittedKept} (1,3,1,2,0,0,0)");
+            Check(onCorv == "1,2,0,0,1,1,0,0" && back == FrigateName + " 1,3,1,2,0,0,0,0" && fittedKept == "1,3,1,2,0,0,0,0",
+                $"hulls yard pick: on the corvette with long-range sensors the picks read {onCorv} (1,2,0,0,1,1,0,0); the fitted frigate picked again reads \"{back}\" (\"{FrigateName} 1,3,1,2,0,0,0,0\": the fitted picks, not the stock 1,1,1,2,0,0,0,0; the sensor pick is gone); editing the hold of that draft left the fitted build at {fittedKept} (1,3,1,2,0,0,0,0)");
 
             // 3: the same hull twice changes nothing: a slot pick made in between survives, and the picks array is the same object
             d = fitted.Clone();
@@ -456,8 +456,8 @@ namespace FogOfWar
             Pick(d, corv, fitted);
             string sameC = $"{d.hull} {Picks(d)}";
             bool sameCArr = ReferenceEquals(arr, d.pick);
-            Check(sameF == FrigateName + " 1,3,2,2,0,0,0" && sameFArr && sameC == CorvetteName + " 1,2,0,0,1,1,0" && sameCArr,
-                $"hulls yard pick: the frigate picked again with the hold at 200 t reads \"{sameF}\" (\"{FrigateName} 1,3,2,2,0,0,0\"), picks object kept {sameFArr} (True); the corvette picked twice with long-range sensors between reads \"{sameC}\" (\"{CorvetteName} 1,2,0,0,1,1,0\"), picks object kept {sameCArr} (True)");
+            Check(sameF == FrigateName + " 1,3,2,2,0,0,0,0" && sameFArr && sameC == CorvetteName + " 1,2,0,0,1,1,0,0" && sameCArr,
+                $"hulls yard pick: the frigate picked again with the hold at 200 t reads \"{sameF}\" (\"{FrigateName} 1,3,2,2,0,0,0,0\"), picks object kept {sameFArr} (True); the corvette picked twice with long-range sensors between reads \"{sameC}\" (\"{CorvetteName} 1,2,0,0,1,1,0,0\"), picks object kept {sameCArr} (True)");
 
             // 4: the fitted hull is the corvette: the frigate is then the stock pick, and the corvette comes back as fitted (Fast drive, drive 2)
             var fittedC = Fitted(corv, (int)Slot.Drive, 2);
@@ -466,8 +466,8 @@ namespace FogOfWar
             string toFrig = $"{d.hull} {Picks(d)}";
             Pick(d, corv, fittedC);
             string backC = $"{d.hull} {Picks(d)}";
-            Check(Picks(fittedC) == "2,2,0,0,0,1,0" && toFrig == FrigateName + " 1,1,1,2,0,0,0" && backC == CorvetteName + " 2,2,0,0,0,1,0",
-                $"hulls yard pick: with the corvette fitted (picks {Picks(fittedC)}, 2,2,0,0,0,1,0) the frigate picked reads \"{toFrig}\" (\"{FrigateName} 1,1,1,2,0,0,0\", its stock pick) and the corvette picked again reads \"{backC}\" (\"{CorvetteName} 2,2,0,0,0,1,0\", the fitted picks); the fitted build still reads {Picks(fittedC)}");
+            Check(Picks(fittedC) == "2,2,0,0,0,1,0,0" && toFrig == FrigateName + " 1,1,1,2,0,0,0,0" && backC == CorvetteName + " 2,2,0,0,0,1,0,0",
+                $"hulls yard pick: with the corvette fitted (picks {Picks(fittedC)}, 2,2,0,0,0,1,0,0) the frigate picked reads \"{toFrig}\" (\"{FrigateName} 1,1,1,2,0,0,0,0\", its stock pick) and the corvette picked again reads \"{backC}\" (\"{CorvetteName} 2,2,0,0,0,1,0,0\", the fitted picks); the fitted build still reads {Picks(fittedC)}");
         }
     }
 }

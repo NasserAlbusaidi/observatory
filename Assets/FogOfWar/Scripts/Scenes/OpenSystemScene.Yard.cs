@@ -28,9 +28,12 @@ namespace FogOfWar
                 : s == Slot.Sensors ? m.Name + (m.Size > 0 ? ": ×2 scan and contact range, ½ scan time" : "")
                 : s == Slot.Radiators ? m.Name + (m.Size < 1 ? $", {m.Mass:0.#} t: stowed after a burn, cold at {Km(Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(m.Size * (yardDraft ?? career.Build).Hull.Facet)))}" : ": always out")
                 : s == Slot.Armor ? m.Name + (m.Size > 0 ? $", {m.Mass:0.#} t: stops {m.Size * 100:0} % of missile hits" : "")
+                : s == Slot.PointDefense ? m.Name + (m.Size > 0 ? $", {m.Mass:0.#} t: one bearing kills {PointDefense.KillChance(1, Career.MissileKms) * 100:0} % of missiles" : "")
                 : m.Name + (m.Mass > 0 ? $", {m.Mass:0.#} t" : "");
             return what + (career.Build.pick[(int)s] == i ? " (fitted)" : "");
         }
+
+        static string SlotLabel(Slot s) => s == Slot.PointDefense ? "PDCs" : s.ToString();
 
         static string HullLabel(Hull h, ShipBuild fitted) =>
             $"{h.Name}, {h.LengthM:0} m, " + (h.Price > 0 ? $"{h.Price:N0} cr" : "starting hull") + (h.Facet < 1 ? $", cold at 1/{1 / h.Facet:0} range" : "")
@@ -122,7 +125,7 @@ namespace FogOfWar
                 var parts = ShipBuild.Catalog[(int)s];
                 var labels = new string[parts.Length];
                 for (int i = 0; i < parts.Length; i++) labels[i] = (d.pick[(int)s] == i ? "● " : "") + PartLabel(s, i);
-                GUILayout.Label(s.ToString(), ui.note);
+                GUILayout.Label(SlotLabel(s), ui.note);
                 int k = ui.Buttons(labels);
                 if (k >= 0) d.pick[(int)s] = k;
             }
@@ -142,7 +145,7 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- shell
 
-        Label yardHead, repairBtn;
+        Label yardHead, yardPdcHead, repairBtn;
         string classicRepair = "-"; // review checks: the Repair button the classic panel drew last
         // review shots: where the classic panel drew the yard's head (scroll content space) and in which frame
         float classicYardY = -1;
@@ -174,7 +177,9 @@ namespace FogOfWar
                 var parts = ShipBuild.Catalog[(int)s];
                 var labels = new string[parts.Length];
                 for (int i = 0; i < parts.Length; i++) labels[i] = PartLabel(s, i);
-                Ui.L(c, s.ToString(), "t-label").style.marginTop = 4;
+                var head = Ui.L(c, SlotLabel(s), "t-label");
+                head.style.marginTop = 4;
+                if (s == Slot.PointDefense) yardPdcHead = head;
                 var slot = s;
                 c.Add(new Segmented(labels, d.pick[(int)s], k => { d.pick[(int)slot] = k; jobsT = 0; }, wrap: true));
             }
@@ -193,14 +198,29 @@ namespace FogOfWar
             Ui.B(row, "Reset", () => { yardDraft = null; jobsT = 0; });
         }
 
-        // review shots: a courier draft (torch drive, 100 t tank) on the Jobs page; false drops it
-        public void TestYardDraft(bool on)
+        // review shots: a courier draft (torch drive, 100 t tank, and the PDC pick given) on the Jobs page; false drops it
+        public void TestYardDraft(bool on, int pdc = 0)
         {
             yardDraft = null; jobsT = 0;
             if (!on || Draft() is not ShipBuild d) return;
             d.pick[(int)Slot.Drive] = 3; d.pick[(int)Slot.Tank] = 0;
+            if (pdc > 0) d.pick[(int)Slot.PointDefense] = pdc;
         }
-        public void TestYardScroll() { if (yardHead != null && pageJobs is ScrollView sv) sv.scrollOffset = new Vector2(0, yardHead.worldBound.y - sv.contentContainer.worldBound.y); }
+        // review shots: the Jobs page scrolled to the yard's head, or to its PDC row
+        public void TestYardScroll(bool pdc = false)
+        {
+            var head = pdc ? yardPdcHead : yardHead;
+            if (head != null && pageJobs is ScrollView sv) sv.scrollOffset = new Vector2(0, head.worldBound.y - sv.contentContainer.worldBound.y);
+        }
+        // review shots: the PDC row in the UI Toolkit yard, on screen, and its labels; "-" when not drawn
+        public string TestYardPdcReport()
+        {
+            if (yardPdcHead?.panel == null || yardDraft == null) return "-";
+            var labels = new List<string>();
+            for (int i = 0; i < ShipBuild.Catalog[(int)Slot.PointDefense].Length; i++) labels.Add(PartLabel(Slot.PointDefense, i));
+            bool onScreen = pageJobs is ScrollView sv && sv.worldBound.Contains(yardPdcHead.worldBound.center);
+            return $"{yardPdcHead.text}: {string.Join(" | ", labels)}; draft {yardDraft.MountCount} mounts, dry {yardDraft.DryMass:N1} t; on screen {onScreen}";
+        }
         // review shots: one drive hit (combat 4a), so the yard shows the Repair row; false repairs it for free
         public void TestDamage(bool on)
         {

@@ -2,11 +2,12 @@ using System;
 
 namespace FogOfWar.OpenWorld
 {
-    public enum Slot { Drive, Tank, Hold, Cabin, Sensors, Radiators, Armor }
+    public enum Slot { Drive, Tank, Hold, Cabin, Sensors, Radiators, Armor, PointDefense }
 
     // A part the yard fits in one slot. Size is the slot's own unit: MN of thrust, tonnes of tank or hold, seats, or the
     // sensor level (0 stock, 1 long range: scan range ×2, dwell ÷2), the radiators' cold-range factor when stowed (1:
-    // fixed, always out), or the armor's chance to stop a missile that gets through (0 none, combat Phase 4).
+    // fixed, always out), the armor's chance to stop a missile that gets through (0 none, combat Phase 4), or the PDC
+    // mounts fitted (0, 2, 4 or 6).
     public class Module
     {
         public Slot Slot;
@@ -24,6 +25,10 @@ namespace FogOfWar.OpenWorld
         public double Facet;       // the hull's own factor on the cold range, out or stowed: 1 for an ordinary hull
         public int[] StockPick;    // by Slot, as ShipBuild.pick
         public string Model;       // Resources/Models/<Model>.fbx and its texture set Models/<Model>/; not saved (the hull's name is)
+        // PDC_0..5's zeniths (PointDefense.Bears). Body frame, as Ship.Att's: x right, y up, z the nose (Heading = Att·forward).
+        // Each is the marker's local +Y with the model placed as the scene places it (RefreshHullModel aligns Nose to +Z).
+        public UnityEngine.Vector3[] Mounts;
+        public int[] MountFit;     // the order a PDC part fits the markers in: its first 2, 4 or 6. Each 2-mount pair is opposite
     }
 
     // The ship as the yard sees it: one hull and one module in each slot (combat design, Phase 1). Every module is mass,
@@ -39,11 +44,30 @@ namespace FogOfWar.OpenWorld
         public const double RatedMass = 500;
         public static double Rated(double g) => g * Ship.G0 * RatedMass; // MN
 
+        // [code: the FBX markers, checked in the scene by QA 17t] the frigate's PDC_1 and PDC_4 are dorsal, PDC_0 and PDC_5
+        // ventral, PDC_2 and PDC_3 the flanks tilted 68.2° from the dorsal; the corvette's PDC_0 and PDC_1 are dorsal, PDC_2
+        // and PDC_3 61° and PDC_4 and PDC_5 118.76° from it
+        static readonly UnityEngine.Vector3[] FrigateMounts =
+        {
+            new UnityEngine.Vector3(0, -1, 0), new UnityEngine.Vector3(0, 1, 0),
+            new UnityEngine.Vector3(-0.92849f, 0.37137f, 0), new UnityEngine.Vector3(0.92849f, 0.37137f, 0),
+            new UnityEngine.Vector3(0, 1, 0), new UnityEngine.Vector3(0, -1, 0),
+        };
+        static readonly UnityEngine.Vector3[] CorvetteMounts =
+        {
+            new UnityEngine.Vector3(0, 1, 0), new UnityEngine.Vector3(0, 1, 0),
+            new UnityEngine.Vector3(-0.87462f, 0.48481f, 0), new UnityEngine.Vector3(0.87462f, 0.48481f, 0),
+            new UnityEngine.Vector3(-0.8767f, -0.4811f, 0), new UnityEngine.Vector3(0.8767f, -0.4811f, 0),
+        };
+        // [design] dorsal and ventral first on the frigate; on the corvette PDC_2 and PDC_5 (0.2° from opposite: no marker
+        // there is straight down), then PDC_3 and PDC_4
+        static readonly int[] FrigateFit = { 1, 5, 2, 3, 0, 4 }, CorvetteFit = { 2, 5, 3, 4, 0, 1 };
+
         public static readonly Hull[] Hulls =
         {
-            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0 }, Model = "PlayerShip" },
+            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0, 0 }, Model = "PlayerShip", Mounts = FrigateMounts, MountFit = FrigateFit },
             // [calc] structure 228 × (60/52)³ = 350.25 t; [design] no Torch drive, a third of the frigate's cold range, 400k cr
-            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0 }, Model = "StealthShip" },
+            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0, 0 }, Model = "StealthShip", Mounts = CorvetteMounts, MountFit = CorvetteFit },
         };
 
         // Prices [design]: an upgrade from stock costs what it did as a counter (drive 50k and 150k more, tank 35k a step,
@@ -94,7 +118,16 @@ namespace FogOfWar.OpenWorld
                 new Module { Slot = Slot.Armor, Name = "Light plating", Size = 0.5, Mass = 15, Price = 40000, RefitDays = 2 },
                 new Module { Slot = Slot.Armor, Name = "Heavy plating", Size = 0.8, Mass = 40, Price = 100000, RefitDays = 3 },
             },
+            // [design] combat Phase 4 (D4): MountMass and MountPrice a mount, on the hull's markers in Hull.MountFit order
+            new[]
+            {
+                new Module { Slot = Slot.PointDefense, Name = "No PDCs", Size = 0, Mass = 0, Price = 0, RefitDays = 0.5 },
+                new Module { Slot = Slot.PointDefense, Name = "2 PDC mounts", Size = 2, Mass = 2 * MountMass, Price = 2 * MountPrice, RefitDays = 2 },
+                new Module { Slot = Slot.PointDefense, Name = "4 PDC mounts", Size = 4, Mass = 4 * MountMass, Price = 4 * MountPrice, RefitDays = 2 },
+                new Module { Slot = Slot.PointDefense, Name = "6 PDC mounts", Size = 6, Mass = 6 * MountMass, Price = 6 * MountPrice, RefitDays = 2 },
+            },
         };
+        public const double MountMass = 3, MountPrice = 30000; // [design] D4: a 1.5 t gun and a 1.5 t magazine
         public static int[] StockPick => Hulls[0].StockPick;   // the first hull's, which the career starts with
         public const double SellBack = 0.7;
 
@@ -136,6 +169,8 @@ namespace FogOfWar.OpenWorld
         public double OutRho => Hull.Facet;               // the cold-range factor with the radiators out
         public double DarkRho => StowRho * Hull.Facet;    // and stowed
         public double ArmorStop => this[Slot.Armor].Size;
+        public int MountCount => (int)this[Slot.PointDefense].Size;
+        public int FittedMounts => PointDefense.FitMask(Hull, MountCount); // bit i: PDC_i fitted
 
         // the yard's readouts: full burn with an empty hold
         public double GFull => Thrust / (DryMass + TankCapacity) / Ship.G0;
