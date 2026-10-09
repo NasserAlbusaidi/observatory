@@ -239,10 +239,11 @@ namespace FogOfWar
                             log.WriteLine("    toasts: " + shell.TestToastReport());
                             // a payday: a green toast with the bank line, the credits counting up, then settled on the new total
                             bool wasSandbox = os.TestPayday(12345);
-                            yield return Wait(0.4f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06p-payday");
+                            // the count runs 1.2 s by the clock; a fixed wait plus a slow shot can miss it (#157)
+                            yield return Until(() => os.TestPaydayReport().Contains("counting True"), 1.5f);
                             string payMid = os.TestPaydayReport();
-                            yield return Wait(1.2f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06p-payday");
+                            yield return Until(() => os.TestPaydayReport().Contains("counting False"), 3f);
                             string payEnd = os.TestPaydayReport();
                             log.WriteLine($"    06p-payday: {payMid}  ->  {payEnd}");
                             string bank = payEnd.Substring(payEnd.LastIndexOf("bank ") + 5);
@@ -649,6 +650,13 @@ namespace FogOfWar
         {
             float t = Time.realtimeSinceStartup + s;
             while (Time.realtimeSinceStartup < t) yield return null;
+        }
+
+        // polls by the real clock; the caller checks the condition again, since this returns either way at the timeout
+        static IEnumerator Until(Func<bool> done, float timeout)
+        {
+            float t = Time.realtimeSinceStartup + timeout;
+            while (!done() && Time.realtimeSinceStartup < t) yield return null;
         }
 
         IEnumerator Shot(FogOfWarApp app, UiShell shell, RenderTexture camRT, RenderTexture uiRT, string tag, string name)
