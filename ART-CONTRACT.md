@@ -70,6 +70,26 @@ Adopts the art side's `OPEN-WORLD-ART.md` naming. The code is the source of trut
   A smoothness. Rendered by `FogOfWar/ShipPBR` (GGX) under `ShipLighting`. Without the texture set the old flat look
   stays. Every surface is procedural; see `space-sim-art/SHIP-CREDITS.md`.
 
+### Stealth corvette: `Models/StealthShip.fbx` + `StealthShip.json`
+- Wired (combat PR 3f). The FWO-060 stealth corvette's own model; `Hull.Model` in `ShipBuild.cs` names it, and the
+  open world spawns the fitted hull's model (`OpenSystemScene.Hull.cs` `RefreshHullModel`, again after a refit, a load
+  or a new career). Same frame as the player ship (x from -0.60 nozzle exit to +0.50 nose, 1.1 model units), scaled to
+  the hull's `lengthM` (60 m). Markers: `Nose`, `Engine` (origin at the bell throat), `Cockpit`, the eight
+  `RCS_<Fore|Aft>_<Up|Down|Left|Right>`, `PDC_0..5`, and `Radiator_0..3`. `Cockpit`, `RCS_*` and `PDC_*` are reserved,
+  as on the player ship.
+- `Radiator_0..3` are separate objects with their origin on the hinge and local X from hinge to tip (never apply their
+  transforms). While the radiators are stowed (`Career.Stowed`) each one's local X scale eases to 0.05 of its import
+  value over 1.5 s of real time, and back when they come out. The FBX axis conversion swaps the panel's local Y and Z;
+  local X, the fold axis, is unchanged. A model without `Radiator_n` folds nothing.
+- Textured: `Models/StealthShip/StealthShip_{Albedo,Normal,Mask,Emission}.png`, from `Blender/stealth_pbr.py`, the
+  same sizes and encodings as the player ship. `Body` and the four radiators share the one atlas and the one hull
+  material; `Engine` keeps its glow material; the nav lights are baked into the emission map. Checked by Fog of
+  War/Check ship normal map with the player ship's.
+- Missing files: no `StealthShip.fbx` spawns `PlayerShip` (then `TorchShip`) at the corvette's length; no texture set
+  keeps the flat `Models.Spawn` look.
+- Floodlights: the corvette has its own four mounts in the same frame (`ShipLighting.CorvetteFloods`): its flanks are
+  far narrower than the player ship's, and its keel railgun runs where the player ship's chin lamp sits.
+
 ### Physical lighting (open world)
 `OpenWorld/ShipLighting.cs` sets these shader globals every frame; `FogOfWarApp` resets them to neutral for the
 other scenes:

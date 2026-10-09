@@ -1,0 +1,93 @@
+{
+  "lengthM": 60.0,
+  "modelLength": 1.1,
+  "note": "x from -0.60 (nozzle exit) to +0.50 (nose); scale by lengthM / modelLength. Engine origin at the bell throat, as PlayerShip.",
+  "throat": [
+    -0.48,
+    0.0,
+    0.0
+  ],
+  "nozzleExit": -0.6,
+  "bellExitRadius": 0.074,
+  "markers": [
+    "Nose",
+    "Engine",
+    "Cockpit",
+    "RCS_<Fore|Aft>_<Up|Down|Left|Right>",
+    "PDC_0..5",
+    "Radiator_0..3"
+  ],
+  "pdc": 6,
+  "radiators": [
+    {
+      "name": "Radiator_0",
+      "hinge": [
+        -0.215,
+        0.0355,
+        0.0075
+      ],
+      "span": 0.24,
+      "chord": 0.065,
+      "axis": [
+        0.0,
+        0.90631,
+        0.42262
+      ],
+      "dihedralDeg": 25.0,
+      "side": "port"
+    },
+    {
+      "name": "Radiator_1",
+      "hinge": [
+        -0.215,
+        0.0355,
+        -0.0075
+      ],
+      "span": 0.24,
+      "chord": 0.065,
+      "axis": [
+        0.0,
+        0.90631,
+        -0.42262
+      ],
+      "dihedralDeg": -25.0,
+      "side": "port"
+    },
+    {
+      "name": "Radiator_2",
+      "hinge": [
+        -0.215,
+        -0.0355,
+        0.0075
+      ],
+      "span": 0.24,
+      "chord": 0.065,
+      "axis": [
+        0.0,
+        -0.90631,
+        0.42262
+      ],
+      "dihedralDeg": 25.0,
+      "side": "starboard"
+    },
+    {
+      "name": "Radiator_3",
+      "hinge": [
+        -0.215,
+        -0.0355,
+        -0.0075
+      ],
+      "span": 0.24,
+      "chord": 0.065,
+      "axis": [
+        0.0,
+        -0.90631,
+        -0.42262
+      ],
+      "dihedralDeg": -25.0,
+      "side": "starboard"
+    }
+  ],
+  "radiatorNote": "model units, Blender model frame (nose +X, Z up, +Y port). Each Radiator_n mesh: origin on the hinge, local +X hinge to tip (deployed span), local Y width, local Z thickness. Fold = local X scale 0.05. In the exported FBX (baked axis conversion) the fold axis, local X, is preserved, but the panel width lies along the file's local Z and its thickness along local Y.",
+  "tris": 18828
+}
