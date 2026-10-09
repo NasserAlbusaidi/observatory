@@ -239,10 +239,11 @@ namespace FogOfWar
                             log.WriteLine("    toasts: " + shell.TestToastReport());
                             // a payday: a green toast with the bank line, the credits counting up, then settled on the new total
                             bool wasSandbox = os.TestPayday(12345);
-                            yield return Wait(0.4f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06p-payday");
+                            // the count runs 1.2 s by the clock; a fixed wait plus a slow shot can miss it (#157)
+                            yield return Until(() => os.TestPaydayReport().Contains("counting True"), 1.5f);
                             string payMid = os.TestPaydayReport();
-                            yield return Wait(1.2f);
+                            yield return Shot(app, shell, camRT, uiRT, tag, "06p-payday");
+                            yield return Until(() => os.TestPaydayReport().Contains("counting False"), 3f);
                             string payEnd = os.TestPaydayReport();
                             log.WriteLine($"    06p-payday: {payMid}  ->  {payEnd}");
                             string bank = payEnd.Substring(payEnd.LastIndexOf("bank ") + 5);
@@ -487,6 +488,17 @@ namespace FogOfWar
                         {
                             setTarget.Invoke(mapOs, new object[] { mapSys[mName] });
                             yield return Wait(0.5f);
+                            // #120: a portrait screen is narrow; widen the map until the path's flip is on screen
+                            if (size.y > size.x && !mapOs.TestMapReport().Contains("flip mark on"))
+                            {
+                                var camDistF = typeof(OpenSystemScene).GetField("camDist", MF);
+                                for (int z = 0; z < 6 && !mapOs.TestMapReport().Contains("flip mark on"); z++)
+                                {
+                                    camDistF.SetValue(mapOs, (double)camDistF.GetValue(mapOs) * 1.5);
+                                    yield return Wait(0.2f);
+                                }
+                                log.WriteLine($"    {mShot}: portrait, map widened to {(double)camDistF.GetValue(mapOs) / OpenWorld.Frame.AU:F1} AU");
+                            }
                             yield return Shot(app, shell, camRT, uiRT, tag, mShot);
                         }
                         string mRep = mapOs.TestMapReport();
@@ -618,6 +630,7 @@ namespace FogOfWar
                 os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", f).GetValue(os);
                 var setCam = typeof(OpenSystemScene).GetMethod("SetCam", f);
                 var pitch = typeof(OpenSystemScene).GetField("lookPitch", f);
+                yield return ClassicYardShot(app, os, size);
                 foreach (var c in SurfaceCases)
                 {
                     os.TestSurfaceReadout(c.altitude, c.landed, c.body);
@@ -645,10 +658,44 @@ namespace FogOfWar
             Quit();
         }
 
+        // #158: the classic panel's yard with a courier draft, the panel scrolled to the yard's head
+        IEnumerator ClassicYardShot(FogOfWarApp app, OpenSystemScene os, Vector2Int size)
+        {
+            var nf = BindingFlags.Instance | BindingFlags.NonPublic;
+            var scroll = typeof(FogOfWarApp).GetField("panelScroll", nf);
+            var panel = typeof(FogOfWarApp).GetField("panelRect", nf);
+            os.TestYardDraft(true);
+            yield return Wait(0.6f); // the panel lays out and draws the yard
+            os.TestClassicYardReport(out float head);
+            scroll.SetValue(app, new Vector2(0, Mathf.Max(0, head - 8)));
+            yield return Wait(0.6f);
+            yield return new WaitForEndOfFrame();
+            string tag = $"{size.x}x{size.y}-classic-yard";
+            var tex = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(dir, tag + ".png"), tex.EncodeToPNG());
+            string yard = os.TestClassicYardReport(out head);
+            float top = head - ((Vector2)scroll.GetValue(app)).y, view = ((Rect)panel.GetValue(app)).height;
+            bool sized = tex.width == size.x && tex.height == size.y;
+            log.WriteLine($"  {tag}: {yard} | head at {top:F0} of {view:F0} in the panel, captured {tex.width}x{tex.height}");
+            if (!yard.Contains("->") || !yard.Contains("Mars") || !yard.Contains("drawn True") || yard.Contains("NaN") || yard.Contains("∞")
+                || head < 0 || top < -2 || top > view * 0.5f || !sized)
+            { errors++; log.WriteLine($"    ERROR {tag}: expected the draft's readouts, a trip check to Mars and the yard's head in the panel's top half"); }
+            Destroy(tex);
+            os.TestYardDraft(false);
+            scroll.SetValue(app, Vector2.zero);
+        }
+
         static IEnumerator Wait(float s)
         {
             float t = Time.realtimeSinceStartup + s;
             while (Time.realtimeSinceStartup < t) yield return null;
+        }
+
+        // polls by the real clock; the caller checks the condition again, since this returns either way at the timeout
+        static IEnumerator Until(Func<bool> done, float timeout)
+        {
+            float t = Time.realtimeSinceStartup + timeout;
+            while (!done() && Time.realtimeSinceStartup < t) yield return null;
         }
 
         IEnumerator Shot(FogOfWarApp app, UiShell shell, RenderTexture camRT, RenderTexture uiRT, string tag, string name)

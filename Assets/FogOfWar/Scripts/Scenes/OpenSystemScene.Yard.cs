@@ -74,6 +74,7 @@ namespace FogOfWar
             var d = Draft();
             if (d == null) return;
             ui.Section("Yard");
+            if (Event.current.type == EventType.Repaint) { classicYardY = GUILayoutUtility.GetLastRect().y; classicYardFrame = Time.frameCount; }
             if (YardLine() is string yard) GUILayout.Label(yard, ui.label);
             foreach (Slot s in Enum.GetValues(typeof(Slot)))
             {
@@ -101,6 +102,9 @@ namespace FogOfWar
         // ---------------------------------------------------------------- shell
 
         Label yardHead;
+        // review shots: where the classic panel drew the yard's head (scroll content space) and in which frame
+        float classicYardY = -1;
+        int classicYardFrame = -1;
 
         void BuildYard(VisualElement c)
         {
@@ -140,12 +144,18 @@ namespace FogOfWar
             d.pick[(int)Slot.Drive] = 3; d.pick[(int)Slot.Tank] = 0;
         }
         public void TestYardScroll() { if (yardHead != null && pageJobs is ScrollView sv) sv.scrollOffset = new Vector2(0, yardHead.worldBound.y - sv.contentContainer.worldBound.y); }
-        public string TestYardReport()
+        public string TestYardReport() => yardDraft == null ? "no draft (not docked?)" : YardReportText() + $" | shown {yardHead?.panel != null}";
+        // the classic panel: drawn in this frame or the one before, and the head's y in the panel's scroll content
+        public string TestClassicYardReport(out float headY)
         {
-            if (yardDraft == null) return "no draft (not docked?)";
+            headY = classicYardY;
+            return yardDraft == null ? "no draft (not docked?)" : YardReportText() + $" | drawn {Time.frameCount - classicYardFrame <= 1}";
+        }
+        string YardReportText()
+        {
             var parts = new List<string>();
             foreach (var (key, now, after) in YardReadouts(career.Build, yardDraft)) parts.Add($"{key} {now} -> {after}");
-            return string.Join("; ", parts) + " | " + YardTripLine(yardDraft) + " | " + YardPriceLine(yardDraft, out _) + $" | shown {yardHead?.panel != null}";
+            return string.Join("; ", parts) + " | " + YardTripLine(yardDraft) + " | " + YardPriceLine(yardDraft, out _);
         }
     }
 }
