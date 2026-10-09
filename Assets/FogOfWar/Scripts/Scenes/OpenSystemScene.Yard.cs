@@ -31,10 +31,9 @@ namespace FogOfWar
             return what + (career.Build.pick[(int)s] == i ? " (fitted)" : "");
         }
 
-        // every hull but the first wears the frigate's model until 3f gives each its own
         static string HullLabel(Hull h, ShipBuild fitted) =>
             $"{h.Name}, {h.LengthM:0} m, " + (h.Price > 0 ? $"{h.Price:N0} cr" : "starting hull") + (h.Facet < 1 ? $", cold at 1/{1 / h.Facet:0} range" : "")
-            + (h != ShipBuild.Hulls[0] ? " (placeholder model)" : "") + (fitted.hull == h.Name ? " (fitted)" : "");
+            + (fitted.hull == h.Name ? " (fitted)" : "");
 
         // a hull's own stock parts come with it: the slot picks of the old hull mean other parts there.
         // The fitted hull comes back with its fitted parts, so picking it again cancels the swap.

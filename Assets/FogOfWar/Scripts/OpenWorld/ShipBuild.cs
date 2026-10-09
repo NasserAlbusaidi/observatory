@@ -23,6 +23,7 @@ namespace FogOfWar.OpenWorld
         public double Price;       // cr, bought at a big yard (Career.CanRefitTo)
         public double Facet;       // the hull's own factor on the cold range, out or stowed: 1 for an ordinary hull
         public int[] StockPick;    // by Slot, as ShipBuild.pick
+        public string Model;       // Resources/Models/<Model>.fbx and its texture set Models/<Model>/; not saved (the hull's name is)
     }
 
     // The ship as the yard sees it: one hull and one module in each slot (combat design, Phase 1). Every module is mass,
@@ -40,9 +41,9 @@ namespace FogOfWar.OpenWorld
 
         public static readonly Hull[] Hulls =
         {
-            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0 } },
+            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0 }, Model = "PlayerShip" },
             // [calc] structure 228 × (60/52)³ = 350.25 t; [design] no Torch drive, a third of the frigate's cold range, 400k cr
-            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1 } },
+            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1 }, Model = "StealthShip" },
         };
 
         // Prices [design]: an upgrade from stock costs what it did as a counter (drive 50k and 150k more, tank 35k a step,

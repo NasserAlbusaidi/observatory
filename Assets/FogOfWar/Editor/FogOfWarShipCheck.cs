@@ -4,20 +4,30 @@ using UnityEngine;
 
 namespace FogOfWar.EditorTools
 {
-    // Checks the ship's object-space normal map against the imported mesh: for each vertex, the map's normal mapped by
-    // ShipLighting.BlenderToMesh should agree with the mesh normal (the bake has no detail at most texels). Also
-    // searches all 48 signed axis permutations and prints the best, so a changed FBX axis setting shows up at once.
+    // Checks each textured hull's object-space normal map against its imported mesh (the largest one but Engine: the
+    // body): for each vertex, the map's normal mapped by ShipLighting.BlenderToMesh should agree with the mesh normal (the
+    // bake has no detail at most texels). Also searches all 48 signed axis permutations and prints the best, so a changed
+    // FBX axis setting shows up at once. The frigate (PlayerShip) and the corvette (StealthShip); either missing fails.
     public static class FogOfWarShipCheck
     {
+        static readonly string[] Sets = { "PlayerShip", "StealthShip" };
+
         [MenuItem("Fog of War/Check ship normal map")]
         public static void Check()
         {
-            const string fbx = "Assets/FogOfWar/Resources/Models/PlayerShip.fbx";
-            const string png = "Assets/FogOfWar/Resources/Models/PlayerShip/PlayerShip_Normal.png";
+            bool ok = true;
+            foreach (var set in Sets) ok &= CheckSet(set);
+            Exit(ok ? 0 : 1);
+        }
+
+        static bool CheckSet(string set)
+        {
+            string fbx = $"Assets/FogOfWar/Resources/Models/{set}.fbx";
+            string png = $"Assets/FogOfWar/Resources/Models/{set}/{set}_Normal.png";
             Mesh mesh = null;
             foreach (var o in AssetDatabase.LoadAllAssetsAtPath(fbx))
                 if (o is Mesh m && m.name != "Engine" && (mesh == null || m.vertexCount > mesh.vertexCount)) mesh = m;
-            if (mesh == null || !File.Exists(png)) { Debug.LogError("ShipCheck: missing mesh or normal map"); Exit(1); return; }
+            if (mesh == null || !File.Exists(png)) { Debug.LogError($"ShipCheck: {set}: missing mesh or normal map"); return false; }
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
             tex.LoadImage(File.ReadAllBytes(png));
             var n = mesh.normals; var uv = mesh.uv;
@@ -44,8 +54,9 @@ namespace FogOfWar.EditorTools
                     float sc = Score(m);
                     if (sc > best) { best = sc; bestM = m; }
                 }
-            Debug.Log($"ShipCheck: {mesh.name} {mesh.vertexCount} verts, {tex.width}x{tex.height} map. BlenderToMesh mean dot {cur:F3}; best {best:F3} rows ({bestM.GetRow(0)}) ({bestM.GetRow(1)}) ({bestM.GetRow(2)})");
-            Exit(cur > 0.9f ? 0 : 1);
+            Debug.Log($"ShipCheck: {set}: {mesh.name} {mesh.vertexCount} verts, {tex.width}x{tex.height} map. BlenderToMesh mean dot {cur:F3}; best {best:F3} rows ({bestM.GetRow(0)}) ({bestM.GetRow(1)}) ({bestM.GetRow(2)})");
+            Object.DestroyImmediate(tex);
+            return cur > 0.9f;
         }
 
         static void Exit(int code) { if (Application.isBatchMode) EditorApplication.Exit(code); }

@@ -33,7 +33,7 @@ namespace FogOfWar.OpenWorld
             idPlumeCol = Shader.PropertyToID("_FOWPlumeCol"), idShadowTex = Shader.PropertyToID("_ShipShadowTex"),
             idShadowMatrix = Shader.PropertyToID("_ShipShadowMatrix"), idShadowParams = Shader.PropertyToID("_ShipShadowParams");
 
-        readonly Renderer[] hull;
+        Renderer[] hull;
         readonly Material depthMat;
         readonly RenderTexture shadowRt;
         readonly CommandBuffer cb = new CommandBuffer { name = "Ship shadow" };
@@ -45,16 +45,28 @@ namespace FogOfWar.OpenWorld
         public float Exposure => Mathf.Pow(2f, ev);
         public Body ShineBody { get; private set; }
         public bool Floods;     // hull floodlights, toggled by the pilot
+        public float LengthM = 52; // the fitted hull's length: the floodlights' 10 m reference is in its metres
 
         // Hull floodlights: (position, aim) in the Blender model frame of ship.py (x nose, y port, z up; hull length
         // 1.1 from -0.60 to +0.50), on booms and masts pointing back at the hull like the ISS's external lights.
-        static readonly (Vector3 pos, Vector3 aim)[] FloodMounts =
+        static readonly (Vector3 pos, Vector3 aim)[] FrigateFloods =
         {
             (new Vector3(-0.13f, 0.17f, 0.04f), new Vector3(1f, -0.35f, -0.05f)),    // radiator roots, along each flank
             (new Vector3(-0.13f, -0.17f, 0.04f), new Vector3(1f, 0.35f, -0.05f)),
             (new Vector3(0.12f, 0f, 0.13f), new Vector3(-1f, 0f, -0.35f)),           // dorsal mast, aft along the spine
             (new Vector3(0.36f, 0f, -0.13f), new Vector3(-1f, 0f, 0.22f)),           // under the chin, aft along the keel
         };
+        // The corvette (stealth.py: same frame and length) is narrow: its flank is 0.064 off the centreline there, so the
+        // frigate's 0.17 flank lamps would hang 6 m out in space, and its keel railgun runs through the frigate's chin lamp
+        // (barrel at z -0.128). Flank lamps just off its flanks ahead of the radiator bays, the chin lamp under the barrel.
+        static readonly (Vector3 pos, Vector3 aim)[] CorvetteFloods =
+        {
+            (new Vector3(-0.13f, 0.08f, 0.04f), new Vector3(1f, -0.2f, -0.05f)),
+            (new Vector3(-0.13f, -0.08f, 0.04f), new Vector3(1f, 0.2f, -0.05f)),
+            (new Vector3(0.12f, 0f, 0.13f), new Vector3(-1f, 0f, -0.35f)),
+            (new Vector3(0.36f, 0f, -0.15f), new Vector3(-1f, 0f, 0.22f)),
+        };
+        (Vector3 pos, Vector3 aim)[] floodMounts = FrigateFloods;
         // Irradiance 10 m from a lamp, in sunlight-at-1-AU units: 0.05 is about 5,000 lux, a strong LED work light.
         // A 5000 K white.
         static readonly Color FloodColour = new Color(1f, 0.96f, 0.90f) * 0.05f;
@@ -76,6 +88,16 @@ namespace FogOfWar.OpenWorld
                 name = "Ship shadow", filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, useMipMap = false,
             };
             shadowRt.Create();
+        }
+
+        // A new hull model (a refit or a load): the shadow map, exposure and floodlights carry on; the casters and the lamp
+        // mounts change. `model`: the Resources/Models file spawned. null renderers: no self-shadow (the flat look), and the
+        // last model's map is switched off here, since RenderShadow no longer runs to overwrite it.
+        public void SetHull(Renderer[] hullRenderers, string model)
+        {
+            hull = hullRenderers;
+            floodMounts = model == "StealthShip" ? CorvetteFloods : FrigateFloods;
+            if (hull == null) Shader.SetGlobalVector(idShadowParams, Vector4.zero);
         }
 
         // Blender object axes -> the imported mesh's object axes. The FBX export (forward -Z, up Y, baked space
@@ -179,10 +201,10 @@ namespace FogOfWar.OpenWorld
         {
             if (!Floods) { Shader.SetGlobalVector(idFloodCol, Vector4.zero); return; }
             float k = shipRenderLen / 1.1f;                    // render units per model unit
-            float metre = shipRenderLen / 52f;
-            for (int i = 0; i < FloodMounts.Length; i++)
+            float metre = shipRenderLen / LengthM;
+            for (int i = 0; i < floodMounts.Length; i++)
             {
-                var (p, a) = FloodMounts[i];
+                var (p, a) = floodMounts[i];
                 var local = new Vector3(p.y, p.z, p.x + 0.05f) * (k / shipT.lossyScale.x);
                 var w = shipT.TransformPoint(local);
                 var d = shipT.TransformDirection(new Vector3(a.y, a.z, a.x)).normalized;

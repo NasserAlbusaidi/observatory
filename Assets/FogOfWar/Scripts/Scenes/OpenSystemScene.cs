@@ -177,6 +177,7 @@ namespace FogOfWar
             stars = Gfx.Starfield(Root, 6000).transform;
             stars.localRotation = Frame.StarsToRender;
             InitCareer();
+            RefreshHullModel(); // the new career's hull: the scene object lives across New game, so career was the old one until now
 
         }
 
@@ -185,25 +186,13 @@ namespace FogOfWar
         Texture2D beltHist;
         bool showHist;
 
+        // the ship's holder, its lighting and plume; the model itself is the fitted hull's (RefreshHullModel, after InitCareer)
         void BuildShip()
         {
             shipT = new GameObject("Ship").transform;
             shipT.SetParent(Root, false);
-            bool own = Resources.Load<GameObject>("Models/PlayerShip") != null;
-            var model = Models.Spawn(own ? "PlayerShip" : "TorchShip", shipT, new Color(0.78f, 0.8f, 0.84f));
-            shipModel = model.transform;
-            Models.AlignMarker(shipModel, "Nose", Vector3.forward);
-            var rends = model.GetComponentsInChildren<Renderer>();
-            var bounds = rends[0].bounds;
-            foreach (var r in rends) bounds.Encapsulate(r.bounds);
-            shipLen = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
-            shipModel.localPosition -= bounds.center - shipT.position;
-            // textured hull (PBR) with physical lighting; without the texture set the flat Models.Spawn look stays
-            var hull = ShipLighting.ApplyHullMaterial(model);
-            if (hull != null && hull.Length > 0) OwnMat(hull[0].sharedMaterial);
-            lighting = new ShipLighting(hull);
-            engine = Models.FindDeep(shipModel, "Engine");
-            if (engine != null) engineScale = engine.localScale;
+            shipModel = null; hullModel = null; engine = null; radiators.Clear(); hullMats.Clear(); fold = 0;
+            lighting = new ShipLighting(null);
 
             plumeMat = OwnMat(Gfx.Mat("Plume"));
             plume = Gfx.Obj("Plume", shipT, Own(Gfx.UVSphere(24, 12)), plumeMat).transform;
@@ -427,6 +416,7 @@ namespace FogOfWar
                 camW = PivotW() + Frame.FromU(off) * camDist;
                 Cam.transform.rotation = Quaternion.LookRotation(-off, Vector3.up);
             }
+            RefreshHullModel(); // a no-op unless a refit, a load or a new career changed the hull's model
             shipModel.gameObject.SetActive(mode != CamMode.Cockpit);
             LateCockpit(mode == CamMode.Cockpit);
 
@@ -491,6 +481,7 @@ namespace FogOfWar
             Shader.SetGlobalVector("_FOWSunDir", Frame.U((sunW - ship.Pos).Norm));
             float thr = (float)ship.Throttle;
             if (engine != null) engine.localScale = thr > 0 ? engineScale * (1 + 0.15f * Mathf.Sin(Time.time * 37f)) : engineScale * 0.0001f;
+            FoldRadiators();
             plume.gameObject.SetActive(thr > 0.01f);
             if (thr > 0.01f)
             {
@@ -500,6 +491,7 @@ namespace FogOfWar
                 float behind = Mathf.Clamp01(Vector3.Dot((shipT.position - Cam.transform.position).normalized, shipT.forward));
                 plumeMat.SetFloat("_Intensity", (0.5f + 0.9f * thr) * Mathf.Lerp(1f, 0.3f, behind));
             }
+            if (lighting != null) lighting.LengthM = realLen * 1000;
             lighting?.Update(sys, jd, ship.Pos, sunW, dt, shipT, shipLen * shipT.lossyScale.x,
                              shipT.TransformPoint(new Vector3(0, 0, -shipLen * 0.55f)), thr);
             starGlare.End(dt, lighting != null ? lighting.Exposure : 1f);
