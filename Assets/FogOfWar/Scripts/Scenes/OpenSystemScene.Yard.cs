@@ -26,9 +26,23 @@ namespace FogOfWar
             var m = ShipBuild.Catalog[(int)s][i];
             string what = s == Slot.Drive ? $"{m.Name} {m.Size:0.0} MN, {m.Mass:0.#} t" + (m.Size > ShipBuild.Rated(3) ? " (juice: fictional)" : "")
                 : s == Slot.Sensors ? m.Name + (m.Size > 0 ? ": ×2 scan and contact range, ½ scan time" : "")
-                : s == Slot.Radiators ? m.Name + (m.Size < 1 ? $", {m.Mass:0.#} t: stowed after a burn, cold at {Km(Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(m.Size)))}" : ": always out")
+                : s == Slot.Radiators ? m.Name + (m.Size < 1 ? $", {m.Mass:0.#} t: stowed after a burn, cold at {Km(Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(m.Size * (yardDraft ?? career.Build).Hull.Facet)))}" : ": always out")
                 : m.Name + (m.Mass > 0 ? $", {m.Mass:0.#} t" : "");
             return what + (career.Build.pick[(int)s] == i ? " (fitted)" : "");
+        }
+
+        // every hull but the first wears the frigate's model until 3f gives each its own
+        static string HullLabel(Hull h, ShipBuild fitted) =>
+            $"{h.Name}, {h.LengthM:0} m, " + (h.Price > 0 ? $"{h.Price:N0} cr" : "starting hull") + (h.Facet < 1 ? $", cold at 1/{1 / h.Facet:0} range" : "")
+            + (h != ShipBuild.Hulls[0] ? " (placeholder model)" : "") + (fitted.hull == h.Name ? " (fitted)" : "");
+
+        // a hull's own stock parts come with it: the slot picks of the old hull mean other parts there.
+        // The fitted hull comes back with its fitted parts, so picking it again cancels the swap.
+        static void PickHull(ShipBuild d, Hull h, ShipBuild fitted)
+        {
+            if (d.hull == h.Name) return;
+            d.hull = h.Name;
+            d.pick = (int[])(fitted.hull == h.Name ? fitted.pick : h.StockPick).Clone();
         }
 
         // (what, now, with the draft)
@@ -41,9 +55,9 @@ namespace FogOfWar
             Add("Empty tank", b => $"{b.GEmpty:0.00} g");
             Add("Speed change, full tank", b => $"{b.DvFull:N0} km/s");
             Add("Jet power, full burn", b => $"{b.JetPowerTW:0.0} TW");
-            Add("Seen at, full burn · cold", b => $"{Km(Signature.RangeKm(b.JetPowerTW * 1e12))} · {Km(Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(b.StowRho)))}" + (b.Stowable ? " stowed" : ""));
+            Add("Seen at, full burn · cold", b => $"{Km(Signature.RangeKm(b.JetPowerTW * 1e12))} · {Km(Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(b.Stowable ? b.DarkRho : b.OutRho)))}" + (b.Stowable ? " stowed" : ""));
             if (now.Stowable || after.Stowable)
-                Add("Dark, full tank", b => b.Stowable ? $"{b.TankCapacity * Career.SinkSecondsPerT / 3600:0.0} h; tracked {Signature.HoldText(Signature.TrackHoldS * b.StowRho)} after a burn" : "none: fixed radiators");
+                Add("Dark, full tank", b => b.Stowable ? $"{b.TankCapacity * Career.SinkSecondsPerT / 3600:0.0} h; tracked {Signature.HoldText(Signature.TrackHoldS * b.DarkRho)} after a burn" : "none: fixed radiators");
             Add("Sees a stock burn at", b => Km(Signature.RangeKm(Signature.StockBurnW, Signature.SensorKm(b.SensorLevel))));
             Add("Sees a cold hull at", b => Km(Signature.RangeKm(0, Signature.SensorKm(b.SensorLevel))));
             Add("Tank · hold · seats", b => $"{b.TankCapacity:N0} t · {b.HoldTonnes:N0} t · {b.Seats}");
@@ -79,6 +93,15 @@ namespace FogOfWar
             ui.Section("Yard");
             if (Event.current.type == EventType.Repaint) { classicYardY = GUILayoutUtility.GetLastRect().y; classicYardFrame = Time.frameCount; }
             if (YardLine() is string yard) GUILayout.Label(yard, ui.label);
+            if (career.Docked?.HullSale == true)
+            {
+                var hulls = ShipBuild.Hulls;
+                var hullLabels = new string[hulls.Length];
+                for (int i = 0; i < hulls.Length; i++) hullLabels[i] = (d.hull == hulls[i].Name ? "● " : "") + HullLabel(hulls[i], career.Build);
+                GUILayout.Label("Hull", ui.note);
+                int h = ui.Buttons(hullLabels);
+                if (h >= 0) PickHull(d, hulls[h], career.Build);
+            }
             foreach (Slot s in Enum.GetValues(typeof(Slot)))
             {
                 var parts = ShipBuild.Catalog[(int)s];
@@ -115,6 +138,14 @@ namespace FogOfWar
             if (d == null) return;
             yardHead = Ui.Section(c, "Yard");
             if (YardLine() is string yard) Ui.L(c, yard, "t-body", "warn");
+            if (career.Docked?.HullSale == true)
+            {
+                var hulls = ShipBuild.Hulls;
+                var hullLabels = new string[hulls.Length];
+                for (int i = 0; i < hulls.Length; i++) hullLabels[i] = HullLabel(hulls[i], career.Build);
+                Ui.L(c, "Hull", "t-label").style.marginTop = 4;
+                c.Add(new Segmented(hullLabels, Math.Max(0, Array.FindIndex(hulls, h => h.Name == d.hull)), k => { PickHull(d, hulls[k], career.Build); jobsT = 0; }, wrap: true));
+            }
             foreach (Slot s in Enum.GetValues(typeof(Slot)))
             {
                 var parts = ShipBuild.Catalog[(int)s];

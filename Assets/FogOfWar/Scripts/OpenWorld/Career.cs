@@ -11,6 +11,7 @@ namespace FogOfWar.OpenWorld
         public double FuelPrice; // cr per tonne
         public Faction Owner;
         public double PatrolG;   // the owner's patrol here, in g; 0 for none (Threat.cs)
+        public bool HullSale;    // a big yard: sells hulls (agreed Decision 4)
     }
 
     public enum JobKind { Cargo, Passengers, Survey, Rescue, Intercept }
@@ -72,10 +73,10 @@ namespace FogOfWar.OpenWorld
         // itself, and the Compact's militia guards only the belt's water port.
         public static readonly Port[] Ports =
         {
-            new Port { Name = "Earth orbit", Body = "Earth", FuelPrice = 60, Owner = Faction.Guard, PatrolG = 3, Note = "Deep gravity well: water is lifted from the ground." },
+            new Port { Name = "Earth orbit", Body = "Earth", FuelPrice = 60, Owner = Faction.Guard, PatrolG = 3, HullSale = true, Note = "Deep gravity well: water is lifted from the ground." },
             new Port { Name = "Luna", Body = "Moon", FuelPrice = 35, Owner = Faction.Guard, PatrolG = 3, Note = "Water from the polar craters." },
-            new Port { Name = "Mars orbit", Body = "Mars", FuelPrice = 30, Owner = Faction.Tharsis, PatrolG = 3, Note = "Water from the ice under the surface." },
-            new Port { Name = "Ceres", Body = "Ceres", FuelPrice = 8, Owner = Faction.Compact, PatrolG = 2, Note = "Ice-rich. The belt's water port." },
+            new Port { Name = "Mars orbit", Body = "Mars", FuelPrice = 30, Owner = Faction.Tharsis, PatrolG = 3, HullSale = true, Note = "Water from the ice under the surface." },
+            new Port { Name = "Ceres", Body = "Ceres", FuelPrice = 8, Owner = Faction.Compact, PatrolG = 2, HullSale = true, Note = "Ice-rich. The belt's water port." },
             new Port { Name = "Vesta", Body = "Vesta", FuelPrice = 25, Owner = Faction.Tharsis, Note = "Dry rock: water is shipped in." },
             new Port { Name = "Ganymede", Body = "Ganymede", FuelPrice = 10, Owner = Faction.Compact, Note = "Ice shell." },
             new Port { Name = "Callisto", Body = "Callisto", FuelPrice = 10, Owner = Faction.Compact, Note = "Ice and rock, outside Jupiter's worst radiation." },

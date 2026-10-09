@@ -6,15 +6,23 @@ namespace FogOfWar.OpenWorld
     // The yard (combat design, Phase 1): refit the build at any port. Each changed part costs its price less 70 % of the
     // part it replaces (a smaller part can pay) and its days in the yard; a refit of several parts sums both. A part the
     // load or the passengers aboard need can't come out; reaction mass a smaller tank can't hold is sold to the port.
+    // A new hull (3e) is the same sum: its price less 70 % of the old hull's, HullRefitDays on top. Only a ship you own can
+    // change hull, and only at a big yard (Port.HullSale).
     public partial class Career
     {
+        public const double HullRefitDays = 7;   // [design] D10
+
         public bool CanRefitTo(ShipBuild to, out string why, out double cost, out double days)
         {
             cost = 0; days = 0;
+            bool newHull = to.hull != Build.hull;
+            if (newHull) { cost += to.Hull.Price - Build.Hull.Price * ShipBuild.SellBack; days += HullRefitDays; }
             foreach (Slot s in Enum.GetValues(typeof(Slot)))
                 if (to.pick[(int)s] != Build.pick[(int)s]) { cost += to[s].Price - Build[s].Price * ShipBuild.SellBack; days += to[s].RefitDays; }
             cost = Math.Round(cost);
             why = Sandbox ? "sandbox" : Docked == null ? "dock first" : days == 0 ? "fitted"
+                : newHull && !OwnsShip ? "buy out the ship first"
+                : newHull && !Docked.HullSale ? "only Earth, Mars and Ceres sell hulls"
                 : to.Thrust > to.Hull.MaxThrust ? "too big for the hull"
                 : CargoTonnes > to.HoldTonnes ? "the load aboard needs the hold"
                 : PeopleAboard > to.Seats ? "the passengers aboard need the seats"
@@ -26,6 +34,7 @@ namespace FogOfWar.OpenWorld
         {
             if (!CanRefitTo(to, out _, out double cost, out double days)) return false;
             var fitted = new List<string>();
+            if (to.hull != Build.hull) fitted.Add(to.hull);
             foreach (Slot s in Enum.GetValues(typeof(Slot)))
                 if (to.pick[(int)s] != Build.pick[(int)s]) fitted.Add(to[s].Name);
             Credits -= cost;

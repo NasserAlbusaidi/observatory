@@ -486,7 +486,7 @@ namespace FogOfWar
             var shipPos = Map(ship.Pos, out double ks);
             shipT.localPosition = shipPos;
             shipT.localRotation = ship.Att;
-            float realLen = 0.052f; // km
+            float realLen = HullKm(); // km
             shipT.localScale = Vector3.one * (float)(realLen * ks / shipLen);
             Shader.SetGlobalVector("_FOWSunDir", Frame.U((sunW - ship.Pos).Norm));
             float thr = (float)ship.Throttle;
