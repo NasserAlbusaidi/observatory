@@ -115,7 +115,7 @@ The danger is at the ends of a trip, not in the middle.
   - **Measured (W2b):** 108 to 117 ships in flight. The cost is in PR 3.
 - **Speed:** runners peak near 0.25 g (`RunnerG`, `Career.Intercept.cs:14`). A 1 AU run then takes about 7 days [calc].
 - **Limit: the path ignores gravity and obstacles.**
-  - Close up, the motion is not physically correct. At Earth's parking orbit, gravity is about 0.11 g [calc], and traffic thrusts at about 0.25 g. From a distance, nobody can see it. A ship that comes near the player becomes a physics ship anyway.
+  - Close up, the motion is not physically correct. At Earth's parking orbit, gravity is about 0.11 g [calc], and traffic thrusts at about 0.25 g. From a distance, nobody can see it. Traffic stays on its rail even near the player: nothing hands a traffic ship to a physics `Ship`. A raider (W4) is a guided `Ship` from the start, placed at its lair, not taken from traffic (`Career.Pirates.cs`).
   - A path between ports on opposite sides of the Sun could pass close to it. Check this in QA. It may already affect runners today.
   - **Answer (W2a survey, `-fowcareer`):** 936 runner courses (9 ports, every ordered pair, 13 dates 60 days apart) [measured].
     - 68 pass within 0.3 AU of the Sun. The closest is 0.034 AU (Mars orbit → Vesta).
