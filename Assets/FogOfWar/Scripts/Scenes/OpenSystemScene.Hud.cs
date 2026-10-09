@@ -139,6 +139,7 @@ namespace FogOfWar
             Ui.B(mrow, "Back to ship  " + UiShell.Keys(A.Map), ToggleMap, "small");
             Ui.B(mrow, "Frame target", () => { if (ship.Target != null) SetPivot(Pivot.Target, ship.Target.Radius * 4); }, "small");
             BuildPage(layer);
+            BuildDevMenu(layer, shell.Portrait);
             hudTargetsDirty = true;
         }
 
@@ -636,6 +637,7 @@ namespace FogOfWar
             SetPill(pArrival, ship.Landed == null && ArrivalNotice != null ? (Ship.Giant(reference) ? "CLOUD-TOP ASSIST · NO SOLID SURFACE" : "ARRIVAL ASSIST · NO ATMOSPHERIC FLIGHT") : null, "bad");
             SetPill(pLimited, limited ? "WARP LIMITED " + Fmt.Num(effectiveWarp, 0) + "×" : null, "bad");
 
+            UpdateDevMenu();
             UpdatePages();
             if (!consoleOpen) return;
             // console: reflect state changed by keys

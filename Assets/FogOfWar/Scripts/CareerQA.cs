@@ -392,6 +392,7 @@ namespace FogOfWar
             yield return PirateChecks();
             yield return DefenseChecks(); // 17: raider missiles, damage, armor and repairs (CareerQA.Defense.cs)
 
+            yield return DevMenuChecks(); // 19: the dev menu (CareerQA.DevMenu.cs)
             State("end");
             Finish();
         }
