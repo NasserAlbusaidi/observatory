@@ -356,6 +356,7 @@ namespace FogOfWar
                 $"Flip ({Controls.Keys(Controls.Action.Flip)}) turns the nose 180° from where it points now, then lets go; 3 points it against your velocity and keeps it there. Turning by hand ends any hold. Turning alone doesn't slow you: burn to brake. " +
                 "Turning uses reaction wheels, which run on power and spend no fuel. " +
                 "Mouse: drag to look around, scroll to zoom. Change keys under Esc → Controls.", ui.note);
+            if (InGame) GUILayout.Label(OpenWorld.Career.DarkCoastHelp, ui.note);
             GUILayout.Space(6);
             if (GUILayout.Button("Close (F1)", ui.button)) HelpOpen = false;
             GUILayout.EndVertical();

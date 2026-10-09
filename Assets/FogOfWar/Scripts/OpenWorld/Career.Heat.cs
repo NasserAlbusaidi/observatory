@@ -11,6 +11,7 @@ namespace FogOfWar.OpenWorld
         public const double WaterC = 4186;         // J/kg·K [calc]
         public const double SinkLoadW = 2e6;       // [design] the hull's waste heat; the same number as Signature.IdleW, not the same role
         public const double SinkMaxK = 100;        // [design]
+        public const string DarkCoastHelp = "To go dark with stowable radiators, coast with the drive off and hands off the RCS: a burn or an RCS push shows you to raiders.";
         public static double SinkSecondsPerT => WaterC * 1000 * SinkMaxK / SinkLoadW;   // 209.3 s of 2 MW per tonne of water
         public double SinkK;
         double fillJd = double.NaN;                // the date the sink filled inside this update, else NaN: SeenSeconds reads it

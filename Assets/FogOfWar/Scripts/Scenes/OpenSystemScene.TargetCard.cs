@@ -130,7 +130,7 @@ namespace FogOfWar
                     if (d >= 1)
                     {
                         PlanTrip(out double secs, out _, out _);
-                        overDays += secs / 86400 + (due.Kind == JobKind.Survey ? due.DwellNeeded / 86400 : 0);
+                        overDays += (secs + AfterArrivalS(due)) / 86400;
                     }
                     Ui.Text(tcJob, $"{due.Title}  ·  due in {Days(Math.Max(due.DeadlineJd - jd, 0))}, " + (overDays > 0 ? $"{Days(overDays)} too late" : $"{Days(-overDays)} to spare"));
                     Ui.SetClass(tcJob, "ok", overDays <= 0);
