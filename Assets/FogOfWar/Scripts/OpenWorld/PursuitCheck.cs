@@ -624,26 +624,36 @@ namespace FogOfWar.OpenWorld
                 $"c{r.ClimbIn}/t{r.TurnIn}", ph, r.Note);
         }
 
-        // Direct production call: distinguish a far-side crossing from S4's safe off-axis stopping segment.
+        // Direct production call: the #141 run-out dodge, the far-side braking segment and S4's safe off-axis stopping segment.
         public static bool ClearanceCalls(SolarSystem sys, TextWriter log)
         {
             var b = sys["Pallas"]; var pc = sys.Pos(b, Jd0); var vc = sys.Vel(b, Jd0);
             var rad = (pc.Norm - b.Pole * D3.Dot(pc.Norm, b.Pole)).Norm;
+            var guard = typeof(Ship).GetMethod("PursueClearance", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            double safe = 1.1 * b.Radius + 20;
+            // run-out: 12 km/s straight in from 20 R cannot stop before the body, so the guard pushes sideways
             var probe = new Ship { MaxG = 1, Pos = pc + rad * (20 * b.Radius), Vel = vc - rad * 12 };
             probe.Obstacles.Add(b);
-            var guard = typeof(Ship).GetMethod("PursueClearance", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            bool crossing = guard.Invoke(probe, new object[] { sys, Jd0 }) != null;
-            double safe = 1.1 * b.Radius + 20;
-            double stop = 12 * 12 / (2 * Ship.PursueMargin * (probe.AMax - b.GM / Math.Pow(20 * b.Radius, 2)));
-            crossing &= stop > 20 * b.Radius + safe; // the endpoint is beyond the far side, not merely inside the body
+            bool runOut = guard.Invoke(probe, new object[] { sys, Jd0 }) != null;
+            // far side: 11.7 km/s straight in from 30 R stops (full drive) before the clear sphere, but the 0.85 stop ends past the far side
+            double r30 = 30 * b.Radius, v30 = 11.7, clear = 1.1 * safe;
+            probe = new Ship { MaxG = 1, Pos = pc + rad * r30, Vel = vc - rad * v30 };
+            probe.Obstacles.Add(b);
+            double net30 = probe.AMax - b.GM / (r30 * r30);
+            bool farSide = v30 * v30 / (2 * net30) <= r30 - clear; // not a run-out
+            farSide &= v30 * v30 / (2 * Ship.PursueMargin * net30) > r30 + safe; // the endpoint is beyond the far side, not merely inside the body
+            var push = guard.Invoke(probe, new object[] { sys, Jd0 }) as D3?;
+            // the braking-segment push is mostly radial, outward; the run-out dodge would be at right angles to the velocity
+            farSide &= push.HasValue && D3.Dot(push.Value.Norm, rad) > 0.9;
             var target = rad * Ship.Standoff(b);
             var direction = (target - b.Pole * 50000).Norm;
             probe.Pos = pc + target * 0.9 + b.Pole * 5000; // point on S4's original pole-to-orbit line
             probe.Vel = vc + direction * 12;
             bool pole = guard.Invoke(probe, new object[] { sys, Jd0 }) == null;
-            Echo(log, $"  G9 far-side crossing guard non-null: {(crossing ? "PASS" : "FAIL")}");
+            Echo(log, $"  G9 run-out dodge guard non-null: {(runOut ? "PASS" : "FAIL")}");
+            Echo(log, $"  G9 far-side braking guard non-null, radial push: {(farSide ? "PASS" : "FAIL")}");
             Echo(log, $"  G9 S4 pole guard null: {(pole ? "PASS" : "FAIL")}");
-            return crossing && pole;
+            return runOut && farSide && pole;
         }
 
         // #90's measurement (report only): can a raider that starts behind an arriving ship board it before the dock?
