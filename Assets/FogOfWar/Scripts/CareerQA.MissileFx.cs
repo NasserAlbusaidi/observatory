@@ -106,13 +106,13 @@ namespace FogOfWar
                     rows.Add((tPrev, Get<double>("frameWarp"), t1, Get<int>("warpIdx")));
                     tPrev = t1;
                     if (double.IsInfinity(t1)) { jdHit = jd; break; }
-                    if (!at30 && t1 <= 15) { at30 = true; yield return Placed("30 km"); }
-                    else if (!atClose && t1 <= 0.5) { atClose = true; yield return Placed("1 km"); }
+                    if (!at30 && t1 <= 15) { at30 = true; yield return Placed("30 km", true); }
+                    else if (!atClose && t1 <= 0.5) { atClose = true; yield return Placed("1 km", false); }
                 }
                 if (shots && double.IsNaN(jdHit) == false)
                 {
                     yield return new WaitForEndOfFrame();
-                    Guard($"missile fx {label} 18d flash", () => FlashCheck(flash0, since));
+                    Guard($"missile fx {label} 18d flash", () => { FlashCheck(flash0, since); Look(true); });
                     yield return Shot($"c18-hit-{shell}");
                 }
                 yield return null; // the frame after the impact
@@ -145,9 +145,23 @@ namespace FogOfWar
             }
 
             // 18c: the flares where the missiles are, at one frame held still; a shot of it
-            IEnumerator Placed(string at)
+            // the orbit camera on the ship: far, ahead of it a little up and to the side, looking back past the hull along the
+            // salvo's line; else 2 km off that line, so a missile 1 km out shows its plume side on
+            void Look(bool far)
+            {
+                var side = D3.Cross(ship.Heading, Frame.EclNorth).Norm;
+                var across = D3.Cross(approach, Frame.EclNorth).Norm;
+                var dir = Frame.U((far ? ship.Heading - side * 0.35 + Frame.EclNorth * 0.2 : across + approach * 0.25 + Frame.EclNorth * 0.15).Norm).normalized;
+                Put("camMode", Nested("CamMode", 1));
+                Call("SetPivot", Nested("Pivot", 0), far ? 0.16 : 2.0);
+                Put("yaw", Mathf.Atan2(dir.x, -dir.z) * Mathf.Rad2Deg);
+                Put("pitch", Mathf.Asin(Mathf.Clamp(dir.y, -1, 1)) * Mathf.Rad2Deg);
+            }
+
+            IEnumerator Placed(string at, bool far)
             {
                 s.QaFreeze = true;
+                Look(far);
                 yield return null;
                 yield return new WaitForEndOfFrame();
                 Guard($"missile fx 18c {at}", () =>
@@ -192,17 +206,7 @@ namespace FogOfWar
             }
 
             if (go) yield return RunHold("1000x", 3, 12000, 200, false);
-            if (go) go = Guard("missile fx camera", () =>
-            {
-                career.DropContact();
-                // across the salvo's line from it, looking past the hull at it 30° off that line, so its plume shows side on
-                var side = D3.Cross(ship.Heading, Frame.EclNorth).Norm;
-                var dir = Frame.U(-(approach + side * 0.5 + Frame.EclNorth * 0.15).Norm).normalized;
-                Put("camMode", Nested("CamMode", 1));
-                Call("SetPivot", Nested("Pivot", 0), 0.16);
-                Put("yaw", Mathf.Atan2(dir.x, -dir.z) * Mathf.Rad2Deg);
-                Put("pitch", Mathf.Asin(Mathf.Clamp(dir.y, -1, 1)) * Mathf.Rad2Deg);
-            });
+            if (go) go = Guard("missile fx camera", () => { career.DropContact(); Look(true); });
             if (go) yield return RunHold("100x", 2, 300, 80, true);
 
             // 18d: the flash is gone; 18e: nothing is left once the chase ends
