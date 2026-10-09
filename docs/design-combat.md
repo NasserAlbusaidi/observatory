@@ -900,10 +900,12 @@ A light struct, not a `Ship` (`design-modes.md:162`). It lives in the `Encounter
 | 6 mounts | all six | 18 t | 180,000 cr | 2 |
 
 - 3 t a mount: a 1.5 t gun and a 1.5 t magazine [design].
-- On the frigate `PDC_1` is dorsal fore and `PDC_5` ventral aft. So two mounts cover both sides [code: the FBX markers, read by the search; see the arc note].
+- On the frigate `PDC_1` is dorsal fore and `PDC_5` ventral aft, their zeniths opposite. So two mounts cover both sides, except on the ship's horizontal plane: dead ahead, dead astern or square on a beam, neither bears [code: the FBX markers, measured by QA 17t and 17s].
+- **On the corvette `PDC_1` + `PDC_5` do not cover both sides.** `PDC_1` is dorsal aft and `PDC_5` points to starboard, 28.8° below the beam. A missile from port, or from port and low, meets neither. The corvette's opposite pairs are `PDC_2` + `PDC_5` and `PDC_3` + `PDC_4` (0.2° from opposite). The slot (4b, part 2) must pick the 2-mount markers per hull [code: QA 17s, 17t].
+- **No zenith on either hull leans fore or aft.** So on exactly the nose or the tail no mount bears, in any fit (zenith · d = 0). At 10° off the axis, 4 of 6 bear from above and 2 from below on both hulls [code: QA 17s].
 - **Arcs.** Each mount covers a hemisphere about its zenith, the marker's local +Y axis [design]. A mount bears on direction d when zenith · d > 0. The hull does not block in Phase 4 [design].
 - **The arc table is data, not a scene read.** `Career` runs headless in QA. So each `Hull` gets `Mounts`: the six zenith vectors in the body frame. A QA check compares them with the FBX markers (as 16o checks the corvette's markers, `CareerQA.HullArt.cs:92`).
-- **Art contract.** `ART-CONTRACT.md` gets the rule: a `PDC_n` empty's +Y is the turret's zenith. The frigate's `PDC_1` and `PDC_4` have no rotation, so they point up. The search read the FBX axes but did not confirm the up axis. 4b checks it.
+- **Art contract.** `ART-CONTRACT.md` gets the rule: a `PDC_n` empty's +Y is the turret's zenith. The frigate's `PDC_1` and `PDC_4` have no rotation, so they point up. QA 17t confirms the up axis on both hulls: each marker's +Y matches `Hull.Mounts` within 0.04°.
 
 **Position spread.** r = r₀ + ½·a·t², t = range / u.
 
@@ -1071,6 +1073,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - **The classic Repair button** is read by `UiShots`' classic yard shot (docked at Earth), which runs only with `-fowclassicshots` (it needs a visible window). CareerQA reads the UI Toolkit row; the Missiles and Damage rows run in both shells.
 
 **PR 4b: `pdc`** (needs new art: no. The markers exist)
+- Status: the math, the mount table and its QA are built first on branch `pdc-mounts` (`OpenWorld/PointDefense.cs`, `Hull.Mounts`, `CareerQA.PointDefense.cs`, 17p-17t); the slot, hits and boarding follow 4a.
 - Adds: `Slot.PointDefense` (D4), `Hull.Mounts`, the arc test, the pass integral, the PDC hit, the boarding rule and `BreakOff.Repelled`, the bearing count in the Missiles row, the `ART-CONTRACT.md` zenith rule.
 - Touches: `OpenWorld/ShipBuild.cs`, `OpenWorld/Career.Damage.cs`, `OpenWorld/Career.Pirates.cs` (`Contacts`, `OffNote`), the yard and HUD in both shells, `CareerQA.Defense.cs`, `CareerQA.HullArt.cs` (mount vectors against the FBX).
 - QA:
