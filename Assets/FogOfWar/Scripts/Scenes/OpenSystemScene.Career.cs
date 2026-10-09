@@ -270,6 +270,11 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- panel
 
+        // the dry-tank line in both shells: at a port the tender is not offered, the port sells on credit (Career.BuyFuel)
+        static string DryLine(bool docked) => docked
+            ? $"The tank is dry. The port sells up to {Career.EmergencyTonnes:N0} t on credit."
+            : "The tank is dry. You are adrift.";
+
         void CareerPanel(PanelUI ui)
         {
             if (!career.Sandbox) CallPanel(ui); // first: a call waits for an answer (OpenSystemScene.RaiderHud.cs)
@@ -296,7 +301,7 @@ namespace FogOfWar
             GUILayout.Label("Standing: " + string.Join("   ·   ", standings), ui.note);
             if (ship.Fuel < 1)
             {
-                GUILayout.Label("The tank is dry. You are adrift.", ui.label);
+                GUILayout.Label(DryLine(career.Docked != null), ui.label);
                 if (career.Docked == null && ui.Button($"Call an emergency tender ({Career.EmergencyTonnes:N0} t, {Career.EmergencyCost:N0} cr)")) career.EmergencyDrop(ship);
             }
 

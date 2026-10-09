@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -8,10 +9,25 @@ namespace FogOfWar
     // Stored in PlayerPrefs under fow-set-*.
     public static class GameSettings
     {
-        static float F(string k, float d) => PlayerPrefs.GetFloat("fow-set-" + k, d);
-        static int I(string k, int d) => PlayerPrefs.GetInt("fow-set-" + k, d);
-        static void SetF(string k, float v) { PlayerPrefs.SetFloat("fow-set-" + k, v); PlayerPrefs.Save(); Changed?.Invoke(); }
-        static void SetI(string k, int v) { PlayerPrefs.SetInt("fow-set-" + k, v); PlayerPrefs.Save(); Changed?.Invoke(); }
+        // #155: an unattended suite keeps its setting changes in memory, so a killed run cannot leave QA values in the
+        // player's settings. Reads fall back to the player's saved values, so a suite still starts from them.
+        public static readonly bool InMemory = Array.Exists(OpenSystemScene.UnattendedSuites(),
+            a => Array.IndexOf(Environment.GetCommandLineArgs(), a) >= 0);
+        static readonly Dictionary<string, float> memF = new Dictionary<string, float>();
+        static readonly Dictionary<string, int> memI = new Dictionary<string, int>();
+
+        static float F(string k, float d) => InMemory && memF.TryGetValue(k, out float v) ? v : PlayerPrefs.GetFloat("fow-set-" + k, d);
+        static int I(string k, int d) => InMemory && memI.TryGetValue(k, out int v) ? v : PlayerPrefs.GetInt("fow-set-" + k, d);
+        static void SetF(string k, float v)
+        {
+            if (InMemory) memF[k] = v; else { PlayerPrefs.SetFloat("fow-set-" + k, v); PlayerPrefs.Save(); }
+            Changed?.Invoke();
+        }
+        static void SetI(string k, int v)
+        {
+            if (InMemory) memI[k] = v; else { PlayerPrefs.SetInt("fow-set-" + k, v); PlayerPrefs.Save(); }
+            Changed?.Invoke();
+        }
 
         public static event Action Changed;
         public static bool SilentOutput; // the audio check records the synth with the speakers off

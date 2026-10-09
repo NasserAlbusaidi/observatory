@@ -181,6 +181,8 @@ namespace FogOfWar
             SurfaceReadoutChecks();
             CoastStateChecks();
             SaveKeyChecks();
+            TargetSpeedRowChecks();
+            WarpLimitedNoteChecks();
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
             Check(!ship.UnlimitedFuel && Math.Abs(ship.Fuel - 200) < 1e-6, "tank full, reaction mass is limited");
@@ -591,7 +593,8 @@ namespace FogOfWar
                     yield return null; yield return null;
                     Check(!career.Active.Contains(copy) && Get<int>("warpIdx") == 0 && !ship.PlanActive && sys[copy.To] == null,
                         $"dry tank: job failed, warp {Get<int>("warpIdx")}, plan {(ship.PlanActive ? "on" : "off")}");
-                    Check(career.Notes.Exists(n => n.Text.Contains("emergency tender")), "dry tank offers the emergency tender");
+                    Check(career.Notes.Exists(n => n.Text.Contains(career.Docked == null ? "emergency tender" : "on credit")),
+                        $"dry tank offers the emergency tender, or the port's credit when docked ({career.Docked?.Name ?? "not docked"})");
                     ship.Fuel = keep;
                     ship.Plan = Plan.None;
                     Call("SetTarget", sys.Moon);
