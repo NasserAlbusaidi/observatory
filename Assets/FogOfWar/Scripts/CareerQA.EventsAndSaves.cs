@@ -17,6 +17,7 @@ namespace FogOfWar
 
         IEnumerable<object> EventAndSaveChecks()
         {
+            DryTankChecks(); // 5a: #151, #152 the dry tank at a port
             // 5. a dry tank cuts the drive; the tender refills it
             ship.Plan = Plan.None; ship.Fuel = 0; ship.ThrottleCmd = 1;
             var v0 = ship.Vel;
