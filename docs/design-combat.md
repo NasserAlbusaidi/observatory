@@ -203,7 +203,7 @@ The stock and Torch rows match the doc's 0.23 and 0.52 AU.
 
 ### Raiders: the planner predicts it (PR 2a)
 
-`Threat.Of` (`Threat.cs:79-124`) keeps its signature. Three lines change:
+`Threat.Of` (`Threat.cs:80-127`) keeps its signature. Three lines change:
 
 | Phase | W3 today | Phase 2 |
 |---|---|---|
@@ -211,7 +211,7 @@ The stock and Torch rows match the doc's 0.23 and 0.52 AU.
 | Speeding up (`:119`) | counted | counted: loud |
 | Slow coast (`:120`) | whole coast | **first 2 h only**: the departure burn's track |
 | Braking (`:121`) | counted | counted: loud |
-| Held at the target (`:122`) | 1.5 h | 1.5 h at a body with no port; **dropped** at a port (#162, decision 9) |
+| Held at the target (`:125`) | 1.5 h | 1.5 h at a body with no port; **dropped** at a port (#162, decision 9) |
 
 Exposed hours (presence, patrol reach and e^(−v/70.6 km/s) unchanged). Chance at 0.2 calls/h [calc]:
 
@@ -228,13 +228,13 @@ Exposed hours (presence, patrol reach and e^(−v/70.6 km/s) unchanged). Chance 
 | Survey dwell after the braking burn, 2 h | 33.0 % | 33.0 % |
 | Hand-flown trip, any | 0 % (gate) | as the planned trip |
 
-- Every W3 check at `CareerQA.Threat.cs:31-34` stays as it is. The "dock first" clause (`Threat.cs:131`) stays. #162 later dropped the port hold (decision 9), which moves the two Mars orbit → Vesta numbers.
+- Every W3 check at `CareerQA.Threat.cs:31-34` stays as it is. The "dock first" clause (`Threat.cs:134`) stays. #162 later dropped the port hold (decision 9), which moves the two Mars orbit → Vesta numbers.
 - **The third axis is real for cruise.**
   - Today a ¼ cruise counts 2.4× the risk of a full burn.
   - In Phase 2 it is the quietest of the three. The long coast goes cold 2 h after the departure burn.
   - At full thrust the drive choice moves only the time spent burning: Δv / a.
 - **Port hold dropped (#162).** `FindDock` (`Career.cs:253-270`) docks a ship as soon as it is inside `DockRange`, bound, with the drive off, so the 1.5 h hold at a port was never live exposure. `Threat.Of` now counts the hold only at a body with no port, such as a survey target. See decision 9.
-- **The line** (`Threat.cs:132`) reads: "Raider risk: moderate. 2.0 h slow and seen (a burn, or 2 h after one), out of patrol reach in raider space, most of it on arrival: dock first and a raider can't board."
+- **The line** (`Threat.cs:135`) reads: "Raider risk: moderate. 2.0 h slow and seen (a burn, or 2 h after one), out of patrol reach in raider space, most of it on arrival: dock first and a raider can't board."
 
 ### What the player sees and does not see
 
