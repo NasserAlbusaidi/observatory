@@ -11,7 +11,7 @@ namespace FogOfWar
     // 16. Stowable radiators and the heat sink (Career.Heat.cs, docs/design-combat.md Phase 3a): the constants, the yard rows
     // and the build, the soak of one update, the heat paths (burn, dry, tender, dock), what the raider sees, the planner's
     // hold, the save and the call's cost, the raider that loses a dark hull (3b), the quiet watch on Pallas (3c: a survey whose
-    // dwell counts only unseen time, its board slot, its save and its line), then in the scene the Signature, Heat sink,
+    // dwell counts only unseen time, its board slot, its save and its line), contraband (3d), then in the scene the Signature, Heat sink,
     // Raiders and Raider track rows and the SEEN and DARK pills (the rows alone under -fowlegacyui), and the Jobs page's
     // quiet line. Headless parts run on a system of their own at the pursuit check's date, the planner at the scene's date
     // as 15 does. Every [calc] number was worked by hand and never run: every check logs what it measured.
@@ -31,9 +31,11 @@ namespace FogOfWar
                 Guard("stealth save", () => StealthSaveChecks(qs));
                 Guard("stealth lost", () => StealthLostChecks(qs));
                 Guard("stealth scout", () => StealthScoutChecks(qs));
+                Guard("stealth smuggle", () => StealthSmuggleChecks(qs));
             }
             yield return StealthSceneChecks();
             Guard("stealth scout lines", StealthScoutShellChecks);
+            Guard("stealth smuggle lines", StealthSmuggleShellChecks);
             yield return StealthLineChecks(); // 16k and 16l (CareerQA.StealthLines.cs)
         }
 

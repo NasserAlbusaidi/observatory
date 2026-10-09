@@ -235,7 +235,12 @@ namespace FogOfWar
               .Append(career.Codex.SensorLevel).Append(cruiseIdx).Append('|').Append(Math.Round(ship.MaxG, 2)).Append('|').Append(ship.PlanActive).Append(Math.Round(ship.CruiseCap)).Append('|').Append(Math.Round(jd, 2));
             for (int i = 1; i < Career.Factions.Length; i++) sb.Append('s').Append(career.Standing((Faction)i));
             // pay and tonnes too: a raider's boarding or give-up changes them on a job that stays on
-            foreach (var a in career.Active) sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell)).Append(':').Append(Math.Round(a.Pay)).Append(':').Append(Math.Round(a.Tonnes, 1));
+            // a contraband job's grade moves as raiders see the ship; rounded, so the page does not redraw every 0.4 s
+            foreach (var a in career.Active)
+            {
+                sb.Append('a').Append(a.Id).Append(':').Append(Math.Round(a.Dwell)).Append(':').Append(Math.Round(a.Pay)).Append(':').Append(Math.Round(a.Tonnes, 1));
+                if (a.Contraband) sb.Append(':').Append(Math.Round(Career.Grade(a), 2));
+            }
             if (career.Encounter != null) foreach (var a in RaiderAnswers(out _)) sb.Append('r').Append(a.Label);
             foreach (var b in career.Board) sb.Append('b').Append(b.Id);
             return sb.ToString();
@@ -334,9 +339,10 @@ namespace FogOfWar
                     if (owner != Faction.None) what += " · for " + Career.Factions[(int)owner].Name;
                     Ui.L(card, what, "t-note");
                     if (j.Quiet) Ui.L(card, Career.QuietLine, "t-note");
+                    if (j.Contraband) Ui.L(card, Career.ContrabandLine(j), "t-note");
                     double expressLeft = j.ExpressJd - jd;
                     if (j.ExpressJd > 0 && expressLeft >= 0)
-                        Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done in {Days(expressLeft)}", "t-label", "f-mono", "ok");
+                        Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus * Career.Grade(j):N0} cr if done in {Days(expressLeft)}", "t-label", "f-mono", "ok");
                     var body = career.TargetOf(j);
                     if (body != null && left >= 0 && career.CanFlyInByHand(j))
                     {
@@ -402,12 +408,13 @@ namespace FogOfWar
                     if (j.Tier != null) what += " · " + j.Tier;
                     Ui.L(card, what, "t-body");
                     if (j.Quiet) Ui.L(card, Career.QuietLine, "t-note");
+                    if (j.Contraband) Ui.L(card, Career.ContrabandLine(j), "t-note");
                     // a far run can need more than the tank for a full burn: say so here, not after Engage
                     bool overTank = fuel > career.TankCapacity;
                     var cost = Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {Fmt.Num(a / Ship.G0, 2)} g: {Dur(t)}, {fuel:N1} t" + (overTank ? " (more than the tank: coast)" : ""), "t-note", "f-mono");
                     Ui.SetClass(cost, "warn", overTank);
                     if (j.ExpressDays > 0)
-                        Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done within {Days(j.ExpressDays)}", "t-note", "f-mono", "ok");
+                        Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus * Career.Grade(j):N0} cr if done within {Days(j.ExpressDays)}", "t-note", "f-mono", "ok");
                     bool ok = career.CanAccept(j, out string why);
                     var b = Ui.B(card, ok ? "Accept" : "Can't accept: " + why, () => { if (career.CanAccept(j, out _)) career.Accept(j, jd); }, "small", ok ? "primary" : "disabled");
                     b.style.alignSelf = Align.FlexStart; b.style.marginTop = 6;

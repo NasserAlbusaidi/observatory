@@ -382,6 +382,7 @@ namespace FogOfWar
                 if (owner != Faction.None) what += "   ·   for " + Career.Factions[(int)owner].Name;
                 GUILayout.Label($"{what}   ·   {due}   ·   {c.Pay:N0} cr", left >= 0 ? ui.label : ui.note);
                 if (c.Quiet) GUILayout.Label(Career.QuietLine, ui.note);
+                if (c.Contraband) GUILayout.Label(Career.ContrabandLine(c), ui.note);
                 var body = career.TargetOf(c);
                 int b = ui.Buttons((ship.Target == body ? "● " : "") + "Set target", "Abandon");
                 if (b == 0 && body != null) SetTarget(body);
@@ -405,6 +406,7 @@ namespace FogOfWar
                     : c.Kind == JobKind.Passengers ? $"{c.People} × {c.Title} → {c.To} (max 1 g)" : $"{c.Tonnes:N0} t {c.Title} → {c.To}";
                 GUILayout.Label($"{what}\n{c.Pay:N0} cr   ·   {Days(c.Days)} allowed   ·   {Km(d)}   ·   full burn at {Fmt.Num(a / Ship.G0, 2)} g: {Dur(t)} with parking, {fuel:N1} t", ui.note);
                 if (c.Quiet) GUILayout.Label(Career.QuietLine, ui.note);
+                if (c.Contraband) GUILayout.Label(Career.ContrabandLine(c), ui.note);
                 bool ok = career.CanAccept(c, out string why);
                 if (ui.Buttons(ok ? "Accept" : "Accept (" + why + ")") == 0 && ok) career.Accept(c, jd);
             }

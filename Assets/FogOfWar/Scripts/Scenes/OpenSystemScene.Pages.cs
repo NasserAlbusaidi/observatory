@@ -159,8 +159,8 @@ namespace FogOfWar
                 if (j.ExpressJd > jd)
                 {
                     double margin = j.ExpressJd - jd - arrive;
-                    Ui.L(tripLines, margin >= 0 ? $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr: made with {Days(margin)} to spare"
-                        : $"Misses the express bonus (+{j.Pay * Career.ExpressBonus:N0} cr) by {Days(-margin)}", "t-body", margin >= 0 ? "ok" : "dim");
+                    Ui.L(tripLines, margin >= 0 ? $"Express bonus +{j.Pay * Career.ExpressBonus * Career.Grade(j):N0} cr: made with {Days(margin)} to spare"
+                        : $"Misses the express bonus (+{j.Pay * Career.ExpressBonus * Career.Grade(j):N0} cr) by {Days(-margin)}", "t-body", margin >= 0 ? "ok" : "dim");
                 }
             }
             if (ship.PlanActive && ship.CruiseCap > 0) Ui.L(tripLines, $"Cruise speed {ship.CruiseCap:N0} km/s", "t-note");
