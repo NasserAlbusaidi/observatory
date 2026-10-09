@@ -412,6 +412,7 @@ namespace FogOfWar
                     foreach (var x in sys.Bodies) if (x.Parent != null && !Career.IsCraft(x)) texts.Add(Career.OffNote(Career.BreakOff.Landed, x.Name, h));
                     texts.Add(Career.OffNote(Career.BreakOff.JobOver, null, h));
                     texts.Add(Career.OffNote(Career.BreakOff.Outrun, null, h));
+                    texts.Add(Career.OffNote(Career.BreakOff.Lost, null, h));
                     texts.Add(Career.LostNote(h));
                     foreach (double t in new[] { 0, 99.9 }) { texts.Add(Career.BoardedNote(t, 9999999, h)); texts.Add(Career.GaveUpNote(t, 9999999, h)); }
                 }

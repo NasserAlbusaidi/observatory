@@ -653,7 +653,7 @@ namespace FogOfWar
                 b.C.Answer(Career.RouteAnswer.Divert, b.Jd);
                 b.C.Answer(Career.RouteAnswer.GiveUp, b.Jd);
                 foreach (var (_, text) in b.Said) { texts.Add(text); if (text.StartsWith("Incoming: ")) incoming = text; }
-                texts.Add(Career.OffNote(Career.BreakOff.Patrol, "Ceres", "Pallas")); texts.Add(Career.OffNote(Career.BreakOff.Outrun, null, "Pallas")); texts.Add(Career.BoardedNote(20, 10000, "Pallas")); texts.Add(Career.LostNote("Pallas"));
+                texts.Add(Career.OffNote(Career.BreakOff.Patrol, "Ceres", "Pallas")); texts.Add(Career.OffNote(Career.BreakOff.Outrun, null, "Pallas")); texts.Add(Career.OffNote(Career.BreakOff.Lost, null, "Pallas")); texts.Add(Career.BoardedNote(20, 10000, "Pallas")); texts.Add(Career.LostNote("Pallas"));
             }
             finally { info.Name = was; }
             var bad = texts.FindAll(t => t == null || t.Contains(name + "'") || t.Contains(name.ToLowerInvariant()) || Regex.IsMatch(t, $@"\b[Aa]n? {name}")
