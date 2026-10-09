@@ -593,7 +593,7 @@ namespace FogOfWar
             var date = Frame.UtcFromTdb(jd);
             Ui.Text(stDate, date.ToString("ddd d MMM yyyy  ·  HH:mm", System.Globalization.CultureInfo.InvariantCulture));
             segWarpTop.Value = warpIdx;
-            bool limited = Time.realtimeSinceStartup - limitedAt < 2f;
+            bool limited = WarpLimitedShown;
             Ui.Text(stLimited, limited ? $"Limited by the frame budget: running at {Fmt.Num(effectiveWarp, 0)}×" : "");
             Ui.Show(stLimited, limited);
             var refPos = sys.Pos(reference, jd);
