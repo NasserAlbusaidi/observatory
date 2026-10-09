@@ -7,12 +7,19 @@ namespace FogOfWar.OpenWorld
     public partial class Career
     {
         // Seconds of this update a raider could see the ship: its loud seconds, plus the time after its last loud moment, up
-        // to TrackHoldS. Gaps between two burns inside one update are left out (at most one frame).
+        // to HoldS. Gaps between two burns inside one update are left out (at most one frame). If the sink filled inside the
+        // update, the stowed hold counts up to the fill and TrackHoldS from it on: what one tick per frame would have counted.
         internal double SeenSeconds(Ship ship, double jd, double simDt)
         {
             if (!spanOk || simDt <= 0) return 0;
             double loud = Math.Max(0, ship.LoudSeconds - spanLoud);
-            double tail = (Math.Min(jd, ship.LastLoudJd + Signature.TrackHoldS / 86400) - Math.Max(spanJd, ship.LastLoudJd)) * 86400;
+            double l = ship.LastLoudJd, from = Math.Max(spanJd, l), tail;
+            if (double.IsNaN(fillJd)) tail = (Math.Min(jd, l + HoldS(ship) / 86400) - from) * 86400;
+            else
+            {
+                double stowEnd = l + Signature.TrackHoldS * Build.StowRho / 86400;
+                tail = (Math.Max(0, Math.Min(jd, stowEnd) - from) + Math.Max(0, Math.Min(jd, l + Signature.TrackHoldS / 86400) - Math.Max(from, Math.Max(fillJd, stowEnd)))) * 86400;
+            }
             return Math.Min(simDt, loud + Math.Max(0, tail));
         }
 
@@ -34,6 +41,9 @@ namespace FogOfWar.OpenWorld
             return carry ?? survey;
         }
 
+        // the drive or the RCS is above the loud line now
+        bool LoudNow(Ship ship) => Signature.Loud(ship.Mass, ship.Throttle * ship.AMax + ship.RcsLevel * Ship.RcsAccel);
+
         public enum Watch { None, Loud, Tracked, Cold }
 
         // For the HUD: None outside raider space (no raid job, presence 0, a patrol in reach, docked, landed, a chase on)
@@ -42,8 +52,8 @@ namespace FogOfWar.OpenWorld
             leftS = 0;
             if (Sandbox || Docked != null || ship.Landed != null || Encounter != null || RaidJob(sys, ship, jd) == null) return Watch.None;
             if (Threat.Presence(sys, ship.Pos, jd) <= 0 || Threat.PatrolAt(sys, ship.Pos, jd) != null) return Watch.None;
-            if (Signature.Loud(ship.Mass, ship.Throttle * ship.AMax + ship.RcsLevel * Ship.RcsAccel)) return Watch.Loud;
-            leftS = Signature.TrackHoldS - (jd - ship.LastLoudJd) * 86400;
+            if (LoudNow(ship)) return Watch.Loud;
+            leftS = HoldS(ship) - (jd - ship.LastLoudJd) * 86400;
             return leftS > 0 ? Watch.Tracked : Watch.Cold;
         }
 
@@ -52,7 +62,7 @@ namespace FogOfWar.OpenWorld
         {
             double ago = (jd - ship.LastLoudJd) * 86400;
             if (ago < 60) return $" It saw your burn from {(start - ship.Pos).Mag:N0} km.";
-            return ago < Signature.TrackHoldS ? $" It has tracked you since your last burn, {(ago < 3600 ? $"{Math.Floor(ago / 60):0} min" : $"{ago / 3600:0.#} h")} ago." : "";
+            return ago < HoldS(ship) ? $" It has tracked you since your last burn, {(ago < 3600 ? $"{Math.Floor(ago / 60):0} min" : $"{ago / 3600:0.#} h")} ago." : "";
         }
     }
 }

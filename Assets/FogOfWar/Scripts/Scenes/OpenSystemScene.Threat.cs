@@ -19,14 +19,15 @@ namespace FogOfWar
         {
             var t = ship.Target;
             if (t == null) return null;
-            string key = t.Name + "|" + cruiseIdx + "|" + ship.AMax.ToString("R") + "|" + ship.PlanActive;
+            double hold = career?.HoldS(ship) ?? Signature.TrackHoldS;
+            string key = t.Name + "|" + cruiseIdx + "|" + ship.AMax.ToString("R") + "|" + ship.PlanActive + "|" + hold;
             if (key == riskKey && Time.unscaledTime - riskAt < 0.5f) return riskLine;
             riskKey = key; riskAt = Time.unscaledTime;
             var from = reference ?? sys.Sun;
             double d = Math.Max((sys.Pos(t, jd) - ship.Pos).Mag - Ship.Standoff(t), 0);
             double f = PlannerFrac(d);
-            risk = Threat.Of(sys, from, ship.Pos - sys.Pos(from, jd), t, jd, d, ship.AMax, f < 1 ? f * Math.Sqrt(ship.AMax * d) : 0);
-            return riskLine = Threat.Line(risk);
+            risk = Threat.Of(sys, from, ship.Pos - sys.Pos(from, jd), t, jd, d, ship.AMax, f < 1 ? f * Math.Sqrt(ship.AMax * d) : 0, hold);
+            return riskLine = Threat.Line(risk, hold);
         }
 
         public string TestRiskLine() { riskKey = null; return RiskLine(); } // checks

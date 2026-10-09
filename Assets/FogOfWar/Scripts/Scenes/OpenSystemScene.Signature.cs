@@ -10,7 +10,7 @@ namespace FogOfWar
     // shells, and the UI Toolkit pill. Career.RaiderWatch allocates (Threat.Presence), so the state is cached at 4 Hz.
     public partial class OpenSystemScene
     {
-        Label pSeen;
+        Label pSeen, pDark;
         Career.Watch watch;
         double watchLeft;
         float watchAt = -1;
@@ -32,14 +32,23 @@ namespace FogOfWar
 
         void SignatureReadouts(List<Readout> list)
         {
-            double p = Signature.JetW(ship), r = Signature.RangeKm(p);
+            double p = Signature.JetW(ship), coldW = career?.ColdW(ship, jd) ?? Signature.IdleW, r = Signature.RangeKm(p, Signature.StockKm, coldW);
             // P = ½ m a vₑ of the main drive and RCS: ideal exhaust power, not onboard waste heat
             list.Add(p > 0 ? new Readout("Signature", $"{Fmt.Num(p / 1e12, 1)} TW exhaust (ideal, not heat), seen at {Km(r)}", Tone.Hot)
-                           : new Readout("Signature", $"cold ({Signature.IdleW / 1e6:0} MW idle), seen at {Km(r)}"));
+                           : new Readout("Signature", coldW < Signature.IdleW ? $"cold, radiators stowed ({coldW / 1e6:0.00} MW), seen at {Km(r)}"
+                                                                              : $"cold ({Signature.IdleW / 1e6:0} MW idle), seen at {Km(r)}"));
+            if (career != null && !career.Sandbox && career.Build.Stowable)
+            {
+                double k = career.SinkK, left = career.SinkLeftS(ship);
+                if (career.Docked != null) list.Add(new Readout("Heat sink", "0 of 100 K: the port takes the heat"));
+                else if (!career.DarkReady(ship)) list.Add(new Readout("Heat sink", "full: radiators out, tracked 2 h after a burn", Tone.Bad));
+                else if (career.Stowed(ship, jd)) list.Add(new Readout("Heat sink", $"{k:0} of 100 K, radiators stowed, {Dur(left)} dark left", Tone.Cold));
+                else list.Add(new Readout("Heat sink", $"{k:0} of 100 K, radiators out, {Dur(left)} dark left"));
+            }
             UpdateWatch();
             if (watch == Career.Watch.Loud) list.Add(new Readout("Raiders", "can see your burn", Tone.Bad));
             else if (watch == Career.Watch.Tracked) list.Add(new Readout("Raiders", $"tracking you, {Dur(watchLeft)} left", Tone.Bad));
-            else if (watch == Career.Watch.Cold) list.Add(new Readout("Raiders", "no track: cold for over 2 h", Tone.Cold));
+            else if (watch == Career.Watch.Cold) list.Add(new Readout("Raiders", "no track: cold for over " + Signature.HoldText(career.HoldS(ship)), Tone.Cold));
             if (traffic != null) list.Add(new Readout("Contacts", $"sensed: {traffic.SeenCount} of {traffic.Flying.Count} in flight"));
         }
 
@@ -65,5 +74,15 @@ namespace FogOfWar
             return pSeen.style.display.value == DisplayStyle.Flex ? pSeen.text : "-";
         }
         public void TestWatchNow() => watchAt = -1;
+
+        string DarkPill() => career != null && career.Stowed(ship, jd)
+            ? $"DARK {Math.Floor(career.SinkLeftS(ship) / 3600):0}:{Math.Floor(career.SinkLeftS(ship) % 3600 / 60):00}" : null;
+
+        public string TestDarkPill()
+        {
+            if (pDark == null) return "no pill";
+            SetPill(pDark, DarkPill(), "cold");
+            return pDark.style.display.value == DisplayStyle.Flex ? pDark.text : "-";
+        }
     }
 }

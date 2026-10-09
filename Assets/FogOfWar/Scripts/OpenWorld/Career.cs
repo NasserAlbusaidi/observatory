@@ -58,6 +58,7 @@ namespace FogOfWar.OpenWorld
         public bool contact;             // saved during a raider's chase (W4): a load does not resume it, and says so
         public ShipBuild build;          // the yard's build; saves made before it have none: drive, tank and sensors stand for it
         public double refitJd;           // in the yard until this date; 0 = not
+        public double sinkK;             // the heat sink, K above port water (combat Phase 3); 0 for older saves
     }
 
     // The trucker career: credits, reaction mass, ports, contracts and upgrades. Plain data and rules, no UI; the scene
@@ -211,6 +212,7 @@ namespace FogOfWar.OpenWorld
                     : $"Out of fuel. The port sells up to {EmergencyTonnes:N0} t on credit in the Jobs panel.", false);
             }
             wasDry = dry;
+            Soak(ship, simDt);
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
             Scan(sys, ship, jd, simDt);
             TransferInProgress = false;
@@ -629,7 +631,9 @@ namespace FogOfWar.OpenWorld
         // Adrift with a dry tank: a tender brings reaction mass. Debt is allowed.
         public void EmergencyDrop(Ship ship)
         {
+            double before = ship.Fuel;
             ship.Fuel = Math.Min(TankCapacity, ship.Fuel + EmergencyTonnes);
+            MixWater(before, ship.Fuel);
             Credits -= EmergencyCost;
             Say(Happening.EmergencyTender, $"Emergency tender: +{EmergencyTonnes:N0} t of fuel, −{EmergencyCost:N0} cr", false);
         }
@@ -677,7 +681,7 @@ namespace FogOfWar.OpenWorld
 
         public CareerSave ToSave(Ship ship) => new CareerSave
         {
-            credits = Credits, earned = Earned, fuel = ship.Fuel, build = Build.Clone(), refitJd = RefitJd, nextId = nextId,
+            credits = Credits, earned = Earned, fuel = ship.Fuel, build = Build.Clone(), refitJd = RefitJd, sinkK = SinkK, nextId = nextId,
             done = Done, failed = Failed, sandbox = Sandbox, active = new List<Contract>(Active), tutorial = TutorialStep,
             shipPaid = ShipPaid, startJd = StartJd, standing = (int[])this.standing.Clone(),
             taken = new List<string>(this.taken),
@@ -705,6 +709,7 @@ namespace FogOfWar.OpenWorld
             void Fill(HashSet<string> set, List<string> l) { set.Clear(); if (l != null) set.UnionWith(l); }
             Fill(Codex.Visited, s.visited); Fill(Codex.Scanned, s.scanned); Fill(Codex.Achieved, s.achieved); Fill(Codex.DockedAt, s.dockedAt);
             ship.Fuel = s.fuel;
+            SinkK = double.IsNaN(s.sinkK) ? 0 : Math.Max(0, Math.Min(SinkMaxK, s.sinkK));
             Apply(ship);
         }
     }
