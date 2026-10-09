@@ -224,6 +224,7 @@ namespace FogOfWar
             });
             yield return PirateShellChecks(); // 14b: the call card, the pill, the dot and the classic panel
             yield return RaiderModelChecks(); // 17x-17z: the raider's model (CareerQA.RaiderModel.cs)
+            yield return MissileFxChecks();   // 18a-18f: the missiles on screen and the 1× hold (CareerQA.MissileFx.cs)
             yield return PirateNoteChecks(qs);
             yield return PirateNoSaveChecks();
         }

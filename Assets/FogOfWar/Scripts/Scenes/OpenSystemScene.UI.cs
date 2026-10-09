@@ -228,7 +228,7 @@ namespace FogOfWar
         public override void OnGUIOverlay()
         {
             if (Prof) swGui.Start();
-            try { ProbeNotes(); if (GameSettings.ShowLabels) { DrawLabels(); DrawTraffic(); DrawRaider(); } if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
+            try { ProbeNotes(); if (GameSettings.ShowLabels) { DrawLabels(); DrawTraffic(); DrawRaider(); DrawMissiles(); } if (!HasHud || !App.ShellActive) { DrawHud(); DrawCareerNotes(); } } finally { if (Prof) swGui.Stop(); }
         }
 
         GUIStyle labelStyle, labelOn, hudStyle, hudBig;
