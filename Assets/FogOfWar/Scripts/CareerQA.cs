@@ -181,6 +181,8 @@ namespace FogOfWar
             SurfaceReadoutChecks();
             CoastStateChecks();
             SaveKeyChecks();
+            TargetSpeedRowChecks();
+            WarpLimitedNoteChecks();
             State("new career");
             Check(career.Docked?.Name == "Earth orbit", "new career starts docked at Earth orbit");
             Check(!ship.UnlimitedFuel && Math.Abs(ship.Fuel - 200) < 1e-6, "tank full, reaction mass is limited");
