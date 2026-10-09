@@ -14,7 +14,7 @@ namespace FogOfWar
     // and the table's weights over seeded draws (17c); the plating (17d); every effect and floor (17e); the readers of the
     // damaged drive and sensors against the yard's as-fitted readouts (17f); the repair (17g); the chase's end dropping the
     // missiles (17h); the route and board draws (17i); the save (17j); then in the scene the Missiles and Damage rows (both
-    // shells) and the yard's Repair row (UI Toolkit; UiShots draws the classic one docked), and the notes against the
+    // shells) and the yard's Repair row (UI Toolkit; UiShots -fowclassicshots reads the classic one), and the notes against the
     // classic note strip (17l). Headless parts run on benches of their own at the pursuit check's date (CareerQA.Pirates.cs).
     // 4b goes on from 17p. Every [calc] number was worked by hand: every check logs what it measured.
     public partial class CareerQA
@@ -503,7 +503,7 @@ namespace FogOfWar
                 career.DropContact();
                 if (UI.UiShell.Disabled)
                 {
-                    log.WriteLine("  SKIP defense 17k: no UI Toolkit shell (-fowlegacyui): the Jobs page's Repair row; the rows above run in both shells, and UiShots reads the classic panel's Repair button docked at Earth");
+                    log.WriteLine("  SKIP defense 17k: no UI Toolkit shell (-fowlegacyui): the Jobs page's Repair row; the rows above run in both shells, and UiShots -fowclassicshots reads the classic panel's Repair button docked at Earth");
                     return;
                 }
                 setDocked.Invoke(career, new object[] { Array.Find(Career.Ports, p => p.Name == "Ceres") });
