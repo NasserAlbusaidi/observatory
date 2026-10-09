@@ -418,6 +418,7 @@ namespace FogOfWar
             GUILayout.Label(current.Eyebrow.ToUpperInvariant(), ui.eyebrow);
             GUILayout.Label(current.Title.ToUpperInvariant(), ui.title);
             if (!InGame) GUILayout.Label(current.Blurb, ui.body);
+            current.PanelTop(ui);
 
             ui.Section("Readouts");
             foreach (var r in readouts)

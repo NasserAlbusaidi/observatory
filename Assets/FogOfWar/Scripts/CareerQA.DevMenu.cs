@@ -62,7 +62,13 @@ namespace FogOfWar
                     Check(report.StartsWith("Flex", StringComparison.Ordinal) && s.TestDevMenuFits && s.TestDevClassicFrame < 0,
                         $"dev 19a: the UI Toolkit HUD shows the menu on screen ({s.TestDevMenuFits}), the classic panel does not draw it: {report}");
                 }
-                else Check(s.TestDevClassicFrame >= openFrame, $"dev 19a: the classic panel paints the menu (frame {s.TestDevClassicFrame}, opened at {openFrame})");
+                else
+                {
+                    // above the readouts, in a panel scrolled to the top: on screen without scrolling
+                    var scroll = (Vector2)typeof(FogOfWarApp).GetField("panelScroll", F).GetValue(app);
+                    Check(s.TestDevClassicFrame >= openFrame && s.TestDevClassicY >= 0 && s.TestDevClassicY < 150 && scroll == Vector2.zero,
+                        $"dev 19a: the classic panel paints the menu at its top (frame {s.TestDevClassicFrame}, opened at {openFrame}; {s.TestDevClassicY:0} px down, scroll {scroll})");
+                }
             });
 
             // 19b

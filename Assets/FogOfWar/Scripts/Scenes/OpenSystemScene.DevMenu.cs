@@ -9,7 +9,7 @@ using HS = FogOfWar.OpenWorld.Career.HitSystem;
 namespace FogOfWar
 {
     // The dev menu (OpenSystemScene.Dev.cs) in both shells: a panel on the UI Toolkit HUD, and a section at the top of the
-    // classic panel (-fowlegacyui, or the Classic panel setting). One list of entries feeds both. Its buttons take clicks
+    // classic panel, above the readouts (-fowlegacyui, or the Classic panel setting). One list of entries feeds both. Its buttons take clicks
     // only, as the other panels' do: the flight keys stay with flight.
     public partial class OpenSystemScene
     {
@@ -102,12 +102,16 @@ namespace FogOfWar
         // ------------------------------------------------------------ classic panel
 
         int devClassicFrame = -1; // QA: the frame the classic panel last painted the menu
+        float devClassicY = -1;   // QA: and the menu's top in the panel's scrolled content
         int devClassicClick = -1; // QA: entry i clicked as its button would be, at the next repaint
+
+        public override void PanelTop(PanelUI ui) => DevPanel(ui);
 
         void DevPanel(PanelUI ui)
         {
             if (!devMenu) return;
             ui.Section("Dev menu (F7)");
+            if (Event.current.type == EventType.Repaint) devClassicY = GUILayoutUtility.GetLastRect().y;
             GUILayout.Label(DevStatus(), ui.note);
             var all = DevEntries();
             for (int i = 0; i < all.Count;)
@@ -129,6 +133,7 @@ namespace FogOfWar
         }
 
         internal int TestDevClassicFrame => devClassicFrame;
+        internal float TestDevClassicY => devClassicY;
 
         // QA: the entry's button clicked in the shell that shows the menu: a ClickEvent sent to the HUD's button, or the
         // classic panel's at its next repaint. False with the menu closed

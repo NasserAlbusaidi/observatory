@@ -436,7 +436,6 @@ namespace FogOfWar
 
         public override void Controls(PanelUI ui)
         {
-            DevPanel(ui);
             CareerPanel(ui);
             // --- ship
             GUILayout.Label("Throttle (" + Ctl.Keys(A.ThrottleUp) + " / " + Ctl.Keys(A.ThrottleDown) + ", " + Ctl.Keys(A.ThrottleFull) + " full, " + Ctl.Keys(A.ThrottleCut) + " cut)", ui.label);

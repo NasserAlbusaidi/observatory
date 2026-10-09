@@ -50,6 +50,8 @@ namespace FogOfWar
         public virtual void LateTick(float dt) { }
         public abstract void Readouts(List<Readout> list);
         public abstract void Controls(PanelUI ui);
+        // Drawn above the readouts in the classic panel
+        public virtual void PanelTop(PanelUI ui) { }
         public virtual void OnGUIOverlay() { }
         // Return true to take mouse drag / wheel input instead of the shared orbit camera.
         public virtual bool HandleDrag(Vector2 delta, int button) => false;
