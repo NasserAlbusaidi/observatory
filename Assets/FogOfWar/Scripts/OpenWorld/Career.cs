@@ -29,6 +29,7 @@ namespace FogOfWar.OpenWorld
         public double ExpressDays, ExpressJd; // the bonus window from acceptance; 0 = none (intercepts, the tutorial, older saves)
         public double SpoilJd;           // cargo trouble ridden out: delivered after this, it pays half; 0 = none
         public double Dwell, DwellNeeded; // survey: seconds spent in scan range with the drive off
+        public bool Quiet;               // survey: the dwell counts only unseen time (3c: a watch on a raider haven); false for older saves
         public bool Tutorial;
         [NonSerialized] public string Tier;  // board cargo: local, interplanetary or far, as seen from the posting port
         public string Key;              // board slot, so an accepted job doesn't come back the same day
@@ -375,13 +376,17 @@ namespace FogOfWar.OpenWorld
         // Seconds of this update spent within range of b with the drive off. In between the update's end states the
         // position relative to b is taken as a cubic (Hermite) curve, sampled for range crossings; if both ends are in
         // range the whole update counts. Drive time is taken off as if it all fell in range, so this never overcounts.
-        double ScanSeconds(SolarSystem sys, Body b, double range, double jd, double simDt)
+        double ScanSeconds(SolarSystem sys, Body b, double range, double jd, double simDt) => ScanSeconds(sys, b, range, jd, simDt, out _);
+
+        // whole: both ends of the update are in range, so the drive time is the only part taken off
+        double ScanSeconds(SolarSystem sys, Body b, double range, double jd, double simDt, out bool whole)
         {
+            whole = false;
             if (!spanOk) return 0;
             var r1 = ship.Pos - sys.Pos(b, jd);
             var r0 = spanPos - sys.PosAt(b, spanJd);
             double d0 = r0.Mag - range, d1 = r1.Mag - range, inside;
-            if (d0 <= 0 && d1 <= 0) inside = simDt;
+            if (d0 <= 0 && d1 <= 0) { inside = simDt; whole = true; }
             else
             {
                 var m0 = (spanVel - sys.Vel(b, spanJd)) * simDt;
@@ -411,7 +416,8 @@ namespace FogOfWar.OpenWorld
                 if (c.Kind != JobKind.Survey) continue;
                 var b = sys[c.To];
                 if (b == null) continue;
-                double q = ScanSeconds(sys, b, Codex.ScanRange(b), jd, simDt);
+                double q = ScanSeconds(sys, b, Codex.ScanRange(b), jd, simDt, out bool whole);
+                if (c.Quiet) q = QuietSeconds(ship, jd, simDt, q, whole);
                 if (q <= 0) continue;
                 c.Dwell += q * (Codex.SensorLevel > 0 ? 2 : 1);
                 if (c.Dwell < c.DwellNeeded) continue;
@@ -520,12 +526,13 @@ namespace FogOfWar.OpenWorld
 
             // standing with the port's owner sets the pay; neutral leaves every job as posted
             double payFactor = PayFactor(Docked.Owner);
-            for (int k = 0; k < 8; k++)
+            for (int k = 0; k < 9; k++)
             {
                 var c = k == 0 ? Tiered(local, localName) : k == 1 ? Tiered(near, "interplanetary") : k == 2 ? Tiered(far, "far")
                       : k < 5 ? Haul(rng, Pick(), JobKind.Passengers, sys, jd)
                       : k == 6 ? (rng.NextDouble() < 0.6 ? Rescue(rng, sys, jd) : null)
                       : k == 7 ? (rng.NextDouble() < 0.6 ? Intercept(rng, sys, jd) : null)
+                      : k == 8 ? Recon(rng, sys, jd)
                       : Survey(rng, sys, jd);
                 if (c == null) continue;
                 if (payFactor != 1) c.Pay = Math.Round(c.Pay * payFactor / 100) * 100;
