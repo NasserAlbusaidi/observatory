@@ -115,7 +115,7 @@ namespace FogOfWar
             Ui.Show(tripBox, on);
             Ui.Show(navEst, !on);
             if (!on) return;
-            var sig = JobsSignature();
+            var sig = JobsSignature() + "|" + career.HoldS(ship);
             if (sig == tripSig) return;
             tripSig = sig;
             tripLines.Clear();
@@ -129,7 +129,7 @@ namespace FogOfWar
                 // switch now would give
                 PlanTrip(out double ct, out double cdv, out double cfuel, FlyingPlan && i == cruiseIdx ? -1 : CruiseFracs[i]);
                 bool cshort = DvShort(cdv);
-                double late = due == null ? 0 : jd + ct / 86400 + (due.Kind == JobKind.Survey ? due.DwellNeeded / 86400 : 0) - due.DeadlineJd;
+                double late = due == null ? 0 : jd + (ct + AfterArrivalS(due)) / 86400 - due.DeadlineJd;
                 var card = Ui.E(tripLines, "trip-card");
                 Ui.SetClass(card, "on", i == cruiseIdx);
                 Ui.SetClass(card, "bad", cshort || late > 0);
@@ -152,7 +152,7 @@ namespace FogOfWar
             {
                 if (career.TargetOf(j) != ship.Target) continue;
                 // the cards carry the deadline; a second job here, and the express window, get their own lines
-                double arrive = t / 86400 + (j.Kind == JobKind.Survey ? j.DwellNeeded / 86400 : 0);
+                double arrive = (t + AfterArrivalS(j)) / 86400;
                 bool onTime = jd + arrive <= j.DeadlineJd;
                 if (j != due) Ui.L(tripLines, $"{j.Title}: arrives with {Days(Math.Abs(j.DeadlineJd - jd - arrive))} {(onTime ? "to spare" : "too late")}", "t-body", onTime ? "ok" : "warn");
                 // the time price: say whether this plan makes the express window, and by how much it misses

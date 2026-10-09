@@ -197,6 +197,10 @@ namespace FogOfWar
             Career.Trip(d, ship.AMax, f >= 0 ? f : PlannerFrac(d), ship.Mass, out seconds, out dv, out tonnes, u, w);
         }
 
+        // The seconds a job needs after the arrival: a survey's dwell, and before a quiet watch's dwell the raider's hold
+        // (the hull's own, as the risk line reads it; the contract's days carry the stock 2 h).
+        internal double AfterArrivalS(Contract c) => c.Kind != JobKind.Survey ? 0 : c.DwellNeeded + (c.Quiet ? career.HoldS(ship) : 0);
+
         // Headroom over the estimate for what it leaves out: steering, gravity, the guidance's own lag. CareerQA measures
         // the flown Δv against the estimate.
         const double DvMargin = 1.1;
@@ -415,7 +419,7 @@ namespace FogOfWar
             {
                 var body = career.TargetOf(c);
                 if (body != ship.Target) continue;
-                double arrive = t / 86400 + (c.Kind == JobKind.Survey ? c.DwellNeeded / 86400 : 0);
+                double arrive = (t + AfterArrivalS(c)) / 86400;
                 bool onTime = jd + arrive <= c.DeadlineJd;
                 GUILayout.Label($"{c.Title}: arrives with {Days(Math.Abs(c.DeadlineJd - jd - arrive))} {(onTime ? "to spare" : "too late")}", onTime ? ui.note : ui.label);
             }

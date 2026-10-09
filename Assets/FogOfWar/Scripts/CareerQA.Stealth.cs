@@ -34,6 +34,7 @@ namespace FogOfWar
             }
             yield return StealthSceneChecks();
             Guard("stealth scout lines", StealthScoutShellChecks);
+            yield return StealthLineChecks(); // 16k and 16l (CareerQA.StealthLines.cs)
         }
 
         static bool Near(double v, double want, double tol) => Math.Abs(v - want) <= tol;
