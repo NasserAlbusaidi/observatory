@@ -42,6 +42,19 @@ namespace FogOfWar.EditorTools
                     report.Check("S4guard/h=" + h + "/activation", result.ClimbIn >= 1 ? 0 : 1, 0, "missing climb entries",
                         "an unguarded braking segment crosses Pallas", $"climb entries {result.ClimbIn}");
                 }
+                // G10 (#141) is committed before its first run: a fast run-out toward Vesta stays above the guard floor.
+                foreach (string id in new[] { "S6-1h", "S6-2h", "S6-4h" }) foreach (double h in new[] { 1.0, 5.0 })
+                {
+                    var result = OpenWorld.PursuitCheck.Fly(sys, id, h);
+                    double floor = 0.1 * sys["Vesta"].Radius + 20;
+                    // never sampled (MaxValue) fails as infinity, so the gate cannot pass without measuring
+                    double below = result.MinAltPreDock < double.MaxValue ? Math.Max(0, floor - result.MinAltPreDock) : double.PositiveInfinity;
+                    report.Check(id + "/h=" + h + "/altitude", below, 0, "km below safe altitude",
+                        "guard safe radius minus body radius; least altitude inside every pirate step before the dock",
+                        $"min altitude {result.MinAltPreDock:F3} km at {result.MinAltPreDockT:F0} s, floor {floor:F3} km, dock {result.DockT:F0} s, climb entries {result.ClimbIn}");
+                    report.Check(id + "/h=" + h + "/dock", result.DockT >= 0 ? 0 : 1, 0, "missing docks",
+                        "the player docks, so the altitude covers the whole chase before the dock");
+                }
                 using var calls = new StringWriter();
                 report.Check("guard/call-geometry", OpenWorld.PursuitCheck.ClearanceCalls(sys, calls) ? 0 : 1, 0, "failures",
                     "far-side crossing activates; S4 pole approach stays clear", calls.ToString());
