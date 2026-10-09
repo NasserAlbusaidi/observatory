@@ -1,6 +1,6 @@
 # The world: design
 
-Date: 2026-10-06. Updated 2026-10-08. Status: W1–W4 are built. W1: PR 81. W2: PRs 82, 84, 85. W3: PR 86. W4: PRs 87 and 121, with fixes 105 and 115, and the follow-ups 134, 137, 138, 139 and 140. The combat doc's Phase 1 (the shipyard, PRs 130–132) followed. Open: decision 2 (#92) and the pirate fly-through bug (#141).
+Date: 2026-10-06. Updated 2026-10-09. Status: W1–W4 are built. W1: PR 81. W2: PRs 82, 84, 85. W3: PR 86. W4: PRs 87 and 121, with fixes 105 and 115, and the follow-ups 134, 137, 138, 139 and 140. The combat doc's Phase 1 (the shipyard, PRs 130–132) followed. Open: the pirate fly-through bug (#141). Decisions 1 to 3 are decided.
 Code first read on `main` at ee4c7f2, before W1. Line numbers refer to that commit; some have moved since. Scope: career mode.
 
 **This came first.** Phases W1–W4 came before Phase 1 (the shipyard) of [design-combat.md](design-combat.md). You cannot fight nothing.
@@ -18,7 +18,7 @@ Code first read on `main` at ee4c7f2, before W1. Line numbers refer to that comm
 ## Setting
 
 - The game runs at today's date, with every body where it really is (README, ephemeris). So the world is an **alternate present**.
-- The one fiction stays the torch drive. Proposal: it arrived about **40 years ago** [design]. That is long enough for people born in the belt, and short enough that Earth still leads.
+- The one fiction stays the torch drive. Decided: it arrived about **40 years ago** [design]. That is long enough for people born in the belt, and short enough that Earth still leads.
 - The code already uses the word "belter" (an achievement, `Codex.cs:107`).
 
 ## Water is the economy
@@ -42,7 +42,7 @@ The port fuel prices already describe the politics (`Career.cs:62-70`) [code]:
 
 ## Factions
 
-All names are **working names**. See decision 2.
+All names are **final**. See decision 2.
 
 | Faction | Ports | Wants | Fleet (Phase 6 ladder) | To the player |
 |---|---|---|---|---|
@@ -208,7 +208,7 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
 
 ### PR 1: `world-factions` (W1). Merged in PR 81.
 
-- `Career.Factions.cs` holds the factions, with their working names and blurbs, in one table. A rename (decision 2) is one edit there.
+- `Career.Factions.cs` holds the factions, with their names and blurbs, in one table. The names are final (decision 2). A later rename is one edit there.
 - Each `Port` gets an `Owner`.
 - A job belongs to the owner of the port that posts it (`Contract.From`). Nothing new is saved on the job. A distress rescue near a survey body has no owner.
 - **Standing** per faction [design]:
@@ -343,7 +343,6 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
   - **Target card** (#100, PR 139). With a raider as the target, the gauge reads CONTACT, and the raider's answers replace ENGAGE and the trip lines.
 - **Open:**
   - #141: a pirate that overshoots at speed can pass inside Vesta (149 to 257 km under the surface in PR 140's S6 runs). The surface guard misses a fast run-out.
-  - #92: final faction names (decision 2).
   - Not decided (#90, first comment): a pilot with the autopilot off is never raided, because the roll needs an active plan (`Career.Route.cs:43`). Combat Phase 2 (signatures) settles it in PR 2a: raiders see the burn, not the autopilot.
 
 ### Risks
@@ -354,12 +353,12 @@ Six PRs, one feature each, plus one spike. W4 is two PRs (5a and 5b). Each PR br
 
 ## Decisions for you
 
-1. **When the torch drive arrived.** Proposal: about 40 years ago [design].
-2. **Final faction names.** The trope (an Earth navy, a lawless belt) is generic. The Expanse's names (UN Navy, MCRN, OPA, Belter creole) are not, and the UN is a real organization. Pick final names before any text goes in front of players.
-3. **Mars as a company town.** Proposal: yes. It makes Mars different from Earth, from the Compact, and from the Expanse.
+1. **When the torch drive arrived.** Decided: about 40 years ago [design].
+2. **Final faction names.** Decided: Cislunar Guard, Tharsis Company, Ice Compact and Raiders (#92). They are original names, not Expanse names or real organizations. "raider" stays as a common noun in player text.
+3. **Mars as a company town.** Decided: yes. It makes Mars different from Earth, from the Compact, and from the Expanse.
 4. **Boarding time.** Decided: 2 h (#91). It sets the size of every safe zone (`Threat.BoardingSeconds`).
 5. **Traffic count.** Proposal: about 100 ships in flight [design], after a frame-cost check. W2b runs 108 to 117, inside the frame budget [measured].
 
 6. **How a pirate brakes.** Today it brakes on the spare drive that the target's present thrust leaves it. A ship that cuts its drive or flips near the pirate makes it fly past, and it must come back (PR 5a). The other choice: brake as if the target could cut its drive at any time. Then nothing flies past, but a 1 g pirate brakes at 1 g, not 1.85 g, against a ship that brakes into port. Decided: keep today's law (#89). "Change the flip time" is one of the player's answers in W4.
 
-W1 started with the working names. Set decision 2 before this text goes into a release: W4's call card names the Raiders. Decisions 4 and 6 are decided (#91, #89). Decision 5 is measured. Decisions 1 and 3 are still proposals. Decision 2 is issue #92. The combat doc's Phase 1 (the shipyard) followed W4.
+W1 started with the working names. The final names are set (decision 2, #92), and W4's call card names the Raiders. Decisions 1 to 4 and 6 are decided (decision 4 in #91, decision 6 in #89). Decision 5 is measured. The combat doc's Phase 1 (the shipyard) followed W4.
