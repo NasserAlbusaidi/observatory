@@ -64,5 +64,26 @@ namespace FogOfWar.OpenWorld
                 if ((fitted & (1 << i)) != 0 && Bears(h.Mounts[i], dirBody)) n++;
             return n;
         }
+
+        // the mount in `working` whose zenith is nearest dirBody, bearing or not; the lower index on a tie; −1 with none
+        public static int Nearest(Hull h, int working, Vector3 dirBody)
+        {
+            int best = -1;
+            float top = 0;
+            for (int i = 0; i < h.Mounts.Length; i++)
+            {
+                if ((working & (1 << i)) == 0) continue;
+                float d = Vector3.Dot(h.Mounts[i], dirBody);
+                if (best < 0 || d > top) { best = i; top = d; }
+            }
+            return best;
+        }
+
+        public static int Count(int mask)
+        {
+            int n = 0;
+            for (; mask != 0; mask &= mask - 1) n++;
+            return n;
+        }
     }
 }

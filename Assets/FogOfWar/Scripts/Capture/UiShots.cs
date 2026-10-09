@@ -369,6 +369,16 @@ namespace FogOfWar
                     string repair = os.TestRepairReport();
                     log.WriteLine($"    06y-yard repair: {repair}");
                     if (!repair.StartsWith("Repair all: ")) { errors++; log.WriteLine("    ERROR 06y-yard: expected the Repair button for a drive hit"); }
+                    // combat 4b: the PDC row, the draft with 4 mounts
+                    os.TestYardDraft(true, 2);
+                    yield return Wait(0.6f);
+                    os.TestYardScroll(true);
+                    yield return Wait(0.3f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, "06y-yard-pdc");
+                    string pdc = os.TestYardPdcReport();
+                    log.WriteLine($"    06y-yard-pdc: {pdc}");
+                    if (!pdc.StartsWith("PDCs: No PDCs (fitted) | 2 PDC mounts, 6 t: ") || !pdc.Contains("draft 4 mounts") || !pdc.EndsWith("on screen True"))
+                    { errors++; log.WriteLine("    ERROR 06y-yard-pdc: expected the PDC row on screen with the stock pick fitted and a 4-mount draft"); }
                     os.TestYardDraft(false);
                     os.TestDamage(false);
                 }

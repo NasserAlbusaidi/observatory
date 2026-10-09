@@ -2,11 +2,12 @@ using System;
 
 namespace FogOfWar.OpenWorld
 {
-    public enum Slot { Drive, Tank, Hold, Cabin, Sensors, Radiators, Armor }
+    public enum Slot { Drive, Tank, Hold, Cabin, Sensors, Radiators, Armor, PointDefense }
 
     // A part the yard fits in one slot. Size is the slot's own unit: MN of thrust, tonnes of tank or hold, seats, or the
     // sensor level (0 stock, 1 long range: scan range ×2, dwell ÷2), the radiators' cold-range factor when stowed (1:
-    // fixed, always out), or the armor's chance to stop a missile that gets through (0 none, combat Phase 4).
+    // fixed, always out), the armor's chance to stop a missile that gets through (0 none, combat Phase 4), or the PDC
+    // mounts fitted (0, 2, 4 or 6).
     public class Module
     {
         public Slot Slot;
@@ -64,9 +65,9 @@ namespace FogOfWar.OpenWorld
 
         public static readonly Hull[] Hulls =
         {
-            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0 }, Model = "PlayerShip", Mounts = FrigateMounts, MountFit = FrigateFit },
+            new Hull { Name = "FWO-052 light frigate", LengthM = 52, Structure = 228, MaxThrust = Rated(5), Price = 0, Facet = 1, StockPick = new[] { 1, 1, 1, 2, 0, 0, 0, 0 }, Model = "PlayerShip", Mounts = FrigateMounts, MountFit = FrigateFit },
             // [calc] structure 228 × (60/52)³ = 350.25 t; [design] no Torch drive, a third of the frigate's cold range, 400k cr
-            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0 }, Model = "StealthShip", Mounts = CorvetteMounts, MountFit = CorvetteFit },
+            new Hull { Name = "FWO-060 stealth corvette", LengthM = 60, Structure = 350.25, MaxThrust = Rated(3), Price = 400000, Facet = 1.0 / 3, StockPick = new[] { 1, 2, 0, 0, 0, 1, 0, 0 }, Model = "StealthShip", Mounts = CorvetteMounts, MountFit = CorvetteFit },
         };
 
         // Prices [design]: an upgrade from stock costs what it did as a counter (drive 50k and 150k more, tank 35k a step,
@@ -117,7 +118,16 @@ namespace FogOfWar.OpenWorld
                 new Module { Slot = Slot.Armor, Name = "Light plating", Size = 0.5, Mass = 15, Price = 40000, RefitDays = 2 },
                 new Module { Slot = Slot.Armor, Name = "Heavy plating", Size = 0.8, Mass = 40, Price = 100000, RefitDays = 3 },
             },
+            // [design] combat Phase 4 (D4): MountMass and MountPrice a mount, on the hull's markers in Hull.MountFit order
+            new[]
+            {
+                new Module { Slot = Slot.PointDefense, Name = "No PDCs", Size = 0, Mass = 0, Price = 0, RefitDays = 0.5 },
+                new Module { Slot = Slot.PointDefense, Name = "2 PDC mounts", Size = 2, Mass = 2 * MountMass, Price = 2 * MountPrice, RefitDays = 2 },
+                new Module { Slot = Slot.PointDefense, Name = "4 PDC mounts", Size = 4, Mass = 4 * MountMass, Price = 4 * MountPrice, RefitDays = 2 },
+                new Module { Slot = Slot.PointDefense, Name = "6 PDC mounts", Size = 6, Mass = 6 * MountMass, Price = 6 * MountPrice, RefitDays = 2 },
+            },
         };
+        public const double MountMass = 3, MountPrice = 30000; // [design] D4: a 1.5 t gun and a 1.5 t magazine
         public static int[] StockPick => Hulls[0].StockPick;   // the first hull's, which the career starts with
         public const double SellBack = 0.7;
 
@@ -159,6 +169,8 @@ namespace FogOfWar.OpenWorld
         public double OutRho => Hull.Facet;               // the cold-range factor with the radiators out
         public double DarkRho => StowRho * Hull.Facet;    // and stowed
         public double ArmorStop => this[Slot.Armor].Size;
+        public int MountCount => (int)this[Slot.PointDefense].Size;
+        public int FittedMounts => PointDefense.FitMask(Hull, MountCount); // bit i: PDC_i fitted
 
         // the yard's readouts: full burn with an empty hold
         public double GFull => Thrust / (DryMass + TankCapacity) / Ship.G0;

@@ -214,11 +214,11 @@ namespace FogOfWar
             return e.Proxy.Name + (e.Dwell > 0 ? " alongside" : e.Range < Career.CloseKm ? " close" : " chasing");
         }
 
-        // combat 4a: the missiles in flight and left; changes only on a salvo or a hit
+        // combat 4a: the missiles in flight and left, and 4b's kills; changes only on a salvo, a hit or a kill
         string RecMissiles()
         {
             var e = career?.Encounter;
-            return e == null ? "-" : $"{e.Missiles.Count} in flight, {e.Magazine} left";
+            return e == null ? "-" : $"{e.Missiles.Count} in flight, {e.Magazine} left, {e.Killed} killed";
         }
 
         // ---------------------------------------------------------------- review checks

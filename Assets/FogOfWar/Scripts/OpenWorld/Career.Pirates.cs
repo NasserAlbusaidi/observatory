@@ -20,6 +20,8 @@ namespace FogOfWar.OpenWorld
         public double Range, Vrel;           // from the player at the last career update
         public readonly List<Missile> Missiles = new List<Missile>(); // 4a: in flight (Career.Damage.cs); the chase's end drops them
         public int Magazine = Career.MagazineSize;                     // 4a: missiles it has left
+        public int Killed;                                             // 4b: its missiles the PDCs killed
+        public double Repel;                 // 4b: seconds alongside, held off by a mount, its magazine spent (Career.RepelS)
         internal readonly SolarSystem Sys;   // the system the proxy is in
         D3 pos, vel, acc;
         double at;
@@ -80,6 +82,7 @@ namespace FogOfWar.OpenWorld
         public const double ChaseWarp = 1000, CloseWarp = 100, CloseKm = 10000; // D7: the warp cap, and where it tightens
         public const double CatchMinS = 2 * 3600, CatchMaxS = 6 * 3600;        // D11: the catch time a raider's start must give
         public const double GiveUpS = 3600;                       // #98: how long the catch stays past CatchMaxS before it breaks off
+        public const double RepelS = 3600;                        // combat 4b (D9): held off with a spent magazine this long, it breaks off
         static readonly string[] RaiderHulls = { "Magpie", "Jackal", "Lamprey", "Skua", "Cutlass", "Remora" };
 
         public static bool IsRaider(Body b) => b is Encounter.RaiderBody;
@@ -218,7 +221,9 @@ namespace FogOfWar.OpenWorld
 
         // Each update: a docked or landed ship is safe, a patrol in reach drives the raider off, its missiles fly (4a,
         // Volley), and one alongside boards at Threat.BoardingSeconds. Alongside is Career.Intercept's rule (InterceptKm and
-        // InterceptKms, any throttle, at most 30 s a frame), and any break resets the clock.
+        // InterceptKms, any throttle, at most 30 s a frame), and any break resets the clock. 4b (D9): a working PDC mount
+        // that bears on the raider stops the clock, and held off for RepelS with its magazine spent and none in flight, it
+        // breaks off.
         void Contacts(SolarSystem sys, Ship ship, double jd, double simDt)
         {
             // D8: a load dropped a chase (FromSave, LostContact)
@@ -250,7 +255,15 @@ namespace FogOfWar.OpenWorld
             Volley(e, ship, simDt);
             // a cabin hit failed the chase's passenger job
             if (!Active.Contains(e.Job)) { EndContact(Happening.RaiderGone, OffNote(BreakOff.JobOver, null, Haven()), true, jd); return; }
-            if (!alongside) { e.Dwell = 0; return; }
+            if (!alongside) { e.Dwell = 0; e.Repel = 0; return; }
+            if (MountsBearing(ship, e.Pirate.Pos - ship.Pos) > 0)
+            {
+                if (e.Magazine > 0 || e.Missiles.Count > 0) return;
+                e.Repel += simDt;
+                if (e.Repel >= RepelS) EndContact(Happening.RaiderGone, OffNote(BreakOff.Repelled, null, Haven()), true, jd);
+                return;
+            }
+            e.Repel = 0;
             e.Dwell += Math.Min(simDt, 30);
             if (e.Dwell < Threat.BoardingSeconds) return;
             var (t, pay) = Take(e.Job, BoardShare);
@@ -318,7 +331,7 @@ namespace FogOfWar.OpenWorld
             return (vp - u) / a1 + vp / a2 + w / a2;
         }
 
-        internal enum BreakOff { Docked, Landed, JobOver, Patrol, Outrun, Lost }
+        internal enum BreakOff { Docked, Landed, JobOver, Patrol, Outrun, Lost, Repelled }
         internal const string DryNote = "Can't divert: the tank is dry", NavNote = "Can't divert: the nav computer would not engage";
         internal static string RunNote => $"Running: burn hard, or dock first. Time is held to {ChaseWarp:N0}×";
         internal static string DivertNote(Port p) => $"Diverting to {p.Name}, into the {Factions[(int)p.Owner].Name} patrol's reach";
@@ -327,7 +340,7 @@ namespace FogOfWar.OpenWorld
         internal static string GaveUpNote(double t, double pay, string haven) => $"Gave up {Loot(t, pay)}: the raider " + (haven != null ? "goes back to " + haven : "leaves");
         internal static string OffNote(BreakOff why, string where, string haven) =>
             (why == BreakOff.Docked ? $"Docked at {where}" : why == BreakOff.Landed ? $"Landed on {where}" : why == BreakOff.Patrol ? $"{where} patrol in reach"
-                : why == BreakOff.Outrun ? "Outrun" : why == BreakOff.Lost ? "Track lost" : "The job is over") +
+                : why == BreakOff.Outrun ? "Outrun" : why == BreakOff.Lost ? "Track lost" : why == BreakOff.Repelled ? "PDCs" : "The job is over") +
             ": the raider breaks off" + Back(haven);
         static string Back(string haven) => haven != null ? ", back to " + haven : "";
         static string Loot(double t, double pay) => (t > 0 ? $"{t:N1} t and " : "") + $"{pay:N0} cr";

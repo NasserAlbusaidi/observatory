@@ -55,7 +55,7 @@ namespace FogOfWar
                 rec.WriteLine($"# Fog of War flight log, {DateTime.Now:yyyy-MM-dd HH:mm:ss}, game {Application.version}, Unity {Application.unityVersion}, {Screen.width}x{Screen.height}");
                 rec.WriteLine("# args: " + string.Join(" ", Environment.GetCommandLineArgs()));
                 rec.WriteLine("# S: state each second. EVT: a state changed (keys = actions fired that frame). WARN: a sanity rule. ERR: Unity error. MARK: bookmark, then the last 10 s at 10 Hz (R).");
-                rec.WriteLine("# units: km, km/s, deg/s. closing > 0: approaching the target. raider_closing > 0: a raider approaching; boarding: its clock's part of the boarding time; magazine, missiles: its missiles left and in flight, missile_km: the first one's range; dmg_*: missile hits not repaired. nose_tgt / nose_vel: cosine of the angle from the nose to the target / to the velocity vs ref. g_drive: local gravity over the drive's limit.");
+                rec.WriteLine("# units: km, km/s, deg/s. closing > 0: approaching the target. raider_closing > 0: a raider approaching; boarding: its clock's part of the boarding time; magazine, missiles: its missiles left and in flight, missile_km: the first one's range; killed: its missiles the PDCs killed; bear_raider, bear_missile: working PDC mounts that bear on the raider and on the first missile; dmg_*: missile hits not repaired (dmg_mounts: PDC mounts out). nose_tgt / nose_vel: cosine of the angle from the nose to the target / to the velocity vs ref. g_drive: local gravity over the drive's limit.");
                 Application.logMessageReceived += RecOnLog;
                 Application.quitting += () => { RecLine("EVT", "game quit"); rec?.Dispose(); rec = null; recFailed = true; };
             }
@@ -141,9 +141,15 @@ namespace FogOfWar
                 var e = career.Encounter;
                 sb.Append(" magazine=").Append(e.Magazine).Append(" missiles=").Append(e.Missiles.Count);
                 if (e.Missiles.Count > 0) sb.Append(" missile_km=").Append(F(e.Missiles[0].P.Mag, "0.#"));
+                if (career.Build.MountCount > 0)
+                {
+                    sb.Append(" killed=").Append(e.Killed).Append(" bear_raider=").Append(career.MountsBearing(ship, e.Pirate.Pos - ship.Pos));
+                    if (e.Missiles.Count > 0) sb.Append(" bear_missile=").Append(career.MountsBearing(ship, e.Missiles[0].P));
+                }
             }
             if (career != null && career.Damage.Any)
-                sb.Append(" dmg_drive=").Append(career.Damage.drive).Append(" dmg_sensors=").Append(career.Damage.sensors).Append(" dmg_radiators=").Append(career.Damage.radiators ? 1 : 0);
+                sb.Append(" dmg_drive=").Append(career.Damage.drive).Append(" dmg_sensors=").Append(career.Damage.sensors).Append(" dmg_radiators=").Append(career.Damage.radiators ? 1 : 0)
+                  .Append(" dmg_mounts=").Append(PointDefense.Count(career.Damage.mounts));
             return sb.ToString();
         }
 
