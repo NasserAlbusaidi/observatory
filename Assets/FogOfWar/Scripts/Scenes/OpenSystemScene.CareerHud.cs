@@ -333,6 +333,7 @@ namespace FogOfWar
                     var owner = Career.OwnerOf(j);
                     if (owner != Faction.None) what += " · for " + Career.Factions[(int)owner].Name;
                     Ui.L(card, what, "t-note");
+                    if (j.Quiet) Ui.L(card, Career.QuietLine, "t-note");
                     double expressLeft = j.ExpressJd - jd;
                     if (j.ExpressJd > 0 && expressLeft >= 0)
                         Ui.L(card, $"Express bonus +{j.Pay * Career.ExpressBonus:N0} cr if done in {Days(expressLeft)}", "t-label", "f-mono", "ok");
@@ -400,6 +401,7 @@ namespace FogOfWar
                     string what = j.Kind == JobKind.Rescue ? "Find the derelict and take the crew off" : j.Kind == JobKind.Survey ? $"Survey {j.To}" : j.Kind == JobKind.Passengers ? $"{j.People} passengers to {j.To} (max 1 g)" : $"{j.Tonnes:N0} t to {j.To}";
                     if (j.Tier != null) what += " · " + j.Tier;
                     Ui.L(card, what, "t-body");
+                    if (j.Quiet) Ui.L(card, Career.QuietLine, "t-note");
                     // a far run can need more than the tank for a full burn: say so here, not after Engage
                     bool overTank = fuel > career.TankCapacity;
                     var cost = Ui.L(card, $"{Days(j.Days)} allowed · {Km(d)} · full burn at {Fmt.Num(a / Ship.G0, 2)} g: {Dur(t)}, {fuel:N1} t" + (overTank ? " (more than the tank: coast)" : ""), "t-note", "f-mono");

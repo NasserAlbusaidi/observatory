@@ -79,7 +79,7 @@ All names are **working names**. See decision 2.
 
 A pirate must match velocity. In mid-course, at hundreds of km/s, that takes days of loud burning. So pirates strike where ships are slow or easy to predict:
 - **Arrivals and departures** at ports that have no patrol.
-- **Survey jobs:** the ship holds still for the 2 h scan (`DwellSeconds`, `Career.cs:82`).
+- **Survey jobs:** the ship holds still for the 2 h scan (`DwellSeconds`, `Career.cs:82`). A quiet watch on Pallas (Phase 3c) counts only the time that no raider can see.
 - **Rescue jobs:** a derelict is good bait. A distress call (`RouteKind.Distress` in `Career.Route.cs`) can be a trap.
 - **Long coasts,** but only for a pirate that planned days ahead. You see that pirate coming.
 
