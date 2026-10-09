@@ -9,6 +9,8 @@ namespace FogOfWar.OpenWorld
         // Seconds of this update a raider could see the ship: its loud seconds, plus the time after its last loud moment, up
         // to HoldS. Gaps between two burns inside one update are left out (at most one frame). If the sink filled inside the
         // update, the stowed hold counts up to the fill and OutHoldS from it on: what one tick per frame would have counted.
+        // Readers: the raid roll (RouteTick) and the quiet watch (QuietSeconds) return before it while a chase is on; Expose
+        // (3d) reads it in a chase too, so Soak keeps the fill date then as well.
         internal double SeenSeconds(Ship ship, double jd, double simDt)
         {
             if (!spanOk || simDt <= 0) return 0;

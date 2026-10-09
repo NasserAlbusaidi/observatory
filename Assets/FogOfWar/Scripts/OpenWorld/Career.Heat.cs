@@ -15,7 +15,7 @@ namespace FogOfWar.OpenWorld
         public const string DarkCoastHelp = "To go dark with stowable radiators, coast with the drive off and hands off the RCS: a burn or an RCS push shows you to raiders.";
         public static double SinkSecondsPerT => WaterC * 1000 * SinkMaxK / SinkLoadW;   // 209.3 s of 2 MW per tonne of water
         public double SinkK;
-        double fillJd = double.NaN;                // the date the sink filled inside this update, else NaN: SeenSeconds reads it
+        double fillJd = double.NaN;                // the date the sink filled inside this update, else NaN, chase or not: SeenSeconds reads it
 
         // how long a raider keeps the track with the radiators out
         public double OutHoldS => Signature.TrackHoldS * Build.OutRho;
@@ -29,8 +29,10 @@ namespace FogOfWar.OpenWorld
 
         // Once per Tick, after the dock test and before the roll. The stowed seconds are this update's overlap with the OutHoldS
         // window after the last loud moment: the tail SeenSeconds counts, at OutHoldS. It holds no loud seconds by definition.
-        // With a chase on, they are all the update's quiet seconds: simDt less its loud seconds. No fill date is kept then:
-        // RouteTick and RaiderWatch read none while the chase lasts.
+        // With a chase on, they are all the update's quiet seconds: simDt less its loud seconds. The fill date is kept then too,
+        // because Expose (3d) reads SeenSeconds in a chase. It is counted back from jd: those seconds include any quiet time
+        // before the last burn, so counted on from the burn they would put the fill late. A fill before the last burn lands at
+        // or before it, where SeenSeconds counts the whole OutHoldS tail, as it should.
         void Soak(Ship ship, double simDt)
         {
             fillJd = double.NaN;
@@ -41,7 +43,8 @@ namespace FogOfWar.OpenWorld
                                          : (Math.Min(jd, ship.LastLoudJd + OutHoldS / 86400) - Math.Max(spanJd, ship.LastLoudJd)) * 86400;
             s = Math.Max(0, Math.Min(s, simDt));
             double toFullS = (SinkMaxK - SinkK) * WaterC * ship.Fuel * 1000 / SinkLoadW;
-            if (Encounter == null && SinkK < SinkMaxK && toFullS <= s) fillJd = Math.Max(spanJd, ship.LastLoudJd) + toFullS / 86400;
+            if (SinkK < SinkMaxK && toFullS <= s)
+                fillJd = Encounter != null ? jd - (s - toFullS) / 86400 : Math.Max(spanJd, ship.LastLoudJd) + toFullS / 86400;
             SinkK = Math.Min(SinkMaxK, SinkK + SinkLoadW * s / (WaterC * ship.Fuel * 1000));
         }
 

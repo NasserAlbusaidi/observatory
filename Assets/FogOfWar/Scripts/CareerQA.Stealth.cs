@@ -187,6 +187,27 @@ namespace FogOfWar
             Check(Near(fill.C.SinkK, 100, 1e-12) && Near(fillSeen, 5174, 0.01),
                 $"stealth: 50 t from 60 K, one update of 16,667 s fills the sink at {fill.C.SinkK:0.000000000000} K (100); a raider sees {fillSeen:0.000} s of it (5,174 ± 0.01: 2,160 + 3,014, as 1x frames count)");
 
+            // the same fill in a chase keeps its date (Expose reads SeenSeconds then): 50 t from 60 K is full after 4,186 s of a
+            // 5,000 s update, so a raider sees 2,160 + 814 = 2,974 s (5,000 if the date were lost: the hold is OutHoldS after it)
+            var fillField = typeof(Career).GetField("fillJd", F);
+            double FillAt(Bench b, double l) { double f = (double)fillField.GetValue(b.C); return double.IsNaN(f) ? f : (f - l) * 86400; }
+            var cf2 = Dark(qs, at, vel);
+            var nf2 = Dark(qs, at, vel);
+            try
+            {
+                foreach (var b in new[] { cf2, nf2 }) { b.Ship.Fuel = 50; b.C.SinkK = 60; b.Ship.LastLoudJd = b.Jd; }
+                double lc = cf2.Jd, ln = nf2.Jd;
+                nf2.Tick(5000); // before the chase: its proxy body joins qs
+                var ce2 = cf2.C.StartContact(cf2.Job, qs, cf2.Ship, cf2.Jd, at - at.Norm * 1e5, vel);
+                cf2.Tick(5000);
+                double cFill = FillAt(cf2, lc), nFill = FillAt(nf2, ln);
+                double cSeen = cf2.C.SeenSeconds(cf2.Ship, cf2.Jd, 5000), nSeen = nf2.C.SeenSeconds(nf2.Ship, nf2.Jd, 5000);
+                string cState = cf2.C.Encounter == ce2 ? "on" : cf2.C.Encounter == null ? "gone" : "other";
+                Check(Near(cFill, 4186, 1e-3) && Near(cSeen, 2974, 0.01) && Near(cf2.C.SinkK, 100, 1e-12) && Near(nFill, 4186, 1e-3) && Near(nSeen, 2974, 0.01) && Near(nf2.C.SinkK, 100, 1e-12),
+                    $"stealth: 50 t from 60 K, one update of 5,000 s in a chase (chase {cState} after it): the fill date is {cFill:0.000000} s after the burn (4,186 ± 1e-3), a raider sees {cSeen:0.000} s (2,974 ± 0.01), sink {cf2.C.SinkK:0.000000000000} K (100); no chase: {nFill:0.000000} s, {nSeen:0.000} s, {nf2.C.SinkK:0.000000000000} K (the same)");
+            }
+            finally { cf2.C.DropContact(); }
+
             var fixedBench = SigBench(qs, at, vel);
             fixedBench.Ship.LastLoudJd = fixedBench.Jd;
             fixedBench.Tick(3600);

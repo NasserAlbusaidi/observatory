@@ -351,12 +351,14 @@ namespace FogOfWar.OpenWorld
         }
 
         // The raider's share of job c: that part of its pay, and of its load for cargo. The job stays on (no Abandon, no
-        // standing change), and Apply takes the ship's cargo mass from Tonnes on the next update.
+        // standing change), and Apply takes the ship's cargo mass from Tonnes on the next update. The pay it returns, for the
+        // notes, is the pay lost: the cut at the job's grade (3d), as delivery would have paid it. The cut leaves Exposure as
+        // it is, so the grade is the same before and after; a plain job's grade is 1.
         static (double tonnes, double pay) Take(Contract c, double share)
         {
-            double pay = c.Pay * share, t = c.Kind == JobKind.Cargo ? c.Tonnes * share : 0;
+            double grade = Grade(c), pay = c.Pay * share, t = c.Kind == JobKind.Cargo ? c.Tonnes * share : 0;
             c.Pay -= pay; c.Tonnes -= t;
-            return (t, pay);
+            return (t, pay * grade);
         }
 
         static string HavenNear(SolarSystem sys, D3 x, double jd) => Threat.NearestHaven(sys, x, jd)?.Name; // null: no haven in the system
