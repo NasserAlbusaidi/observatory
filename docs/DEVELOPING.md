@@ -177,7 +177,9 @@ The **Build … review copy** menu items build the same game under another name,
 
 ## Unattended test runs
 
-The built game takes these flags. Each run writes its report and screenshots to `<dir>`, then quits.
+`Tools/qa.sh <dir>` builds the Windows game and runs the suites a PR reports, in order: `career`, `legacy` (the career run in the classic shell), `uishots` and `qa`. It stops at the first nonzero exit and leaves each report under `<dir>/<suite>/`. Name suites to run a subset, or add `audio`, `tour`, `physics`, `regression` or `gpu`. `QA_NOBUILD=1` reuses the last build. The scripts find the editor under the Unity Hub folder and keep one build or suite running at a time with a lock in the temp folder; `Tools/unity-env.sh` names the variables (`UNITY_EDITORS`, `FOW_UNITY_LOCK`) and the gitignored `Tools/unity.local` that can set them.
+
+The built game takes these flags. Each run writes its report and screenshots to `<dir>`, then quits. A suite that checks something (`-fowqa`, `-fowtour`, `-fowcareer`, `-fowaudioqa`, `-fowuishots`, `-fowbhshots`) exits 0 when the run is clean, 1 on a failed check or a logged error, and 2 when the run did not finish (a hang guard or an exception), so a script can gate on the exit code and not on the report. `-fowshipshots` and `-fowfidelity` only capture, and always exit 0.
 
 | Flag | What it does |
 |---|---|
@@ -193,7 +195,7 @@ The built game takes these flags. Each run writes its report and screenshots to 
 Other flags:
 
 - `-fowsavekey <key>` uses another save slot. Without it, unattended suites reuse `fow-save-qa-<hash>`, a stable short hash of the build data path and suite flag. This bounds the saved key pairs and separates suites and worktrees from the player's save. Concurrent copies of the same build and suite share that pair; give them distinct explicit keys when isolation is needed. `-fowfidelity` and `-fowbhshots` are unattended too, so route events are disabled for them.
-- `-fowcareer` uses a fixed TDB epoch and a fixed simulated frame duration. Flight limits use game time; a wall-clock hang guard reports `TIMEOUT` and exits 2. Functional failures exit 1. Timing samples report `PERF PASS` or `PERF SLOW` separately. `-fowcareertraffic` alongside `-fowcareer <dir>` runs just the deterministic traffic section.
+- `-fowcareer` uses a fixed TDB epoch and a fixed simulated frame duration. Flight limits use game time; a wall-clock hang guard reports `TIMEOUT` and exits 2. Timing samples report `PERF PASS` or `PERF SLOW` separately. `-fowcareertraffic` alongside `-fowcareer <dir>` runs just the deterministic traffic section.
 - Run focused coast-clock regressions with `Unity.exe -batchmode -nographics -projectPath "<repo>" -executeMethod FogOfWar.EditorTools.FogOfWarRegressionCheck.Run -logFile Logs/regression-editor.log`. The analytic circle and zero-motion guidance checks write `Logs/issue-regressions.txt` and exit nonzero on failure.
 - `-fowqa` runs the career in sandbox: unlimited reaction mass and no contracts, so the physics tests keep working.
 - `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fowprof` logs frame time every 2 s. `-fownobloom` turns bloom off. `-fowlegacyui` uses the old IMGUI shell.
