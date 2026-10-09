@@ -30,6 +30,8 @@ namespace FogOfWar.OpenWorld
         public double SpoilJd;           // cargo trouble ridden out: delivered after this, it pays half; 0 = none
         public double Dwell, DwellNeeded; // survey: seconds spent in scan range with the drive off
         public bool Quiet;               // survey: the dwell counts only unseen time (3c: a watch on a raider haven); false for older saves
+        public bool Contraband;          // cargo: graded by raider sight on delivery (3d, Career.Smuggle.cs); false for older saves
+        public double Exposure;          // contraband: expected raider calls so far, the roll's own exponent; 0 for older saves
         public bool Tutorial;
         [NonSerialized] public string Tier;  // board cargo: local, interplanetary or far, as seen from the posting port
         public string Key;              // board slot, so an accepted job doesn't come back the same day
@@ -214,6 +216,7 @@ namespace FogOfWar.OpenWorld
             }
             wasDry = dry;
             Soak(ship, simDt);
+            Expose(sys, ship, jd, simDt);
             if (Docked != null) { Codex.DockedAt.Add(Docked.Name); Deliver(jd); RefreshBoard(sys, ship, jd); }
             Scan(sys, ship, jd, simDt);
             TransferInProgress = false;
@@ -296,7 +299,9 @@ namespace FogOfWar.OpenWorld
         void Complete(Contract c, double jd, string what)
         {
             if (FinallyExpired(c, jd)) return; // Expire fails it; nothing pays after the final cutoff (#24)
-            double pay = PayAt(c, jd, out bool late, out bool express), expressExtra = pay - c.Pay;
+            double pay = PayAt(c, jd, out bool late, out bool express), g = Grade(c);
+            // the express bonus as paid: the grade scales it with the rest of the pay
+            double expressExtra = express ? (Math.Round(c.Pay * (1 + ExpressBonus)) - c.Pay) * g : 0;
             double hand = !late && HandArrival(c) ? Math.Round(c.Pay * HandBonus) : 0;
             pay += hand;
             Credits += pay; Earned += pay; Done++;
@@ -305,6 +310,7 @@ namespace FogOfWar.OpenWorld
             if (c.Kind == JobKind.Rescue || c.Kind == JobKind.Intercept) DropWarp = true;
             Say(c.Kind == JobKind.Rescue ? Happening.RescueDone : c.Kind == JobKind.Intercept ? Happening.InterceptDone : c.Kind == JobKind.Survey ? Happening.SurveyDone : Happening.JobPaid,
                 $"{what}: +{pay:N0} cr" + (Spoiled(c, jd) ? " (cargo spoiled, half pay)" : "") + (late ? " (late, half pay)" : express ? $" (express bonus +{expressExtra:N0} cr)" : "") +
+                (c.Contraband ? $" (contraband, seen {c.Exposure:0.00} calls: ×{g:0.00})" : "") +
                 (hand > 0 ? $" (flown in by hand +{hand:N0} cr)" : ""));
             if (!late) ChangeStanding(c, StandingGain);
         }
@@ -330,14 +336,16 @@ namespace FogOfWar.OpenWorld
             return dest != null && helmTarget == dest && helmKm >= DockRange(dest);
         }
 
-        // What a job pays if it is done at jd: the express bonus inside its window, half pay after the deadline.
+        // What a job pays if it is done at jd: the express bonus inside its window, half pay after the deadline. Contraband
+        // is graded by raider sight on top of both (Career.Smuggle.cs).
         public static double PayAt(Contract c, double jd, out bool late, out bool express)
         {
             late = jd > c.DeadlineJd;
             bool spoiled = Spoiled(c, jd);
             express = !late && !spoiled && c.ExpressJd > 0 && jd <= c.ExpressJd;
             double pay = late ? c.Pay * 0.5 : express ? Math.Round(c.Pay * (1 + ExpressBonus)) : c.Pay;
-            return spoiled ? pay * 0.5 : pay;
+            double v = spoiled ? pay * 0.5 : pay;
+            return c.Contraband ? Math.Round(v * Grade(c)) : v;
         }
 
         // cargo trouble ridden out (route events): past SpoilJd the load is spoiled and pays half
@@ -370,7 +378,7 @@ namespace FogOfWar.OpenWorld
             spanPos = lastPos; spanVel = lastVel; spanJd = lastJd; spanBurn = lastBurn; spanLoud = lastLoud;
             lastPos = ship.Pos; lastVel = ship.Vel; lastJd = jd; lastBurn = ship.BurnSeconds; lastLoud = ship.LoudSeconds;
             // a load or a date jump starts tracked: no chase or track is saved (D8). A frozen frame (same date, no time) is neither
-            if (!spanOk && !(simDt <= 0 && jd == spanJd)) ship.LastLoudJd = jd;
+            if (!spanOk && !(simDt <= 0 && jd == spanJd)) { ship.LastLoudJd = jd; loadJd = jd; }
         }
 
         // Seconds of this update spent within range of b with the drive off. In between the update's end states the
@@ -526,13 +534,14 @@ namespace FogOfWar.OpenWorld
 
             // standing with the port's owner sets the pay; neutral leaves every job as posted
             double payFactor = PayFactor(Docked.Owner);
-            for (int k = 0; k < 9; k++)
+            for (int k = 0; k < 10; k++)
             {
                 var c = k == 0 ? Tiered(local, localName) : k == 1 ? Tiered(near, "interplanetary") : k == 2 ? Tiered(far, "far")
                       : k < 5 ? Haul(rng, Pick(), JobKind.Passengers, sys, jd)
                       : k == 6 ? (rng.NextDouble() < 0.6 ? Rescue(rng, sys, jd) : null)
                       : k == 7 ? (rng.NextDouble() < 0.6 ? Intercept(rng, sys, jd) : null)
                       : k == 8 ? Recon(rng, sys, jd)
+                      : k == 9 ? Smuggle(rng, others, sys, jd)
                       : Survey(rng, sys, jd);
                 if (c == null) continue;
                 if (payFactor != 1) c.Pay = Math.Round(c.Pay * payFactor / 100) * 100;

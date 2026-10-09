@@ -138,6 +138,8 @@ What changes standing:
 | Piracy | Far down with the victim's faction, up with the Raiders | Combat Phase 5 |
 | Privateering under a Compact licence | Down with the Guard, up with the Compact | Combat Phase 5 |
 
+Combat Phase 3d grades contraband pay by how long raiders see the ship. "Smuggling, caught" waits for a later PR that adds a patrol sensor.
+
 What standing does:
 - **High:** better jobs on the board.
 - **Low:** a port refuses to dock you, or charges more for water.

@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is designed below. PR 3a (#148, `stealth-sink`) and PR 3b (#149, `stealth-lost`) are built. PR 3c (`stealth-scout`) is built in this PR. PRs 3d–3f are not built. Phases 4–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is designed below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (`stealth-contraband`) is built in this PR. PRs 3e–3f are not built. Phases 4–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -26,7 +26,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | W1–W4 | The world ([design-world.md](design-world.md)) | Factions, NPC traffic, threat map, pirates that board you | None | Built |
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
-| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Designed; 3a (#148) and 3b (#149) built, 3c built in this PR, 3d–3f not built |
+| 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Designed; 3a (#148), 3b (#149) and 3c (#150) built, 3d built in this PR, 3e–3f not built |
 | 4 | Point defense | PDCs, armor, damage | Defense only | — |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
@@ -427,7 +427,7 @@ Pirates that board you moved to [design-world.md](design-world.md), phase W4.
 
 ## Phase 3: stealth
 
-This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a (#148, `stealth-sink`) and PR 3b (#149, `stealth-lost`) are built. PR 3c (`stealth-scout`) is built in this PR. PRs 3d–3f are not built.
+This needs signatures (Phase 2) only. It has no weapons. Code read on `main` at c6ebc46. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (`stealth-contraband`) is built in this PR. PRs 3e–3f are not built.
 
 ### The rule
 
@@ -584,7 +584,7 @@ Example [calc]. The last loud moment is 30 min before a 3,600 s update. Stock: t
 
 ### Jobs
 
-**Scouting (3c, built in this PR): a quiet watch on a raider haven.**
+**Scouting (3c, built, #150): a quiet watch on a raider haven.**
 - A Survey with `Contract.Quiet = true`. The target is Pallas [design]. Hektor is too far for a board job.
 - Posted at Ceres and Vesta in board slot k = 8, with a 0.5 roll. The loop (`Career.cs:519`) becomes `k < 9`. Earlier slots draw first, so their jobs and keys do not move. `Key` keeps three parts (`:488`).
 - In `Scan` (`Career.cs:410`): `if (c.Quiet) q = QuietSeconds(ship, jd, simDt, q, whole)`. The dwell counts only the seconds no raider could see. When the ship was in range for the whole update, that is `Math.Min(q, Math.Max(0, simDt - seen))`. When it entered or left the range in the update, the seen seconds may lie anywhere in `q`'s window. Then only `Math.Max(0, q - seen)` is sure to be unseen, and the dwell counts that.
@@ -597,12 +597,12 @@ Example [calc]. The last loud moment is 30 min before a 3,600 s update. Stock: t
   - **Days and express include the hold.** The posted days and the express window add the 2 h hold (`Signature.TrackHoldS`) to the dwell. The dwell starts only after the arrival burn's hold. So a stock hull can still earn the express bonus. The planner arrival lines still leave out the hold wait. That is a later fix.
 - Built: `Career.Scout.cs` holds `ReconBody`, `QuietLine`, `QuietSeconds` and `Recon`. `Recon` draws no rng at other ports, and only the roll and the slack at Ceres and Vesta. It takes `nextId++` only when it posts a job, so contracts made after this board can get a different `Id`. Keys do not move.
 
-**Smuggling (3d): contraband cargo.**
+**Smuggling (3d, built in this PR): contraband cargo.**
 - A Cargo job with `Contract.Contraband = true`. It keeps every Cargo gate (`RaidJob`, `PirateCall`, route events, the hand bonus), so it needs no new `JobKind`.
-- Posted at Tharsis and Compact ports (Mars, Vesta, Ceres, Ganymede, Callisto, Titan, Enceladus) in slot k = 9, with a 0.5 roll.
+- Posted at Tharsis and Compact ports (Mars, Vesta, Ceres, Ganymede, Callisto, Titan, Enceladus) in slot k = 9, with a 0.5 roll. The loop becomes `k < 10`. Slot 9 draws last, and draws nothing at a Guard port. So the jobs and keys of slots 0–8 do not move.
 - **It is posted only if the route's planner risk is at least 1 h:** `Threat.Of(...).Hours ≥ 1` at the posting date. The call costs about 1 ms and runs once per port-day (`RefreshBoard`, `Career.cs:485`).
-- **Exposure** is the expected number of raider calls. Each update, while the job is aboard and not docked, with `seenS = SeenSeconds(...) > 0`: `c.Exposure += PirateRate(sys, ship, c, jd) × seenS / 3600` (`Career.Pirates.cs:119`). This is the roll's own exponent, so the roll and the grade agree.
-- **Pay on delivery** (in `Complete`, `Career.cs:294`): posted pay × 1.25 × e^(−Exposure / 0.5). Posted pay is plain cargo pay × 1.5 [design].
+- **Exposure** is the expected number of raider calls. Each update, while the job is aboard and the ship is not docked or landed, with `seenS = SeenSeconds(...) > 0`: `c.Exposure += PirateRate(sys, ship, c, jd) × seenS / 3600` (`Career.Pirates.cs:119`). This is the roll's own exponent, so the roll and the grade agree.
+- **Pay on delivery** (in `PayAt`, used by `Complete`): posted pay × 1.25 × e^(−Exposure / 0.5). Posted pay is plain cargo pay × 1.5 [design].
 
 | Exposure (calls) | Pay vs plain cargo [calc] |
 |---|---|
@@ -612,6 +612,14 @@ Example [calc]. The last loud moment is 30 min before a 3,600 s update. Stock: t
 | 0.7 | 0.462 |
 
 - **Stealth helps** by cutting each burn's tail from 2 h to 36 min (12 min on the corvette). It cannot hide the loud seconds.
+- Five more [design] choices, made in 3d:
+  - **Pick, then test.** The slot picks one destination with the rng. It then runs one `Threat.Of` for that route. A route under 1 h (`.Serious` is `Hours ≥ 1`) posts nothing that day. A departure from Vesta (belt, no patrol) is about 2 h exposed at 1 g, so every Vesta route passes [calc, unrun].
+  - **The posting yardstick is a 1 g full burn** (`ExpressG × Ship.G0`, no cap) with the default 2 h hold. The poster does not know the buyer's hull.
+  - **Exposure accrues apart from the call gates.** It does not need `RouteEvents`, a pending call, `RouteGapDays` or a chase. It stops only for a docked or landed ship, a sandbox career, or a zero step. The grade is not an event, and a chase does not stop it. The seen seconds are the ship's own (`SeenSeconds`): the raider's fix in a chase adds none. So the exposure equals the roll's exponent on any update where the roll is drawn for that job.
+  - **A load is not charged.** A load or a date jump starts the ship tracked (D8). That is a chance of a call for the roll. It is not a pay cut for the grade. So while the last loud moment is that start, only the loud seconds add exposure. A real loud moment after it counts as before.
+  - **The grade stacks with the other pay rules.** `PayAt` returns the express, late or spoiled pay times the grade. A boarding's or a give-up's cut of `c.Pay` stacks with it. The hand bonus stays on the posted pay, ungraded. The delivery note names the true express extra, not the extra folded into the grade. The express lines on the cards and the trip page show the graded extra. The raider notes (`BoardedNote`, `GaveUpNote`) name the nominal cut of `c.Pay`: the pay lost is that cut times the grade.
+- **No tier.** A slot-9 job keeps `Tier == null`. The card prints a tier only when it is set.
+- Built: `Career.Smuggle.cs` holds `ContrabandPayFactor`, `CleanBonus`, `ExposureScale`, `ContrabandGoods`, `Grade`, `ContrabandLine`, `Expose` and `Smuggle`. The goods titles read through `InSentence` on the raider card. The card line reads "pays ×1.25 of the posted pay now" at exposure 0. It shows the grade, not a multiple of plain pay. `Haul` takes `nextId++` for each slot-9 job, so later `Id` values can shift at a posting port. Keys do not move. `Expose` charges each contraband job its own `PirateRate`, but the roll draws one job (`RaidJob`). So the match is exact when the contraband job is the one `RaidJob` returns.
 - **"Caught by the Guard"** (`design-world.md:136`) is not built in Phase 3. Phase 3 has no patrol sensor model. A follow-up can add one: a port with `PatrolG > 0` sees the ship within `RangeKm(P, StockKm, coldW)` of the port body. Then the stowed range matters to a second observer. That PR also adds `ChangeStanding(Faction, int)` (`Career.Factions.cs:57`).
 
 ### The hull (3e, last gameplay PR) and the art (3f)
@@ -742,7 +750,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - `CareerQA.Signature.cs:219` and `CareerQA.Pirates.cs:621-622` pass unchanged.
 - The player notices: a fitted ship that is chased can cut the drive and coast 36 min to make the raider leave. A full sink or a burn ends the trick.
 
-**PR 3c: `stealth-scout`** (needs new art: no. Built in this PR)
+**PR 3c: `stealth-scout`** (needs new art: no. Built, #150)
 - Adds: `Contract.Quiet`, a `Recon` generator beside `Survey`, board slot k = 8 at Ceres and Vesta, the quiet dwell in `Scan`, and a job-card line "counts only unseen time".
 - [design] choices, as in the Scouting section above: no quiet credit during a chase, none from a chase that has ended, full credit while landed, and Days and express that include the 2 h hold.
 - Touches:
@@ -757,13 +765,14 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - Both shells show the line.
 - The player notices: a high-pay watch on Pallas that counts only unseen time.
 
-**PR 3d: `stealth-contraband`** (needs new art: no)
-- Adds: `Contract.Contraband` and `Exposure`, slot k = 9 at Tharsis and Compact ports where the route risk is ≥ 1 h, the exposure sum, and the pay grade in `Complete`.
+**PR 3d: `stealth-contraband`** (needs new art: no. Built in this PR)
+- Adds: `Contract.Contraband` and `Exposure`, slot k = 9 at Tharsis and Compact ports where the route risk is ≥ 1 h, the exposure sum, and the pay grade in `PayAt` (used by `Complete`).
+- [design] choices, as in the Smuggling section above: pick the destination, then test the route; a 1 g full-burn yardstick with the 2 h hold; exposure that accrues apart from calls, the gap and a chase; a grade that multiplies the express, late and spoiled pay, with the hand bonus left on the posted pay.
 - Touches:
-  - `OpenWorld/Career.cs` (`:31`, `:294`, `:519`, the `Tick` call near `:217`);
+  - `OpenWorld/Career.cs` (`Contract`, `Tick`, `Complete`, `PayAt`, the `RefreshBoard` loop);
   - new `OpenWorld/Career.Smuggle.cs`;
   - the card lines in both shells;
-  - `JobsSignature` (`CareerHud.cs:234`) adds `Exposure`.
+  - `JobsSignature` (`CareerHud.cs:234`) adds the grade, rounded to 2 places. The raw `Exposure` would redraw the page every 0.4 s.
 - QA:
   - Exposure equals the sum of the roll's exponents over the same updates.
   - Pay at exposure 0, 0.1, 0.314 and 0.7 is 1.875, 1.535, 1.00 and 0.462 of plain pay (± 1 cr).
@@ -921,7 +930,7 @@ Ordered by size. Your list put the destroyer first.
 | `ShipBuild.cs:5,44-78`, `Career.Heat.cs` (new), `Career.cs:46-61,182-220,630-635` | No heat state. No radiator part | `Slot.Radiators` (fixed or stowable); `Career.SinkK`, soaked once per tick and saved | 3 (3a) | Built (3a) |
 | `Signature.cs:17`, `Career.Signature.cs:15,46,55`, `Threat.cs:79,120,122,132` | One cold range (10,000 km) and one 2 h hold | `RangeKm(jetW, baseKm, coldW)`; `Career.HoldS` = ρ × 2 h for a dark-ready hull | 3 (3a) | Built (3a) |
 | `Career.Pirates.cs:10-19,204-246,298-308` | No lose-the-raider rule (D16) | `Encounter.FixJd`, `BreakOff.Lost`, for stowable hulls only | 3 (3b) | Built (3b) |
-| `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built; 3d not built |
+| `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built (#150); 3d built in this PR |
 | `ShipBuild.cs:17-39,81,95-102`, `Career.Yard.cs:11-40`, `Career.cs:8-14,71-74`, `OpenSystemScene.cs:778`, `.Hud.cs:24`, `.CareerHud.cs:234`, `OpenSystemScene.Hull.cs` (new) | One hull | Per-hull stock, price and facet; `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | — |
 | `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The user's Blender model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Needs art |
 | `PlayerShip.json` | `PDC_0..5` unused | PDC mounts | 4 | — |
@@ -934,4 +943,4 @@ Ordered by size. Your list put the destroyer first.
 3. **Where stealth goes.** Right after Phase 2, as in the table. It needs signatures only.
 4. **Where the yards are.** Every port refits. Only big yards sell hulls: Earth, Mars, Ceres [design]. Phase 1 has one hull, so the hull rule waits for the second hull (Phase 3).
 
-Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is designed. PR 3a (#148) and PR 3b (#149) are built. PR 3c is built in this PR. PRs 3d–3f are not built.
+Phase 1 shipped after W4 of [design-world.md](design-world.md). Phase 2 is built (2a, 2b). Phase 3 is designed. PR 3a (#148), PR 3b (#149) and PR 3c (#150) are built (merged). PR 3d is built in this PR. PRs 3e–3f are not built.
