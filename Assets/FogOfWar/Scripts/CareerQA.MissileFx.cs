@@ -252,7 +252,7 @@ namespace FogOfWar
                     inside++;
                     bearing = Math.Max(bearing, want);
                     if (tr.Count != want) wrong++;
-                    if (!placed && near <= 3)
+                    if (!placed && near <= 1.2)
                     {
                         placed = true;
                         yield return TracersPlaced();

@@ -142,7 +142,7 @@ namespace FogOfWar
         // [design] the look: the rounds as dashes that stream from the mount to the missile at RoundKms, never so close on
         // screen that they read as a solid line
         const float TracerSpacingKm = 0.02f, TracerDashes = 30;
-        static readonly Color TracerColour = new Color(2f, 1.7f, 1.1f, 1f);
+        static readonly Color TracerColour = new Color(1.3f, 1.1f, 0.7f, 1f);
         readonly Transform[] mountT = new Transform[6];   // PDC_n on the hull model now shown
         Transform mountsOf;                               // the hull model mountT was read off
         GameObject tracerObj;
