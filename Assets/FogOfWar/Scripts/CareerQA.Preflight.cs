@@ -178,6 +178,20 @@ namespace FogOfWar
             Check(Key(Array.Empty<string>(), Application.dataPath) == "fow-save-v1"
                 && Key(new[] { "-fowcareer", "-fowsavekey", "fow-save-job3" }, Application.dataPath) == "fow-save-job3",
                 "normal play keeps its key and an explicit save key wins");
+            // #155: a suite's setting changes stay in memory; PlayerPrefs keeps the player's value
+            const string masterKey = "fow-set-vol-master";
+            bool hadMaster = PlayerPrefs.HasKey(masterKey);
+            float savedMaster = PlayerPrefs.GetFloat(masterKey, -1), was = GameSettings.Master, qa = was > 0.5f ? 0.3f : 0.7f;
+            int changed = 0;
+            void Count() => changed++;
+            GameSettings.Changed += Count;
+            GameSettings.Master = qa;
+            bool held = GameSettings.Master == qa;
+            bool untouched = PlayerPrefs.HasKey(masterKey) == hadMaster && PlayerPrefs.GetFloat(masterKey, -1) == savedMaster;
+            GameSettings.Master = was;
+            GameSettings.Changed -= Count;
+            Check(GameSettings.InMemory && held && untouched && changed == 2,
+                $"settings stay in memory under a suite: Master reads {qa:F1}, PlayerPrefs keeps {(hadMaster ? savedMaster.ToString("F2") : "no value")}, {changed} change events");
         }
     }
 }

@@ -56,8 +56,10 @@ namespace FogOfWar
             GameSettings.SilentOutput = true; AudioListener.volume = 0; // record, but play nothing out loud
             bool cine = GameSettings.CinematicSound, on = GameSettings.ShipSound, bg = GameSettings.MuteInBackground;
             float vMaster = GameSettings.Master, vFx = GameSettings.Effects, vAmb = GameSettings.Music, vCh = GameSettings.Chimes;
+            float savedMaster = PlayerPrefs.GetFloat("fow-set-vol-master", -1);
             GameSettings.Master = 0.8f; GameSettings.Effects = 0.8f; GameSettings.Music = 0.6f; GameSettings.Chimes = 0.8f;
             GameSettings.ShipSound = true; GameSettings.MuteInBackground = false; GameSettings.CinematicSound = false;
+            Check(GameSettings.InMemory && PlayerPrefs.GetFloat("fow-set-vol-master", -1) == savedMaster, "QA levels stay in memory: the player's saved Master is untouched");
             ShipSynthFilter.Tap = (d, ch) => { lock (recLock) { recChannels = ch; rec.AddRange(d); } };
             Note($"output {AudioSettings.outputSampleRate} Hz, {AudioSettings.driverCapabilities}, batchmode {Application.isBatchMode}");
 
