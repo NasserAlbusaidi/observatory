@@ -23,6 +23,7 @@ namespace FogOfWar
             Guard("stealth smuggle load", () => StealthSmuggleLoadChecks(qs, at, vel));
             Guard("stealth smuggle board", () => StealthSmuggleBoardChecks(qs, at, vel));
             Guard("stealth smuggle delivery", () => StealthSmuggleDeliveryChecks(qs, at, vel));
+            Guard("stealth smuggle raider notes", () => StealthSmuggleRaiderChecks(qs, at, vel));
             Guard("stealth smuggle save", () => StealthSmuggleSaveChecks(qs, at, vel));
             Guard("stealth smuggle line", StealthSmuggleLineChecks);
         }
@@ -279,6 +280,47 @@ namespace FogOfWar
                 string extraText = $"express bonus +{extra:N0} cr";
                 Check(fast.gone && Near(fast.paid, wantF, 1) && fast.note.Contains(extraText) && fast.note.Contains("contraband"),
                     $"stealth smuggle: the same inside the express window: credits +{fast.paid:N0} cr (round(12,500 x g) = {wantF:N0} ± 1), note \"{fast.note}\" (holds \"{extraText}\": the extra is 2,500 x g = {extra:0.000}, the grade is not folded into it)");
+            }
+            finally { foreach (var b in live) b.C.DropContact(); }
+        }
+
+        // 16m, the raider notes: a give-up's and a boarding's note name the cut at the job's grade, the pay it loses. A SigBench
+        // ship has never burned, so no update in the chase adds Exposure and the grade stays the one set here. The boarding
+        // clock is set by hand one update short (the full 7,200 s alongside is the pirates' Q4). The job is MakeBench's: 20,000 cr, 40 t.
+        void StealthSmuggleRaiderChecks(SolarSystem qs, D3 at, D3 vel)
+        {
+            const double e = 0.3;
+            double g = 1.25 * Math.Exp(-e / 0.5);   // [calc] 1.25 x e^-0.6 = 0.686015
+            double cutG = 20000 * Career.GiveUpShare, cutB = 20000 * Career.BoardShare; // 5,000 and 10,000 cr
+            var live = new List<Bench>();
+            (string give, string board, Contract jg, Contract jb) Run(bool contraband)
+            {
+                var a = SigBench(qs, at, vel);
+                var b = SigBench(qs, at, vel);
+                live.Add(a); live.Add(b);
+                foreach (var x in new[] { a, b }) { x.Job.Contraband = contraband; x.Job.Exposure = e; }
+                var off = new D3(1, 0, 0);
+                a.C.StartContact(a.Job, qs, a.Ship, a.Jd, a.Ship.Pos + off, a.Ship.Vel);
+                a.C.Answer(Career.RouteAnswer.GiveUp, a.Jd);
+                var enc = b.C.StartContact(b.Job, qs, b.Ship, b.Jd, b.Ship.Pos + off, b.Ship.Vel);
+                enc.Dwell = Threat.BoardingSeconds - 30;
+                Alongside(b, enc, off);
+                return (a.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text ?? "-", b.Said.FindLast(s => s.What == Career.Happening.Boarded).Text ?? "-", a.Job, b.Job);
+            }
+            try
+            {
+                var smug = Run(true);
+                double grade = Career.Grade(smug.jg), lostG = cutG * g, lostB = cutB * g;   // [calc] 3,430.07 and 6,860.15 cr
+                string wantG = $"Gave up {10.0:N1} t and {lostG:N0} cr: the raider ", wantB = $"Boarded: the raider took {20.0:N1} t and {lostB:N0} cr back to ";
+                Check(Near(grade, 0.686015, 1e-6) && Near(g, grade, 1e-12) && smug.give.StartsWith(wantG) && HavenNamed(smug.give) && smug.board.StartsWith(wantB) && HavenNamed(smug.board)
+                      && smug.jg.Pay == 15000 && smug.jg.Tonnes == 30 && smug.jb.Pay == 10000 && smug.jb.Tonnes == 20 && smug.jg.Exposure == e && smug.jb.Exposure == e,
+                    $"stealth smuggle: a contraband job at Exposure {e} has the grade {grade:0.000000000} (1.25 x e^-0.6 = 0.686015 ± 1e-6); give up: \"{smug.give}\" (starts \"{wantG}\": 5,000 cr x the grade = {lostG:0.00}), pay {smug.jg.Pay:N0} cr (15,000), {smug.jg.Tonnes:0.###} t (30); " +
+                    $"boarded: \"{smug.board}\" (starts \"{wantB}\": 10,000 cr x the grade = {lostB:0.00}), pay {smug.jb.Pay:N0} cr (10,000), {smug.jb.Tonnes:0.###} t (20); Exposure after {smug.jg.Exposure:0.000000000000} and {smug.jb.Exposure:0.000000000000} ({e}: the chase added none)");
+
+                var plain = Run(false);
+                string plainG = $"Gave up {10.0:N1} t and {cutG:N0} cr: the raider ", plainB = $"Boarded: the raider took {20.0:N1} t and {cutB:N0} cr back to ";
+                Check(Career.Grade(plain.jg) == 1 && plain.give.StartsWith(plainG) && plain.board.StartsWith(plainB) && plain.jg.Pay == 15000 && plain.jb.Pay == 10000,
+                    $"stealth smuggle: the plain control, Exposure {e} and Contraband off: grade {Career.Grade(plain.jg)} (1); give up \"{plain.give}\" (starts \"{plainG}\"), boarded \"{plain.board}\" (starts \"{plainB}\"), pay {plain.jg.Pay:N0} and {plain.jb.Pay:N0} cr (15,000 and 10,000)");
             }
             finally { foreach (var b in live) b.C.DropContact(); }
         }

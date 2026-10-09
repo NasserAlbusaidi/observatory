@@ -356,6 +356,8 @@ namespace FogOfWar
                 else
                     log.WriteLine($"  SKIP hulls scene: the camera's pivot is not the ship, so the free camera's floor is not the hull's (frigate {floorF:0.000000} km, corvette {floorC:0.000000} km)");
 
+                Guard("stealth hull yard pick", () => StealthHullPickChecks(corv)); // a throw here must not skip the row checks below
+
                 if (UI.UiShell.Disabled)
                 {
                     log.WriteLine("  SKIP hulls scene: no UI Toolkit shell (-fowlegacyui): the hull row and the Jobs page's signature; the classic panel draws the row with GUILayout and no QA reads IMGUI text");
@@ -404,6 +406,68 @@ namespace FogOfWar
                     $"hulls scene: the Jobs page's signature ({sig0.Length} chars) changes when only the draft's hull does ({sigDraft != sig0}, True) or only the fitted build's ({sigBuild != sig0}, True), picks equal ({Picks(draft)} against {Picks(build0)}); put back it reads as before ({sigBack == sig0}, True)");
             }
             finally { Restore(); }
+        }
+
+        // 16n, the yard's hull pick: both shells call OpenSystemScene.PickHull(draft, hull, fitted build) from their hull row.
+        // This checks that helper alone, not either shell's wiring to it (the GUILayout row, the UI Toolkit Segmented).
+        // The method is static, so it runs on builds made here and reaches no scene state; nothing is changed, nothing to put back.
+        // The picks are the slot order of Slot: drive, tank, hold, cabin, sensors, radiators. [calc] by hand from the table:
+        // frigate stock 1,1,1,2,0,0; corvette stock 1,2,0,0,0,1; the fitted frigate has the 400 t tank (tank 3): 1,3,1,2,0,0.
+        void StealthHullPickChecks(Hull corv)
+        {
+            var frig = ShipBuild.Hulls[0];
+            var pickM = typeof(OpenSystemScene).GetMethod("PickHull", BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            if (pickM == null) { Check(false, "hulls yard pick: the scene has no PickHull"); return; }
+            void Pick(ShipBuild d, Hull h, ShipBuild fitted) => pickM.Invoke(null, new object[] { d, h, fitted });
+            ShipBuild Fitted(Hull h, int slot, int part) { var b = ShipBuild.Stock(h); b.pick[slot] = part; return b; }
+
+            // 1: the other hull gets its own stock pick, and the draft's picks are a copy of the table's
+            var fitted = Fitted(frig, (int)Slot.Tank, 3);
+            var d = fitted.Clone();
+            Pick(d, corv, fitted);
+            string toCorv = $"{d.hull} {Picks(d)}";
+            d.pick[(int)Slot.Drive] = 0;
+            string tableAfter = string.Join(",", corv.StockPick), fittedAfter = Picks(fitted);
+            Check(toCorv == CorvetteName + " 1,2,0,0,0,1" && tableAfter == "1,2,0,0,0,1" && fittedAfter == "1,3,1,2,0,0",
+                $"hulls yard pick: a draft of the fitted frigate (picks {Picks(fitted)}) that picks the corvette reads \"{toCorv}\" (\"{CorvetteName} 1,2,0,0,0,1\", its stock pick, not the frigate's 1,3,1,2,0,0); editing the draft's drive left the corvette's table at {tableAfter} (1,2,0,0,0,1) and the fitted build at {fittedAfter} (1,3,1,2,0,0)");
+
+            // 2: the fitted hull again gives back the fitted picks, not its stock pick; a pick made on the other hull is gone
+            d = fitted.Clone();
+            Pick(d, corv, fitted);
+            d.pick[(int)Slot.Sensors] = 1;
+            string onCorv = Picks(d);
+            Pick(d, frig, fitted);
+            string back = $"{d.hull} {Picks(d)}";
+            d.pick[(int)Slot.Hold] = 2;
+            string fittedKept = Picks(fitted);
+            Check(onCorv == "1,2,0,0,1,1" && back == FrigateName + " 1,3,1,2,0,0" && fittedKept == "1,3,1,2,0,0",
+                $"hulls yard pick: on the corvette with long-range sensors the picks read {onCorv} (1,2,0,0,1,1); the fitted frigate picked again reads \"{back}\" (\"{FrigateName} 1,3,1,2,0,0\": the fitted picks, not the stock 1,1,1,2,0,0; the sensor pick is gone); editing the hold of that draft left the fitted build at {fittedKept} (1,3,1,2,0,0)");
+
+            // 3: the same hull twice changes nothing: a slot pick made in between survives, and the picks array is the same object
+            d = fitted.Clone();
+            d.pick[(int)Slot.Hold] = 2;
+            var arr = d.pick;
+            Pick(d, frig, fitted);
+            string sameF = $"{d.hull} {Picks(d)}";
+            bool sameFArr = ReferenceEquals(arr, d.pick);
+            Pick(d, corv, fitted);
+            d.pick[(int)Slot.Sensors] = 1;
+            arr = d.pick;
+            Pick(d, corv, fitted);
+            string sameC = $"{d.hull} {Picks(d)}";
+            bool sameCArr = ReferenceEquals(arr, d.pick);
+            Check(sameF == FrigateName + " 1,3,2,2,0,0" && sameFArr && sameC == CorvetteName + " 1,2,0,0,1,1" && sameCArr,
+                $"hulls yard pick: the frigate picked again with the hold at 200 t reads \"{sameF}\" (\"{FrigateName} 1,3,2,2,0,0\"), picks object kept {sameFArr} (True); the corvette picked twice with long-range sensors between reads \"{sameC}\" (\"{CorvetteName} 1,2,0,0,1,1\"), picks object kept {sameCArr} (True)");
+
+            // 4: the fitted hull is the corvette: the frigate is then the stock pick, and the corvette comes back as fitted (Fast drive, drive 2)
+            var fittedC = Fitted(corv, (int)Slot.Drive, 2);
+            d = fittedC.Clone();
+            Pick(d, frig, fittedC);
+            string toFrig = $"{d.hull} {Picks(d)}";
+            Pick(d, corv, fittedC);
+            string backC = $"{d.hull} {Picks(d)}";
+            Check(Picks(fittedC) == "2,2,0,0,0,1" && toFrig == FrigateName + " 1,1,1,2,0,0" && backC == CorvetteName + " 2,2,0,0,0,1",
+                $"hulls yard pick: with the corvette fitted (picks {Picks(fittedC)}, 2,2,0,0,0,1) the frigate picked reads \"{toFrig}\" (\"{FrigateName} 1,1,1,2,0,0\", its stock pick) and the corvette picked again reads \"{backC}\" (\"{CorvetteName} 2,2,0,0,0,1\", the fitted picks); the fitted build still reads {Picks(fittedC)}");
         }
     }
 }
