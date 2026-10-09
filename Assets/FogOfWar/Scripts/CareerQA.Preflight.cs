@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using FogOfWar.OpenWorld;
 using UnityEngine;
@@ -178,6 +179,73 @@ namespace FogOfWar
             Check(Key(Array.Empty<string>(), Application.dataPath) == "fow-save-v1"
                 && Key(new[] { "-fowcareer", "-fowsavekey", "fow-save-job3" }, Application.dataPath) == "fow-save-job3",
                 "normal play keeps its key and an explicit save key wins");
+            // #155: a suite's setting changes stay in memory; PlayerPrefs keeps the player's value
+            const string masterKey = "fow-set-vol-master";
+            bool hadMaster = PlayerPrefs.HasKey(masterKey);
+            float savedMaster = PlayerPrefs.GetFloat(masterKey, -1), was = GameSettings.Master, qa = was > 0.5f ? 0.3f : 0.7f;
+            int changed = 0;
+            void Count() => changed++;
+            GameSettings.Changed += Count;
+            GameSettings.Master = qa;
+            bool held = GameSettings.Master == qa;
+            bool untouched = PlayerPrefs.HasKey(masterKey) == hadMaster && PlayerPrefs.GetFloat(masterKey, -1) == savedMaster;
+            GameSettings.Master = was;
+            GameSettings.Changed -= Count;
+            Check(GameSettings.InMemory && held && untouched && changed == 2,
+                $"settings stay in memory under a suite: Master reads {qa:F1}, PlayerPrefs keeps {(hadMaster ? savedMaster.ToString("F2") : "no value")}, {changed} change events");
+        }
+
+        // #154: the Data panel's target speeds read in m/s under 1 km/s, as the target card does, never ×10^
+        void TargetSpeedRowChecks()
+        {
+            var target = ship.Target; var vel = ship.Vel;
+            try
+            {
+                ship.Target = sys.Moon;
+                var dir = (sys.Pos(sys.Moon, jd) - ship.Pos).Norm;
+                string Row(List<Readout> rows, string label) { int i = rows.FindIndex(r => r.label == label); return i < 0 ? "-" : rows[i].value; }
+                List<Readout> Rows(double closingKms)
+                {
+                    ship.Vel = sys.Vel(sys.Moon, jd) + dir * closingKms;
+                    var rows = new List<Readout>(); s.Readouts(rows); return rows;
+                }
+                var near = Rows(3.2e-4);
+                Check(Row(near, "Relative speed") == "0.32 m/s" && Row(near, "Closing speed") == "0.32 m/s",
+                    $"target rows at 0.32 m/s closing: relative \"{Row(near, "Relative speed")}\", closing \"{Row(near, "Closing speed")}\"");
+                var away = Rows(-3.2e-4);
+                Check(Row(away, "Relative speed") == "0.32 m/s" && Row(away, "Closing speed") == "-0.32 m/s",
+                    $"target rows at 0.32 m/s opening: relative \"{Row(away, "Relative speed")}\", closing \"{Row(away, "Closing speed")}\"");
+                var fast = Rows(2.5);
+                Check(Row(fast, "Relative speed") == "2.5 km/s" && Row(fast, "Closing speed") == "2.5 km/s",
+                    $"target rows at 2.5 km/s: relative \"{Row(fast, "Relative speed")}\", closing \"{Row(fast, "Closing speed")}\"");
+            }
+            finally { ship.Target = target; ship.Vel = vel; }
+        }
+
+        // #170: the warp-limited note needs a shortfall over 2 %; at 1M× a 0.004 % loss shows nothing
+        void WarpLimitedNoteChecks()
+        {
+            int warp = Get<int>("warpIdx"); float at = Get<float>("limitedAt"); double eff = Get<double>("effectiveWarp");
+            try
+            {
+                Put("warpIdx", 6); Put("limitedAt", Time.realtimeSinceStartup);
+                Readout Row(double effective)
+                {
+                    Put("effectiveWarp", effective);
+                    var rows = new List<Readout>(); s.Readouts(rows);
+                    return rows.Find(r => r.label == "Time compression");
+                }
+                var tiny = Row(999959);
+                Check(!s.WarpLimitedShown && tiny.value == "1M×" && tiny.tone == Tone.Normal,
+                    $"1M× running at 999,959× shows no limit note: \"{tiny.value}\" ({tiny.tone})");
+                var real = Row(900000);
+                Check(s.WarpLimitedShown && real.value == "1M× (limited: running at 900,000×)" && real.tone == Tone.Bad,
+                    $"1M× running at 900,000× shows the limit note: \"{real.value}\" ({real.tone})");
+                Put("limitedAt", Time.realtimeSinceStartup - 3f);
+                var stale = Row(900000);
+                Check(!s.WarpLimitedShown && stale.value == "1M×", $"a limit 3 s old shows no note: \"{stale.value}\"");
+            }
+            finally { Put("warpIdx", warp); Put("limitedAt", at); Put("effectiveWarp", eff); }
         }
     }
 }
