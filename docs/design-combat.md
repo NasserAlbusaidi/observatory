@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built in this PR. 4c is not built. Phases 5–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built (#192). PR 4c is built: the raider's model (#191) and the rest (`pdc-fx`) in this PR. Phases 5–6 are not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -27,7 +27,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | 1 | Shipyard | Modules on their own hull | None | Built (PRs 130–132) |
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
 | 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f (#188) (the corvette's own model). Phase 3 is complete |
-| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built (#190); 4b (`pdc-mounts`) built in this PR; 4c not built |
+| 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built (#190); 4b (`pdc-mounts`) built (#192); 4c built (the raider's model #191; `pdc-fx` in this PR) |
 | 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
 
@@ -1072,7 +1072,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - **The classic Repair button** is read by `UiShots`' classic yard shot (docked at Earth), which runs only with `-fowclassicshots` (it needs a visible window). CareerQA reads the UI Toolkit row; the Missiles and Damage rows run in both shells.
 
 **PR 4b: `pdc`** (needs new art: no. The markers exist)
-- Status: built in this PR, on branch `pdc-mounts`. Part 1 is the math, the mount table and its QA (`OpenWorld/PointDefense.cs`, `Hull.Mounts`, `CareerQA.PointDefense.cs`, 17p-17t). Part 2 is the slot, the kill roll, the PDC hit, the boarding rule, the rows and the yard (17u-17w).
+- Status: built (#192, branch `pdc-mounts`). Part 1 is the math, the mount table and its QA (`OpenWorld/PointDefense.cs`, `Hull.Mounts`, `CareerQA.PointDefense.cs`, 17p-17t). Part 2 is the slot, the kill roll, the PDC hit, the boarding rule, the rows and the yard (17u-17w).
 - Adds: `Slot.PointDefense` (D4), `Hull.Mounts`, the arc test, the pass integral, the PDC hit, the boarding rule and `BreakOff.Repelled`, the bearing count in the Missiles row, the `ART-CONTRACT.md` zenith rule.
 - Touches: `OpenWorld/ShipBuild.cs`, `OpenWorld/Career.Damage.cs`, `OpenWorld/Career.Pirates.cs` (`Contacts`, `OffNote`), the yard and HUD in both shells, `CareerQA.Defense.cs`, `CareerQA.HullArt.cs` (mount vectors against the FBX).
 - QA:
@@ -1094,19 +1094,21 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - **Flight log.** `killed`, `bear_raider` and `bear_missile` next to the missile fields (with mounts fitted), `dmg_mounts` in the damage fields, and the missiles state adds "n killed".
 
 **PR 4c: `pdc-fx`** (needs new art: no. It reuses `CourierShip`)
-- The raider's model ships first, on its own (`raider-model`, built in this PR). The missile flares, tracers, flashes and the 1× cap follow 4a.
+- The raider's model ships first, on its own (`raider-model`, #191). The missile flares, tracers, flashes and the 1× cap follow 4a and 4b (`pdc-fx`).
 - Built in `raider-model`: `LateRaider` (`Scenes/OpenSystemScene.RaiderHud.cs`) draws the pirate `Ship` as `CourierShip` at its `Fleet.json` length (45.63 m), at `Pirate.Pos` and `Pirate.Att`, with the runner's plume while it thrusts. It shares `SpawnCraft` and `CraftDrive` with `LateRunner` (`Scenes/OpenSystemScene.Career.cs`). The model spawns with the chase and is destroyed, with its materials, when the chase ends. The dot goes when the model is longer than 40 px on screen, as a body's label does; the tag moves past the hull's box on screen. QA 17x-17z in `CareerQA.RaiderModel.cs`, with shots at 2 km and close up in both shells.
 - Adds: the raider's model, the missile flares, the tracers, the kill and hit flashes, and the 1× cap in the last 20 s.
 - Touches: `Scenes/OpenSystemScene.RaiderHud.cs`, new `Scenes/OpenSystemScene.Missiles.cs`, `OpenWorld/Career.Pirates.cs` (`WarpCap`), `Capture/UiShots.cs`.
 - QA: the cap is 1× from 20 s before an impact and lifts after it. Screenshots in both shells: the raider at 2 km, a salvo in flight, tracers.
 - The player notices: the fight is on screen at 1×.
-- **Built (4c part 2 notes)** (`pdc-fx`). The missile flares and the 1× hold. Tracers and kill flashes wait for 4b's PDCs.
+- **Built (4c part 2 notes)** (`pdc-fx`). The missile flares, the tracers, the hit and kill flashes and the 1× hold.
   - **The hold.** `Career.ImpactInS` is the nearest missile's |P| / `MissileKms`. `WarpCap` returns 1 when it is 20 s (`ImpactHoldS`) or less. The scene also ends a frame where the hold starts (`TickInner`), so no warp or frame time steps over it. Volley is unchanged, so the hit lands on the same update at any warp.
   - **The warp comes back after the impact.** `CapWarp` keeps the warp the hold lowered and gives it back when the hold lifts, in the same chase. A `DropWarp`, a call card or the end of the chase cancels that. The text did not say; the raider fires again at once, and its next flight is up to 1,000 s.
   - **The flares** (`Scenes/OpenSystemScene.Missiles.cs`). One holder per missile at `ship.Pos + P`, nose on the ship: an additive flare and a 100 m plume on the `Plume` shader. Under 14 px on screen the plume is drawn larger, and the flare is never under 4 px, so a missile reads at 40 km. While it is drawn larger, a 3 px dot and a tag ("Missile · 30 km · 15 s") in the Raiders' colour mark it. A salvo's two missiles fly on one line (4a), so they draw as one.
+  - **The tracers.** Each working mount that bears on a missile inside `EnvelopeKm` (5 km, the last 2.5 s) fires from its `PDC_n` marker on the hull model shown, with the bearing test the kill uses (`PointDefense.Bears`, `Hull.Mounts`, `WorkingMounts`). The rounds are dashes that stream at `RoundKms` on game time, one line mesh for all. They stop at the impact. They are a look only: the kill is still one draw at impact (`Career.Strike`).
+  - **The kill flash.** On `MissileKilled`, a short white pop where the missile was last drawn. The kill is drawn at impact, so at 1× that is one frame's flight (about 33 m) from the hull, not 2 km out. Moving it out would need the kill drawn earlier, which is 4b's rule.
   - **The hit flash.** On `MissileHit`, and on the cabin hit's `JobFailed` "Hit:" note. It swells and fades at the hull on the side the missile came in on, over 0.6 s of real time, and is freed after.
-  - Flares, materials and meshes are freed when the chase ends, and in `Teardown`. The recorder's missiles field adds "held 1×" during the hold.
-  - QA 18a-18f in `CareerQA.MissileFx.cs`, after 17x-17z. The salvo is put in flight by hand, astern, with an empty magazine. Shots of the salvo at 30 km and 1 km and of the hit, in both shells. The damage the hits do is undone after.
+  - Flares, tracers, materials and meshes are freed when the chase ends, and in `Teardown`. The recorder's missiles field adds "held 1×" during the hold.
+  - QA 18a-18i in `CareerQA.MissileFx.cs`, after 17x-17z. The salvo is put in flight by hand, astern, with an empty magazine. 18a-18d run with no PDCs; 18g-18i with 6 mounts and a seeded combat rng, then with every mount dead. Shots of the salvo at 30 km and 1 km, the tracers, the kill and the hit, in both shells. The build and the damage the hits do are put back after.
 
 ### Decisions
 
@@ -1193,8 +1195,9 @@ Ordered by size. Your list put the destroyer first.
 | `Career.cs:16-43,402-417,482-531`, `Career.Scout.cs`, `Career.Smuggle.cs` (new) | No quiet or contraband jobs | `Contract.Quiet`, `Contraband`, `Exposure`; board slots k = 8 and 9 | 3 (3c, 3d) | 3c built (#150); 3d built (#184) |
 | `ShipBuild.cs:18-26,43-45,90-94,108,128-129`, `Career.Yard.cs:9-40`, `Career.cs:14,76-79`, `Career.Heat.cs`, `Career.Signature.cs`, `Career.Pirates.cs:261`, `OpenSystemScene.cs:489`, `.Hud.cs:24`, `.CareerHud.cs:230-246`, `.Signature.cs`, `.Yard.cs`, `OpenSystemScene.Hull.cs` (new) | One hull; the cold range and hold are hull-blind | Per-hull stock, price and facet (`OutRho`, `DarkRho`, `OutHoldS`); `Port.HullSale`; a hull row in the yard; scale from hull length | 3 (3e) | Built (#185) |
 | `Resources/Models/StealthShip.fbx`, `ART-CONTRACT.md` | No stealth model | The corvette's own model, `Radiator_n` markers, a model rebuild on hull change | 3 (3f) | Built (#188) |
-| `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | 4a built (#190: missiles, armor, damage, repairs); 4b built in this PR (PDC mounts, kills, mount hits, boarding rule) |
+| `Career.Pirates.cs`, `Career.Damage.cs` (new), `ShipBuild.cs`, `Career.cs` (`Apply`, save), `Career.Yard.cs`, `Signature.cs:26`, `Codex.cs:34-35` | Raiders only board. `PDC_0..5` markers unused (`CareerQA.HullArt.cs:24` only) | Raider missiles, `Slot.Armor`, `Slot.PointDefense`, `Hull.Mounts`, damage and repairs | 4 | 4a built (#190: missiles, armor, damage, repairs); 4b built (#192: PDC mounts, kills, mount hits, boarding rule) |
 | `OpenSystemScene.RaiderHud.cs:104-131`, `OpenSystemScene.Career.cs` (`LateRunner`) | The raider is a 5 px dot and a tag | `LateRaider`: the pirate `Ship` as `CourierShip` (`Fleet.json`, 45.63 m), spawned and destroyed with the chase; the spawn shared with `LateRunner` (`SpawnCraft`) | 4 (4c, part 1) | Built (#191): QA in `CareerQA.RaiderModel.cs` |
+| `Career.Pirates.cs` (`WarpCap`), `OpenSystemScene.cs` (`TickInner`), `.Pirates.cs` (`CapWarp`), `OpenSystemScene.Missiles.cs` (new) | Missiles and PDCs are rows and notes only; the chase holds 100× to the impact | The flares, the tracers, the hit and kill flashes; 1× for the last 20 s before an impact | 4 (4c, part 2) | Built in this PR (`pdc-fx`): QA in `CareerQA.MissileFx.cs` |
 | `Ship.cs:19-21`, `:44` | `RcsAccel`, `AngAccel`, `MaxRate`, `Ve` are `const` | Per instance (hulls, torpedoes) | 5–6 | — |
 
 ## Decisions (agreed 2026-10-06)
