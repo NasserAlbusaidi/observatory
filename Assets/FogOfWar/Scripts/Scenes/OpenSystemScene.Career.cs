@@ -499,7 +499,7 @@ namespace FogOfWar
         const float WreckKm = 0.038f;                                        // 38 m container hauler
         static readonly Vector3 WreckTumble = new Vector3(1.1f, 0.4f, 2.3f); // deg/s, from the art's Derelict.json
 
-        void LateCareer() { LateWreck(); LateRunner(); }
+        void LateCareer() { LateWreck(); LateRunner(); LateRaider(); }
 
         // ---------------------------------------------------------------- the ship under thrust on an intercept job
 
@@ -514,7 +514,7 @@ namespace FogOfWar
         [Serializable] class FleetFile { public FleetShips ships; }
         static FleetShip[] fleet;
 
-        static FleetShip FleetFor(string to)
+        static FleetShip[] Fleet()
         {
             if (fleet == null)
             {
@@ -522,8 +522,16 @@ namespace FogOfWar
                 var s = ta != null ? JsonUtility.FromJson<FleetFile>(ta.text)?.ships : null;
                 fleet = s == null ? new FleetShip[0] : new[] { s.Courier, s.Packet, s.Liner, s.Freighter, s.Tanker, s.Hauler };
             }
+            return fleet;
+        }
+
+        // the Fleet.json hull with this model name, or null
+        static FleetShip FleetModel(string model) => Array.Find(Fleet(), f => f != null && f.model == model);
+
+        static FleetShip FleetFor(string to)
+        {
             // the runner body is "Runner <name> <id>", the hull string "<class> <name>" (Career.Intercept.Runners)
-            foreach (var f in fleet)
+            foreach (var f in Fleet())
             {
                 if (f == null || string.IsNullOrEmpty(f.runner)) continue;
                 string name = f.runner.Substring(f.runner.IndexOf(' ') + 1);
@@ -540,25 +548,13 @@ namespace FogOfWar
             if (runnerT != null && runnerFor != job.To) { UnityEngine.Object.Destroy(runnerT.gameObject); runnerT = null; }
             if (runnerT == null)
             {
-                runnerT = new GameObject("Runner").transform;
-                runnerT.SetParent(Root, false);
                 runnerFor = job.To;
                 var f = FleetFor(job.To);
                 bool own = f != null && Resources.Load<GameObject>("Models/" + f.model) != null;
                 runnerKm = own ? f.lengthM / 1000f : TorchKm;
-                var go = Models.Spawn(own ? f.model : "TorchShip", runnerT, new Color(0.7f, 0.68f, 0.62f));
-                if (own) ShipLighting.ApplyHullMaterial(go, f.model); // stays flat-coloured until its atlas is in the build
-                var model = go.transform;
-                Models.AlignMarker(model, "Nose", Vector3.forward);
-                // the fleet's Engine glows at all times: shown only under thrust
-                runnerGlow = own ? Models.FindDeep(model, "Engine") : null;
-                var rends = model.GetComponentsInChildren<Renderer>();
-                var bounds = rends[0].bounds;
-                foreach (var r in rends) { bounds.Encapsulate(r.bounds); foreach (var m in r.sharedMaterials) Own(m); }
-                runnerLen = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
-                model.localPosition -= bounds.center - runnerT.position;
-                var pm = OwnMat(Gfx.Unlit(new Color(0.55f, 0.75f, 1f, 0.5f), true));
-                runnerPlume = Gfx.Obj("Runner plume", runnerT, Own(Gfx.UVSphere(24, 12)), pm).transform;
+                var made = new List<UnityEngine.Object>();
+                runnerT = SpawnCraft("Runner", own ? f.model : "TorchShip", own, made, out runnerLen, out runnerGlow, out runnerPlume);
+                foreach (var o in made) Own(o);
             }
             runnerT.gameObject.SetActive(true);
             runnerT.localPosition = Map(sys.Pos(b, jd), out double k);
@@ -566,12 +562,48 @@ namespace FogOfWar
             // nose along its thrust: it flies forward, then turns its drive against its motion to brake
             var acc = b.PathAccel(jd);
             if (acc.Sqr > 1e-18) runnerT.localRotation = Quaternion.LookRotation(Frame.U(acc.Norm));
-            float g = (float)(acc.Mag / Ship.G0);
-            runnerPlume.gameObject.SetActive(g > 0.005f);
-            if (runnerGlow != null) runnerGlow.gameObject.SetActive(g > 0.005f);
-            float L = runnerLen * Mathf.Clamp(0.4f + 2f * g, 0.4f, 1.2f);
-            runnerPlume.localScale = new Vector3(runnerLen * 0.06f, runnerLen * 0.06f, L);
-            runnerPlume.localPosition = new Vector3(0, 0, -runnerLen * 0.5f - L * 0.9f);
+            CraftDrive(runnerPlume, runnerGlow, runnerLen, (float)(acc.Mag / Ship.G0));
+        }
+
+        // A craft's model in a new holder under Root: a Fleet.json hull on its textured hull (own: its file is in the build),
+        // else the torch ship, flat-coloured. The nose on +Z and centred on the holder; len its long extent in model units;
+        // glow the fleet's Engine (null for the torch ship); a drive plume. made gets every material and mesh made for it,
+        // for the caller to free.
+        Transform SpawnCraft(string name, string model, bool own, List<UnityEngine.Object> made, out float len, out Transform glow, out Transform plume)
+        {
+            var t = new GameObject(name).transform;
+            t.SetParent(Root, false);
+            var go = Models.Spawn(model, t, new Color(0.7f, 0.68f, 0.62f));
+            var rends = go.GetComponentsInChildren<Renderer>();
+            foreach (var r in rends) foreach (var m in r.sharedMaterials) if (m != null && !made.Contains(m)) made.Add(m);
+            if (own)
+            {
+                var hull = ShipLighting.ApplyHullMaterial(go, model); // stays flat-coloured until its atlas is in the build
+                if (hull != null && hull.Length > 0) made.Add(hull[0].sharedMaterial);
+            }
+            var mt = go.transform;
+            Models.AlignMarker(mt, "Nose", Vector3.forward);
+            // the fleet's Engine glows at all times: shown only under thrust
+            glow = own ? Models.FindDeep(mt, "Engine") : null;
+            var bounds = rends[0].bounds;
+            foreach (var r in rends) bounds.Encapsulate(r.bounds);
+            len = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+            mt.localPosition -= bounds.center - t.position;
+            var pm = Gfx.Unlit(new Color(0.55f, 0.75f, 1f, 0.5f), true);
+            var mesh = Gfx.UVSphere(24, 12);
+            made.Add(pm); made.Add(mesh);
+            plume = Gfx.Obj(name + " plume", t, mesh, pm).transform;
+            return t;
+        }
+
+        // a craft's plume and Engine glow at g of thrust: both off under 0.005 g
+        static void CraftDrive(Transform plume, Transform glow, float len, float g)
+        {
+            plume.gameObject.SetActive(g > 0.005f);
+            if (glow != null) glow.gameObject.SetActive(g > 0.005f);
+            float L = len * Mathf.Clamp(0.4f + 2f * g, 0.4f, 1.2f);
+            plume.localScale = new Vector3(len * 0.06f, len * 0.06f, L);
+            plume.localPosition = new Vector3(0, 0, -len * 0.5f - L * 0.9f);
         }
 
         void LateWreck()

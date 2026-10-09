@@ -223,6 +223,7 @@ namespace FogOfWar
                 Put("warpIdx", 0);
             });
             yield return PirateShellChecks(); // 14b: the call card, the pill, the dot and the classic panel
+            yield return RaiderModelChecks(); // 17x-17z: the raider's model (CareerQA.RaiderModel.cs)
             yield return PirateNoteChecks(qs);
             yield return PirateNoSaveChecks();
         }
