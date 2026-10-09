@@ -96,13 +96,13 @@ namespace FogOfWar.OpenWorld
         public Func<Body, bool> Divert;
         bool contactLost; // a load dropped an encounter: the note waits for a tick, which knows the date and the ship
 
-        public const double ImpactHoldS = 20; // [design] D11 (combat 4c): 1× for the last 20 s before an impact, 40 km out
+        public const double ImpactHoldS = 20; // [design] D11 (combat 4c): 1× for the last 20 s before an impact, 200 km out at 10 km/s
         // A frame cut to end at the hold lands within jd's 40 µs grid of it, so the hold takes that frame's end as in: the
         // scene would otherwise cut a frame of nothing, and time would stop
         public const double ImpactSlackS = 0.01;
 
-        // The seconds to the next missile impact: the flight is straight in the ship's frame at MissileKms, so |P| / MissileKms
-        // (Volley). Infinite with none in flight, and in the sandbox, whose tick flies no missiles.
+        // The seconds to the next missile impact: each missile's closed form (Missile.ImpactInS), which Volley steps exactly.
+        // Infinite with none in flight, and in the sandbox, whose tick flies no missiles.
         public double ImpactInS
         {
             get
@@ -110,7 +110,7 @@ namespace FogOfWar.OpenWorld
                 var e = Encounter;
                 double t = double.PositiveInfinity;
                 if (e == null || Sandbox) return t;
-                foreach (var m in e.Missiles) t = Math.Min(t, m.P.Mag / MissileKms);
+                foreach (var m in e.Missiles) t = Math.Min(t, m.ImpactInS);
                 return t;
             }
         }

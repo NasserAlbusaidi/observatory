@@ -70,6 +70,18 @@ namespace FogOfWar
                 got.Add($"{m}: {p:0.0000} ({want[m]:0.00}), {6 * (1 - p):0.00} of 6 through");
             }
             Check(ok, $"pdc: P(kill) a missile at 2 km/s by mounts bearing (± 0.01): {string.Join("; ", got)}");
+
+            // 2026-10-09: a missile closes at 10 km/s from a raider at rest, 15 km/s from one closing at 5 [calc]
+            var fast = new List<string>();
+            bool fastOk = true;
+            foreach (var (v, w) in new[] { (10.0, new[] { 0.10, 0.19, 0.28 }), (15.0, new[] { 0.07, 0.13, 0.19 }) })
+                for (int m = 1; m <= 3; m++)
+                {
+                    double p = PointDefense.KillChance(m, v);
+                    fastOk &= Near(p, w[m - 1], 0.01);
+                    fast.Add($"{v:0} km/s, {m}: {p:0.0000} ({w[m - 1]:0.00})");
+                }
+            Check(fastOk, $"pdc: P(kill) at the missile's coast speeds (± 0.01): {string.Join("; ", fast)}");
         }
 
         // 17r: 10,000 seeded passes for 1-3 mounts, each a walk in 5 m steps with a kill chance 1 − exp(−m·λ·dt) a step (the
@@ -301,7 +313,7 @@ namespace FogOfWar
         // 17v: the kill roll on the real strike path, the PDC hit, and the draws of a whole chase
         void PdcStrikeChecks(SolarSystem qs)
         {
-            // 10,000 strikes for 1, 2 and 3 mounts bearing (from 17s's table: 2 mounts from the top and from the nose, 4 from
+            // 10,000 strikes at 10 km/s for 1, 2 and 3 mounts bearing (from 17s's table: 2 mounts from the top and from the nose, 4 from
             // starboard). The mounts are made whole after each strike, so a PDC hit does not change m mid-run
             var got = new List<string>();
             bool ok = true;
@@ -313,8 +325,8 @@ namespace FogOfWar
                 var from = Frame.FromU(dir) * 1.5;
                 int bearing = b.C.MountsBearing(b.Ship, from), kills = 0;
                 const int n = 10000;
-                for (int i = 0; i < n; i++) { if (b.C.Strike(b.Ship, from)) kills++; b.C.Damage = new ShipDamage(); }
-                double want = PointDefense.KillChance(m, Career.MissileKms), f = (double)kills / n;
+                for (int i = 0; i < n; i++) { if (b.C.Strike(b.Ship, from, Career.MissileDvKms)) kills++; b.C.Damage = new ShipDamage(); }
+                double want = PointDefense.KillChance(m, Career.MissileDvKms), f = (double)kills / n;
                 int notes = SaidCount(b, Career.KillNote);
                 bool one = bearing == m && Near(f, want, 0.02) && notes == kills && rng.Draws == kills + 3 * (n - kills);
                 ok &= one;
@@ -333,7 +345,7 @@ namespace FogOfWar
                 var from = Frame.FromU(Vector3.down);
                 b.C.Damage = new ShipDamage { mounts = dead };
                 int bearing = b.C.MountsBearing(b.Ship, from), kills = 0;
-                for (int i = 0; i < 1000; i++) { if (b.C.Strike(b.Ship, from)) kills++; b.C.Damage = new ShipDamage { mounts = dead }; }
+                for (int i = 0; i < 1000; i++) { if (b.C.Strike(b.Ship, from, Career.MissileDvKms)) kills++; b.C.Damage = new ShipDamage { mounts = dead }; }
                 quiet &= bearing == 0 && kills == 0 && rng.Draws == 2000 && SaidCount(b, Career.KillNote) == 0;
                 nb.Add($"{b.C.Build.MountCount} mounts, dead {Mask(dead)}: {bearing} bear, {kills} kills, {rng.Draws:N0} draws");
             }
@@ -485,8 +497,8 @@ namespace FogOfWar
                 setDocked.Invoke(career, new object[] { Array.Find(Career.Ports, p => p.Name == "Ceres") });
                 var box = new UIE.VisualElement();
                 Call("BuildJobs", box);
-                string two = $"2 PDC mounts, 6 t: one bearing kills {PointDefense.KillChance(1, Career.MissileKms) * 100:0} % of missiles";
-                int head = CountText(box, "PDCs"), row = CountText(box, two), fitted = CountText(box, "4 PDC mounts, 12 t: one bearing kills 42 % of missiles (fitted)");
+                string two = $"2 PDC mounts, 6 t: one bearing kills {PointDefense.KillChance(1, Career.MissileDvKms) * 100:0} % of missiles at 10 km/s";
+                int head = CountText(box, "PDCs"), row = CountText(box, two), fitted = CountText(box, "4 PDC mounts, 12 t: one bearing kills 10 % of missiles at 10 km/s (fitted)");
                 string want = R<string>("RepairLine", false);
                 Check(head == 1 && row == 1 && fitted == 1 && want.StartsWith("Repair all: 7,500 cr, ", StringComparison.Ordinal) && CountText(box, want) == 1,
                     $"defense 17v: the Jobs page docked at Ceres draws the \"PDCs\" head {head} time (1), \"{two}\" {row} (1), the 4 fitted {fitted} (1), and \"{want}\" (a mount at 25 % of 30,000, 1 day)");

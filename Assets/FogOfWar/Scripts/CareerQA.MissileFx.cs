@@ -12,13 +12,13 @@ namespace FogOfWar
     // started by hand astern with an empty magazine, and a salvo of 2 put in flight by hand, 14° off the tail (the Aft
     // aspect: no hold or cabin hit). With no PDCs: 18a/18b the hold at 1,000× asked (the raider past CloseKm) and at 100×
     // asked (inside it): every frame before it at the warp asked, none stepping past its start, 1× from 20 s out to the
-    // impact, the impact the closed form's, the warp given back after; 18c a flare per missile at ship.Pos + P in the scene
-    // frame, nose on the ship, and the dot and tag while it is drawn larger than it is; 18d the hit flash on the side it came
-    // in on, fired by MissileHit. With 6 mounts: 18g tracers only inside 5 km from a working mount that bears, none after the
-    // impact, none with every mount dead; 18h each from its PDC_n marker to the missile; 18i a kill flash at the missile on
-    // MissileKilled. 18e nothing left once the chase ends; 18f the damage the hits did and the build are undone. Shots of
-    // the salvo at 30 km and 1 km, the tracers, the kill and the hit, in both shells. The scene is put back at the end, after
-    // a failed or thrown check too.
+    // impact, the impact the closed form's, the warp given back after, the plume on only while the missile burns; 18c a flare
+    // per missile at ship.Pos + P in the scene frame, nose on the ship, and the dot and tag while it is drawn larger than it
+    // is; 18d the hit flash on the side it came in on, fired by MissileHit. With 6 mounts: 18g tracers only inside 5 km from
+    // a working mount that bears, none after the impact, none with every mount dead; 18h each from its PDC_n marker to the
+    // missile; 18i a kill flash at the missile on MissileKilled. 18e nothing left once the chase ends; 18f the damage the hits
+    // did and the build are undone. Shots of the salvo burning at the hold's start, coasting at 30 km and 1 km, the tracers,
+    // the kill and the hit, in both shells. The scene is put back at the end, after a failed or thrown check too.
     public partial class CareerQA
     {
         IEnumerator MissileFxChecks()
@@ -79,13 +79,15 @@ namespace FogOfWar
                 approach = (-ship.Heading + side * 0.25).Norm;
             });
 
-            // a chase d km astern with no salvo of its own, and a salvo of 2 put in flight `km` out; the jd it was put there
-            double Salvo(double raiderKm, double km)
+            // a chase d km astern with no salvo of its own, and a salvo of 2 put in flight `km` out, fired from rest just now
+            // or past its burn (coasting at 10 km/s); the jd it was put there
+            double Salvo(double raiderKm, double km, bool coast = false)
             {
                 e = career.StartContact(job, sys, ship, jd, ship.Pos - ship.Heading * raiderKm, ship.Vel);
                 e.Magazine = 0;
-                e.Missiles.Add(new Missile { P = approach * km });
-                e.Missiles.Add(new Missile { P = approach * km });
+                var m = new Missile { P = approach * km, Age = coast ? Career.BurnS : 0 };
+                e.Missiles.Add(m);
+                e.Missiles.Add(m);
                 return jd;
             }
 
@@ -105,16 +107,28 @@ namespace FogOfWar
                 if (!ok) yield break;
                 var rows = new List<(double t0, double fw, double t1, int warp)>();
                 double tPrev = career.ImpactInS, jdHit = double.NaN;
-                bool at30 = !shots, atClose = !shots;
+                bool atBurn = !shots, at30 = !shots, atClose = !shots;
+                // the plume a frame shows is the last LateUpdate's, drawn from the missile as the frame before left it
+                bool? burnLast = e.Missiles.Count > 0 ? e.Missiles[0].Burning : (bool?)null;
+                int plumeOn = 0, plumeOff = 0, plumeWrong = 0;
                 for (int f = 0; f < 4000 && career.Encounter == e && e.Missiles.Count > 0; f++)
                 {
                     yield return null;
-                    double t1 = career.ImpactInS;
+                    var mt = Get<List<Transform>>("missileT");
+                    if (burnLast.HasValue && mt.Count > 0 && mt[0] != null)
+                    {
+                        bool on = mt[0].GetChild(1).gameObject.activeSelf;
+                        if (on != burnLast.Value) plumeWrong++;
+                        if (on) plumeOn++; else plumeOff++;
+                    }
+                    burnLast = e.Missiles.Count > 0 ? e.Missiles[0].Burning : (bool?)null;
+                    double t1 = career.ImpactInS, km1 = e.Missiles.Count > 0 ? e.Missiles[0].P.Mag : 0;
                     rows.Add((tPrev, Get<double>("frameWarp"), t1, Get<int>("warpIdx")));
                     tPrev = t1;
                     if (double.IsInfinity(t1)) { jdHit = jd; break; }
-                    if (!at30 && t1 <= 15) { at30 = true; yield return Placed("30 km", true); }
-                    else if (!atClose && t1 <= 0.5) { atClose = true; yield return Placed("1 km", false); }
+                    if (!atBurn && t1 <= Career.ImpactHoldS && burnLast == true) { atBurn = true; yield return Placed("burn", true); }
+                    else if (!at30 && km1 <= 30) { at30 = true; yield return Placed("30 km", true); }
+                    else if (!atClose && km1 <= 1) { atClose = true; yield return Placed("1 km", false); }
                 }
                 if (shots && double.IsNaN(jdHit) == false)
                 {
@@ -133,7 +147,7 @@ namespace FogOfWar
                     foreach (var r in pre) { preMax = Math.Max(preMax, r.fw); preMin = Math.Min(preMin, r.t1); overstep |= r.fw > cap * (1 + 1e-9); }
                     foreach (var r in hold) { holdMax = Math.Max(holdMax, r.fw); holdS += r.fw / 60; }
                     bool hit = !double.IsNaN(jdHit);
-                    double flight = (jdHit - jd0) * 86400, want0 = km / Career.MissileKms;
+                    double flight = (jdHit - jd0) * 86400, want0 = FlightS(0, km);
                     double fwAfter = Get<double>("frameWarp");
                     int wAfter = Get<int>("warpIdx");
                     Check(hit && pre.Count > 0 && !overstep && preMax >= 0.9 * Math.Min(cap, WarpOf(want)) && preMin >= Career.ImpactHoldS - 1e-3,
@@ -143,7 +157,9 @@ namespace FogOfWar
                         $"18{(want == 3 ? "a" : "b")} impact hold {label}: the 1× hold began {(first >= 0 ? hold[0].t0 : double.NaN):0.0000} s before the impact (20 to 20.01), {hold.Count} frames to it ran at ≤ {holdMax:0.000000}× (≤ 1), " +
                         $"{holdS:0.000} s of sim time (the hold's start ± one 1/60 s update)");
                     Check(hit && Math.Abs(flight - want0) <= 1.0 / 60 + 1e-3,
-                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: the salvo hit {flight:0.0000} s after it was put {km:N0} km out (closed form {want0:0.0000} s ± one 1/60 s update), the warp and the hold notwithstanding");
+                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: the salvo hit {flight:0.0000} s after it was put {km:N0} km out from rest (closed form {want0:0.0000} s ± one 1/60 s update), the warp and the hold notwithstanding");
+                    Check(hit && plumeWrong == 0 && plumeOn > 0 && plumeOff > 0,
+                        $"18{(want == 3 ? "a" : "b")} plume {label}: drawn on {plumeOn} frames and off {plumeOff} (both > 0: the burn is the first {Career.BurnS:0.0} s), {plumeWrong} frames (0) where it did not match the missile's burn");
                     double capAfter = career.WarpCap;
                     Check(hit && career.Encounter == e && capAfter == cap && wAfter == want && fwAfter >= 0.9 * Math.Min(cap, WarpOf(want)) && fwAfter <= cap * (1 + 1e-9),
                         $"18{(want == 3 ? "a" : "b")} impact hold {label}: after the impact the cap is {capAfter:N0}× again ({cap:N0}), the warp {WarpOf(wAfter):N0}× is given back ({WarpOf(want):N0}× asked once, before the salvo), and the next frame ran at {fwAfter:N0}×");
@@ -212,7 +228,8 @@ namespace FogOfWar
                     $"{e.Missiles.Count} missiles and {Holders("Missile")} flare holders left (0)");
             }
 
-            // 18g-18i: the PDCs' tracers and the kill flash. A salvo 8 km out at 1×: with 6 working mounts (`dead` false) the
+            // 18g-18i: the PDCs' tracers and the kill flash. A salvo 8 km out at 1×, past its burn at 10 km/s as from a raider at
+            // rest: with 6 working mounts (`dead` false) the
             // tracers run from each one that bears on a missile inside EnvelopeKm and stop at the impact, and a kill (combatRng
             // seeded) flashes at the missile; with every mount dead, none
             IEnumerator TracerRun(bool dead)
@@ -226,7 +243,7 @@ namespace FogOfWar
                     career.Damage.mounts = dead ? career.Build.FittedMounts : 0;
                     career.Apply(ship);
                     career.SeedCombat(TracerSeed);
-                    Salvo(300, 8);
+                    Salvo(300, 8, true);
                     kill0 = KillF.Count; hit0 = HitF.Count; since = Time.realtimeSinceStartup;
                     Put("warpIdx", 0);
                 });
@@ -271,9 +288,9 @@ namespace FogOfWar
                         double off = t != null ? (t.localPosition - shipT.localPosition).magnitude : double.NaN;
                         if (t != null) { made.Add(KillF.Mat); made.Add(KillF.Mesh); }
                         if (HitF.T != null) { made.Add(HitF.Mat); made.Add(HitF.Mesh); }
-                        Check(e.Killed > 0 && kills == e.Killed && killNotes == e.Killed && hits == 2 - e.Killed && t != null && t.gameObject.activeInHierarchy && ang <= 1 && off <= 0.04,
+                        Check(e.Killed > 0 && kills == e.Killed && killNotes == e.Killed && hits == 2 - e.Killed && t != null && t.gameObject.activeInHierarchy && ang <= 1 && off <= OneFrameKm,
                             $"18i kill flash: combatRng seeded {TracerSeed}, {bearing / 2} mounts bearing: {e.Killed} of 2 killed (≥ 1), {killNotes} MissileKilled notes, {kills} kill flashes and {hits} hit flashes ({e.Killed} and {2 - e.Killed}); " +
-                            $"the kill flash is {(t != null && t.gameObject.activeInHierarchy ? "on" : "off")} {off * 1000:0.0} m from the ship (≤ 40: one 1× frame's flight), {ang:0.000}° off the salvo's side (≤ 1)");
+                            $"the kill flash is {(t != null && t.gameObject.activeInHierarchy ? "on" : "off")} {off * 1000:0.0} m from the ship (≤ {OneFrameKm * 1000:0}: one 1× frame's flight at 10 km/s), {ang:0.000}° off the salvo's side (≤ 1)");
                     });
                     yield return Shot($"c18-kill-{shell}");
                 }
@@ -283,8 +300,8 @@ namespace FogOfWar
                         Check(inside > 0 && bearing == 0 && wrong == 0 && outside == 0 && after == 0,
                             $"18g tracers, {label}: {inside} frames inside {PointDefense.EnvelopeKm:0} km with {bearing} mounts bearing (0) drew none ({wrong} frames with tracers, 0), and none at the impact ({after}, 0)");
                     else
-                        Check(inside >= 140 && bearing > 0 && wrong == 0 && outside == 0 && after == 0,
-                            $"18g tracers, {label}: {outside} frames past {PointDefense.EnvelopeKm:0} km drew tracers (0); {inside} frames inside it (≥ 140: 2.5 s at 1×) drew one a missile a bearing mount ({bearing} at most) in all but {wrong} (0); " +
+                        Check(inside >= InsideFrames && bearing > 0 && wrong == 0 && outside == 0 && after == 0,
+                            $"18g tracers, {label}: {outside} frames past {PointDefense.EnvelopeKm:0} km drew tracers (0); {inside} frames inside it (≥ {InsideFrames}: 90 % of 0.5 s at 1×) drew one a missile a bearing mount ({bearing} at most) in all but {wrong} (0); " +
                             $"the frame after the impact: {after} (0, the line object off)");
                 });
                 career.DropContact();
@@ -331,9 +348,10 @@ namespace FogOfWar
                 s.QaFreeze = false;
             }
 
-            if (go) yield return RunHold("1000x", 3, 12000, 200, false);
+            // from rest: 2,000 km is the fire range's 216.9 s; 250 km is 42.0 s, the burn ending 80 km out, in the hold
+            if (go) yield return RunHold("1000x", 3, 12000, Career.FireKm, false);
             if (go) go = Guard("missile fx camera", () => { career.DropContact(); Look(true); });
-            if (go) yield return RunHold("100x", 2, 300, 80, true);
+            if (go) yield return RunHold("100x", 2, 300, 250, true);
             if (go) yield return TracerRun(false);
             if (go) yield return TracerRun(true);
 
@@ -386,6 +404,10 @@ namespace FogOfWar
         string HitFlashLeft() => HitF.T == null && KillF.T == null ? "gone" : "still on";
         OpenSystemScene.Flash HitF => Get<OpenSystemScene.Flash>("hitFlash");
         OpenSystemScene.Flash KillF => Get<OpenSystemScene.Flash>("killFlash");
-        const int TracerSeed = 4; // any seed that kills at least one of the two at 5 bearing mounts (0.93 each)
+        // any seed that kills one of the two at 10 km/s with 4 to 6 mounts bearing (0.35 to 0.48 each): its first draw is 0.29
+        const int TracerSeed = 3;
+        // the tracer salvo at 10 km/s: one 1× frame's flight with a fifth to spare, and 90 % of the frames inside EnvelopeKm
+        static double OneFrameKm => Career.MissileDvKms / 60 * 1.2;
+        static int InsideFrames => (int)(0.9 * 60 * PointDefense.EnvelopeKm / Career.MissileDvKms);
     }
 }
