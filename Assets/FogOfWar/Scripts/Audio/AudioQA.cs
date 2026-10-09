@@ -210,11 +210,20 @@ namespace FogOfWar
             GameSettings.Master = 0.8f;
             Note($"meter: Master at 0 % {off.rms:F1} dBFS RMS");
             Check(off.rms < -70, "Master slider at 0 % silences everything");
-            GameSettings.Master = 0.4f;
-            yield return Meter(1f, l => off = l);
+            // the drive bed wanders by a dB or two between one-second windows: alternate 80 % and 40 % and pool each level's power
+            double pFull = 0, pHalf = 0;
+            float peakFull = -200;
+            for (int k = 0; k < 4; k++)
+            {
+                GameSettings.Master = 0.8f;
+                yield return Meter(1f, l => { pFull += Math.Pow(10, l.rms / 10); peakFull = Mathf.Max(peakFull, l.peak); });
+                GameSettings.Master = 0.4f;
+                yield return Meter(1f, l => pHalf += Math.Pow(10, l.rms / 10));
+            }
             GameSettings.Master = 0.8f;
-            Note($"meter: Master at 40 % {off.rms:F1} dBFS RMS");
-            Check(Mathf.Abs(off.rms - (on.rms - 6.02f)) < 2, "Master slider at half level lowers the mix by about 6 dB");
+            float drop = (float)(10 * Math.Log10(pFull / Math.Max(pHalf, 1e-30)));
+            Note($"meter: Master 40 % against 80 %, four pairs pooled: {drop:F1} dB lower (80 % peak {peakFull:F1} dBFS)");
+            Check(Mathf.Abs(drop - 6.02f) < 2, "Master slider at half level lowers the mix by about 6 dB");
             GameSettings.Music = 0.6f;
 
             Controls.Tap(Controls.Action.ThrottleCut);
