@@ -848,7 +848,7 @@ PR 3a depends on D1-D6 and D11. Each has a safe default, the recommendation, so 
 
 ## Phase 4: point defense and damage
 
-Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), the raider's model (4c, part 1) is built (#191), PR 4b is built (#192), and the rest of 4c (`pdc-fx`: the missile flares, the tracers, the kill and hit flashes and the 1× hold) is built (#193). D1-D15 below are agreed as recommended. The 4a, 4b and 4c build notes under the build plan list where the code goes past or differs from this text.
+Code read on `main` at e5f2c05. Paths are under `Assets/FogOfWar/Scripts/`. Status: PR 4a is built (#190), the raider's model (4c, part 1) is built (#191), PR 4b is built (#192), and the rest of 4c (`pdc-fx`: the missile flares, the tracers, the kill and hit flashes and the 1× hold) is built (#193). D1-D15 below are agreed as recommended. After play, D2 and D3 changed on 2026-10-09 (`missile-flight`): a missile starts at the raider's closing speed and burns 30 g for 10 km/s, and the kill roll takes its speed at impact. The 4a, 4b and 4c build notes under the build plan list where the code goes past or differs from this text.
 
 ### The rule
 
@@ -877,13 +877,15 @@ A light struct, not a `Ship` (`design-modes.md:162`). It lives in the `Encounter
 | Fire range `FireKm` | 2,000 km from the ship | [design] |
 | Salvo | 2 missiles. A new salvo only when the last one has resolved | [design] |
 | Magazine | 6 missiles a raider | [design] |
-| Closing speed V | 2 km/s against the ship | [design] |
-| Flight time | 2,000 / 2 = 1,000 s = 16.7 min from `FireKm` | [calc] |
+| Closing speed at launch s₀ | The raider's closing rate on the ship, −d\|r\|/dt, never under 0 (2026-10-09) | [design] |
+| Burn | 30 g (`MissileG`) until it has added 10 km/s (`MissileDvKms`): 34.0 s, 170 km from rest. Then it coasts at s₀ + 10 km/s (2026-10-09) | [design] |
+| Flight time from `FireKm` | At rest: 34.0 s + 1,830 km / 10 km/s = 217.0 s. Closing at 5 km/s: 34.0 s + 1,660 km / 15 km/s = 144.7 s | [calc] |
 | Jink | 20 g, random, until 200 m out; then straight to the hit | [design] |
 | Cross-section A | 0.5 m² (what a PDC round must hit to kill it) | [design] |
 
-- **The flight is in the ship's frame.** The missile keeps a position p relative to the ship. Each update moves it V·dt toward the ship. Its own 20 g covers the ship's thrust (5 g at most, `Rated(5)`). So the ship cannot outrun a missile once it is fired [calc].
-- **Impact** is the update where |p| ≤ V·dt. The approach direction is p̂ at that update. It goes into the ship's body frame through `ship.Att` (`Ship.cs:24`, render frame, `Ship.cs:15`).
+- **The flight is in the ship's frame.** The missile keeps a position p relative to the ship, its launch speed s₀ and its age. Each update moves it toward the ship by the closed form of its burn, then its coast, over dt. Its own 30 g covers the ship's thrust (5 g at most, `Rated(5)`). So the ship cannot outrun a missile once it is fired [calc].
+- **It starts at the raider's closing speed** (2026-10-09). Before, it flew at a fixed 2 km/s from the launch point, so a raider closing faster passed its own missiles. Now the missile closes at least as fast as the raider for its whole flight, unless the raider pulls more than 30 g. Only the closing rate carries over: the flight stays straight at the ship, so the side it comes in on is still the side it was fired from.
+- **Impact** is the update that holds the closed-form impact time. The approach direction is p̂ at that update. It goes into the ship's body frame through `ship.Att` (`Ship.cs:24`, render frame, `Ship.cs:15`).
 - **The raider fires** while the chase is on, the range is under `FireKm`, its magazine is not empty and no salvo is in flight. It needs no aim choice: what it hits depends on the aspect (see Damage).
 - **The chase ends, the missiles go.** `EndContact` and `DropContact` drop missiles in flight (`Career.Pirates.cs:367-387`). Docked, landed, patrol, lost, outrun and boarded all end the chase.
 - **Kzinti's lesson waits** (D13). A lit drive does not burn missiles in Phase 4.
@@ -916,7 +918,7 @@ A light struct, not a `Ship` (`design-modes.md:162`). It lives in the `Encounter
 | Spread at 20 g jink | 6.1 m at 500 m, 24.5 m at 1 km, 98 m at 2 km, 613 m at 5 km (plus r₀) | [calc] |
 
 - So a PDC is a weapon for the last 2 km, as the sketch said.
-- **No ammunition count in Phase 4** [design]. A pass takes 250 rounds a mount (2.5 s × 100) [calc]. Munitions become the money sink in Phase 5 (audit #4).
+- **No ammunition count in Phase 4** [design]. A pass takes 50 rounds a mount at 10 km/s (0.5 s × 100) [calc]. Munitions become the money sink in Phase 5 (audit #4).
 
 **The pass.** Do not simulate rounds. Use a kill rate λ = n × A / (π·r²). Then P_survive = exp(−∫λ dt) over the last 5 km.
 
@@ -924,16 +926,16 @@ A light struct, not a `Ship` (`design-modes.md:162`). It lives in the `Encounter
   - ∫ dx / (r₀ + c·x²)² = x / (2·r₀·(r₀ + c·x²)) + atan(x·√(c/r₀)) / (2·r₀·√(r₀·c)).
 - The jink runs from 5 km to 200 m. The last 200 m are straight, so r = r₀ there, and the integral is 200 / r₀².
 - With m mounts bearing, the exponent is m × n·A / (π·V) × (I_jink + I_straight).
-- One draw per missile, at impact. The pass takes 2.5 s, so the ship's attitude at impact stands for the whole pass [design].
+- One draw per missile, at impact, at its closing speed then (2026-10-09). The pass takes 0.5 s at 10 km/s, so the ship's attitude at impact stands for the whole pass [design].
 
-| Mounts bearing | P(kill) per missile, V = 2 km/s, 20 g jink | Of a 6-missile magazine, missiles through |
-|---|---|---|
-| 0 | 0 | 6 |
-| 1 | 0.42 | 3.5 |
-| 2 | 0.66 | 2.0 |
-| 3 | 0.80 | 1.2 |
+| Mounts bearing | P(kill), V = 2 km/s | P(kill), V = 10 km/s (raider at rest) | P(kill), V = 15 km/s (raider closing at 5) | Of a 6-missile magazine through, at 10 km/s |
+|---|---|---|---|---|
+| 0 | 0 | 0 | 0 | 6 |
+| 1 | 0.42 | 0.10 | 0.07 | 5.4 |
+| 2 | 0.66 | 0.19 | 0.13 | 4.8 |
+| 3 | 0.80 | 0.28 | 0.19 | 4.3 |
 
-[calc] The exponent per mount is 0.139 for the jink and 0.398 for the straight part, 0.537 in all. It is linear in n / V, so the rate and the speed are the tuning knobs.
+[calc] The exponent per mount is 0.139 for the jink and 0.398 for the straight part, 0.537 in all, at 2 km/s. It is linear in n / V, so the rate and the speed are the tuning knobs. At 10 km/s it is 0.107. The 20 g jink is unchanged.
 
 ### Damage: no hit points
 
@@ -980,7 +982,7 @@ A new slot, `Slot.Armor` [design]. It goes through `DryMass` (`ShipBuild.cs:121`
 | 4 mounts, light plating | 327 t | 0.949 | 1.529 | 4,772 km/s |
 | 6 mounts, heavy plating | 358 t | 0.896 | 1.397 | 4,438 km/s |
 
-- **Hits from a full magazine** [calc]: no PDCs and no armor, 6. Three mounts bearing, 1.2 through; with light plating 0.6, with heavy 0.24.
+- **Hits from a full magazine** [calc]: no PDCs and no armor, 6. Three mounts bearing at 10 km/s, 4.3 through; with light plating 2.2, with heavy 0.87. (At the old 2 km/s: 1.2, 0.6 and 0.24.)
 
 ### Repairs
 
@@ -999,14 +1001,14 @@ A new slot, `Slot.Armor` [design]. It goes through `DryMass` (`ShipBuild.cs:121`
 ### Time warp
 
 - **Missiles resolve in closed form at any warp.** The cap is for the eyes, not for the result.
-- The chase already caps warp at 100× inside 10,000 km (`Career.Pirates.cs:78,104`). So a 1,000 s flight is about 10 s of real time. That is time to turn the ship.
-- **1× for the last 20 s before an impact** [design], through `WarpCap` (`Career.Pirates.cs:97-106`) and `CapWarp`, before `simDt` is set. At 2 km/s the missile is then 40 km out [calc].
+- The chase already caps warp at 100× inside 10,000 km (`Career.Pirates.cs:78,104`). So a 217 s flight from rest is 2 s of real time to the hold, then 20 s at 1×. That is time to turn the ship.
+- **1× for the last 20 s before an impact** [design], through `WarpCap` (`Career.Pirates.cs:97-106`) and `CapWarp`, before `simDt` is set. At 10 km/s the missile is then 200 km out [calc].
 - A route call still drops to 1× (`Career.Route.cs:117`).
 
 ### What the player sees
 
 **Notes** (short, one line, as `Career.Pirates.cs:293-296` asks):
-- "Missiles: 2 fired, impact in 17 min"
+- "Missiles: 2 fired, impact in 4 min"
 - "PDCs killed a missile"
 - "Hit: drive, thrust 50 %" / "Hit: the plating took it" / "Hit: the hull took it"
 - "PDCs: the raider breaks off"
@@ -1019,8 +1021,8 @@ A new slot, `Slot.Armor` [design]. It goes through `DryMass` (`ShipBuild.cs:121`
 
 **In the scene** (4c):
 - **The raider gets a model.** It is a 5 px dot today (`OpenSystemScene.RaiderHud.cs:104-131`). At 2 km a 46 m hull spans 1.3° [calc], so a dot reads wrong. Use `CourierShip` from `Fleet.json` (45.6 m) [design]. No new art.
-- Missiles: a small flare and its 20 g plume.
-- Tracers from each bearing mount in the last 2.5 s. A kill flash or a hit flash.
+- Missiles: a small flare, and its 30 g plume while it burns.
+- Tracers from each bearing mount in the last 5 km (0.5 s at 10 km/s). A kill flash or a hit flash.
 
 ### Per-frame cost
 
@@ -1063,7 +1065,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
 - Adds: the missile struct and the raider's fire rule; the aspect hit table; the damage effects and floors; `Slot.Armor`; the Repair row; `CareerSave.damage`; the notes and rows in both shells; the combat rng; recorder fields.
 - Touches: `OpenWorld/Career.Pirates.cs` (fire, drop), new `OpenWorld/Career.Damage.cs`, `OpenWorld/ShipBuild.cs` (slot, catalog, stock picks), `OpenWorld/Career.cs` (`Apply`, save, cabin fail), `OpenWorld/Career.Yard.cs` (repair), `OpenWorld/Signature.cs`, `OpenWorld/Codex.cs`, `OpenWorld/Career.Heat.cs` (jam), `Scenes/OpenSystemScene.Yard.cs`, `.CareerHud.cs`, `.Recorder.cs`, new `CareerQA.Defense.cs`.
 - QA:
-  - A raider inside 2,000 km fires 2. The impact is 1,000 s ± one update later. A 6-missile magazine fires 3 salvos.
+  - A raider inside 2,000 km fires 2. The impact is 1,000 s ± one update later (216.9 s from 1,999 km since 2026-10-09: see the 4a notes). A 6-missile magazine fires 3 salvos.
   - The aspect table: 10,000 seeded hits per aspect land within 2 % of the weights.
   - Each effect: thrust 0.5 then 0.25, and a third drive hit stays 0.25; the tank vents 20 %; cargo and pay lose 20 %; a cabin hit fails the passenger job; sensors 0.5; jammed radiators are not dark-ready.
   - Light plating stops 50 % of 10,000 seeded hits, heavy 80 % (± 2 %).
@@ -1082,6 +1084,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - **Readers of the drive.** Damaged (the ship as it flies now): `Career.Thrust` and so `Apply`/`ship.Thrust`, `ship.AMax` (planner, trip card, `CatchNow`, `NearestPatrol`, the route's burn yardstick), `TopG`/`MaxG` (the drive-limit buttons), `AccelAt` (board trip lines, intercept checks) and the HUD's drive lines. As fitted: the yard's `ShipBuild` readouts, `YardTrip`, `ExpressReport` and the "Hard burn" feat (`Codex`, reads `Build.Thrust`). `Apply` only lowers the pilot's limit, so after a repair the pilot raises it again, as after carrying passengers.
   - **Readers of the sensors.** Damaged: `Codex.SensorRange` (scan range) and `Signature.SensorKm(level, factor)` from the traffic sense. As fitted: the yard's rows. The dwell speed (`Codex.ScanSeconds`, `Career.cs` survey dwell) does not change.
   - **Notes and events.** New `Happening.MissileFired` and `MissileHit`. "Hit: the plating took it" is a good (cyan) note. The Missiles row reads "2 inbound, impact in m:ss; n left aboard the raider" (4b adds the mounts that bear).
+  - **The flight (2026-10-09, `missile-flight`).** 4a flew each missile at a fixed `MissileKms` = 2 km/s from the raider's launch point. In play a Jackal fired, then flew past the ship before its missiles hit. Now `Missile` keeps `S0` (the closing speed at launch) and `Age`; the defaults are a missile fired from rest just now, so a missile made by hand still flies, and missiles are still not saved. `Fire` sets `S0` to the raider's closing rate on the ship, −r·v/\|r\|, clamped at 0 for a raider that opens the range. `Volley` steps each missile exactly over the update (`Missile.After`: the burn left, then the coast), so the result does not depend on the warp or the frame length; the hit lands on the update that holds the closed-form impact time (`Missile.ImpactInS`). The fired note, the Missiles row and the flare tag read that time. The row's time and bearing are the missile that hits first, not the nearest: two salvos (the dev menu's) can fly at different speeds. QA 17m-17o (`CareerQA.MissileFlight.cs`): a raider closing at 5 km/s fires at 1,999 km, the salvo hits on the 1 s update that holds 144.6 s at 15 km/s, and the raider stays out past it; a raider at rest at 2,000 km, at updates of a 1×, 100× and 1,000× frame, hits on the update that holds 217.0 s, ends the burn on the one that holds 34.0 s and coasts at 10 km/s; the kill roll's chance is `KillChance(m, V)` at the impact speed within 1e-7, at rest, mid-burn (100 km, 7.67 km/s) and closing (15 km/s). 17b's flights are now the 300 s update, its note "impact in 4 min".
   - **The classic Repair button** is read by `UiShots`' classic yard shot (docked at Earth), which runs only with `-fowclassicshots` (it needs a visible window). CareerQA reads the UI Toolkit row; the Missiles and Damage rows run in both shells.
 
 **PR 4b: `pdc`** (needs new art: no. The markers exist)
@@ -1103,7 +1106,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - **The PDC hit** takes the working mount whose zenith is nearest the approach, bearing or not; on a tie (the frigate's `PDC_1` and `PDC_4` share a zenith) the lower index. The note is "Hit: a PDC mount, n of m working". With no working mount it is the hull's.
   - **A refit that changes the hull** clears the dead mounts too: the new hull's fit mask differs. A save's mask is clamped to the fitted mounts.
   - **Notes and events.** New `Happening.MissileKilled` for "PDCs killed a missile", a good (cyan) note. The break-off reads "PDCs: the raider breaks off, back to <haven>", as the other break-offs do.
-  - **Rows.** The Missiles row ends "; n mounts bear" (the working mounts that bear on the nearest missile at the attitude now) only with mounts fitted, so a stock ship's row is 4a's. The Damage row says "n of m PDC mounts out". The yard's row is headed "PDCs"; a fit reads "2 PDC mounts, 6 t: one bearing kills 42 % of missiles".
+  - **Rows.** The Missiles row ends "; n mounts bear" (the working mounts that bear on the nearest missile at the attitude now) only with mounts fitted, so a stock ship's row is 4a's. The Damage row says "n of m PDC mounts out". The yard's row is headed "PDCs"; a fit reads "2 PDC mounts, 6 t: one bearing kills 10 % of missiles at 10 km/s". Since 2026-10-09 the kill roll takes the missile's closing speed at impact, so the row names its speed: 10 km/s, a missile from a raider at rest, the slowest a full burn ends. A raider closing at 5 km/s gives 15 km/s and 7 %. 17v's 10,000 strikes run at 10 km/s.
   - **Flight log.** `killed`, `bear_raider` and `bear_missile` next to the missile fields (with mounts fitted), `dmg_mounts` in the damage fields, and the missiles state adds "n killed".
 
 **PR 4c: `pdc-fx`** (needs new art: no. It reuses `CourierShip`)
@@ -1114,22 +1117,23 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
 - QA: the cap is 1× from 20 s before an impact and lifts after it. Screenshots in both shells: the raider at 2 km, a salvo in flight, tracers.
 - The player notices: the fight is on screen at 1×.
 - **Built (4c part 2 notes)** (`pdc-fx`). The missile flares, the tracers, the hit and kill flashes and the 1× hold.
-  - **The hold.** `Career.ImpactInS` is the nearest missile's |P| / `MissileKms`. `WarpCap` returns 1 when it is 20 s (`ImpactHoldS`) or less. The scene also ends a frame where the hold starts (`TickInner`), so no warp or frame time steps over it. Volley is unchanged, so the hit lands on the same update at any warp.
-  - **The warp comes back after the impact.** `CapWarp` keeps the warp the hold lowered and gives it back when the hold lifts, in the same chase. A `DropWarp`, a call card or the end of the chase cancels that. The text did not say; the raider fires again at once, and its next flight is up to 1,000 s.
-  - **The flares** (`Scenes/OpenSystemScene.Missiles.cs`). One holder per missile at `ship.Pos + P`, nose on the ship: an additive flare and a 100 m plume on the `Plume` shader. Under 14 px on screen the plume is drawn larger, and the flare is never under 4 px, so a missile reads at 40 km. While it is drawn larger, a 3 px dot and a tag ("Missile · 30 km · 15 s") in the Raiders' colour mark it. A salvo's two missiles fly on one line (4a), so they draw as one.
-  - **The tracers.** Each working mount that bears on a missile inside `EnvelopeKm` (5 km, the last 2.5 s) fires from its `PDC_n` marker on the hull model shown, with the bearing test the kill uses (`PointDefense.Bears`, `Hull.Mounts`, `WorkingMounts`). The rounds are dashes that stream at `RoundKms` on game time, one line mesh for all. They stop at the impact. They are a look only: the kill is still one draw at impact (`Career.Strike`).
-  - **The kill flash.** On `MissileKilled`, a short white pop where the missile was last drawn. The kill is drawn at impact, so at 1× that is one frame's flight (about 33 m) from the hull, not 2 km out. Moving it out would need the kill drawn earlier, which is 4b's rule.
+  - **The hold.** `Career.ImpactInS` is the least closed-form time to impact of the missiles in flight (`Missile.ImpactInS`, the burn left, then the coast; 2026-10-09, before that |P| / 2 km/s). `WarpCap` returns 1 when it is 20 s (`ImpactHoldS`) or less. The scene also ends a frame where the hold starts (`TickInner`), so no warp or frame time steps over it. `Volley` steps the same closed form, so the hit lands on the same update at any warp.
+  - **The warp comes back after the impact.** `CapWarp` keeps the warp the hold lowered and gives it back when the hold lifts, in the same chase. A `DropWarp`, a call card or the end of the chase cancels that. The text did not say; the raider fires again at once, and its next flight is up to 217 s (from rest at `FireKm`).
+  - **The flares** (`Scenes/OpenSystemScene.Missiles.cs`). One holder per missile at `ship.Pos + P`, nose on the ship: an additive flare and a 100 m plume on the `Plume` shader. The plume shows only while the missile burns, its first 34 s (2026-10-09); a coasting missile is the flare alone. Under 14 px on screen the plume is drawn larger, and the flare is never under 4 px, so a missile reads at the 200 km where the hold starts. While it is drawn larger, a 3 px dot and a tag ("Missile · 30 km · 3 s", the closed-form time) in the Raiders' colour mark it. A salvo's two missiles fly on one line (4a), so they draw as one.
+  - **The tracers.** Each working mount that bears on a missile inside `EnvelopeKm` (5 km, the last 0.5 s at 10 km/s) fires from its `PDC_n` marker on the hull model shown, with the bearing test the kill uses (`PointDefense.Bears`, `Hull.Mounts`, `WorkingMounts`). The rounds are dashes that stream at `RoundKms` on game time, one line mesh for all. They stop at the impact. They are a look only: the kill is still one draw at impact (`Career.Strike`).
+  - **The kill flash.** On `MissileKilled`, a short white pop where the missile was last drawn. The kill is drawn at impact, so at 1× that is one frame's flight (about 167 m at 10 km/s) from the hull, not 2 km out. Moving it out would need the kill drawn earlier, which is 4b's rule.
   - **The hit flash.** On `MissileHit`, and on the cabin hit's `JobFailed` "Hit:" note. It swells and fades at the hull on the side the missile came in on, over 0.6 s of real time, and is freed after.
   - Flares, tracers, materials and meshes are freed when the chase ends, and in `Teardown`. The recorder's missiles field adds "held 1×" during the hold.
   - QA 18a-18i in `CareerQA.MissileFx.cs`, after 17x-17z. The salvo is put in flight by hand, astern, with an empty magazine. 18a-18d run with no PDCs; 18g-18i with 6 mounts and a seeded combat rng, then with every mount dead. Shots of the salvo at 30 km and 1 km, the tracers, the kill and the hit, in both shells. The build and the damage the hits do are put back after.
+  - **Since 2026-10-09** 18a puts the salvo 2,000 km out from rest (217.0 s, at 1,000×) and 18b 250 km out (42.0 s, at 100×, the burn ending 80 km out inside the hold). Both check the plume against the burn every frame, on and off. 18b adds a shot of the salvo burning at the hold's start (`c18-salvo-burn`); the 30 km and 1 km shots now trigger on the range, and show a coasting missile. 18g-18i fly a coasting salvo at 10 km/s from 8 km, so the tracers run 0.5 s; the combat seed is 3.
 
 ### Decisions
 
 All are agreed as recommended.
 
 1. **[4a] D1. What shoots at the player in Phase 4.** Recommend: raiders fire disabling missiles. Alternatives: (a) PDCs only keep a boarder off, with no missiles and no damage (small, but damage waits for Phase 5); (b) a `-fowbattle` arena first (`design-modes.md`, B2), with career play unchanged until later.
-2. **[4a] D2. Missile numbers:** 2,000 km fire range, salvos of 2, a magazine of 6, 2 km/s closing, 20 g jink to 200 m. Recommend, and tune after play.
-3. **[4b] D3. PDC numbers:** 2 km/s rounds, 100 rounds/s, 0.5 m² target, 2 m floor, 100° arcs (a hemisphere and 10°), no hull blocking, no ammunition count. That gives 0.42, 0.66 and 0.80 for 1, 2 and 3 mounts. Recommend.
+2. **[4a] D2. Missile numbers:** 2,000 km fire range, salvos of 2, a magazine of 6, 2 km/s closing, 20 g jink to 200 m. Recommend, and tune after play. **Changed 2026-10-09 (after play):** a missile starts at the raider's closing speed at launch, then burns 30 g until it has added 10 km/s, then coasts. 217 s from `FireKm` at rest, 145 s for a raider closing at 5 km/s.
+3. **[4b] D3. PDC numbers:** 2 km/s rounds, 100 rounds/s, 0.5 m² target, 2 m floor, 100° arcs (a hemisphere and 10°), no hull blocking, no ammunition count. That gives 0.42, 0.66 and 0.80 for 1, 2 and 3 mounts at 2 km/s. Recommend. **Changed 2026-10-09:** the kill roll takes the missile's real closing speed at impact. That gives 0.10, 0.19 and 0.28 at 10 km/s, and 0.07, 0.13 and 0.19 at 15 km/s. The drop is intended.
 4. **[4b] D4. The PDC part:** 2, 4 or 6 mounts at 3 t and 30,000 cr each, 2 days, in each hull's own fit order (`Hull.MountFit`). Recommend. Alternative: one pick per marker (six yard rows).
 5. **[4a] D5. Armor:** a new slot. Light 15 t, 40,000 cr, stops 50 %; heavy 40 t, 100,000 cr, stops 80 %. No wear. Recommend.
 6. **[4a] D6. Damage effects:** the table above. The drive never goes below 25 %, so no hit strands the ship. The tank vents once, with no lasting leak (no new state). Recommend. Alternative: a leak that runs until a dock.

@@ -119,11 +119,13 @@ namespace FogOfWar
             // 19d: on the 10,000 km chase, outside FireKm with none in flight
             if (go) go = Guard("dev salvo", () =>
             {
-                double range = (e.Pirate.Pos - ship.Pos).Mag;
+                var r = e.Pirate.Pos - ship.Pos;
+                double range = r.Mag, closing = Math.Max(0, -D3.Dot(r, e.Pirate.Vel - ship.Vel) / range), flight = FlightS(closing, range);
                 int n = s.DevSalvo();
                 string note = Last();
-                Check(n == 2 && e.Missiles.Count == 2 && e.Magazine == 4 && Math.Abs(e.Missiles[0].P.Mag - range) < 1e-6 && note == Career.FiredNote(2, range / Career.MissileKms),
-                    $"dev 19d: a salvo at {range:N0} km: {n} fired, {e.Missiles.Count} inbound, {e.Magazine} aboard: \"{note}\"");
+                Check(n == 2 && e.Missiles.Count == 2 && e.Magazine == 4 && Math.Abs(e.Missiles[0].P.Mag - range) < 1e-6 && Math.Abs(e.Missiles[0].ImpactInS - flight) < 1e-6
+                      && note == Career.FiredNote(2, flight),
+                    $"dev 19d: a salvo at {range:N0} km, the raider closing at {closing:0.000} km/s: {n} fired, {e.Missiles.Count} inbound, {e.Magazine} aboard, impact in {e.Missiles[0].ImpactInS:0.0} s ({flight:0.0}): \"{note}\"");
                 Check(s.DevRefill() && e.Magazine == Career.MagazineSize && Last() == "Dev: the raider's magazine refilled (6)", $"dev 19d: refilled to {e.Magazine}");
                 n = s.DevSalvo();
                 Last();

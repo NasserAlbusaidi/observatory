@@ -4,8 +4,39 @@ using UnityEngine;
 namespace FogOfWar.OpenWorld
 {
     // A raider's missile (combat Phase 4a, docs/design-combat.md): a point in the ship's frame, km from the ship in the sim
-    // (ecliptic) frame. It lives in the Encounter, so the end of a chase drops it, and it is not saved.
-    public struct Missile { public D3 P; }
+    // (ecliptic) frame. It lives in the Encounter, so the end of a chase drops it, and it is not saved. It flies straight at
+    // the ship in that frame: from S0, the raider's closing speed when it fired, it burns at MissileG until it has added
+    // MissileDvKms, then coasts. Age is its seconds in flight. The defaults are a missile fired from rest just now.
+    public struct Missile
+    {
+        public D3 P;
+        public double S0, Age;
+
+        public bool Burning => Age < Career.BurnS;
+        // the closing speed t seconds on, km/s
+        public double KmsIn(double t) => S0 + Career.MissileA * Math.Min(Math.Max(0, Age + t), Career.BurnS);
+        public double Kms => KmsIn(0);
+
+        // km closed in the next t seconds: what is left of the burn, then the coast
+        public double ClosesIn(double t)
+        {
+            double burn = Math.Min(t, Math.Max(0, Career.BurnS - Age));
+            return Kms * t + Career.MissileA * burn * (t - 0.5 * burn);
+        }
+
+        // the seconds to close km; on the burn 2·km / (s + √(s² + 2·a·km)), which keeps its digits when s ≫ a·t
+        public double SecondsTo(double km)
+        {
+            if (!(km > 0)) return 0;
+            double a = Career.MissileA, s = Kms, burn = Math.Max(0, Career.BurnS - Age), onBurn = burn * (s + 0.5 * a * burn);
+            if (km <= onBurn) return 2 * km / (s + Math.Sqrt(s * s + 2 * a * km));
+            return burn + (km - onBurn) / (s + a * burn);
+        }
+
+        public double ImpactInS => SecondsTo(P.Mag);
+        // t seconds on, short of the ship
+        public Missile After(double t) => new Missile { P = P - P.Norm * ClosesIn(t), S0 = S0, Age = Age + t };
+    }
 
     // The hits not yet repaired (combat Phase 4a). Saved; a save made before it has none. Each count is capped at
     // Career.MaxHits on write, so the floor, the repair bill and the save agree.
@@ -20,14 +51,17 @@ namespace FogOfWar.OpenWorld
     }
 
     // Combat Phase 4a: raiders shoot to cripple, not to kill (D1). A raider closer than FireKm fires a salvo when none is
-    // in flight; each missile closes at MissileKms and hits on the update it would reach the ship. The plating rolls first,
-    // then the side it comes in on picks the system (the hit table). No hit points: a hit halves the drive or the sensors to a
-    // floor, vents water, takes cargo, fails a passenger job or jams the radiators out, and any dock repairs the parts for
-    // credits and days. The draws come from combatRng, so the route and board draws do not move (D10). 4b: before the
+    // in flight; each missile flies as Missile has it and hits on the update it would reach the ship. The plating rolls
+    // first, then the side it comes in on picks the system (the hit table). No hit points: a hit halves the drive or the
+    // sensors to a floor, vents water, takes cargo, fails a passenger job or jams the radiators out, and any dock repairs the
+    // parts for credits and days. The draws come from combatRng, so the route and board draws do not move (D10). 4b: before the
     // plating, the working PDC mounts that bear on the approach get one kill draw (PointDefense), and a PDC hit kills a mount.
     public partial class Career
     {
-        public const double FireKm = 2000, MissileKms = 2;   // [design] D2: fire range, closing speed: 1,000 s from FireKm
+        public const double FireKm = 2000;                   // [design] D2: fire range
+        public const double MissileG = 30, MissileDvKms = 10; // [design] D2 (2026-10-09): the burn, and the closing speed it adds
+        public const double MissileA = MissileG * Ship.G0;  // km/s²
+        public const double BurnS = MissileDvKms / MissileA;  // [calc] 34.0 s, 170 km from rest; from rest at FireKm 217 s
         public const int Salvo = 2, MagazineSize = 6;        // [design] D2
         public const int MaxHits = 2;                        // [design] D6: hits that count on the drive and the sensors
         public const double HitFactor = 0.5;                 // [design] D6: thrust or sensor range per hit; floor 0.25
@@ -82,13 +116,13 @@ namespace FogOfWar.OpenWorld
         void Volley(Encounter e, Ship ship, double simDt)
         {
             if (!(simDt > 0)) return;
-            double step = MissileKms * simDt;
             for (int i = 0; i < e.Missiles.Count;)
             {
-                var p = e.Missiles[i].P;
-                if (p.Mag > step) { e.Missiles[i] = new Missile { P = p - p.Norm * step }; i++; continue; }
+                var m = e.Missiles[i];
+                double t = m.ImpactInS;
+                if (t > simDt) { e.Missiles[i] = m.After(simDt); i++; continue; }
                 e.Missiles.RemoveAt(i);
-                if (Strike(ship, p)) e.Killed++;
+                if (Strike(ship, m.P, m.KmsIn(t))) e.Killed++;
             }
             if (e.Missiles.Count > 0 || e.Magazine <= 0 || !(e.Range < FireKm) || !Active.Contains(e.Job)) return;
             Fire(e, ship);
@@ -101,18 +135,21 @@ namespace FogOfWar.OpenWorld
             if (n <= 0) return 0;
             e.Magazine -= n;
             var from = e.Pirate.Pos - ship.Pos;
-            for (int i = 0; i < n; i++) e.Missiles.Add(new Missile { P = from });
-            Say(Happening.MissileFired, FiredNote(n, from.Mag / MissileKms), false);
+            double r = from.Mag;
+            // [design] the raider's closing rate on the ship, −d|r|/dt; a raider opening the range gives 0
+            var m = new Missile { P = from, S0 = r > 0 ? Math.Max(0, -D3.Dot(from, e.Pirate.Vel - ship.Vel) / r) : 0 };
+            for (int i = 0; i < n; i++) e.Missiles.Add(m);
+            Say(Happening.MissileFired, FiredNote(n, m.ImpactInS), false);
             return n;
         }
 
-        // One missile at the ship from direction `from`: the PDCs, the plating, then the aspect's system. True when the PDCs
-        // killed it. No kill draw with no mount bearing, so a ship without PDCs draws as it did in 4a.
-        internal bool Strike(Ship ship, D3 from)
+        // One missile at the ship from direction `from`, closing at kms: the PDCs, the plating, then the aspect's system. True
+        // when the PDCs killed it. No kill draw with no mount bearing, so a ship without PDCs draws as it did in 4a.
+        internal bool Strike(Ship ship, D3 from, double kms)
         {
             var body = ToBody(ship, from);
             int m = PointDefense.Bearing(Build.Hull, WorkingMounts, body);
-            if (m > 0 && PointDefense.Kills(combatRng, m, MissileKms)) { Say(Happening.MissileKilled, KillNote); return true; }
+            if (m > 0 && PointDefense.Kills(combatRng, m, kms)) { Say(Happening.MissileKilled, KillNote); return true; }
             if (combatRng.NextDouble() < Build.ArmorStop) { Say(Happening.MissileHit, PlatingNote); return false; }
             Hit(ship, SystemFor(AspectOf(body), combatRng.NextDouble()), body);
             return false;

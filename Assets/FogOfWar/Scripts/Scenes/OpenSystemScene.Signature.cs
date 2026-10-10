@@ -59,13 +59,13 @@ namespace FogOfWar
                 list.Add(holds ? new Readout("Raider track", "it has your track", Tone.Bad)
                                        : new Readout("Raider track", $"it loses you in {Math.Floor(Math.Max(0, lose) / 60):0}:{Math.Floor(Math.Max(0, lose) % 60):00} if you stay dark", Tone.Cold));
             }
-            // combat 4a: the salvo in flight (it closes at MissileKms, so the nearest hits first) and what the hits have taken;
-            // 4b: the working mounts that bear on the nearest, with any fitted
+            // combat 4a: the salvo in flight, the time to the first impact (two salvos can fly at different speeds, so the
+            // nearest may not hit first) and what the hits have taken; 4b: the working mounts that bear on that missile
             if (career?.Encounter is Encounter en && en.Missiles.Count > 0)
             {
                 var near = en.Missiles[0].P;
-                foreach (var m in en.Missiles) if (m.P.Mag < near.Mag) near = m.P;
-                double t = near.Mag / Career.MissileKms;
+                double t = double.PositiveInfinity;
+                foreach (var m in en.Missiles) if (m.ImpactInS < t) { t = m.ImpactInS; near = m.P; }
                 list.Add(new Readout("Missiles", $"{en.Missiles.Count} inbound, impact in {Math.Floor(t / 60):0}:{Math.Floor(t % 60):00}; {en.Magazine} left aboard the raider" +
                                                  (career.Build.MountCount > 0 ? "; " + Career.BearText(career.MountsBearing(ship, near)) : ""), Tone.Bad));
             }

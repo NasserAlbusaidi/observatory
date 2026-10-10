@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using FogOfWar.OpenWorld;
 using UnityEngine;
 using UIE = UnityEngine.UIElements;
@@ -34,6 +33,9 @@ namespace FogOfWar
             {
                 Guard("defense table", DefenseTableChecks);
                 Guard("defense fire", () => DefenseFireChecks(qs));
+                Guard("missile flight chase", () => MissileChaseChecks(qs)); // 17m-17o: CareerQA.MissileFlight.cs
+                Guard("missile flight warps", () => MissileWarpChecks(qs));
+                Guard("missile flight kill", () => MissileKillChecks(qs));
                 Guard("defense aspect", () => DefenseAspectChecks(qs));
                 Guard("defense plating", () => DefensePlatingChecks(qs));
                 Guard("defense effects", () => DefenseEffectChecks(qs));
@@ -70,9 +72,11 @@ namespace FogOfWar
             bool shape = Career.HitWeights.Length == 3 && Array.TrueForAll(Career.HitWeights, r => r.Length == systems);
             Check(shape && sums.TrueForAll(t => t == 100) && Career.HitWeights[0][(int)Career.HitSystem.Drive] == 0 && Career.HitWeights[2][(int)Career.HitSystem.Drive] == 60,
                 $"defense 17a: the hit table has 3 aspects of {systems} systems ({shape}), rows sum to {string.Join(", ", sums)} (100 each); drive fore {Career.HitWeights[0][0]} % (0), aft {Career.HitWeights[2][0]} % (60)");
-            Check(Career.FireKm == 2000 && Career.MissileKms == 2 && Career.Salvo == 2 && Career.MagazineSize == 6 && Career.MaxHits == 2 && Career.HitFactor == 0.5
-                  && Career.VentShare == 0.2 && Career.HoldShare == 0.2 && Career.RepairShare == 0.25 && Career.FireKm / Career.MissileKms == 1000,
-                $"defense 17a: fire {Career.FireKm:N0} km, {Career.MissileKms} km/s ({Career.FireKm / Career.MissileKms:N0} s from the fire range), salvo {Career.Salvo}, magazine {Career.MagazineSize}, {Career.MaxHits} hits at ×{Career.HitFactor}, vent {Career.VentShare}, hold {Career.HoldShare}, repair {Career.RepairShare}");
+            double fromRest = FlightS(0, Career.FireKm);
+            Check(Career.FireKm == 2000 && Career.MissileG == 30 && Career.MissileDvKms == 10 && Near(Career.BurnS, 33.99, 0.01) && Near(fromRest, 217.0, 0.05)
+                  && Career.Salvo == 2 && Career.MagazineSize == 6 && Career.MaxHits == 2 && Career.HitFactor == 0.5
+                  && Career.VentShare == 0.2 && Career.HoldShare == 0.2 && Career.RepairShare == 0.25,
+                $"defense 17a: fire {Career.FireKm:N0} km, {Career.MissileG} g to add {Career.MissileDvKms} km/s ({Career.BurnS:0.00} s, 33.99; from rest {fromRest:0.000} s from the fire range, 217.0), salvo {Career.Salvo}, magazine {Career.MagazineSize}, {Career.MaxHits} hits at ×{Career.HitFactor}, vent {Career.VentShare}, hold {Career.HoldShare}, repair {Career.RepairShare}");
             var armor = ShipBuild.Catalog[(int)Slot.Armor];
             string rows = string.Join("; ", Array.ConvertAll(armor, m => $"{m.Name} {m.Mass} t {m.Price:N0} cr {m.RefitDays} d stops {m.Size}"));
             Check((int)Slot.Armor == 6 && armor.Length == 3 && armor[0].Name == "No armor" && armor[0].Mass == 0 && armor[0].Price == 0 && armor[0].RefitDays == 0.5 && armor[0].Size == 0
@@ -87,8 +91,9 @@ namespace FogOfWar
                 $"defense 17a: light plating {light.DryMass} t dry, {light.GFull:0.000} g full, {light.GEmpty:0.000} empty, {light.DvFull:N0} km/s (315, 0.971, 1.587, 4,916); heavy {heavy.DryMass} t, {heavy.GFull:0.000}, {heavy.GEmpty:0.000}, {heavy.DvFull:N0} (340, 0.926, 1.471, 4,626)");
         }
 
-        // 17b: a raider just outside FireKm holds fire; inside, a salvo of 2 that hits 1,000 s later (± one 100 s update); a
-        // new salvo only when the last has resolved; 6 missiles are 3 salvos; the call card names the missiles
+        // 17b: a raider just outside FireKm holds fire; inside, at rest, a salvo of 2 that hits on the 100 s update that holds
+        // the closed form's 216.9 s; a new salvo only when the last has resolved; 6 missiles are 3 salvos; the call card names
+        // the missiles
         void DefenseFireChecks(SolarSystem qs)
         {
             var (_, at, vel) = Belt(qs);
@@ -113,16 +118,17 @@ namespace FogOfWar
                 }
                 var flights = new List<string>();
                 bool timed = hits.Count == 3 && fires.Count == 3;
+                double want = FlightS(0, 1999);
                 for (int i = 0; i < Math.Min(fires.Count, hits.Count); i++)
                 {
                     double s = (hits[i] - fires[i]) * 86400;
                     flights.Add($"{s:F0}");
-                    timed &= Math.Abs(s - 999.5) <= 100 + 1e-6;
+                    timed &= s >= want - 1e-3 && s < want + 100;
                 }
                 string note = b.Said.Find(s => s.Text.StartsWith("Missiles:")).Text;
                 int hitNotes = b.Said.FindAll(s => s.What == Career.Happening.MissileHit || (s.What == Career.Happening.JobFailed && s.Text.StartsWith("Hit:"))).Count;
-                Check(outside == 0 && timed && inFlight == 2 && e.Magazine == 0 && hitNotes == 6 && note == "Missiles: 2 fired, impact in 17 min" && b.C.Encounter == e,
-                    $"defense 17b: at 2,001 km the raider holds fire ({outside} in flight, 0); at 1,999 km it fires {fires.Count} salvos (3) of {inFlight} (2), each hitting {string.Join(", ", flights)} s after it fired (999.5 ± one 100 s update); " +
+                Check(outside == 0 && timed && inFlight == 2 && e.Magazine == 0 && hitNotes == 6 && note == "Missiles: 2 fired, impact in 4 min" && b.C.Encounter == e,
+                    $"defense 17b: at 2,001 km the raider holds fire ({outside} in flight, 0); at 1,999 km it fires {fires.Count} salvos (3) of {inFlight} (2), each hitting {string.Join(", ", flights)} s after it fired (the update that holds {want:0.0} s: 300); " +
                     $"magazine left {e.Magazine} (0), hit notes {hitNotes} (6), {during} updates with missiles in flight; first note \"{note}\"");
             }
             finally { b.C.DropContact(); }
@@ -193,7 +199,7 @@ namespace FogOfWar
                 b.C.SeedCombat(77);
                 var from = new D3(0.6, 0.0, 0.8);
                 b.Ship.Att = Quaternion.LookRotation(Frame.U(noseOn ? from : -from), Vector3.up);
-                for (int i = 0; i < 1000; i++) b.C.Strike(b.Ship, from * 1.5);
+                for (int i = 0; i < 1000; i++) b.C.Strike(b.Ship, from * 1.5, Career.MissileDvKms);
                 int drive = SaidCount(b, "Hit: drive"), sensors = SaidCount(b, "Hit: sensors"), hold = SaidCount(b, "Hit: hold"), tank = SaidCount(b, "Hit: tank");
                 Check(noseOn ? drive == 0 && sensors > 200 && hold > 100 : sensors == 0 && hold == 0 && drive > 500,
                     $"defense 17c: 1,000 strikes with the {(noseOn ? "nose" : "tail")} on the raider: drive {drive}, sensors {sensors}, hold {hold}, tank {tank} hits ({(noseOn ? "no drive; sensors near 300, hold near 200" : "no sensors or hold; drive near 600")})");
@@ -210,7 +216,7 @@ namespace FogOfWar
                 b.C.Build.pick[(int)Slot.Armor] = pick;
                 b.C.Apply(b.Ship);
                 b.C.SeedCombat(9000 + pick);
-                for (int i = 0; i < 10000; i++) b.C.Strike(b.Ship, new D3(1, 0, 0));
+                for (int i = 0; i < 10000; i++) b.C.Strike(b.Ship, new D3(1, 0, 0), Career.MissileDvKms);
                 int stopped = SaidCount(b, Career.PlatingNote);
                 double pct = stopped / 100.0;
                 Check(Math.Abs(pct - want) <= 2, $"defense 17d: {b.C.Build[Slot.Armor].Name} stops {stopped:N0} of 10,000 seeded hits: {pct:0.00} % ({want} ± 2)");
@@ -421,7 +427,7 @@ namespace FogOfWar
                     if (fight)
                     {
                         x.C.SeedCombat(3);
-                        for (int i = 0; i < 1000; i++) x.C.Strike(x.Ship, new D3(0, 1, 0));
+                        for (int i = 0; i < 1000; i++) x.C.Strike(x.Ship, new D3(0, 1, 0), Career.MissileDvKms);
                         x.C.Damage = new ShipDamage { drive = 2, sensors = 2 };
                     }
                     x.C.Tick(qs, x.Ship, x.Jd, 0);
@@ -494,9 +500,11 @@ namespace FogOfWar
             {
                 var rows = SigRows();
                 string m = SigVal(rows, "Missiles");
-                bool shape = Regex.IsMatch(m, @"^2 inbound, impact in 16:[0-5]\d; 4 left aboard the raider$");
+                // fired from rest at the first update: 216.9 s, less the frames since
+                double t = career.ImpactInS, from = FlightS(0, 1999);
+                bool shape = m == $"2 inbound, impact in {Math.Floor(t / 60):0}:{Math.Floor(t % 60):00}; 4 left aboard the raider" && t <= from && t > from - 1;
                 Check(e.Missiles.Count == 2 && shape && SigTone(rows, "Missiles") == Tone.Bad && SigAt(rows, "Damage") < 0,
-                    $"defense 17k: in the scene a raider 1,999 km off fired {e.Missiles.Count} (2): Missiles row \"{m}\" (2 inbound, impact in 16:xx; 4 left), {SigTone(rows, "Missiles")} (Bad); no Damage row yet ({SigVal(rows, "Damage")})");
+                    $"defense 17k: in the scene a raider 1,999 km off fired {e.Missiles.Count} (2): Missiles row \"{m}\" (2 inbound, impact in {t:0.00} s as m:ss, within 1 s under {from:0.00}; 4 left), {SigTone(rows, "Missiles")} (Bad); no Damage row yet ({SigVal(rows, "Damage")})");
                 var sigM = s.GetType().GetMethod("JobsSignature", F);
                 string sig0 = (string)sigM.Invoke(s, null);
                 career.Hit(ship, Career.HitSystem.Drive);

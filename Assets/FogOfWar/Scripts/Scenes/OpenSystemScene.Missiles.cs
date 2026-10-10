@@ -5,14 +5,14 @@ using UnityEngine;
 
 namespace FogOfWar
 {
-    // A raider's missiles on screen (combat 4c, docs/design-combat.md "In the scene"): each one in flight as a flare and its
-    // 20 g plume, nose on the ship, a dot and tag in the Raiders' colour while it is too small to see; tracers from the PDC
+    // A raider's missiles on screen (combat 4c, docs/design-combat.md "In the scene"): each one in flight as a flare and, while
+    // it burns, its 30 g plume, nose on the ship, a dot and tag in the Raiders' colour while it is too small to see; tracers from the PDC
     // mounts that bear on it in its last 5 km; a flash at the hull when one hits, and at the missile when the PDCs kill it.
     // Drawn only: the flight, the kill and the hit are Career.Volley's, at any warp.
     public partial class OpenSystemScene
     {
-        // [design] the look, in km: no model, the drive's light. A 20 g torch's plume many bodies long; under MissilePx the
-        // whole of it is drawn larger, so it reads at the 40 km where the 1× hold starts (100 m there is 2 px)
+        // [design] the look, in km: no model, the drive's light. A 30 g torch's plume many bodies long; under MissilePx the
+        // whole of it is drawn larger, so it reads at the 200 km where the 1× hold starts at 10 km/s (100 m there is 0.5 px)
         const float MissileFlareKm = 0.004f, MissilePlumeKm = 0.1f, MissilePlumeW = 0.006f;
         const float MissilePx = 14, MissileFlarePx = 4; // the plume's least length, and the flare's least width, on screen
 
@@ -64,6 +64,7 @@ namespace FogOfWar
                 var P = e.Missiles[i].P;
                 if (P.Mag < near) { near = P.Mag; missileLast = P; }
                 var t = missileT[i];
+                t.GetChild(1).gameObject.SetActive(e.Missiles[i].Burning);
                 t.localPosition = Map(ship.Pos + P, out double k);
                 if (P.Sqr > 1e-18) t.localRotation = Quaternion.LookRotation(Frame.U(-P.Norm));
                 float dist = Mathf.Max(t.localPosition.magnitude, 1e-6f);
@@ -112,7 +113,7 @@ namespace FogOfWar
             string shown = "";
             for (int i = 0; i < e.Missiles.Count; i++)
             {
-                var P = e.Missiles[i].P;
+                var M = e.Missiles[i];
                 var t = missileT[i];
                 var p = t.localPosition;
                 float dist = p.magnitude;
@@ -130,7 +131,7 @@ namespace FogOfWar
                 missileDots++;
                 if (tags.Exists(x => (x - g).magnitude < 12)) { shown += " dot;"; continue; }
                 tags.Add(g);
-                string tag = $"Missile · {Km(P.Mag)} · {Math.Ceiling(P.Mag / Career.MissileKms):0} s";
+                string tag = $"Missile · {Km(M.P.Mag)} · {Math.Ceiling(M.ImpactInS):0} s";
                 GUI.Label(new Rect(g.x + 5, g.y - 8, raiderStyle.CalcSize(new GUIContent(tag)).x, 16), tag, raiderStyle);
                 shown += " " + tag + ";";
             }
@@ -152,7 +153,7 @@ namespace FogOfWar
         // review checks: the tracers drawn last, as (mount, from, to) in the root's frame
         readonly List<(int mount, Vector3 from, Vector3 to)> tracers = new List<(int, Vector3, Vector3)>();
 
-        // Each working mount that bears on a missile in its last EnvelopeKm (the 2.5 s the pass takes) fires at it from its
+        // Each working mount that bears on a missile in its last EnvelopeKm (0.5 s at 10 km/s) fires at it from its
         // PDC_n marker. Only a look: the kill is one draw at impact (Career.Strike), on the bearing then.
         void LateTracers(Encounter e)
         {
@@ -224,7 +225,7 @@ namespace FogOfWar
         readonly Flash killFlash = new Flash { Name = "Missile kill", Seconds = 0.35f, Km = 0.01f, Colour = new Color(1.8f, 1.9f, 2.2f) };
 
         // Career.OnEvent: a hit (a cabin hit says JobFailed, with the same "Hit:" lead) at the hull on the side it came in on;
-        // a kill where the missile was last drawn: the kill is drawn at impact, so at 1× that is one frame's flight (33 m) out
+        // a kill where the missile was last drawn: the kill is drawn at impact, so at 1× that is one frame's flight (167 m at 10 km/s) out
         void MissileEvent(Career.Happening what, string text)
         {
             var dir = missileLast.Sqr > 1e-18 ? missileLast.Norm : -ship.Heading;

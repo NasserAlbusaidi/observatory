@@ -28,7 +28,7 @@ namespace FogOfWar
                 : s == Slot.Sensors ? m.Name + (m.Size > 0 ? ": ×2 scan and contact range, ½ scan time" : "")
                 : s == Slot.Radiators ? m.Name + (m.Size < 1 ? $", {m.Mass:0.#} t: stowed after a burn, cold at {Km(Signature.RangeKm(0, Signature.StockKm, Signature.ColdW(m.Size * (yardDraft ?? career.Build).Hull.Facet)))}" : ": always out")
                 : s == Slot.Armor ? m.Name + (m.Size > 0 ? $", {m.Mass:0.#} t: stops {m.Size * 100:0} % of missile hits" : "")
-                : s == Slot.PointDefense ? m.Name + (m.Size > 0 ? $", {m.Mass:0.#} t: one bearing kills {PointDefense.KillChance(1, Career.MissileKms) * 100:0} % of missiles" : "")
+                : s == Slot.PointDefense ? m.Name + (m.Size > 0 ? $", {m.Mass:0.#} t: one bearing kills {PointDefense.KillChance(1, Career.MissileDvKms) * 100:0} % of missiles at {Career.MissileDvKms:0} km/s" : "")
                 : m.Name + (m.Mass > 0 ? $", {m.Mass:0.#} t" : "");
             return what + (career.Build.pick[(int)s] == i ? " (fitted)" : "");
         }

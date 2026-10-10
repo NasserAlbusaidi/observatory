@@ -36,11 +36,11 @@ namespace FogOfWar.OpenWorld
         // one mount's exponent for a whole pass: 0.139 jink + 0.398 straight = 0.537 at 2 km/s [calc]
         public static double Exponent(double closingKms) => PerIntegral(closingKms) * (JinkIntegral + StraightIntegral);
 
-        // 0.42, 0.66 and 0.80 for 1, 2 and 3 mounts at 2 km/s [calc]
+        // 0.42, 0.66 and 0.80 for 1, 2 and 3 mounts at 2 km/s; 0.10, 0.19 and 0.28 at 10 km/s, a missile's coast from rest [calc]
         public static double KillChance(int mountsBearing, double closingKms) =>
             mountsBearing <= 0 ? 0 : 1 - Math.Exp(-mountsBearing * Exponent(closingKms));
 
-        // the one draw a missile gets, at impact: the pass takes 2.5 s, so the attitude then stands for all of it [design]
+        // the one draw a missile gets, at impact: the pass takes 0.5 s at 10 km/s, so the attitude then stands for all of it [design]
         public static bool Kills(System.Random rng, int mountsBearing, double closingKms) => rng.NextDouble() < KillChance(mountsBearing, closingKms);
 
         // A mount covers ArcDeg about its zenith; the hull blocks nothing [design]. 10° past the hemisphere, so a missile dead
