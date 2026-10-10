@@ -1269,6 +1269,48 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. E
 
 Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
 
+## Impact effects (added 2026-10-10)
+
+A look only: no rule, number or draw in `Career` changes. It replaces 4c's hit flash and builds on it, so Phase 5's hits on a raider use the same parts.
+
+### The rule
+
+Every effect follows from a hit in vacuum. No air, so no fireball, smoke, shockwave or drag. Hot matter glows as a blackbody and cools. Debris flies straight and keeps its spin and the ship's velocity. The Sun is the one fill light.
+
+### The hit
+
+A raider missile hits at 10 km/s or more (Phase 4). No warhead is needed: the kinetic energy is 12 times that of TNT, per kilogram.
+
+| Item | Value | Tag |
+|---|---|---|
+| Missile mass m | 100 kg | [design] |
+| Speed V | The missile's closing speed at impact (`Missile.Kms`) | [code] |
+| Energy E = ½·m·V² | 5.0 GJ at 10 km/s, 11.3 GJ at 15 km/s | [calc] |
+| Radiated fraction η | 1 %. Lunar impact flashes give about 0.1 % in visible light; a metal-on-metal hit is hotter | [design] |
+| Start temperature T₀ | 6,000 K: metal vapour and melt | [design] |
+| Cooling | Radiative, dT/dt ∝ −T⁴, so T = T₀·(1 + t/τ)^(−1/3). τ = 1/63 s puts it at 1,500 K (dull red) at 1 s | [design] |
+| Power L(t) = L₀·(T/T₀)⁴ | L₀ = η·E / 3τ = 1.05 GW at 10 km/s (∫L dt = η·E) | [calc] |
+| Light on the hull at the first frame | 610 × full sunlight at 10 m, 90 × at 26 m (half the hull) | [calc] |
+| Light after 0.1 s | 7 % of L₀ at 3,100 K, of which less reaches the eye: the visible share of a blackbody falls as it cools | [calc] |
+
+- **Where.** The hit is on the hull surface: a ray along the approach direction, against the hull mesh. It was a point half a hull length out from the centre, which on a broadside hit is in space.
+- **The light.** A point light at the hit, lighting the hull through `ShipPBR` like the plume (`_FOWFlashPos`, `_FOWFlashCol`), colour from Planck's law (`BlackHoleScene.PlanckColor`), visible power from the same spectrum.
+- **The eye.** The exposure meter counts the flash. The frame whites out, then the eye closes over 0.35 s while the glow fades to orange, so the hull reads dark for a moment after.
+- **The core.** The glowing spot itself, a few metres across, takes the same colour and brightness.
+- **The kill flash** is a PDC round on the missile, a much smaller energy. It stays as 4c built it until fx-2 adds its debris.
+- **Momentum (not in fx-1).** 100 kg at 10 km/s gives a 300 t ship 3.3 m/s [calc]. That changes the flight, so it needs its own decision.
+
+### Build plan
+
+| PR | Adds | Needs |
+|---|---|---|
+| fx-1 `impact-fx` | The hit point on the hull, the flash as a light with blackbody colour and cooling, the exposure kick | — |
+| fx-2 | GPU sparks (a compute shader, indirect draw): ejecta from the hit, back along the approach, cooling as blackbodies; the kill's debris cloud | fx-1 |
+| fx-3 | Hull scars: a damage mask in the hull's UV space. Glowing edges cool. Scars stay until the yard repairs them | fx-1 |
+| fx-4 | Venting: a tank hit makes a water-ice plume, lit only by the Sun; a cabin hit makes a short air burst | fx-2 |
+
+Each PR passes `-fowcareer` with 0 FAIL in both shells and adds shots to `CareerQA.MissileFx`.
+
 ## Phase 6: the hull ladder
 
 Ordered by size. Your list put the destroyer first.

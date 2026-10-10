@@ -13,6 +13,7 @@ namespace FogOfWar.OpenWorld
     //   _FOWShineCol   planetshine irradiance at the ship, linear RGB, same units as _FOWSunIrr
     //   _FOWExposure   camera exposure, adapting toward 1 / (light on the ship), within ExposureMin..ExposureMax
     //   _FOWPlumePos/_FOWPlumeCol  the drive plume as a point light, zero while the drive is off
+    //   _FOWFlashPos/_FOWFlashCol  an impact flash as a point light (SetFlash), zero without one
     // and renders a self-shadow map of the hull along the sunlight (_ShipShadowTex, _ShipShadowMatrix).
     // Every other scene sees the neutral values from ResetGlobals().
     public class ShipLighting : IDisposable
@@ -31,7 +32,8 @@ namespace FogOfWar.OpenWorld
             idShineDir = Shader.PropertyToID("_FOWShineDir"), idShineCol = Shader.PropertyToID("_FOWShineCol"),
             idExposure = Shader.PropertyToID("_FOWExposure"), idPlumePos = Shader.PropertyToID("_FOWPlumePos"),
             idPlumeCol = Shader.PropertyToID("_FOWPlumeCol"), idShadowTex = Shader.PropertyToID("_ShipShadowTex"),
-            idShadowMatrix = Shader.PropertyToID("_ShipShadowMatrix"), idShadowParams = Shader.PropertyToID("_ShipShadowParams");
+            idShadowMatrix = Shader.PropertyToID("_ShipShadowMatrix"), idShadowParams = Shader.PropertyToID("_ShipShadowParams"),
+            idFlashPos = Shader.PropertyToID("_FOWFlashPos"), idFlashCol = Shader.PropertyToID("_FOWFlashCol");
 
         Renderer[] hull;
         readonly Material depthMat;
@@ -75,6 +77,7 @@ namespace FogOfWar.OpenWorld
             idFloodCol = Shader.PropertyToID("_FOWFloodCol");
         readonly Vector4[] floodPos = new Vector4[4], floodDir = new Vector4[4];
         public Vector3 Shine { get; private set; }
+        float flashMeter;       // the last flash's light at the hull's middle, for the meter
 
         public ShipLighting(Renderer[] hullRenderers)
         {
@@ -146,6 +149,7 @@ namespace FogOfWar.OpenWorld
             Shader.SetGlobalVector(idPlumeCol, Vector4.zero);
             Shader.SetGlobalVector(idShadowParams, Vector4.zero);
             Shader.SetGlobalVector(idFloodCol, Vector4.zero);
+            Shader.SetGlobalVector(idFlashCol, Vector4.zero);
             StarGlare.Reset();
         }
 
@@ -166,7 +170,7 @@ namespace FogOfWar.OpenWorld
             float shineLum = Vector3.Dot(Shine, new Vector3(0.2126f, 0.7152f, 0.0722f));
             // the floodlights meter like any other light on the hull (about their irradiance at 10 m)
             float floodLum = Floods ? FloodColour.grayscale : 0f;
-            float key = Mathf.Max(SunIrr * (1 - Eclipse) + floodLum, shineLum, SunIrr / EclipseHeadroom);
+            float key = Mathf.Max(SunIrr * (1 - Eclipse) + floodLum + flashMeter, shineLum, SunIrr / EclipseHeadroom);
             float target = Mathf.Log(Mathf.Clamp(1f / Mathf.Max(key, 1e-6f), ExposureMin, ExposureMax), 2f);
             if (float.IsNaN(ev)) ev = target;
             // the eye opens up slowly in the dark and closes quickly in the light
@@ -193,6 +197,19 @@ namespace FogOfWar.OpenWorld
 
             SetFloods(shipT, shipRenderLen);
             RenderShadow(Frame.U(toSun.Norm), shipT.position, shipRenderLen);
+        }
+
+        // An impact flash this frame (docs/design-combat.md "Impact effects"): a point light at `pos` (render space), `irr10`
+        // its light 10 m away in sunlight-at-1-AU units (linear RGB, visible only). `metreRender` is 1 m in render units.
+        // The meter reads it at the hull's middle, half a hull away, on the next Update. Off with irr10 = black.
+        public void SetFlash(Vector3 pos, Color irr10, float metreRender)
+        {
+            float lum = irr10.grayscale;
+            if (lum <= 0) { flashMeter = 0; Shader.SetGlobalVector(idFlashCol, Vector4.zero); return; }
+            float half = Mathf.Max(LengthM * 0.5f, FloodRefM);
+            flashMeter = lum * (FloodRefM / half) * (FloodRefM / half);
+            Shader.SetGlobalVector(idFlashPos, new Vector4(pos.x, pos.y, pos.z, FloodRefM * metreRender));
+            Shader.SetGlobalVector(idFlashCol, new Vector4(irr10.r, irr10.g, irr10.b, 1));
         }
 
         // Mount points are in the model frame; shipT has the nose on +Z, up on +Y and its origin at the hull's middle

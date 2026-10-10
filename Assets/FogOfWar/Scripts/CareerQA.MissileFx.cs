@@ -18,7 +18,8 @@ namespace FogOfWar
     // a working mount that bears, none after the impact, none with every mount dead; 18h each from its PDC_n marker to the
     // missile; 18i a kill flash at the missile on MissileKilled. 18e nothing left once the chase ends; 18f the damage the hits
     // did and the build are undone. Shots of the salvo burning at the hold's start, coasting at 30 km and 1 km, the tracers,
-    // the kill and the hit, in both shells. The scene is put back at the end, after a failed or thrown check too.
+    // the kill and the hit, in both shells. 18j (fx-1): a beam hit seen close, shot at 0, 0.05, 0.15 and 0.4 s. The scene is put
+    // back at the end, after a failed or thrown check too.
     public partial class CareerQA
     {
         IEnumerator MissileFxChecks()
@@ -223,9 +224,14 @@ namespace FogOfWar
                 int flashes = HitF.Count - flash0, notes = HitNotes(since);
                 float ang = t != null ? Vector3.Angle(t.localPosition - shipT.localPosition, Frame.U(approach)) : 180;
                 if (t != null) { made.Add(HitF.Mat); made.Add(HitF.Mesh); }
-                Check(t != null && t.gameObject.activeInHierarchy && flashes == 2 && notes == 2 && ang <= 1 && e.Missiles.Count == 0 && Holders("Missile") == 0,
+                // the impact effects (fx-1): on the hull mesh, a light on it brighter than sunlight 10 m out, hot
+                var light = Shader.GetGlobalVector("_FOWFlashCol");
+                float lum = new Color(light.x, light.y, light.z).grayscale, off = (float)(HitF.Off.Mag * 1000 / career.Build.Hull.LengthM);
+                Check(t != null && t.gameObject.activeInHierarchy && flashes == 2 && notes == 2 && ang <= 1 && e.Missiles.Count == 0 && Holders("Missile") == 0
+                      && HitF.OnHull && off < 0.6f && light.w == 1 && lum > 1,
                     $"18d hit flash: {notes} hit notes (2: the salvo), {flashes} flashes fired (2); the flash is {(t != null && t.gameObject.activeInHierarchy ? "on" : "off")}, {ang:0.000}° off the side the salvo came in on (≤ 1); " +
-                    $"{e.Missiles.Count} missiles and {Holders("Missile")} flare holders left (0)");
+                    $"{e.Missiles.Count} missiles and {Holders("Missile")} flare holders left (0); on the hull mesh {HitF.OnHull} (True), {off:0.000} hull lengths from the middle (< 0.6); " +
+                    $"the hull light {(light.w == 1 ? "on" : "off")}, {lum:0.0} × sunlight at 10 m (> 1) at {HitF.Kms:0.0} km/s");
             }
 
             // 18g-18i: the PDCs' tracers and the kill flash. A salvo 8 km out at 1×, past its burn at 10 km/s as from a raider at
@@ -348,6 +354,48 @@ namespace FogOfWar
                 s.QaFreeze = false;
             }
 
+            // 18j: the impact effects (fx-1, docs/design-combat.md "Impact effects"). A coasting salvo 3 km out on the beam, a
+            // little above it, no PDCs; the camera 90 m off on the side it comes in on. Shots one frame past the impact, then with
+            // the flash set to 0.05, 0.15 and 0.4 s old: it lights the hull, then cools to orange and fades
+            IEnumerator ImpactShots()
+            {
+                var keep = approach;
+                bool ok = Guard("missile fx 18j start", () =>
+                {
+                    career.Build.pick[(int)Slot.PointDefense] = 0;
+                    career.Damage = new ShipDamage();
+                    career.Apply(ship);
+                    approach = (D3.Cross(ship.Heading, Frame.EclNorth).Norm + Frame.EclNorth * 0.3).Norm;
+                    Salvo(300, 3, true);
+                    Put("warpIdx", 0);
+                    var dir = Frame.U((approach + ship.Heading * 0.6 + Frame.EclNorth * 0.2).Norm).normalized;
+                    Put("camMode", Nested("CamMode", 1));
+                    Call("SetPivot", Nested("Pivot", 0), 0.09);
+                    Put("yaw", Mathf.Atan2(dir.x, -dir.z) * Mathf.Rad2Deg);
+                    Put("pitch", Mathf.Asin(Mathf.Clamp(dir.y, -1, 1)) * Mathf.Rad2Deg);
+                });
+                approach = keep;
+                if (!ok) yield break;
+                int hit0 = HitF.Count;
+                for (int f = 0; f < 600 && HitF.Count == hit0; f++) yield return null;
+                var ages = new List<string>();
+                var lums = new List<string>();
+                foreach (float at in new[] { 0f, 0.05f, 0.15f, 0.4f })
+                {
+                    // a 5120 px capture takes longer than 0.05 s: set the flash's age, so each shot is one frame past it
+                    if (at > 0) HitF.At = Time.unscaledTime - at;
+                    yield return null;
+                    yield return new WaitForEndOfFrame();
+                    var light = Shader.GetGlobalVector("_FOWFlashCol");
+                    ages.Add($"{Time.unscaledTime - HitF.At:0.000}");
+                    lums.Add($"{new Color(light.x, light.y, light.z).grayscale:0.0}");
+                    yield return Shot($"c18-impact-{at * 1000:000}ms-{shell}");
+                }
+                Check(HitF.Count > hit0 && HitF.OnHull,
+                    $"18j impact shots: {HitF.Count - hit0} hits (2) on the hull mesh {HitF.OnHull} (True) at {HitF.Kms:0.0} km/s; shot at {string.Join(", ", ages)} s after the hit, " +
+                    $"the hull light then {string.Join(", ", lums)} × sunlight at 10 m (logged)");
+            }
+
             // from rest: 2,000 km is the fire range's 217.0 s; 250 km is 42.0 s, the burn ending 80 km out, in the hold
             if (go) yield return RunHold("1000x", 3, 12000, Career.FireKm, false);
             if (go) go = Guard("missile fx camera", () => { career.DropContact(); Look(true); });
@@ -356,6 +404,7 @@ namespace FogOfWar
             if (go) yield return RunHold("100x", 2, 300, 250, true);
             if (go) yield return TracerRun(false);
             if (go) yield return TracerRun(true);
+            if (go) yield return ImpactShots();
 
             // 18d: the flash is gone; 18e: nothing is left once the chase ends
             if (go)
@@ -369,9 +418,9 @@ namespace FogOfWar
                 {
                     int alive = 0;
                     foreach (var o in made) if (o != null) alive++;
-                    Check(career.Encounter == null && Get<List<Transform>>("missileT").Count == 0 && Holders("Missile") == 0 && Holders("Missile hit") == 0 && Holders("Missile kill") == 0 && Holders("PDC tracers") == 0 && HitF.T == null && KillF.T == null
+                    Check(Shader.GetGlobalVector("_FOWFlashCol").w == 0 && career.Encounter == null && Get<List<Transform>>("missileT").Count == 0 && Holders("Missile") == 0 && Holders("Missile hit") == 0 && Holders("Missile kill") == 0 && Holders("PDC tracers") == 0 && HitF.T == null && KillF.T == null
                           && Get<List<UnityEngine.Object>>("missileMade").Count == 0 && Get<Encounter>("missilesFor") == null && alive == 0 && made.Count >= 9 && Get<string>("missileShown") == "none",
-                        $"18e missile fx: after the flash ({HitFlashLeft()}) and DropContact no flare holder ({Holders("Missile")}), tracer line ({Holders("PDC tracers")}) or flash ({Holders("Missile hit")} hit, {Holders("Missile kill")} kill) under the root, {Get<List<UnityEngine.Object>>("missileMade").Count} tracked (0), " +
+                        $"18e missile fx: after the flash ({HitFlashLeft()}; its hull light {(Shader.GetGlobalVector("_FOWFlashCol").w == 0 ? "off" : "on")}) and DropContact no flare holder ({Holders("Missile")}), tracer line ({Holders("PDC tracers")}) or flash ({Holders("Missile hit")} hit, {Holders("Missile kill")} kill) under the root, {Get<List<UnityEngine.Object>>("missileMade").Count} tracked (0), " +
                         $"{alive} of the {made.Count} materials and meshes made for them still alive (0); the marker: {Get<string>("missileShown")} (none)");
                 });
             }

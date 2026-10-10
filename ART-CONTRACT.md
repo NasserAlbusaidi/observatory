@@ -10,6 +10,7 @@ What the Unity code expects from Blender output, so art can drop in without code
 - `WarpShip`: an empty named `Nose` at the front (the game rotates the model so Nose points along travel), an object named `Engine` (pulses).
 - Any material or object with `Glow` in its name renders emissive. Every other material is swapped for the game's own lit shader, keeping only the base colour, so don't bother with PBR maps or node setups. Unity won't see them.
 - Keep it under roughly 50k triangles per model.
+- `PlayerShip` and `StealthShip` import with Read/Write on: an impact flash finds the hull surface with a ray against their meshes.
 
 ## Wired as of the first art pack
 - `Sky/SkyOurs.png`, `Sky/SkyOther.png`: skyA/skyB in FOWCommon.cginc (global `_SkyA`, `_SkyB`, `_SkyRot`). SkyOurs is
