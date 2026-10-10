@@ -1227,7 +1227,7 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
   - **A PDC hit is a 7,500 cr repair.** With no mounts it is the hull's, for free. So 2 mounts raise the repair bill (7,889 to 11,343 cr a call), and a boarder gets on when the hits kill both mounts. The boarding-only number above (56 trips for 2 mounts) becomes 131.
   - **Light plating is the best buy** on every job set: 27 trips from Vesta, 35 on risky jobs.
   - **The tail costs most** (24,670 cr a call with no gear, risky jobs): 60 % of tail hits are on the drive. A flip that shows the raider the nose saves about a third.
-  - **Reading.** No fit pays back in under about 30 trips. Away from the belt, none pays back in under 100. The gear is a belt purchase. The free answers still win elsewhere, as point 4 says. Escort and bounty jobs must close them.
+  - **Reading.** No fit pays back in under 27 trips (light plating, Vesta). Over all jobs, none pays back in under 100; that figure includes the belt, so the other ports alone are higher. The gear is a belt purchase. The free answers still win elsewhere, as point 4 says. Escort and bounty jobs must close them.
 
 **5. NPCs have different goals.** New goals need no new hulls. They fly `Fleet.json` hulls.
 
