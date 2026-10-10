@@ -21,6 +21,7 @@ namespace FogOfWar.OpenWorld
         public readonly List<Missile> Missiles = new List<Missile>(); // 4a: in flight (Career.Damage.cs); the chase's end drops them
         public int Magazine = Career.MagazineSize;                     // 4a: missiles it has left
         public int Killed;                                             // 4b: its missiles the PDCs killed
+        public readonly List<SalvoLog> Salvos = new List<SalvoLog>();  // Phase 5 point 9: each salvo, for the after-action card
         public double Repel;                 // 4b: seconds alongside, held off by a mount, its magazine spent (Career.RepelS)
         internal readonly SolarSystem Sys;   // the system the proxy is in
         D3 pos, vel, acc;
@@ -485,11 +486,14 @@ namespace FogOfWar.OpenWorld
         static string HavenNear(SolarSystem sys, D3 x, double jd) => Threat.NearestHaven(sys, x, jd)?.Name; // null: no haven in the system
 
         // The raider goes at once (no course home in W4), with a note; the next call waits RouteGapDays from now.
+        // Phase 5 point 9: then the after-action card, with the note as its cause (Career.Report.cs)
         void EndContact(Happening what, string text, bool good, double jd)
         {
+            var e = Encounter;
             DropContact();
             lastCallJd = jd;
             Say(what, text, good);
+            if (e != null) ReportCard(e, text);
         }
 
         // D8, for the scene's LoadCareer: the career it replaced had a chase. The next update says it was not saved, whether

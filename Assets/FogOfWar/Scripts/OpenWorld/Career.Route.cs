@@ -10,11 +10,12 @@ namespace FogOfWar.OpenWorld
     // call is not saved.
     public partial class Career
     {
-        // Threat: a chase's warp-drop card (Career.Threat.cs, Phase 5 point 2)
-        public enum RouteKind { Distress, CargoTrouble, Pirate, Threat }
+        // Threat: a chase's warp-drop card (Career.Threat.cs, Phase 5 point 2); Report: its after-action card (Career.Report.cs, point 9)
+        public enum RouteKind { Distress, CargoTrouble, Pirate, Threat, Report }
 
-        // Yes and No answer a distress call or cargo trouble; Run, Divert and GiveUp a raider; Continue and Revise a Threat card
-        public enum RouteAnswer { Yes, No, Run, Divert, GiveUp, Continue, Revise }
+        // Yes and No answer a distress call or cargo trouble; Run, Divert and GiveUp a raider; Continue and Revise a Threat
+        // card; Close a Report
+        public enum RouteAnswer { Yes, No, Run, Divert, GiveUp, Continue, Revise, Close }
 
         public class RouteCall
         {
@@ -35,7 +36,8 @@ namespace FogOfWar.OpenWorld
 
         void RouteTick(SolarSystem sys, Ship ship, double jd, double simDt)
         {
-            if (Call != null)
+            // an after-action card holds no call back and outlives its job: a new call takes its place
+            if (Call != null && Call.Kind != RouteKind.Report)
             {
                 // the job ended (delivered, failed or dropped), or nobody answered the distress call in time
                 if (!Active.Contains(Call.Job) || (Call.Kind == RouteKind.Distress && jd > Call.ExpiresJd)) Drop();
@@ -122,7 +124,7 @@ namespace FogOfWar.OpenWorld
 
         // An answer from the card (RouteCall.Answers). Yes and No go to a distress call or cargo trouble; Run, Divert and
         // GiveUp to a raider, also once Run has closed its card or a Threat card is up, while the chase goes on. Continue
-        // and Revise close a Threat card (the scene opens the planner on Revise).
+        // and Revise close a Threat card (the scene opens the planner on Revise); Close a Report.
         public void Answer(RouteAnswer a, double jd)
         {
             var call = Call;
@@ -132,18 +134,19 @@ namespace FogOfWar.OpenWorld
                 return;
             }
             if (a == RouteAnswer.Continue || a == RouteAnswer.Revise) { if (call?.Kind == RouteKind.Threat) Drop(); return; }
+            if (a == RouteAnswer.Close) { if (call?.Kind == RouteKind.Report) Drop(); return; }
             if (a == RouteAnswer.Run || a == RouteAnswer.Divert || a == RouteAnswer.GiveUp) AnswerRaider(a, jd);
         }
 
         // The pilot's answer. Distress: yes takes the rescue on (if there is a slot and the fuel for it). Cargo trouble:
         // yes vents the fuel now, no starts the spoil clock on the job. A raider's two-button card: yes gives up the share
-        // its Yes label names, no runs. A Threat card closes either way.
+        // its Yes label names, no runs. A Threat card and a Report close either way.
         public void Answer(bool yes, double jd)
         {
             var call = Call;
             if (call == null) return;
             if (call.Kind == RouteKind.Pirate) { AnswerRaider(yes ? RouteAnswer.GiveUp : RouteAnswer.Run, jd); return; }
-            if (call.Kind == RouteKind.Threat) { Drop(); return; }
+            if (call.Kind == RouteKind.Threat || call.Kind == RouteKind.Report) { Drop(); return; }
             if (call.Kind != RouteKind.Distress && call.Kind != RouteKind.CargoTrouble) return;
             Drop();
             if (call.Kind == RouteKind.Distress)

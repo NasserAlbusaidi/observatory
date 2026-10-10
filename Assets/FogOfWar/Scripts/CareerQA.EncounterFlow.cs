@@ -15,7 +15,11 @@ namespace FogOfWar
     // Pursue from far (a salvo put in flight by hand would not show the first rule's defect: the alongside time near at
     // launch); 20e a raider burn that brings FireKm from 2 h to 5 min gives a card, from 1,500 s to 900 s none; 20f the card
     // in the scene, in both shells: it takes the raider call's place and drops the warp, Continue closes it, Revise closes it
-    // and opens the console's Nav tab (the toolkit shell).
+    // and opens the console's Nav tab (the toolkit shell). 20g-20h, point 9, the after-action card (Career.Report.cs): 20g its
+    // lines against the notes a seeded chase at 6 PDC mounts said and the side each salvo came in on; Give up drops no warp,
+    // the card outlives its job and a new call takes its place; each of the nine ends puts it up with its note as the cause
+    // (ReportedCheck, beside each end's own check); a load gives none (the "pirates: a save and load mid-chase" check).
+    // 20h the card in the scene, in both shells, after Give up: drawn, the warp kept, Close closes it.
     public partial class CareerQA
     {
         IEnumerator EncounterFlowChecks()
@@ -28,6 +32,7 @@ namespace FogOfWar
                 Guard("encounter flow 20c", () => BrakeEventChecks(qs));
                 Guard("encounter flow 20d", () => LaunchCardChecks(qs));
                 Guard("encounter flow 20e", () => BurnCardChecks(qs));
+                Guard("encounter flow 20g", () => ReportCardChecks(qs));
             }
             yield return ThreatShellChecks();
         }
@@ -159,11 +164,99 @@ namespace FogOfWar
                 first ??= $"{call.Title}: {call.Text}";
                 b.C.Answer(Career.RouteAnswer.Continue, b.Jd);
             }
-            Check(launches >= 2 && cards == launches && offLaunch == 0 && noDrop == 0 && b.C.Call == null && first != null
+            Check(launches >= 2 && cards == launches && offLaunch == 0 && noDrop == 0 && (b.C.Encounter == e ? b.C.Call == null : b.C.Call?.Kind == Career.RouteKind.Report) && first != null
                   && first.StartsWith("Missiles inbound: 2 missiles inbound from ", StringComparison.Ordinal) && first.Contains(". Impact in ") && first.EndsWith(". No plan flying.", StringComparison.Ordinal),
                 $"20d threat cards: a raider flown from rest 50,000 km off over {t:N0} s launched {launches} salvos and put up {cards} cards (one a salvo, 2 at least), {offLaunch} on another update (0), " +
                 $"{noDrop} without a warp drop (0); Continue closed each ({(b.C.Call == null ? "none up" : b.C.Call.Title)}); the first: \"{first}\"");
             b.C.DropContact();
+        }
+
+        // point 9: the after-action card is up with the end's note as its last line, and Close its one answer
+        static bool Reported(Career c, string note) => c.Call?.Kind == Career.RouteKind.Report && note != null
+            && c.Call.Text.EndsWith("\n" + note + ".", StringComparison.Ordinal) && c.Call.Answers?.Length == 1 && c.Call.Answers[0].What == Career.RouteAnswer.Close;
+
+        static string CardText(Career c) => c.Call == null ? "no card" : $"{c.Call.Kind} \"{c.Call.Title}: {c.Call.Text.Replace("\n", " / ")}\"";
+
+        void ReportedCheck(Career c, string note, string end) =>
+            Check(Reported(c, note), $"20g after-action card: {end} puts it up with the end's note as its cause: {CardText(c)}");
+
+        // 20g: a 1 g raider from rest 50,000 km off, flown by Pursue in 10 s updates as 20d flies it, at a seeded ship with
+        // 6 PDC mounts, until the chase ends or 4 h. The card against what the chase said: the kills, the hit notes in order,
+        // and the side each salvo came in on (its flight the update before the impact; the bench ship does not turn).
+        void ReportCardChecks(SolarSystem qs)
+        {
+            var (_, at, vel) = Belt(qs);
+            var b = MakeBench(qs, at, vel);
+            b.C.Build.pick[(int)Slot.PointDefense] = 3;
+            b.C.SeedCombat(2010);
+            var e = RaiderAt(b, 5e4);
+            b.Tick(0);
+            var sides = new List<Career.Aspect>();
+            var hits = new List<string>();
+            int kills = 0, arrived = 0, seen = b.Said.Count;
+            double t = 0;
+            bool dropped = false;
+            Body dom = Ship.Dominant(qs, b.Ship.Pos, b.Jd);
+            while (t < 4 * 3600 && b.C.Encounter == e)
+            {
+                D3? inbound = e.Missiles.Count > 0 ? e.Missiles[0].P : (D3?)null;
+                b.C.DropWarp = false;
+                D3 p0 = b.Ship.Pos, v0 = b.Ship.Vel;
+                double j0 = b.Jd, h = (b.Jd + 10.0 / 86400 - b.Jd) * 86400;
+                b.Ship.Step(qs, j0, h, dom);
+                e.Advance(qs, j0, h, p0, v0, b.Ship.Vel);
+                b.Tick(h);
+                t += h;
+                int struck = 0;
+                for (; seen < b.Said.Count; seen++)
+                {
+                    var s = b.Said[seen];
+                    if (s.What == Career.Happening.MissileKilled) { kills++; struck++; }
+                    else if (s.What == Career.Happening.MissileHit || s.What == Career.Happening.JobFailed && s.Text.StartsWith("Hit:", StringComparison.Ordinal)) { hits.Add(s.Text); struck++; }
+                }
+                if (struck > 0 && inbound != null) sides.Add(Career.AspectOf(Career.ToBody(b.Ship, inbound.Value)));
+                arrived += struck;
+                dropped = b.C.DropWarp;
+                if (b.C.Call?.Kind == Career.RouteKind.Threat) b.C.Answer(Career.RouteAnswer.Continue, b.Jd);
+            }
+            string end = b.Said.FindLast(s => s.What == Career.Happening.RaiderGone || s.What == Career.Happening.Boarded).Text;
+            bool boarded = b.Said.Exists(s => s.What == Career.Happening.Boarded);
+            var lines = b.C.Call?.Text.Split('\n') ?? new string[0];
+            bool linesOk = lines.Length == e.Salvos.Count + 1, sidesOk = sides.Count == e.Salvos.Count;
+            var logged = new List<string>();
+            int logKills = 0, logArrived = 0;
+            for (int i = 0; i < e.Salvos.Count; i++)
+            {
+                var s = e.Salvos[i];
+                logged.AddRange(s.Hits); logKills += s.Killed; logArrived += s.Arrived;
+                sidesOk &= i < sides.Count && s.Aspect == sides[i];
+                linesOk &= i < lines.Length && lines[i] == $"Salvo {i + 1}: " + Career.SalvoLine(s) && s.Fired == Career.Salvo && s.Km < Career.FireKm
+                           && lines[i].StartsWith($"Salvo {i + 1}: {Career.Salvo} missiles from {s.Km:N0} km, in at the ", StringComparison.Ordinal);
+            }
+            Check(b.C.Encounter == null && Reported(b.C, end) && b.C.Call.Title == $"After action: the {e.Hull}" && e.Salvos.Count == Career.MagazineSize / Career.Salvo && linesOk && sidesOk
+                  && string.Join("|", logged) == string.Join("|", hits) && logKills == kills && kills == e.Killed && logArrived == arrived && e.Salvos[0].BoreFirst > 0 && (boarded || !dropped),
+                $"20g after-action card: a raider flown from 50,000 km at 6 PDC mounts (seed 2010) ended after {t:N0} s, \"{end}\": {e.Salvos.Count} salvo lines ({Career.MagazineSize / Career.Salvo}) as built from the record ({linesOk}), " +
+                $"the sides {string.Join("/", sides)} as flown ({sidesOk}), {logKills} kills ({kills} said, {e.Killed} counted), {logged.Count} hit notes in order as said ({hits.Count}), {logArrived} arrivals ({arrived}), " +
+                $"the end's warp drop {dropped} (none but a boarding's); {CardText(b.C)}");
+
+            // Give up on a second chase: the card with no salvo, no warp drop; it stays when its job goes, and a raider call takes its place
+            var c = MakeBench(qs, at, vel);
+            var ec = RaiderAt(c, 5e4);
+            c.Tick(1);
+            c.C.DropWarp = false;
+            c.C.Answer(Career.RouteAnswer.GiveUp, c.Jd);
+            string gave = c.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text;
+            bool up = Reported(c.C, gave) && c.C.Call.Text == $"The {ec.Hull} fired no missiles.\n{gave}.", noDrop = !c.C.DropWarp;
+            string shown = CardText(c.C);
+            c.C.Active.Remove(c.Job);
+            c.Tick(10);
+            bool outlives = Reported(c.C, gave);
+            c.C.Active.Add(c.Job);
+            bool made = c.C.MakeCall(Career.RouteKind.Pirate, c.Job, qs, c.Ship, c.Jd);
+            var kind = c.C.Call?.Kind;
+            c.C.DropContact();
+            Check(up && noDrop && outlives && made && kind == Career.RouteKind.Pirate,
+                $"20g after-action card: Give up shows {shown} ({up}), no warp drop ({noDrop}); with its job gone an update on it stays ({outlives}); a raider call takes its place ({made}, {kind?.ToString() ?? "none"})");
         }
 
         // 20e: a raider at rest, its FireKm `from` s out by ReachInS, given in one update the closing speed that brings it to
@@ -271,10 +364,46 @@ namespace FogOfWar
             if (go) go = Guard("threat card revised", () =>
                 Check(career.Call == null && career.Encounter == e && (legacy || s.TestConsoleOpen && Tab() == 1),
                     $"20f threat card ({shell}): Revise closes the card ({career.Call?.Title ?? "none"}) and " + (legacy ? "leaves the classic panel's planner" : $"opens the console ({s.TestConsoleOpen}) on the Nav tab ({Tab()}, 1)")));
+            // 20h: Give up ends the chase; the after-action card shows, the warp stays, and Close closes it
+            if (go) go = Guard("report card give up", () =>
+            {
+                e.Missiles.Clear();
+                if (!legacy) Call("SetConsole", false);
+                Put("warpIdx", 2);
+                career.Answer(Career.RouteAnswer.GiveUp, jd);
+            });
+            for (int i = 0; go && i < 2; i++) yield return null;
+            if (go) go = Guard("report card shown", () =>
+            {
+                var call = career.Call;
+                string note = career.Notes.FindLast(n => n.What == Career.Happening.RaiderGone).Text, how;
+                bool drawn;
+                if (legacy) { how = Get<string>("classicDrawn"); drawn = how == "Close"; }
+                else
+                {
+                    var text = Get<Label>("callText");
+                    float px = text.resolvedStyle.fontSize, high = text.layout.height;
+                    string title = Get<Label>("callTitle").text;
+                    drawn = title == $"AFTER ACTION: THE {e.Hull.ToUpperInvariant()}" && text.text == call?.Text && Get<Label>("callLive").resolvedStyle.display == DisplayStyle.None && high >= 2 * px;
+                    how = $"title \"{title}\", the text {high:0} px high at {px:0} px a line (2 lines at least), the live line {Get<Label>("callLive").resolvedStyle.display}";
+                }
+                Check(Reported(career, note) && call.Title == $"After action: the {e.Hull}" && drawn && Get<int>("warpIdx") == 2,
+                    $"20h after-action card ({shell}): Give up puts it up ({CardText(career)}); drawn: {how}; the warp {WarpOf(Get<int>("warpIdx")):N0}× (100×, kept)");
+                if (legacy) Put("classicClick", 0);
+                else Check(s.TestClickCallButton(0), $"20h after-action card ({shell}): the card's Close button takes a click");
+            });
+            for (int i = 0; go && i < 2; i++) yield return null;
+            if (go) go = Guard("report card closed", () =>
+            {
+                string how = legacy ? Get<string>("classicDrawn") : s.TestCallCardReport();
+                Check(career.Call == null && (legacy ? how == "" : how.StartsWith("card None", StringComparison.Ordinal)),
+                    $"20h after-action card ({shell}): Close closes it ({CardText(career)}; {how})");
+            });
             Guard("threat card restore", () =>
             {
                 e?.Missiles.Clear();
                 career.DropContact();
+                if (career.Call?.Kind == Career.RouteKind.Report) career.Answer(Career.RouteAnswer.Close, jd);
                 if (job != null) career.Active.Remove(job);
                 ship.Pos = pos0; ship.Vel = vel0;
                 Call("SetTarget", target0);

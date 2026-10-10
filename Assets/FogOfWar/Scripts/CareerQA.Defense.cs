@@ -269,6 +269,7 @@ namespace FogOfWar
             Check(gone && p.C.Failed == failed0 + 1 && p.C.Standing(Faction.Compact) == stand0 - Career.StandingLoss && cabin == "Hit: cabin, passengers hurt: QA ore failed"
                   && p.C.Encounter == null && p.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.StartsWith("The job is over")),
                 $"defense 17e: a cabin hit fails the chase's passenger job ({gone}): failed {failed0} → {p.C.Failed}, Compact standing {stand0} → {p.C.Standing(Faction.Compact)} (−{Career.StandingLoss}), \"{cabin}\"; the next update ends the chase ({p.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
+            ReportedCheck(p.C, p.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text, "the job over (the card stays: its job is gone)");
 
             // empty systems: no cargo, no passengers, fixed radiators, any PDC
             var h = MakeBench(qs, at, vel);

@@ -226,6 +226,7 @@ namespace FogOfWar
                 D3 pV = sys.Pos(vesta, jd);
                 ship.Pos = pV + pV.Norm * 1e6; ship.Vel = sys.Vel(vesta, jd);
                 career.DropContact();
+                if (career.Call?.Kind == Career.RouteKind.Report) career.Answer(Career.RouteAnswer.Close, jd); // point 9's card from the ends above
                 career.Active.RemoveAll(c => c.Key == "qa/pirate-scene");
                 Put("warpIdx", 0);
             });
@@ -444,6 +445,7 @@ namespace FogOfWar
                   && b.C.Standing(Faction.Compact) == standing && b.C.Encounter == null && !qs.Bodies.Contains(e.Proxy) && b.C.WarpCap == 0 && b.Ship.Cargo == b.Job.Tonnes
                   && b.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.StartsWith($"Gave up {t0 * Career.GiveUpShare:N1} t and {pay0 * Career.GiveUpShare:N0} cr: the raider goes back to") && HavenNamed(s.Text)),
                 $"pirates: give up: pay {pay0:N0} → {b.Job.Pay:N0} cr, {t0:N0} → {b.Job.Tonnes:N0} t ({b.Ship.Cargo:N0} t aboard), the job kept, the proxy gone, no warp cap ({b.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
+            ReportedCheck(b.C, b.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text, "give up");
 
             // the two-button card (its Yes label is the give-up): No runs, Yes gives up
             b.C.MakeCall(Career.RouteKind.Pirate, b.Job, qs, b.Ship, b.Jd);
@@ -484,6 +486,7 @@ namespace FogOfWar
             c.Tick(1);
             Check(on && c.C.Encounter == null && !qs.Bodies.Contains(e.Proxy) && c.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.StartsWith("Ceres patrol in reach: the raider breaks off") && HavenNamed(s.Text)),
                 $"pirates: a chase that comes in reach of the Ceres patrol breaks off ({c.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
+            ReportedCheck(c.C, c.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text, "a patrol");
         }
 
         // the pirate kept alongside by hand: off the ship, matched (or dvel along off), after the ship's own 30 s step. Its
@@ -518,6 +521,7 @@ namespace FogOfWar
                   && !qs.Bodies.Contains(e.Proxy) && b.Said.Exists(s => s.What == Career.Happening.Boarded && s.Text.StartsWith($"Boarded: the raider took {t0 * Career.BoardShare:N1} t and {pay0 * Career.BoardShare:N0} cr back to") && HavenNamed(s.Text)),
                 $"pirates: boarded after {n * 30} s alongside (the warp cap the time left to the boarding / {Career.EventS:0} s meanwhile: {capped}): pay {pay0:N0} → {b.Job.Pay:N0} cr, {t0:N0} → {b.Job.Tonnes:N0} t, the job kept, no standing lost " +
                 $"({b.Said.Find(s => s.What == Career.Happening.Boarded).Text})");
+            ReportedCheck(b.C, b.Said.Find(s => s.What == Career.Happening.Boarded).Text, "a boarding (its own warp drop)");
 
             // Q5: one update at 0.2 km/s in the middle resets the clock, and the boarding needs the full time again
             var c = MakeBench(qs, at, vel, JobKind.Passengers);
@@ -566,9 +570,9 @@ namespace FogOfWar
             double r = Ship.Standoff(vesta);
             b.Ship.Pos = vp + rad * r; b.Ship.Vel = qs.Vel(vesta, b.Jd + 1.0 / 86400) + D3.Cross(vesta.Pole, rad).Norm * Math.Sqrt(vesta.GM / r);
             b.Tick(1);
-            Check(e != null && b.C.Docked?.Name == "Vesta" && !b.C.Active.Contains(b.Job) && b.C.Credits - cr0 == pay && b.C.Encounter == null && b.C.Call == null
+            Check(e != null && b.C.Docked?.Name == "Vesta" && !b.C.Active.Contains(b.Job) && b.C.Credits - cr0 == pay && b.C.Encounter == null && Reported(b.C, b.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text)
                   && !qs.Bodies.Contains(e.Proxy) && b.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.StartsWith("Docked at Vesta") && HavenNamed(s.Text)),
-                $"pirates: dock first: docked at {b.C.Docked?.Name ?? "-"}, paid {b.C.Credits - cr0:N0} of {pay:N0} cr, the call and the raider gone ({b.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
+                $"pirates: dock first: docked at {b.C.Docked?.Name ?? "-"}, paid {b.C.Credits - cr0:N0} of {pay:N0} cr, the call and the raider gone, the after-action card up ({b.C.Call?.Kind.ToString() ?? "none"}; {b.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text})");
 
             // a landing (on Pallas, not a port) ends it too
             var c = MakeBench(qs, at, vel);
@@ -578,6 +582,7 @@ namespace FogOfWar
             c.Ship.Landed = null;
             Check(c.C.Encounter == null && !qs.Bodies.Contains(e2.Proxy) && c.Said.Exists(s => s.What == Career.Happening.RaiderGone && s.Text.StartsWith("Landed on Pallas")),
                 "pirates: landing ends the chase");
+            ReportedCheck(c.C, c.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text, "a landing");
 
             // Q9: a save made mid-chase loads without it; the next update says so and names the haven
             var d = MakeBench(qs, at, vel);
@@ -628,7 +633,7 @@ namespace FogOfWar
                     if (first < 0 && e.Dwell > 0) first = t;
                 }
                 boarded = b.Said.Exists(s => s.What == Career.Happening.Boarded);
-                outrun = b.Heard(Career.Happening.RaiderGone, "Outrun");
+                outrun = b.Heard(Career.Happening.RaiderGone, "Outrun") && Reported(b.C, b.Said.FindLast(s => s.What == Career.Happening.RaiderGone).Text); // and point 9's card
                 ended = t;
                 range = (e.Pirate.Pos - b.Ship.Pos).Mag;
                 // 4 h on: off the straight line from now by at most a·60 s·t, where the span's a·t²/2 would be ~1e6 km
