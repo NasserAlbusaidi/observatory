@@ -1,3 +1,4 @@
+using System;
 using FogOfWar.OpenWorld;
 
 namespace FogOfWar
@@ -14,21 +15,31 @@ namespace FogOfWar
         void Chase(double jd0, D3 p0, D3 v0) => career.Encounter?.Advance(sys, jd0, (jd - jd0) * 86400, p0, v0, ship.Vel);
 
         // Under the career's cap (D7), before a frame's sim time is set and again after the career tick. Its own choice:
-        // TransferInProgress is cleared on every career tick. Combat 4c: the 1× hold before an impact gives the warp back
-        // after it, in the same chase, unless something else dropped it since (DropWarp, a call card), as a raider fires
-        // again at once and its next flight is 1,000 s
-        int heldFrom = -1;     // the warp the impact hold lowered, or -1
+        // TransferInProgress is cleared on every career tick. Phase 5 point 1: the cap follows the next event and rises once
+        // it passes, so what the cap took is given back as it rises, up to the warp it took it from, in the same chase, while
+        // nothing else has moved the warp since (the player, DropWarp, a call card). Combat 4c's 1× hold is one such cap.
+        int heldFrom = -1;     // the warp the cap lowered, or -1
+        int heldAt = -1;       // the warp the cap left it at; any other warp means something else moved it
         Encounter heldFor;     // the chase it was held in
         void CapWarp()
         {
             double cap = career.WarpCap;
-            if (cap == 1 && heldFrom < 0 && warpIdx > 0) { heldFrom = warpIdx; heldFor = career.Encounter; }
-            else if (cap != 1 && heldFrom >= 0)
-            {
-                if (warpIdx == 0 && career.Encounter == heldFor && career.Call == null) warpIdx = heldFrom;
-                heldFrom = -1; heldFor = null;
-            }
+            if (heldFrom >= 0 && (warpIdx != heldAt || career.Encounter != heldFor || career.Call != null)) heldFrom = -1;
+            if (heldFrom >= 0) while (warpIdx < heldFrom && cap > 0 && Warps[warpIdx + 1] <= cap) warpIdx++;
+            int before = warpIdx;
             if (cap > 0) while (warpIdx > 0 && Warps[warpIdx] > cap) warpIdx--;
+            if (warpIdx < before && heldFrom < 0) { heldFrom = before; heldFor = career.Encounter; }
+            if (heldFrom >= 0 && warpIdx >= heldFrom) heldFrom = -1;
+            heldAt = warpIdx;
+        }
+
+        // The time compression a frame runs at. Under the cap it is the cap itself, up to the warp the cap took the
+        // setting from: the setting under the cap would hold the last 100 s before every event at 1×, ten times EventS
+        // (Phase 5 point 1). Anything that moved the setting since CapWarp (TrackRoute's flip) runs at the setting.
+        double FrameRate()
+        {
+            double w = Warps[warpIdx], cap = career.WarpCap;
+            return heldFrom >= 0 && warpIdx == heldAt && cap > w ? Math.Min(Warps[heldFrom], cap) : w;
         }
 
         // D6, the career's Divert: the port's body as the target, the Fast plan engaged. A pilot running from a raider

@@ -56,6 +56,8 @@ namespace FogOfWar
         static string Raiders => Career.Factions[(int)Faction.Raiders].Name;
         static bool HavenNamed(string text) => Array.Exists(Threat.Havens, h => text.Contains(h));
         static double PirateA => Career.PirateG * Ship.G0;
+        // Phase 5 point 1: the cap for a raider at rest with the ship, its magazine full and none in flight: FireKm in √(2s/a)
+        static double FireCap(Encounter e) => Math.Max(1, Math.Min(Career.ChaseWarp, Math.Sqrt(2 * (e.Range - Career.FireKm) / PirateA) / Career.EventS));
         static string CareerKey => (string)typeof(OpenSystemScene).GetProperty("CareerKey", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
 
         IEnumerator PirateChecks()
@@ -100,15 +102,18 @@ namespace FogOfWar
                 // sys.Vel differences the path 30 s either side, on jd's 40 µs grid: the stand-in's gate (pursuit check G4)
                 Check(!R<bool>("Coasting") && lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel && e.Pirate.DvUsed > 0,
                     $"pirates: in the scene at 1×, the ship in free flight on integrated gravity, the pirate flies the player's spans: its clock {lag:G3} s from the scene's, the proxy {dp:G3} km and {dv:G3} km/s (< {PursuitCheck.GateVel:E0}) off it, Δv {e.Pirate.DvUsed:F3} km/s ({e.Pirate.Phase})");
+                // its FireKm 10,000 s or more out, so the cap reaches 1,000×: the setting the scene coasts the conic at
+                e.Pirate.Pos = ship.Pos + (e.Pirate.Pos - ship.Pos).Norm * 6e5; e.Pirate.Vel = ship.Vel;
                 Put("warpIdx", 6);
             });
             if (ok) yield return null;
             if (ok) ok = Guard("warp cap far", () =>
             {
                 int w = Get<int>("warpIdx");
-                double cap = career.WarpCap, ran = Get<double>("frameWarp");
-                Check(cap == Career.ChaseWarp && WarpOf(w) <= cap && WarpOf(w + 1) > cap && ran <= cap * (1 + 1e-9),
-                    $"pirates: 1M× asked during a chase {e.Range:N0} km off runs at {WarpOf(w):N0}× (cap {cap:N0}×; the frame ran at {ran:N0}×)");
+                // Phase 5 point 1: the raider at rest with the ship 600,000 km off, its magazine full: the first event is its FireKm, √(2s/a) out
+                double cap = career.WarpCap, ran = Get<double>("frameWarp"), want = FireCap(e);
+                Check(Math.Abs(cap / want - 1) < 0.02 && WarpOf(w) <= cap && WarpOf(w + 1) > cap && ran <= cap * (1 + 1e-9),
+                    $"pirates: 1M× asked during a chase {e.Range:N0} km off runs at {WarpOf(w):N0}× (cap {cap:N1}×: its {Career.FireKm:N0} km in √(2s/a) / {Career.EventS:0} s = {want:N1}× ± 2 %; the frame ran at {ran:N0}×)");
                 var p = e.Proxy;
                 double lag = (e.Chase.SpanEnd - jd) * 86400, dp = (sys.Pos(p, jd) - e.Pirate.Pos).Mag, dv = (sys.Vel(p, jd) - e.Pirate.Vel).Mag;
                 Check(R<bool>("Coasting") && lag == 0 && dp < 1e-6 && dv < PursuitCheck.GateVel,
@@ -121,9 +126,11 @@ namespace FogOfWar
             {
                 int w = Get<int>("warpIdx");
                 double ran = Get<double>("frameWarp");
-                // the cap set before the frame's sim time reads the range then, so the first frame within CloseKm is held too
-                Check(career.WarpCap == Career.CloseWarp && WarpOf(w) <= Career.CloseWarp && ran <= Career.CloseWarp * (1 + 1e-9),
-                    $"pirates: the first frame within {Career.CloseKm:N0} km ({e.Range:N0} km) ran at {ran:N0}×; the cap is {career.WarpCap:N0}× and the warp {WarpOf(w):N0}×");
+                // the cap set before the frame's sim time reads the range then, so the first frame after the raider moved in is held too
+                double cap = career.WarpCap, want = FireCap(e);
+                // the frame runs at the cap at its start (FrameRate); the raider closes in it, so the cap after is a little less
+                Check(Math.Abs(cap / want - 1) < 0.02 && WarpOf(w) <= cap && Math.Abs(ran / cap - 1) < 0.01,
+                    $"pirates: the first frame with the raider moved to {e.Range:N0} km ran at {ran:N2}×, the cap ({cap:N2}× after it, ± 1 %; {want:N1}× ± 2 %) and not the warp {WarpOf(w):N0}× under it");
                 Put("warpIdx", 0);
                 var port = Career.NearestPatrol(sys, ship, jd, out _);
                 career.Answer(Career.RouteAnswer.Divert, jd);
@@ -233,6 +240,14 @@ namespace FogOfWar
         {
             var w = (double[])typeof(OpenSystemScene).GetField("Warps", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null);
             return i < w.Length ? w[i] : double.PositiveInfinity;
+        }
+
+        // the highest warp setting at or under cap (the scene's CapWarp), 0 (1×) under 1×
+        static int RungOf(double cap)
+        {
+            int i = 0;
+            while (WarpOf(i + 1) <= cap) i++;
+            return i;
         }
 
         // the belt point the pursuit check uses: 1,000,000 km out from Vesta, at rest with it
@@ -391,8 +406,8 @@ namespace FogOfWar
                 "pirates: with a dry tank Divert says so, asks the scene for nothing and leaves the card up");
 
             b.C.Answer(Career.RouteAnswer.Run, b.Jd);
-            Check(e != null && b.C.Call == null && b.C.Encounter == e && qs.Bodies.Contains(e.Proxy) && b.Heard(Career.Happening.RouteCall, $"{Career.ChaseWarp:N0}×"),
-                $"pirates: Run closes the card and the chase goes on; its note says time is held to {Career.ChaseWarp:N0}×");
+            Check(e != null && b.C.Call == null && b.C.Encounter == e && qs.Bodies.Contains(e.Proxy) && b.Heard(Career.Happening.RouteCall, "Time slows as the raider closes"),
+                "pirates: Run closes the card and the chase goes on; its note says time slows as the raider closes");
 
             // Divert, after Run closed the card: the nearest patrolled port by full-burn time from the ship's state
             b.C.Answer(Career.RouteAnswer.Divert, b.Jd);
@@ -491,12 +506,17 @@ namespace FogOfWar
             double pay0 = b.Job.Pay, t0 = b.Job.Tonnes;
             int n = 0;
             bool capped = true;
-            while (b.C.Encounter != null && n < 300) { Alongside(b, e, off); n++; if (b.C.Encounter != null) capped &= b.C.WarpCap == Career.CloseWarp && e.Dwell == 30 * n; }
+            // Phase 5 point 1: alongside with no mount, the event is the boarding, (BoardingSeconds − Dwell) / EventS
+            while (b.C.Encounter != null && n < 300)
+            {
+                Alongside(b, e, off); n++;
+                if (b.C.Encounter != null) capped &= b.C.WarpCap == Math.Max(1, Math.Min(Career.ChaseWarp, (Threat.BoardingSeconds - e.Dwell) / Career.EventS)) && e.Dwell == 30 * n;
+            }
             b.Tick(1);
             Check(n == (int)(Threat.BoardingSeconds / 30) && capped && b.Job.Pay == pay0 * (1 - Career.BoardShare) && b.Job.Tonnes == t0 * (1 - Career.BoardShare)
                   && b.C.Active.Contains(b.Job) && b.C.Failed == 0 && b.C.Standing(Faction.Compact) == 0 && b.Ship.Cargo == b.Job.Tonnes && b.C.DropWarp
                   && !qs.Bodies.Contains(e.Proxy) && b.Said.Exists(s => s.What == Career.Happening.Boarded && s.Text.StartsWith($"Boarded: the raider took {t0 * Career.BoardShare:N1} t and {pay0 * Career.BoardShare:N0} cr back to") && HavenNamed(s.Text)),
-                $"pirates: boarded after {n * 30} s alongside (warp cap {Career.CloseWarp:N0}× meanwhile): pay {pay0:N0} → {b.Job.Pay:N0} cr, {t0:N0} → {b.Job.Tonnes:N0} t, the job kept, no standing lost " +
+                $"pirates: boarded after {n * 30} s alongside (the warp cap the time left to the boarding / {Career.EventS:0} s meanwhile: {capped}): pay {pay0:N0} → {b.Job.Pay:N0} cr, {t0:N0} → {b.Job.Tonnes:N0} t, the job kept, no standing lost " +
                 $"({b.Said.Find(s => s.What == Career.Happening.Boarded).Text})");
 
             // Q5: one update at 0.2 km/s in the middle resets the clock, and the boarding needs the full time again

@@ -10,9 +10,10 @@ namespace FogOfWar
     // 18a-18i: the missiles on screen and the 1× hold before an impact (docs/design-combat.md Phase 4, PR 4c, D11;
     // OpenSystemScene.Missiles.cs, Career.WarpCap). The ship 1,000,000 km out from Vesta at rest with it, drive off; a chase
     // started by hand astern with an empty magazine, and a salvo of 2 put in flight by hand, 14° off the tail (the Aft
-    // aspect: no hold or cabin hit). With no PDCs: 18a/18b the hold at 1,000× asked (the raider past CloseKm) and at 100×
-    // asked (inside it): every frame before it at the warp asked, none stepping past its start, 1× from 20 s out to the
-    // impact, the impact the closed form's, the warp given back after, the plume on only while the missile burns; 18c a flare
+    // aspect: no hold or cabin hit). With no PDCs: 18a/18b the hold at 1,000× asked (the raider 12,000 km astern) and at 100×
+    // asked (alongside): every frame before it at the warp the time-based cap allows (Phase 5 point 1: t / EventS), none
+    // stepping past its start, 1× from 20 s out to the impact, the impact the closed form's, the warp given back after as far
+    // as the cap allows, the plume on only while the missile burns; 18c a flare
     // per missile at ship.Pos + P in the scene frame, nose on the ship, and the dot and tag while it is drawn larger than it
     // is; 18d the hit flash on the side it came in on, fired by MissileHit. With 6 mounts: 18g tracers only inside 5 km from
     // a working mount that bears, none after the impact, none with every mount dead; 18h each from its PDC_n marker to the
@@ -105,8 +106,9 @@ namespace FogOfWar
                     Put("warpIdx", want);
                 });
                 if (!ok) yield break;
-                var rows = new List<(double t0, double fw, double t1, int warp)>();
-                double tPrev = career.ImpactInS, jdHit = double.NaN;
+                // per frame: the seconds to the impact and the cap at its start and end, the rate it ran at, the warp after it
+                var rows = new List<(double t0, double fw, double t1, int warp, double c0, double c1)>();
+                double tPrev = career.ImpactInS, capPrev = cap, jdHit = double.NaN;
                 bool atBurn = !shots, at30 = !shots, atClose = !shots;
                 // the plume a frame shows is the last LateUpdate's, drawn from the missile as the frame before left it
                 bool? burnLast = e.Missiles.Count > 0 ? e.Missiles[0].Burning : (bool?)null;
@@ -123,8 +125,9 @@ namespace FogOfWar
                     }
                     burnLast = e.Missiles.Count > 0 ? e.Missiles[0].Burning : (bool?)null;
                     double t1 = career.ImpactInS, km1 = e.Missiles.Count > 0 ? e.Missiles[0].P.Mag : 0;
-                    rows.Add((tPrev, Get<double>("frameWarp"), t1, Get<int>("warpIdx")));
-                    tPrev = t1;
+                    double c1 = career.WarpCap;
+                    rows.Add((tPrev, Get<double>("frameWarp"), t1, Get<int>("warpIdx"), capPrev, c1));
+                    tPrev = t1; capPrev = c1;
                     if (double.IsInfinity(t1)) { jdHit = jd; break; }
                     if (!atBurn && t1 <= Career.ImpactHoldS && burnLast == true) { atBurn = true; yield return Placed("burn", true); }
                     else if (!at30 && km1 <= 30) { at30 = true; yield return Placed("30 km", true); }
@@ -141,28 +144,47 @@ namespace FogOfWar
                 {
                     var pre = rows.FindAll(r => r.t0 > Career.ImpactHoldS + Career.ImpactSlackS);
                     int first = rows.FindIndex(r => r.t0 <= Career.ImpactHoldS + Career.ImpactSlackS);
-                    var hold = first >= 0 ? rows.GetRange(first, rows.Count - first) : new List<(double t0, double fw, double t1, int warp)>();
+                    var hold = first >= 0 ? rows.GetRange(first, rows.Count - first) : new List<(double t0, double fw, double t1, int warp, double c0, double c1)>();
                     double preMax = 0, preMin = double.PositiveInfinity, holdMax = 0, holdS = 0;
                     bool overstep = false;
-                    foreach (var r in pre) { preMax = Math.Max(preMax, r.fw); preMin = Math.Min(preMin, r.t1); overstep |= r.fw > cap * (1 + 1e-9); }
+                    int offRung = 0, offCap = 0;
+                    // Phase 5 point 1: a frame's cap is at most t / EventS at its start (the impact is one event; 18b's raider
+                    // alongside is another). The frame runs at the cap at its start or the warp asked, the lower (FrameRate), but
+                    // the one cut to end at the hold; the warp after it is the highest setting under both the cap at its end and
+                    // the warp asked
+                    foreach (var r in pre)
+                    {
+                        preMax = Math.Max(preMax, r.fw); preMin = Math.Min(preMin, r.t1);
+                        overstep |= r.fw > Math.Max(1, Math.Min(Career.ChaseWarp, r.t0 / Career.EventS)) * (1 + 1e-9);
+                        if (r.t1 <= Career.ImpactHoldS + Career.ImpactSlackS) continue;
+                        if (Math.Abs(r.fw / Math.Min(WarpOf(want), r.c0) - 1) > 1e-6) offCap++;
+                        if (r.warp != Math.Min(want, RungOf(r.c1))) offRung++;
+                    }
                     foreach (var r in hold) { holdMax = Math.Max(holdMax, r.fw); holdS += r.fw / 60; }
                     bool hit = !double.IsNaN(jdHit);
                     double flight = (jdHit - jd0) * 86400, want0 = FlightS(0, km);
                     double fwAfter = Get<double>("frameWarp");
                     int wAfter = Get<int>("warpIdx");
-                    Check(hit && pre.Count > 0 && !overstep && preMax >= 0.9 * Math.Min(cap, WarpOf(want)) && preMin >= Career.ImpactHoldS - 1e-3,
-                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: {WarpOf(want):N0}× asked, the chase's cap {cap:N0}× (raider {raiderKm:N0} km off); {pre.Count} frames before the hold ran at up to {preMax:N0}× (≥ 90 % of {Math.Min(cap, WarpOf(want)):N0}×, none over the cap: {!overstep}), " +
+                    Check(hit && pre.Count > 0 && !overstep && offCap == 0 && offRung == 0 && Math.Abs(cap / Math.Max(1, Math.Min(Career.ChaseWarp, FlightS(0, km) / Career.EventS)) - 1) < 1e-6 && preMin >= Career.ImpactHoldS - 1e-3,
+                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: {WarpOf(want):N0}× asked, the chase's cap at the start {cap:N1}× (the flight's {FlightS(0, km):N1} s / {Career.EventS:0} s; raider {raiderKm:N0} km off); {pre.Count} frames before the hold ran at up to {preMax:N0}× " +
+                        $"(none over t / {Career.EventS:0} s at its start: {!overstep}; {offCap} frames (0) not run at the cap or the warp asked, the lower; {offRung} frames (0) where the warp was not the highest setting under the cap and the warp asked), " +
                         $"none ending inside it: the nearest end {preMin:0.0000} s before the impact (≥ {Career.ImpactHoldS:0} − 0.001)");
                     Check(hit && first >= 0 && hold[0].t0 >= Career.ImpactHoldS - 1e-3 && holdMax <= 1 + 1e-6 && Math.Abs(holdS - hold[0].t0) <= 1.0 / 60 + 1e-3,
                         $"18{(want == 3 ? "a" : "b")} impact hold {label}: the 1× hold began {(first >= 0 ? hold[0].t0 : double.NaN):0.0000} s before the impact (20 to 20.01), {hold.Count} frames to it ran at ≤ {holdMax:0.000000}× (≤ 1), " +
                         $"{holdS:0.000} s of sim time (the hold's start ± one 1/60 s update)");
-                    Check(hit && Math.Abs(flight - want0) <= 1.0 / 60 + 1e-3,
-                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: the salvo hit {flight:0.0000} s after it was put {km:N0} km out from rest (closed form {want0:0.0000} s ± one 1/60 s update), the warp and the hold notwithstanding");
+                    // jd's grid (~40 µs) rounds each step the scene takes, and the missiles fly the frame's time, so jd drifts by
+                    // up to half a grid a frame from their clock (about 11 µs at 1×, an old split this does not fix)
+                    double grid = (BitConverter.Int64BitsToDouble(BitConverter.DoubleToInt64Bits(jd) + 1) - jd) * 86400, drift = rows.Count * grid / 2;
+                    Check(hit && Math.Abs(flight - want0) <= 1.0 / 60 + 1e-3 + drift,
+                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: the salvo hit {flight:0.0000} s after it was put {km:N0} km out from rest (closed form {want0:0.0000} s ± one 1/60 s update and {drift:0.0000} s: half of jd's {grid * 1e6:0} µs grid on each of {rows.Count} frames), the warp and the hold notwithstanding");
                     Check(hit && plumeWrong == 0 && plumeOn > 0 && plumeOff > 0,
                         $"18{(want == 3 ? "a" : "b")} plume {label}: drawn on {plumeOn} frames and off {plumeOff} (both > 0: the burn is the first {Career.BurnS:0.0} s), {plumeWrong} frames (0) where it did not match the missile's burn");
                     double capAfter = career.WarpCap;
-                    Check(hit && career.Encounter == e && capAfter == cap && wAfter == want && fwAfter >= 0.9 * Math.Min(cap, WarpOf(want)) && fwAfter <= cap * (1 + 1e-9),
-                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: after the impact the cap is {capAfter:N0}× again ({cap:N0}), the warp {WarpOf(wAfter):N0}× is given back ({WarpOf(want):N0}× asked once, before the salvo), and the next frame ran at {fwAfter:N0}×");
+                    int wBack = Math.Min(want, RungOf(capAfter));
+                    // 18a's raider is 12,000 km off, so its next event lets the setting back up too; 18b's, 300 km off, does not
+                    double rateBack = Math.Min(WarpOf(want), capAfter);
+                    Check(hit && career.Encounter == e && (want != 3 || wBack > 0) && wAfter == wBack && Math.Abs(fwAfter / rateBack - 1) < 0.02,
+                        $"18{(want == 3 ? "a" : "b")} impact hold {label}: after the impact the cap is {capAfter:N1}× (the raider's next event), the warp {WarpOf(wAfter):N0}× is given back ({WarpOf(wBack):N0}×: the highest under the cap and the {WarpOf(want):N0}× asked once, before the salvo), and the next frame ran at {fwAfter:N1}× ({rateBack:N1}×, the cap or the warp asked, ± 2 %)");
                 });
                 Put("warpIdx", 0);
             }

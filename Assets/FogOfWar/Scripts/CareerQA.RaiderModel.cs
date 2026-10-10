@@ -162,7 +162,8 @@ namespace FogOfWar
             if (go) go = Guard("raider model 17y warp", () =>
             {
                 double fw = Get<double>("frameWarp");
-                Check(career.Encounter == e && fw <= Career.CloseWarp && fw > 1, $"17y raider model: 1M× asked, the frame ran at {fw:N0}× (cap {Career.CloseWarp:N0}×, > 1×), chase on {career.Encounter == e}");
+                double cap = career.WarpCap;
+                Check(career.Encounter == e && Math.Abs(fw / cap - 1) < 0.01 && fw > 1, $"17y raider model: 1M× asked, the frame ran at {fw:N1}× (the cap: {cap:N1}× after the frame, ± 1 %; > 1×), chase on {career.Encounter == e}");
                 Placement($"at {fw:N0}×");
                 Put("warpIdx", 0);
             });

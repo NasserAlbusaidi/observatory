@@ -79,7 +79,8 @@ namespace FogOfWar.OpenWorld
         public const double PirateG = 1;                          // D1: the raider's drive, in g
         public const double RaidsPerHour = 0.2;                   // D3: k, calls per exposed hour (PirateRate)
         public const double BoardShare = 0.5, GiveUpShare = 0.25; // D5: the part of the job's pay, and of its tonnes for cargo
-        public const double ChaseWarp = 1000, CloseWarp = 100, CloseKm = 10000; // D7: the warp cap, and where it tightens
+        public const double ChaseWarp = 1000;                     // D7: the warp cap's top in a chase
+        public const double EventS = 10;                          // [design] Phase 5 point 1: the next event this many real seconds away, or more
         public const double CatchMinS = 2 * 3600, CatchMaxS = 6 * 3600;        // D11: the catch time a raider's start must give
         public const double GiveUpS = 3600;                       // #98: how long the catch stays past CatchMaxS before it breaks off
         public const double RepelS = 3600;                        // combat 4b (D9): held off with a spent magazine this long, it breaks off
@@ -115,19 +116,90 @@ namespace FogOfWar.OpenWorld
             }
         }
 
-        // The time compression the scene must hold to while a raider gives chase (0: none). The range is taken now, not at
-        // the last update, so the scene's cap before a frame's sim time is set is that frame's. A chase the raider can't win
-        // ends after GiveUpS (#98). 4c: 1× from ImpactHoldS before an impact; the scene ends the frame before it there.
+        // True for D11's 1× hold: the next impact ImpactHoldS away or less
+        public bool ImpactHeld => ImpactInS <= ImpactHoldS + ImpactSlackS;
+
+        // The time compression the scene must hold to while a raider gives chase (0: none). Phase 5 point 1: the cap follows
+        // time, not range: the next event (ChaseEvents) EventS of real time away or more, at most ChaseWarp, at least 1×.
+        // The positions are read now, not at the last update, so the scene's cap before a frame's sim time is set is that
+        // frame's. 4c: 1× from ImpactHoldS before an impact; the scene ends the frame before it there.
         public double WarpCap
         {
             get
             {
-                var e = Encounter;
-                if (e == null) return 0;
-                if (ImpactInS <= ImpactHoldS + ImpactSlackS) return 1;
-                double range = ship != null ? (e.Pirate.Pos - ship.Pos).Mag : e.Range;
-                return range < CloseKm || e.Dwell > 0 ? CloseWarp : ChaseWarp;
+                if (Encounter == null) return 0;
+                if (ImpactHeld) return 1;
+                return Math.Max(1, Math.Min(ChaseWarp, EventInS / EventS));
             }
+        }
+
+        // Phase 5 point 1: what the cap waits for
+        internal enum ChaseEvent { Impact, Fire, Alongside, Boarded, Flip, Arrival }
+
+        readonly List<(ChaseEvent what, double s)> chaseEvents = new List<(ChaseEvent, double)>();
+
+        // the seconds to the soonest event of the chase (ChaseEvents); infinite with none
+        public double EventInS
+        {
+            get
+            {
+                ChaseEvents(chaseEvents);
+                double t = double.PositiveInfinity;
+                foreach (var x in chaseEvents) t = Math.Min(t, x.s);
+                return t;
+            }
+        }
+
+        // Phase 5 point 1: each event ahead in the chase and its seconds from now, each a closed form that is never late. The
+        // next impact (Missile.ImpactInS). The raider at FireKm while it has missiles and none in flight, and alongside
+        // (InterceptKm, and InterceptKms: the speed to lose takes |v| − InterceptKms over a at least), at ReachInS on its
+        // drive and the ship's thrust toward it. A boarding, alongside with no mount bearing. Under the player's Fast plan,
+        // the flip (or the end of the cruise) and the arrival.
+        internal void ChaseEvents(List<(ChaseEvent what, double s)> into)
+        {
+            into.Clear();
+            var e = Encounter;
+            if (e == null) return;
+            double impact = ImpactInS;
+            if (impact < double.PositiveInfinity) into.Add((ChaseEvent.Impact, impact));
+            if (ship == null) return;
+            var r = e.Pirate.Pos - ship.Pos;
+            var v = e.Pirate.Vel - ship.Vel;
+            double d = r.Mag, u = d > 1e-9 ? -D3.Dot(r, v) / d : 0;
+            double toward = d > 1e-9 ? D3.Dot(ship.Heading, r / d) : 0;
+            double a = PirateG * Ship.G0 + Math.Max(0, ship.Throttle * ship.AMax * toward);
+            if (e.Magazine > 0 && e.Missiles.Count == 0) into.Add((ChaseEvent.Fire, ReachInS(d - FireKm, u, a)));
+            if (!(d < InterceptKm && v.Mag < InterceptKms)) into.Add((ChaseEvent.Alongside, Math.Max(ReachInS(d - InterceptKm, u, a), (v.Mag - InterceptKms) / a)));
+            else if (MountsBearing(ship, r) == 0) into.Add((ChaseEvent.Boarded, Math.Max(0, Threat.BoardingSeconds - e.Dwell)));
+            if (!ship.PlanActive || ship.Plan != Plan.Brachistochrone || ship.Target == null) return;
+            var T = ship.Target;
+            double dist = Math.Max((e.Sys.Pos(T, jd) - ship.Pos).Mag - Ship.Standoff(T), 0), am = ship.AMax;
+            var (uT, wT) = ship.RelToTarget(e.Sys, jd);
+            if (!(am > 0)) return;
+            into.Add((ChaseEvent.Arrival, Ship.TripFrom(dist, am, uT, wT, ship.CruiseCap).t));
+            double brake = BrakeInS(dist, uT, am, ship.CruiseCap);
+            if (brake > 0) into.Add((ChaseEvent.Flip, brake));
+        }
+
+        // The seconds to close s km from a closing speed u (negative: opening) at a straight acceleration a: s = u·t + a·t²/2,
+        // t = 2s / (u + √(u² + 2as)), which keeps its digits when u ≫ a·t. 0 when s ≤ 0. Nothing closes faster from there,
+        // so it is a lower bound on the raider's real time.
+        internal static double ReachInS(double s, double u, double a)
+        {
+            if (!(s > 0)) return 0;
+            if (!(a > 0)) return u > 0 ? s / u : double.PositiveInfinity;
+            return 2 * s / (u + Math.Sqrt(u * u + 2 * a * s));
+        }
+
+        // The seconds until Ship.Guide's Fast plan starts to brake: it steers the closing speed onto √(2 · 0.85a · d), so
+        // from u at d it flips where (u + a·t)² = 1.7a·(d − u·t − a·t²/2), at v = √((1.7a·d + 0.85u²) / 1.85). With a
+        // cruise cap below that it brakes at d = cap² / 1.7a, after the climb to the cap and the coast. 0 or less: braking.
+        internal static double BrakeInS(double d, double u, double a, double cap)
+        {
+            double vf = Math.Sqrt((1.7 * a * d + 0.85 * u * u) / 1.85);
+            if (!(cap > 0) || vf <= cap) return (vf - u) / a;
+            double climb = Math.Max(0, (cap - u) / a), climbKm = Math.Max(0, (cap * cap - u * u) / (2 * a));
+            return climb + Math.Max(0, d - climbKm - cap * cap / (1.7 * a)) / cap;
         }
 
         // The body a raider waits at for job c: the job's target on the second half of the trip, the posting port on the first.
@@ -353,7 +425,7 @@ namespace FogOfWar.OpenWorld
 
         internal enum BreakOff { Docked, Landed, JobOver, Patrol, Outrun, Lost, Repelled }
         internal const string DryNote = "Can't divert: the tank is dry", NavNote = "Can't divert: the nav computer would not engage";
-        internal static string RunNote => $"Running: burn hard, or dock first. Time is held to {ChaseWarp:N0}×";
+        internal static string RunNote => "Running: burn hard, or dock first. Time slows as the raider closes";
         internal static string DivertNote(Port p) => $"Diverting to {p.Name}, into the {Factions[(int)p.Owner].Name} patrol's reach";
         internal static string LostNote(string haven) => "The chase was not saved: the raider is gone" + Back(haven);
         internal static string BoardedNote(double t, double pay, string haven) => "Boarded: the raider took " + Loot(t, pay) + (haven != null ? " back to " + haven : "");

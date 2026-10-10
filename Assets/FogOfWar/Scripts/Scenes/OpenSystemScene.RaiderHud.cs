@@ -206,12 +206,12 @@ namespace FogOfWar
 
         // ---------------------------------------------------------------- the flight log
 
-        // the recorder's discrete field: which raider, and how near (the warp cap follows the same line)
+        // the recorder's discrete field: which raider, and how near
         string RecRaider()
         {
             var e = career?.Encounter;
             if (e == null) return "-";
-            return e.Proxy.Name + (e.Dwell > 0 ? " alongside" : e.Range < Career.CloseKm ? " close" : " chasing");
+            return e.Proxy.Name + (e.Dwell > 0 ? " alongside" : e.Range < Career.FireKm ? " in range" : " chasing");
         }
 
         // combat 4a: the missiles in flight and left, 4b's kills, and 4c's 1× hold before an impact; changes only on a salvo,
@@ -219,7 +219,7 @@ namespace FogOfWar
         string RecMissiles()
         {
             var e = career?.Encounter;
-            return e == null ? "-" : $"{e.Missiles.Count} in flight, {e.Magazine} left, {e.Killed} killed" + (career.WarpCap == 1 ? ", held 1×" : "");
+            return e == null ? "-" : $"{e.Missiles.Count} in flight, {e.Magazine} left, {e.Killed} killed" + (career.ImpactHeld ? ", held 1×" : "");
         }
 
         // ---------------------------------------------------------------- review checks

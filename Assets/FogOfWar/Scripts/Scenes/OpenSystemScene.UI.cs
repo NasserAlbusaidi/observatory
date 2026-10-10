@@ -360,6 +360,9 @@ namespace FogOfWar
         // QA-025: under a 2 % shortfall the frame budget costs nothing worth a note
         const double WarpLimitedShare = 0.98;
         internal bool WarpLimitedShown => Time.realtimeSinceStartup - limitedAt < 2f && effectiveWarp < Warps[warpIdx] * WarpLimitedShare;
+        // Phase 5 point 1: a chase runs the frame at its cap, above the setting under it (FrameRate)
+        internal bool ChaseRateShown => effectiveWarp > Warps[warpIdx] * (2 - WarpLimitedShare);
+        string WarpNote => WarpLimitedShown ? $"limited: running at {Fmt.Num(effectiveWarp, 0)}×" : ChaseRateShown ? $"chase: running at {Fmt.Num(effectiveWarp, 0)}×" : null;
 
         public override void Readouts(List<Readout> list)
         {
@@ -367,7 +370,7 @@ namespace FogOfWar
             var date = Frame.UtcFromTdb(jd);
             list.Add(new Readout("Date (UTC)", date.ToString("yyyy-MM-dd HH:mm")));
             bool limited = WarpLimitedShown;
-            list.Add(new Readout("Time compression", WarpNames[warpIdx] + (limited ? $" (limited: running at {Fmt.Num(effectiveWarp, 0)}×)" : ""), limited ? Tone.Bad : Tone.Normal));
+            list.Add(new Readout("Time compression", WarpNames[warpIdx] + (WarpNote != null ? $" ({WarpNote})" : ""), limited ? Tone.Bad : Tone.Normal));
             list.Add(new Readout("Flight model", FlightModel, Tone.Normal));
             if (ArrivalNotice != null) list.Add(new Readout("Arrival boundary", ArrivalNotice, ship.Landed != null ? Tone.Normal : Tone.Bad));
             var refPos = sys.Pos(reference, jd);

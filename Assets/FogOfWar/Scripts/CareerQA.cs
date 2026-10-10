@@ -391,6 +391,7 @@ namespace FogOfWar
             yield return PursuitChecks();
             yield return PirateChecks();
             yield return DefenseChecks(); // 17: raider missiles, damage, armor and repairs (CareerQA.Defense.cs)
+            yield return EncounterFlowChecks(); // 20: Phase 5's encounter flow (CareerQA.EncounterFlow.cs)
 
             yield return DevMenuChecks(); // 19: the dev menu (CareerQA.DevMenu.cs)
             State("end");
