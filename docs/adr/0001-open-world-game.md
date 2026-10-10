@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-10
-- Source: Nasser's decision, 2026-10-10
+- Source: Nasser's decision, 2026-10-10. Plan: [plan-observatory-split.md](../plan-observatory-split.md)
 
 ## Decision
 
