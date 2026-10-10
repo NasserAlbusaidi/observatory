@@ -1271,7 +1271,7 @@ Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a r
 
 ## Impact effects (added 2026-10-10)
 
-A look only: no rule, number or draw in `Career` changes. It replaces 4c's hit flash and builds on it, so Phase 5's hits on a raider use the same parts.
+A look only, except the momentum kick (below): no other rule, number or draw in `Career` changes. It replaces 4c's hit flash and builds on it, so Phase 5's hits on a raider use the same parts.
 
 ### The rule
 
@@ -1298,7 +1298,7 @@ A raider missile hits at 10 km/s or more (Phase 4). No warhead is needed: the ki
 - **The eye.** The exposure meter counts the flash. The frame whites out, then the eye closes over 0.35 s while the glow fades to orange, so the hull reads dark for a moment after.
 - **The core.** The glowing spot itself, a few metres across, takes the same colour and brightness.
 - **The kill flash** is a PDC round on the missile, a much smaller energy. It stays as 4c built it until fx-2 adds its debris.
-- **Momentum (not in fx-1).** 100 kg at 10 km/s gives a 300 t ship 3.3 m/s [calc]. That changes the flight, so it needs its own decision.
+- **Momentum (agreed 2026-10-10).** Every missile at impact gives the ship its momentum, m·V / M along its flight (`Career.Kick`, in `Strike`): 3.3 m/s to a 300 t ship at 10 km/s [calc]. It uses the ship's mass now, so a full tank takes less. It applies whether the plating stops the missile or not, and to a killed missile too: most kills are in the last 200 m (the straight run holds 0.398 of the 0.537 exponent), where the debris spreads a few metres at most [calc]. The spray thrown back off the hull is left out (momentum factor 1) [design]. No draw, so the seeded draws do not move. QA 17d checks it.
 
 ### The sparks (fx-2)
 

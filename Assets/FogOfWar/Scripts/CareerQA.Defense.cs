@@ -221,6 +221,22 @@ namespace FogOfWar
                 double pct = stopped / 100.0;
                 Check(Math.Abs(pct - want) <= 2, $"defense 17d: {b.C.Build[Slot.Armor].Name} stops {stopped:N0} of 10,000 seeded hits: {pct:0.00} % ({want} ± 2)");
             }
+
+            // the momentum kick: one missile's m·V / M along its flight, the same whether the plating stops it or not
+            foreach (int pick in new[] { 0, 2 })
+            {
+                var k = MakeBench(qs, at, vel);
+                k.C.Build.pick[(int)Slot.Armor] = pick;
+                k.C.Apply(k.Ship);
+                k.C.SeedCombat(31);
+                var from = new D3(0, 3, 4);
+                double mass = k.Ship.Mass, want = Career.MissileKg * Career.MissileDvKms / (mass * 1000);
+                var v0 = k.Ship.Vel;
+                k.C.Strike(k.Ship, from, Career.MissileDvKms);
+                var dv = k.Ship.Vel - v0;
+                Check(Math.Abs(dv.Mag - want) < 1e-9 * want && D3.Dot(dv.Norm, -from.Norm) > 1 - 1e-9,
+                    $"defense 17d: a strike on {k.C.Build[Slot.Armor].Name}, {mass:N0} t: Δv {dv.Mag * 1e3:0.000} m/s (m·V / M {want * 1e3:0.000}), along its flight {D3.Dot(dv.Norm, -from.Norm):0.000000}");
+            }
         }
 
         // 17e: each effect and its floor, one hit at a time
