@@ -1453,6 +1453,64 @@ Nasser chose each as recommended. Each PR's touch and QA list still comes when i
 
 Open at 5d start: where the Interceptor zones are.
 
+### PR 5b: touch and QA list (proposed 2026-10-10)
+
+Three commits, each gated with `career` and playable alone: the bounty job, then the Runner doctrine, then the ambush. Code read on `main` at c4b38f1.
+
+**What exists.** The intercept job already flies a runner: a `Rail` from `RunFrom` at `T0` to `RunTo` at `T1`, peak drive near `RunnerG` 0.25 g, a `Fleet.json` hull (`Runners`, `Career.Intercept.cs:39`) [code]. Its course is saved in the job (`RunFrom`, `RunTo`, `T0`, `T1`), and `SpawnDerelict` puts its body in the system on accept and on load. The board posts only a runner the ship can catch (`Catchable`, `NeedTonnes`, `Rail.Check`). A runner that arrives fails the job with the standing loss (`Intercepts`, `:119`). The bounty reuses all of it.
+
+**Commit 1: the bounty job** (`Career.Bounty.cs`, new; `JobKind.Bounty`).
+- A new kind, not an intercept flag: it completes differently and pays differently. It is board slot 7's intercept, made a bounty in 1 slot of 3 [design]. The slot's key picks it, not a draw, so the board's draws do not move (ADR 0004). No cargo: `Tonnes` 0.
+- **Posted** with the intercept's filters (`Catchable`, `NeedTonnes`, `Rail.Check`). In commit 1 the runner flies its rail and never answers.
+- **Catch and board** (decision 1). Alongside is the intercept rule (`InterceptKm` 500 km, `InterceptKms` 0.1 km/s, any throttle, 30 s a frame at most). Alongside for `Threat.BoardingSeconds` (2 h) boards the runner. A break resets the clock, as for a raider. `TransferInProgress` caps the warp while the clock runs, as for an intercept.
+- **The pay** (decision 2). The bounty only, on the board: `RefPay(gap, 0, 1) × 3.2 + 6,000` [design], twice an intercept with no cargo. 22,400 cr at 10 million km, 27,200 at 30 million, 36,100 at 100 million [calc]. Standing gain as for a delivery.
+- **A runner that docks first** (decision 3): at `T1`, `Failed++`, the standing loss, the note "Missed: the Halcyon docked at Ceres". The intercept's fail path.
+- **`CanAccept`, `TargetOf`, `SpawnDerelict`, `RemoveDerelict`, the dry-tank fail** (`Career.cs:212`): Bounty joins Intercept in each.
+- **The board's intel** (point 3), in both shells (ADR 0007): the classic `ContractBoard` (`OpenSystemScene.Career.cs:395`) and the console's Jobs page (`OpenSystemScene.CareerHud.cs:395`). Four lines, built in `Career` so QA can read them:
+  - The rendezvous with the build now: the first meeting time `Catchable` finds, at the ship's mass now, not a full tank. "Alongside in 9 h 20 min at full burn."
+  - The water after it: the tank less `NeedTonnes` at full burn, less the 2 h hold flying with the runner (its peak drive × 2 h of Δv) [calc]. "About 61 t of water left after the boarding."
+  - The threat: the hull class and "unarmed" (5b runners have no mounts or missiles) [code: `Fleet.json`].
+  - The track: "Burning: seen now", or, once commit 2 lets it go dark, "Dark: last burn seen 12 min ago".
+- Active job line, both shells: "board it: hold within 500 km and 100 m/s for 2 h", then "boarding, 40 %".
+- QA (`CareerQA.Bounty.cs`, new section): a posted bounty is catchable and clear; accept spawns the runner body and a load keeps it; a ship placed alongside boards at 2 h and is paid the bounty and nothing else (hold mass, cargo unchanged); a break at 1 h 59 min resets the clock; `T1` reached fails it with the standing loss; the four intel lines on the board with their numbers in both shells; slots 0–6 and 8–9 of a board are the same with the change and without it.
+
+**Commit 2: the Runner doctrine** (point 5). The runner wants to reach a port.
+- **Its sight.** Stock sensors: it sees the player at `Signature.RangeKm(JetW, StockKm, ColdW)`. The stock ship at full burn is seen from 35 million km; a cold stock hull at 10,000 km; a stowed frigate at 3,000 km [calc].
+- **The catch it fears:** the player alongside, then 2 h more to board: `CatchSeconds` of the player's ship on the runner at the player's drive, plus `Threat.BoardingSeconds`.
+- **When it answers.** The first update it sees the player with that catch before its own arrival at `T1`. Again only after the player has been out of its sight for its hold (below).
+- **Its answers, in order** [design]. The first that docks it before the catch is taken. No draw (ADR 0004).
+  1. **Run:** a new leg to the same port at its top drive, `RunnerTopG` 0.5 g [design], so it docks sooner.
+  2. **Divert:** a new leg to the port it reaches soonest at `RunnerTopG`, if that is before the catch.
+  3. **Go dark:** the drive off. It coasts. Neither 1 nor 2 docks it in time.
+- **A leg's arrival time.** A leg is fixed by its `T1`; its thrust follows from it. So a leg "at a drive" is the earliest `T1` whose leg peaks at or under that drive (the larger end acceleration, as `RunnerPeakG`) and passes `Rail.Check`. A search over `T1`, as `Catchable` searches its meeting times. Run and divert use `RunnerTopG`; the relight after dark uses `RunnerG`.
+- **Posted only if winnable.** One more board filter: the ship catches the runner at full burn even if it runs at once (the run leg from its state at posting, `CatchMargin` 1.3). So a straight burn at full drive always wins a bounty.
+  - What this means: a full-burn player is seen from 35 million km, so at first sight the run cannot win and nearly every bounty's first card is "it goes dark", soon after the undock. It relights after its 2 h hold into a 1 g chase. Run and divert show only when the player coasts, starts late or flies heavy.
+- **A dark runner.** The player's track on it is lost when it has been out of the player's cold range (`Signature.SensorKm`) for its hold, `Signature.TrackHoldS` (2 h: the fleet hulls cannot stow radiators) [design]. The runner lights its drive again after its hold, on a new leg to the port it reaches soonest at `RunnerG`. Its burn is loud, so the player sees it again.
+- **A lost runner leaves the system.** Its body leaves `sys.Bodies`, and `TargetOf` returns null for it (no `Preview` for an active job: `Preview` builds the true runner). If the ship's target is that body, the career clears the target and stops the plan, with `DropWarp` and the note "Track lost: the Halcyon is dark", as the dry-tank fail ends a rendezvous. The map keeps a marker at its last fix. The body comes back on its next burn.
+- **The map draws the legs.** `OpenSystemScene.Orbits.cs:79` draws one rail from `T0` to `T1`; it draws the chain of legs instead, up to now while lost.
+- **Legs, saved.** A new course is a leg on the job: `Contract.Legs`, each (port, `T0`, `T1`, dark), and each starts from the last leg's state at its `T0`. A save without legs reads as the first rail. A job is saved, so ADR 0008 (a chase is not saved) does not apply: the runner's course is a job's lasting state. `Rail` gets a second constructor: from a state (position and velocity) at `T0` to a body at `T1`. A coast leg is a straight line: the rails leave out gravity. Each leg must pass `Rail.Check`, or that answer is not taken. The job's deadline follows the last leg's `T1`.
+- **The card** (point 2: a target's change of burn). Each answer drops the warp to 1× and shows a card: "The Halcyon runs. It saw your burn 210,000 km off. It now docks at Ceres in 6 h 10 min; you are alongside in 7 h 40 min at full burn: it docks first". Answers Continue and Revise, as the Threat card has. Both shells.
+- QA: a runner placed with a burning player 200,000 km off, catch before its arrival: it runs; with a nearer port reached sooner: it diverts; with neither: it goes dark; each new leg's peak is at or under its drive and passes `Rail.Check`; the legs survive a save and load at the same position to 1 m; a dark runner out of range for 2 h leaves the system, the target and plan clear with the note, and it is back on its next burn; each answer gives one card; no answer while the player is unseen; every posted bounty is caught by a straight full burn against the run leg.
+
+**Commit 3: the ambush** (point 6).
+- The bounty states the runner's destination and its arrival (the job line). Its course is drawn on the map while it is seen, as an intercept runner's is (`OpenSystemScene.Orbits.cs:79`).
+- **The geometry in 5b** [calc]. A catch is a 2 h hold before the runner docks. Near the end of its rail it brakes at about 0.25 g, so 2 h before the dock it is about 63,500 km out at 17.7 km/s.
+- **But a seen waiter makes it run.** At 0.5 g from that braking line, the runner docks in 0.72 of the time it had left [calc]. So when it first sees the ambusher, it must still have 2 h 46 min to its dock, or the run docks it first: about 121,000 km out from the port, at 24 km/s toward it.
+- So the ambusher coasts dark down the approach line, at about that speed, and is seen first beyond that point. A stowed frigate is seen at 3,000 km only; its hold is 36 min.
+- **The finding.** With catch and board, the ambush is a tight puzzle in 5b. It becomes the natural move in 5c, when a torpedo needs a firing solution and no 2 h hold.
+- **The runner's answer to a waiter.** The same rule as commit 2: run, else divert, else dark.
+- The job line adds where the brake starts: "It brakes from about 63,500 km out, 2 h before it docks" [calc from its rail].
+- QA: a stowed frigate placed dark on the approach line, matched, 3 h 30 min before the dock (a margin over 2 h 46 min for the time to come alongside): the runner sees it only inside 3,000 km, cannot dock before the catch, goes dark, and the player boards. The same at 2 h before the dock: the runner runs and docks first.
+
+**Left out of 5b** [design]: the runner brakes early or late (it needs a rail with a free end speed); a runner's sink (the fleet hulls have none); any weapon (5c). The warp cap from the time to the next event stays a raider rule (ADR 0006): a runner fires nothing, and each of its answers drops the warp with its card.
+
+**Picks for Nasser** (recommended values above):
+1. The bounty's pay: `RefPay(gap, 0, 1) × 3.2 + 6,000`.
+2. How often a bounty posts: 1 time in 3 in the intercept slot.
+3. The runner's top drive for run and divert: 0.5 g, twice its rail's peak.
+4. The order of the runner's answers: run, then divert, then go dark.
+5. A bounty posts only if a straight burn at full drive catches it even when it runs at once. So most bounties open with "it goes dark" (commit 2).
+
 ## Impact effects (added 2026-10-10)
 
 A look only, except the momentum kick (below): no other rule, number or draw in `Career` changes. It replaces 4c's hit flash and builds on it, so Phase 5's hits on a raider use the same parts.
