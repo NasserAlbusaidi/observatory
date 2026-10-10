@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built (#192). PR 4c is built: the raider's model (#191) and the rest (#193, `pdc-fx`). Phase 5's encounter flow and build plan are agreed (2026-10-10); nothing in Phase 5 is built. Phase 6 is not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built (#192). PR 4c is built: the raider's model (#191) and the rest (#193, `pdc-fx`). Phase 5's encounter flow and build plan are agreed (2026-10-10). PR 5-0 (#197) and PR 5a (#203) are built. The open decisions for 5b–5d are agreed (2026-10-10, "Decisions for 5b–5d"); 5b–5d are not built. Phase 6 is not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -28,7 +28,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
 | 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f (#188) (the corvette's own model). Phase 3 is complete |
 | 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built (#190); 4b (`pdc-mounts`) built (#192); 4c built (the raider's model #191; `pdc-fx` #193) |
-| 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | Agreed (2026-10-10); PRs 5-0, 5a–5d not built |
+| 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | Agreed (2026-10-10); 5-0 and 5a built; 5b–5d not built |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
 
 ## Phase 1: the shipyard
@@ -1162,7 +1162,7 @@ All are agreed as recommended.
 - **Munitions are a money sink** (audit #4).
 - **The Kzinti lesson:** your drive is your biggest weapon. A pursuer straight behind flies into a 24 TW jet. So attackers come in from the side.
 - **Jobs:**
-  - Bounty: catch a runner, kill its drive, dock, take the hold.
+  - Bounty: catch a runner, board it, take the bounty (5b decisions 1–2, agreed 2026-10-10).
   - Escort: take one of the six `Fleet.json` hulls through a threat bubble.
 
 ### Encounter flow (added 2026-10-09)
@@ -1272,7 +1272,7 @@ Build the Runner first, with bounty jobs (5b). Escort and Interceptor come later
 - The player gets the same move as a bounty mode. The bounty gives the runner's destination. The player goes dark near it (Phase 3) and waits.
 - The runner's braking burn shows it to the sensors. Its course is then known for hours. So the player gets a firing solution without a chase.
 - **The limit is heat.** The sink sets how long the player stays dark (Phase 3). A wait that starts too early fails.
-- **The geometry.** A braking ship points its plume at its destination. When D13's plume lands, the ambusher must wait off the axis [design].
+- **The geometry.** A braking ship points its plume at its destination. D13's plume burns weapons only, not ships (agreed 2026-10-10), so the ambusher may wait on the axis. But a weapon it fires up the lit plume is destroyed, so it fires from off the axis, or after the burn ends [design].
 - The runner's answers: brake early or late, burn off the axis, or divert to another port (Runner doctrine, point 5).
 
 **7. The torpedo is the chase weapon.**
@@ -1299,7 +1299,7 @@ Build the Runner first, with bounty jobs (5b). Escort and Interceptor come later
 
 ### Torpedoes and missiles: range against certainty (proposed 2026-10-10)
 
-Proposed by Nasser and the impact-fx session. Not agreed in full, and not built. The combat session builds 5c from it. The open items are at the end.
+Proposed by Nasser and the impact-fx session. Its open items are agreed (2026-10-10, "Decisions for 5b–5d"); not built. The combat session builds 5c from it.
 
 **The rule.** A missile is short range and sure. A torpedo is long range, heavy and easy to avoid, but a hit disables the ship. The attacker chooses: come close for a sure hit, or stay far and risk a miss.
 
@@ -1367,7 +1367,7 @@ Proposed by Nasser and the impact-fx session. Not agreed in full, and not built.
 
 **The tow** (agreed 2026-10-10). A disabled ship calls a tow from the nearest port.
 - **Time:** a flip-and-burn at 1 g from the port [design]: t = 2·√(d / a). 5.6 h from 1 million km, 17.7 h from 10 million km [calc].
-- **Price:** by the tow's time: 20,000 cr (as the emergency tender) plus a rate per hour [design, number open].
+- **Price:** by the tow's time: 20,000 cr (as the emergency tender) plus 2,500 cr an hour (agreed 2026-10-10) [design]. 34,000 cr from 1 million km; 64,250 cr from 10 million km [calc].
 - **The race.** The raider's time to the ship against the tow's. If the raider gets there first, it boards (Phase 4 boarding: the PDCs that still work keep it off). Then the tow still comes.
 - **The escort.** The tow comes with one corvette, flown with the Escort doctrine (point 5) [design]. A raider does not attack an escorted tow on the way home [design].
 
@@ -1391,10 +1391,7 @@ The attacker's answers: fire from closer, fire salvos from different sides, fire
 - **No save scumming.** The game autosaves at the moment of the loss, as it does for Give up (#99), and the career has one save slot. A load then shows the loss; it cannot undo it [design].
 - **Not chosen:** a reload of the last save with a penalty. A penalty kept outside the save is easy to get around (clear the game's data), and the lease already gives a way back.
 
-**Open (Nasser):**
-1. The deductible (10 % above).
-2. The tow's rate per hour.
-3. The torpedo's numbers (60 km/s, 2 m², 2 t) are a first set, for play tests (agreed 2026-10-10). Price and magazine are open.
+**Settled (2026-10-10):** the deductible (10 %), the tow's rate (2,500 cr an hour), and the torpedo's price and magazine (15,000 cr; 4 aboard). See "Decisions for 5b–5d". The torpedo's numbers (60 km/s, 2 m², 2 t) stay a first set, for play tests.
 
 ### Build plan (agreed 2026-10-10)
 
@@ -1430,7 +1427,31 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. E
   - The Report card does not drop the warp and does not block a new call: a new call replaces it. `RouteTick`'s drop rule (the job over) does not apply to it.
   - QA: a chase with 6 mounts, seeded: the lines match the notes and the recorded aspects; each end gives its cause; a load gives no card; both shells draw it.
 
-Settled before 5a: "a step" in point 2 (2026-10-10). Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
+Settled before 5a: "a step" in point 2 (2026-10-10). The open items for 5b–5d are settled below.
+
+### Decisions for 5b–5d (agreed 2026-10-10)
+
+Nasser chose each as recommended. Each PR's touch and QA list still comes when it starts.
+
+**5b: bounty jobs**
+1. **The player stops a runner by catch and board** [design]. The player has no weapon until 5c, and each PR must be playable alone. A catch is alongside and matched (`InterceptKm` 500 km, `InterceptKms` 0.1 km/s), then the boarding time, as a raider boards the player in Phase 4. Runners are unarmed in 5b: the `Fleet.json` hulls have no PDC mounts [code]. The runner's answers: run, divert, go dark. From 5c a torpedo can disable an armed runner first.
+2. **A caught runner pays the bounty only** [design]. The runner and its cargo go to the port authority. The player's hold takes nothing.
+3. **A runner that docks first fails the job** as an expired job does: no pay, a failure, the standing loss [design].
+
+**5c: torpedoes**
+4. **D13, the plume, burns weapons only** [design]. A missile or torpedo that arrives inside the plume cone while the drive burns is destroyed. It is a fixed test at impact, with no draw (ADR 0003). The plume does not burn ships. The cone's angle is set when 5c starts.
+5. **A torpedo hit on a raider ends the chase, with no reward** [design]. The torpedo table decides disabled or destroyed; either way the raider is gone. The reward is the player's job, saved. Nothing new is saved (ADR 0008). This ends D15 for torpedoes.
+6. **A torpedo costs 15,000 cr** [design]. One or two cost about one raider call on a risky job (19,720 cr with no gear, point 4).
+7. **The ship carries 4 torpedoes**, 8 t aboard on every trip [design].
+8. **The tow costs 20,000 cr plus 2,500 cr an hour** [design]: 34,000 cr from 1 million km, 64,250 cr from 10 million km [calc].
+9. **The deductible is 10 %**, 100,000 cr, for a destroyed leased ship; debt is allowed [design].
+
+**5d: player missiles and escorts**
+10. **The player's missile is the raider's**: 100 kg, 30 g until it adds 10 km/s, fired from `FireKm` 2,000 km in salvos of 2 [code]. The Phase 4 numbers and the saturation readout apply as they are.
+11. **A missile costs 2,000 cr** [design]. A full magazine of 6 is 12,000 cr, less than one torpedo.
+12. **An escort job pays 2.5× a cargo job on the same route** (`RefPay`) [design].
+
+Open at 5d start: where the Interceptor zones are.
 
 ## Impact effects (added 2026-10-10)
 
