@@ -503,8 +503,8 @@ namespace FogOfWar
                 string two = $"2 PDC mounts, 6 t: one bearing kills {PointDefense.KillChance(1, Career.MissileDvKms) * 100:0} % of missiles at 10 km/s";
                 int head = CountText(box, "PDCs"), row = CountText(box, two), fitted = CountText(box, "4 PDC mounts, 12 t: one bearing kills 10 % of missiles at 10 km/s (fitted)");
                 string want = R<string>("RepairLine", false);
-                Check(head == 1 && row == 1 && fitted == 1 && want.StartsWith("Repair all: 7,500 cr, ", StringComparison.Ordinal) && CountText(box, want) == 1,
-                    $"defense 17v: the Jobs page docked at Ceres draws the \"PDCs\" head {head} time (1), \"{two}\" {row} (1), the 4 fitted {fitted} (1), and \"{want}\" (a mount at 25 % of 30,000, 1 day)");
+                Check(head == 1 && row == 1 && fitted == 1 && want.StartsWith("Repair all: 0 cr, ", StringComparison.Ordinal) && CountText(box, want) == 1,
+                    $"defense 17v: the Jobs page docked at Ceres draws the \"PDCs\" head {head} time (1), \"{two}\" {row} (1), the 4 fitted {fitted} (1), and \"{want}\" (0 cr: 3 mounts still worked, so the mount is free; 1 day)");
             });
             Guard("pdc scene cleanup", () =>
             {
