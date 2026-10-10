@@ -37,7 +37,8 @@ namespace FogOfWar.OpenWorld
         readonly bool[] used = new bool[Slots];
         readonly int[] kinds = new int[Slots];
         D3 velNow;
-        int next, last = -1;
+        int next, last = -1, held = -1; // held: the burst PinAge froze, at heldAge
+        float heldAge;
         uint serial;
 
         readonly ComputeShader cs;
@@ -133,12 +134,14 @@ namespace FogOfWar.OpenWorld
             used[i] = true;
             kinds[i] = kind;
             last = i;
+            held = -1;
             Fired++;
             LastKind = kind;
         }
 
-        // review checks: the newest burst of `kind` (0 hit, 1 kill) as if it started `age` s ago with no burn since; the
-        // others dropped. False without one.
+        // review checks: the newest burst of `kind` (0 hit, 1 kill) held at `age` s, with no burn since, until the next burst
+        // or Clear; the others dropped. Held, not started `age` s ago: kill debris crosses 167 m to the hull in 17 ms, so one
+        // slow QA frame would age it past the hull. False without one.
         public bool PinAge(int kind, float age)
         {
             int k = -1;
@@ -153,6 +156,8 @@ namespace FogOfWar.OpenWorld
             bursts[k].disp = Vector3.zero;
             vel0[k] = velNow;
             last = k;
+            held = k;
+            heldAge = age;
             return true;
         }
 
@@ -169,7 +174,7 @@ namespace FogOfWar.OpenWorld
             for (int i = 0; i < Slots; i++)
             {
                 if (!used[i]) continue;
-                float age = now - at[i];
+                float age = i == held ? heldAge : now - at[i];
                 if (age > life[i]) { used[i] = false; continue; }
                 // the pieces fly on as the ship burns: take away what the ship's change of velocity since the burst moved it
                 bursts[i].disp += Frame.U((shipVel - vel0[i]) * 1e3) * dt;
@@ -228,6 +233,7 @@ namespace FogOfWar.OpenWorld
             for (int i = 0; i < Slots; i++) used[i] = false;
             Count = 0;
             last = -1;
+            held = -1;
         }
 
         public void Dispose()
