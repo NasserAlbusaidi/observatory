@@ -18,8 +18,9 @@ namespace FogOfWar
     // a working mount that bears, none after the impact, none with every mount dead; 18h each from its PDC_n marker to the
     // missile; 18i a kill flash at the missile on MissileKilled. 18e nothing left once the chase ends; 18f the damage the hits
     // did and the build are undone. Shots of the salvo burning at the hold's start, coasting at 30 km and 1 km, the tracers,
-    // the kill and the hit, in both shells. 18j (fx-1): a beam hit seen close, shot at 0, 0.05, 0.15 and 0.4 s. The scene is put
-    // back at the end, after a failed or thrown check too.
+    // the kill and the hit, in both shells. 18j (fx-1): a beam hit seen close, shot at 0, 0.05, 0.15 and 0.4 s. 18k (fx-2): that
+    // hit's sparks shot at 0.05, 0.3, 1 and 3 s, thrown out on the side it came in on and fading; the kill's debris drawn. The
+    // scene is put back at the end, after a failed or thrown check too.
     public partial class CareerQA
     {
         IEnumerator MissileFxChecks()
@@ -299,6 +300,7 @@ namespace FogOfWar
                             $"the kill flash is {(t != null && t.gameObject.activeInHierarchy ? "on" : "off")} {off * 1000:0.0} m from the ship (≤ {OneFrameKm * 1000:0}: one 1× frame's flight at 10 km/s), {ang:0.000}° off the salvo's side (≤ 1)");
                     });
                     yield return Shot($"c18-kill-{shell}");
+                    yield return KillDebris();
                 }
                 Guard($"missile fx 18g {label}", () =>
                 {
@@ -396,6 +398,55 @@ namespace FogOfWar
                     $"the hull light then {string.Join(", ", lums)} × sunlight at 10 m (logged)");
             }
 
+            // 18k: the kill's debris (fx-2), its burst set 0.01 s old: the pieces drawn, the newest burst a kill's
+            IEnumerator KillDebris()
+            {
+                var sp = Get<Sparks>("sparks");
+                bool pinned = sp != null && sp.PinAge(1, 0.01f);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                Guard("missile fx 18k kill debris", () =>
+                {
+                    int drawn = sp?.Drawn() ?? 0;
+                    Check(sp != null && sp.Ok && pinned && drawn > 0,
+                        $"18k kill debris: sparks {(sp == null ? "never made" : sp.Ok ? "on" : "off (no compute shaders)")}, a kill burst {(pinned ? "found" : "missing")}, {drawn} pieces drawn 0.01 s after it (> 0)");
+                });
+                yield return Shot($"c18-kill-debris-{shell}");
+            }
+
+            // 18k: the hit's sparks (fx-2) after 18j's shots, the newest hit set to each age: thrown out on the side it came in
+            // on, fewer pieces as they cool
+            IEnumerator SparkShots()
+            {
+                var sp = Get<Sparks>("sparks");
+                var drawn = new List<int>();
+                float ang = 180;
+                bool pinned = true;
+                foreach (float at in new[] { 0.05f, 0.3f, 1f, 3f })
+                {
+                    pinned &= sp != null && sp.PinAge(0, at);
+                    yield return null;
+                    yield return new WaitForEndOfFrame();
+                    Guard($"missile fx 18k sparks {at:0.00} s", () =>
+                    {
+                        drawn.Add(sp?.Drawn() ?? 0);
+                        if (at != 0.3f || sp == null) return;
+                        // where the pieces are, from the hit, against the side the salvo came in on
+                        var root = Get<Transform>("shipT").parent;
+                        var hitAt = Get<Transform>("shipT").localPosition + Frame.U(HitF.Off);
+                        var mean = Vector3.zero;
+                        var heads = sp.Heads(4096);
+                        foreach (var h in heads) mean += root.InverseTransformPoint(h) - hitAt;
+                        if (heads.Length > 0) ang = Vector3.Angle(mean, Frame.U(HitF.Off.Norm)); // 18j's approach is put back by then
+                    });
+                    yield return Shot($"c18-sparks-{at * 1000:0000}ms-{shell}");
+                }
+                Guard("missile fx 18k sparks", () =>
+                    Check(sp != null && sp.Ok && pinned && drawn.Count == 4 && drawn[1] > 1000 && drawn[3] < drawn[1] && ang <= 60,
+                        $"18k sparks: {(sp == null ? "never made" : sp.Ok ? "on" : "off (no compute shaders)")}, the hit's burst {(pinned ? "pinned" : "missing")}; " +
+                        $"pieces drawn at 0.05, 0.3, 1 and 3 s: {string.Join(", ", drawn)} (> 1,000 at 0.3 s, fewer at 3 s); at 0.3 s their mean is {ang:0.0}° off the side the salvo came in on (≤ 60)"));
+            }
+
             // from rest: 2,000 km is the fire range's 217.0 s; 250 km is 42.0 s, the burn ending 80 km out, in the hold
             if (go) yield return RunHold("1000x", 3, 12000, Career.FireKm, false);
             if (go) go = Guard("missile fx camera", () => { career.DropContact(); Look(true); });
@@ -405,6 +456,7 @@ namespace FogOfWar
             if (go) yield return TracerRun(false);
             if (go) yield return TracerRun(true);
             if (go) yield return ImpactShots();
+            if (go) yield return SparkShots();
 
             // 18d: the flash is gone; 18e: nothing is left once the chase ends
             if (go)

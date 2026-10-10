@@ -7,8 +7,8 @@ namespace FogOfWar
 {
     // A raider's missiles on screen (combat 4c, docs/design-combat.md "In the scene"): each one in flight as a flare and, while
     // it burns, its 30 g plume, nose on the ship, a dot and tag in the Raiders' colour while it is too small to see; tracers from the PDC
-    // mounts that bear on it in its last 5 km; a flash at the hull when one hits, and at the missile when the PDCs kill it.
-    // Drawn only: the flight, the kill and the hit are Career.Volley's, at any warp.
+    // mounts that bear on it in its last 5 km; a flash at the hull when one hits, and at the missile when the PDCs kill it, each
+    // throwing its debris (fx-2, Sparks). Drawn only: the flight, the kill and the hit are Career.Volley's, at any warp.
     public partial class OpenSystemScene
     {
         // [design] the look, in km: no model, the drive's light. A 30 g torch's plume many bodies long; under MissilePx the
@@ -24,6 +24,9 @@ namespace FogOfWar
         Material missileFlareMat, missilePlumeMat;
         D3 missileLast;               // the nearest missile's P at the last draw: the side a hit comes in on
         double missileLastKms;        // and its closing speed then: the hit's energy
+
+        Sparks sparks;                // fx-2: the hits' and kills' debris, made on the first one
+        Sparks Spark() => sparks ??= new Sparks();
 
         // review checks: how many dots DrawMissiles drew last, and its summary
         int missileDots;
@@ -57,7 +60,7 @@ namespace FogOfWar
                 p.localPosition = new Vector3(0, 0, -MissilePlumeKm / 2);
                 missileT.Add(t); missilePx.Add(0);
             }
-            if (n == 0) { LateTracers(null); LateFlash(hitFlash); LateFlash(killFlash); return; }
+            if (n == 0) { LateTracers(null); LateFlash(hitFlash); LateFlash(killFlash); LateSparks(); return; }
             HullColliders(); // cooked while the salvo flies, not on the frame it hits
             float pxPerRad = UnityEngine.Screen.height / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
             double near = double.PositiveInfinity;
@@ -77,7 +80,7 @@ namespace FogOfWar
                 t.GetChild(0).localScale = Vector3.one * Mathf.Max(MissileFlareKm, MissileFlarePx / 2 * dist / pxPerRad / scale);
             }
             LateTracers(e);
-            LateFlash(hitFlash); LateFlash(killFlash);
+            LateFlash(hitFlash); LateFlash(killFlash); LateSparks();
         }
 
         void DestroyHolder(Transform t)
@@ -255,12 +258,14 @@ namespace FogOfWar
                 if (mf.sharedMesh != null && mf.sharedMesh.isReadable && mf.GetComponent<MeshCollider>() == null) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
         }
 
-        // The hull's surface on the line from its middle along `dir` (unit, sim frame), in km from the middle: a ray from
-        // outside against the hull's mesh. Half a hull length (4c's point) when the ray misses or there is no model.
-        double HullHitKm(D3 dir, out bool onHull)
+        // The hull's surface on the line from its middle along `dir` (unit, sim frame), in km from the middle, and its normal
+        // there (sim frame): a ray from outside against the hull's mesh. Half a hull length (4c's point) facing `dir` when the
+        // ray misses or there is no model.
+        double HullHitKm(D3 dir, out bool onHull, out D3 normal)
         {
             double half = HullKm() * 0.5;
             onHull = false;
+            normal = dir;
             if (shipModel == null) return half;
             HullColliders();
             Physics.SyncTransforms();
@@ -270,22 +275,47 @@ namespace FogOfWar
             var ray = new Ray(shipT.position + w * (2 * len), -w);
             float best = float.PositiveInfinity;
             foreach (var c in shipModel.GetComponentsInChildren<MeshCollider>())
-                if (c.enabled && c.gameObject.activeInHierarchy && c.Raycast(ray, out var hit, 2 * len) && hit.distance < best) best = hit.distance;
+                if (c.enabled && c.gameObject.activeInHierarchy && c.Raycast(ray, out var hit, 2 * len) && hit.distance < best)
+                {
+                    best = hit.distance;
+                    normal = Frame.FromU(Root.InverseTransformDirection(hit.normal)).Norm;
+                }
             onHull = !float.IsInfinity(best);
             return onHull ? (2 * len - best) / len * HullKm() : half;
         }
 
         // Career.OnEvent: a hit (a cabin hit says JobFailed, with the same "Hit:" lead) at the hull on the side it came in on;
-        // a kill where the missile was last drawn: the kill is drawn at impact, so at 1× that is one frame's flight (167 m at 10 km/s) out
+        // a kill where the missile was last drawn: the kill is drawn at impact, so at 1× that is one frame's flight (167 m at 10 km/s) out.
+        // Each throws its debris (fx-2).
         void MissileEvent(Career.Happening what, string text)
         {
             var dir = missileLast.Sqr > 1e-18 ? missileLast.Norm : -ship.Heading;
-            if (what == Career.Happening.MissileKilled) Fire(killFlash, missileLast.Sqr > 1e-18 ? missileLast : dir * (HullKm() * 0.5));
+            double kms = missileLastKms > 0 ? missileLastKms : Career.MissileDvKms;
+            if (what == Career.Happening.MissileKilled)
+            {
+                var off = missileLast.Sqr > 1e-18 ? missileLast : dir * (HullKm() * 0.5);
+                Fire(killFlash, off);
+                Spark().Kill(off, dir, kms, MissileKg, ship.Vel);
+            }
             else if (what == Career.Happening.MissileHit || (what == Career.Happening.JobFailed && text != null && text.StartsWith("Hit:")))
             {
-                hitFlash.Kms = missileLastKms > 0 ? missileLastKms : Career.MissileDvKms;
-                Fire(hitFlash, dir * HullHitKm(dir, out hitFlash.OnHull));
+                hitFlash.Kms = kms;
+                var off = dir * HullHitKm(dir, out hitFlash.OnHull, out var normal);
+                Fire(hitFlash, off);
+                Spark().Hit(off, normal, dir, kms, MissileKg, ship.Vel);
             }
+        }
+
+        // The debris in the ship's frame (m, Unity axes, origin at the hull's middle) on the root's scale there
+        void LateSparks()
+        {
+            if (sparks == null) return;
+            var shipLocal = Map(ship.Pos, out double k);
+            var toWorld = Root.localToWorldMatrix * Matrix4x4.TRS(shipLocal, Quaternion.identity, Vector3.one * (float)(k / 1000));
+            float sunIrr = lighting != null ? lighting.SunIrr * (1 - lighting.Eclipse) : 1;
+            sparks.Update(Time.unscaledDeltaTime, ship.Vel, toWorld, Matrix4x4.Rotate(Quaternion.Inverse(ship.Att)), HullKm() * 1000,
+                          Frame.U((camW - ship.Pos) * 1000), ((Vector3)Shader.GetGlobalVector("_FOWSunDir")).normalized, sunIrr,
+                          lighting?.Exposure ?? 1, Cam);
         }
 
         static void Fire(Flash f, D3 off)
@@ -332,12 +362,14 @@ namespace FogOfWar
             f.T = null; f.Mat = null; f.Mesh = null;
         }
 
-        // Teardown: the flares, the tracers and the flashes are the chase's, not the scene's
+        // Teardown: the flares, the tracers, the flashes and the debris are the chase's, not the scene's
         void DropMissileFx()
         {
             DropMissiles();
             DropFlash(hitFlash); DropFlash(killFlash);
             hitFlash.At = killFlash.At = -1;
+            sparks?.Dispose();
+            sparks = null;
         }
     }
 }

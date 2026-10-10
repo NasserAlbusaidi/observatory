@@ -1330,6 +1330,40 @@ A raider missile hits at 10 km/s or more (Phase 4). No warhead is needed: the ki
 - **The kill flash** is a PDC round on the missile, a much smaller energy. It stays as 4c built it until fx-2 adds its debris.
 - **Momentum (not in fx-1).** 100 kg at 10 km/s gives a 300 t ship 3.3 m/s [calc]. That changes the flight, so it needs its own decision.
 
+### The sparks (fx-2)
+
+Two kinds of matter leave a hit: hot droplets that glow as blackbodies, and cold chunks that only the Sun lights. Each flies straight from where it left, with its own velocity. Nothing slows it.
+
+| Item | Value | Tag |
+|---|---|---|
+| Hot mass M_h | E / 50 MJ: 100 kg at 10 km/s. The missile and the hull metal it melts | [design] |
+| Heat in it | 2.8 MJ/kg to 3,000 K and molten (aluminium): 0.3 GJ, 6 % of E | [calc] |
+| Speeds | Mass faster than v ∝ v^−1.65 (cratering, μ = 0.55), from 30 m/s to V/2. Median 46 m/s, 1 % over 520 m/s | [design], [calc] |
+| Direction | A 50° cone about the line halfway between the hull normal and the way the missile came in | [design] |
+| Droplet radius r | 0.1 to 1 mm, log-uniform | [design] |
+| Start temperature | 2,000 K + 2,500 K·√(v / v_max): the fast spray is the hottest | [design] |
+| Cooling | T = T₀·(1 + t/τ)^(−1/3), τ = ρ·c·r / (9·ε·σ·T₀³), ρ·c = 2.7 MJ/(m³·K), ε = 0.3. τ is 0.02 s (0.1 mm, 4,500 K) to 2.2 s (1 mm, 2,000 K) | [design], [calc] |
+| Power of a droplet | ε·σ·4πr²·T⁴ times the visible share (`Blackbody.VisibleShare`). Gone below 1,000 K | [calc] |
+| The whole spray, visible | 13 MW at the hit, 1.8 MW at 0.2 s, 0.1 MW at 1 s. The flash is 1,070 MW at the hit and 2.9 MW at 0.2 s, so the spray outshines it after about 0.2 s | [calc] |
+| Spall chunks | 24 chunks, 20 kg in all, 5 to 30 m/s in the same cone, tumbling at up to 3 turns/s | [design] |
+| Chunk light | Sunlight on a sphere of the same mass: E = E_sun·p·R²/d²·φ(α), p = 0.3, times a glint as a flat face turns to the Sun | [design] |
+
+**The kill.** A PDC round hits the missile. The debris keeps the missile's velocity, about 10 km/s at the ship.
+
+| Item | Value | Tag |
+|---|---|---|
+| Round mass | 50 g | [design] |
+| Its energy | 3.6 MJ at 12 km/s (the missile's speed plus the round's 2 km/s) | [calc] |
+| Hot spray | E / 50 MJ: 72 g, in a 60° cone along the round's path, from 200 m/s up to half the closing speed relative to the missile | [design], [calc] |
+| Chunks | 40 chunks share the missile's 100 kg. 5 m/s up to about 85 m/s relative to the missile, from 10 % of the round's energy | [design], [calc] |
+| At the hull | A piece whose path meets the hull's ellipsoid (0.15, 0.12, 0.5 of its length) stops there. It is not drawn as a hit | [design] |
+
+**Drawing it.** A compute shader works out every piece from its seed and its age each frame, with no saved state. It drops what is dead or too faint to see, then draws the rest with one indirect draw. Each piece is a point source, so its light on the eye is E = P / (4π·d²). Its pixels sum to π·E / Ω_pixel, in the units where a white surface in full sunlight is 1. A piece that moves on screen in the frame is a streak of that length, with the same total light. A piece whose peak would pass 1 grows wider instead.
+
+- **The frame.** The pieces are in the ship's frame, so they keep the ship's velocity. A burn after the hit leaves them behind: each frame subtracts the ship's change of velocity since the hit.
+- **The clock.** The flash's: `Time.unscaledTime`. A pause does not stop them.
+- **Not in fx-2.** The sparks do not light the hull or count on the exposure meter. After 0.2 s they give more light than the flash. At 20 m that is 0.06 × sunlight at 0.5 s [calc], so it shows only in shadow.
+
 ### Build plan
 
 | PR | Adds | Needs |
