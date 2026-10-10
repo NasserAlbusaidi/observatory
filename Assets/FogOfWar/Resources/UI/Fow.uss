@@ -178,7 +178,7 @@
 .hint > .t-label { color: rgba(170, 177, 205, 0.85); }
 
 /* ------------------------------------------------------------------ observatory rail */
-.rail { position: absolute; left: 16px; top: 16px; width: 270px; }
+.rail { position: absolute; left: 16px; top: 16px; bottom: 64px; width: 270px; }
 .rail-brand { font-size: 26px; letter-spacing: 5px; }
 .rail-brand-b { font-size: 12px; letter-spacing: 7px; color: rgb(255, 181, 71); margin-bottom: 12px; }
 .scene-item { padding: 7px 10px 7px 12px; border-left-width: 2px; border-color: rgba(0, 0, 0, 0); transition-property: background-color, border-color; transition-duration: 0.12s; }

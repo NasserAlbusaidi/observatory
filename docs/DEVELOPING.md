@@ -13,7 +13,7 @@ How to build and test the Observatory, the repository layout and every data cred
 
 ## The scenes
 
-The program opens on the main menu over the first scene. Keys **1–8**, the scene rail and **Esc → Scenes** switch scenes.
+The program opens on the main menu over the first scene. Keys **1–9**, then **0** for scene 10, the scrollable scene rail and **Esc → Scenes** switch scenes.
 
 | Key | Scene | Physics |
 |---|---|---|
@@ -25,6 +25,10 @@ The program opens on the main menu over the first scene. Keys **1–8**, the sce
 | 6 | Moon 1,000 km Closer | True-scale tides, month length and Roche-limit breakup |
 | 7 | Terraform Mars | Energy balance, greenhouse optical depth, lapse rate |
 | 8 | Radio Meteors | Forward scatter heard with an SDR from Muscat |
+| 9 | Three-Body Lab | Planar softened Newtonian gravity: figure-eight, rotating triangle and 3:4:5 encounter |
+| 0 | Double Pendulum | Two independent pendulums with a small initial-angle difference; equal masses and rod lengths |
+
+In the two labs, **Pause** exposes a single-step button; **Replay** resets time and trails. Changing a starting condition restarts the experiment, while speed and trail visibility leave the physical state intact. The three-body camera can keep all bodies in frame; scrolling switches to manual zoom. **Top view** and **Front view** restore useful camera angles.
 
 If the black hole or wormhole stutters, set **Ray-trace quality** (Esc → Settings → Graphics) to Fast or Balanced.
 
@@ -70,6 +74,16 @@ The editor checks run in batch mode: `physics` (`FogOfWarPhysicsCheck.Run`: Kerr
 
 Other flags: `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fownobloom` turns the black hole's glare off. `-fowlegacyui` uses the old IMGUI shell.
 
+### Chaos lab checks without Unity
+
+```powershell
+pwsh -NoProfile -File Tools/check-chaos.ps1
+```
+
+This compiles `ThreeBodyModel.cs` and `DoublePendulumModel.cs` directly with PowerShell's C# compiler. The 85 assertions cover conservation over 60 model-time units, preset/nudge extremes, an analytic rotating triangle, an approximate figure-eight return, the pendulum's small-angle normal mode, deterministic replay, twin divergence, timestep refinement and invalid parameters. A failed assertion exits nonzero.
+
+For native checks, the normal `qa`, `tour` and `uishots` suites include both scenes. `-fowqascene 9` and `-fowqascene 10` exercise their controls, including pause, replay, hidden trails and extreme settings. Check **9 / 0** selection, scrolling to the last rail entry on small windows, pause/single-step, scene re-entry and photo mode in a current build. The headless model checks do not establish Unity compilation, visuals, native input or frame rate.
+
 ## Repository layout
 
 ```
@@ -86,6 +100,7 @@ Tools/
 ```
 
 To add a scene, write a `SimScene` subclass in `Scripts/Scenes/` and add it to the list in `FogOfWarApp.Awake`.
+Add its control extremes to `QA.Steps` too. The digit shortcuts cover the first ten scenes; the rail and menu use the full scene list.
 
 ## Credits and licence
 

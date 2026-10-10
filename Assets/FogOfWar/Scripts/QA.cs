@@ -114,6 +114,23 @@ namespace FogOfWar
                 ("far-tx", s => Set(s, "txKm", 2600f), 5),
                 ("near-tx-nopaths", s => { Set(s, "txKm", 200f); Set(s, "paths", false); }, 5),
             },
+            [typeof(ThreeBodyScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("figure-eight", s => Call(s, "Reset"), 8),
+                ("triangle-nudged-fast", s => { Set(s, "preset", 1); Set(s, "kick", 0.2f); Call(s, "Reset"); Set(s, "speed", 4f); }, 8),
+                ("close-encounter", s => { Set(s, "preset", 2); Set(s, "kick", -0.2f); Call(s, "Reset"); }, 8),
+                ("paused-no-trails", s => { Set(s, "paused", true); Set(s, "showTrails", false); }, 2),
+                ("replay", s => { Set(s, "showTrails", true); Call(s, "Reset"); }, 2),
+            },
+            [typeof(DoublePendulumScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("chaotic-twins", s => Call(s, "Reset"), 15),
+                ("gentle", s => { Set(s, "preset", 1); Call(s, "ApplyPreset"); }, 4),
+                ("upright-fast", s => { Set(s, "preset", 2); Set(s, "gravity", 20f); Set(s, "differencePower", 0f); Set(s, "speed", 4f); Call(s, "ApplyPreset"); }, 8),
+                ("tiny-difference-low-g", s => { Set(s, "gravity", 1f); Set(s, "differencePower", -4f); Call(s, "Reset"); }, 4),
+                ("paused-no-trails", s => { Set(s, "paused", true); Set(s, "showTrails", false); }, 2),
+                ("replay", s => { Set(s, "showTrails", true); Call(s, "Reset"); }, 2),
+            },
         };
 
         IEnumerator UiPass()
@@ -224,7 +241,7 @@ namespace FogOfWar
             {
                 Screen.SetResolution(w, h, FullScreenMode.Windowed);
                 yield return new WaitForSecondsRealtime(1.5f);
-                foreach (int s in new[] { 3, 7 }) { app.Activate(s); yield return new WaitForSecondsRealtime(1f); yield return Shot($"res{w}x{h}-{s + 1}"); }
+                foreach (int s in new[] { 3, 7, 8, 9 }) { app.Activate(s); yield return new WaitForSecondsRealtime(1f); yield return Shot($"res{w}x{h}-{s + 1}"); }
             }
 
             log.WriteLine($"done: {errors} errors, {bad} bad readouts");

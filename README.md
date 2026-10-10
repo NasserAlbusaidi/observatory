@@ -18,7 +18,7 @@
 
 ## OBSERVATORY
 
-**Eight interactive physics models**, each with its assumptions explained.
+**Ten interactive physics models**, each with its assumptions explained.
 
 <table>
 <tr>
@@ -34,6 +34,13 @@
 <td align="center"><img src="docs/media/obs-8-meteors.jpg"><br><b>RADIO METEORS</b><br><sub>Catch meteor echoes with an SDR from Muscat</sub></td>
 </tr>
 </table>
+
+Two more experiments are in the scene rail:
+
+- **9 · Three-Body Lab** — three gravitating bodies with fading orbital trails. Try a figure-eight dance, a rotating triangle or a 3:4:5 close encounter, then nudge the launch velocity and replay.
+- **0 · Double Pendulum** — overlay two pendulums with almost identical starting angles. Watch their tips diverge, change gravity, or pause and step through the motion.
+
+Both labs have deterministic presets, pause/replay, simulation-speed controls and live energy-error readouts. Their assumptions and numerical limits are in [Models and limits](docs/MODEL-FIDELITY.md#chaos-labs).
 
 <p align="center"><sub>The black hole uses geodesic-based lensing with numerical tracing and lens tables. Moving emission uses snapshot time; the disk is an idealized model. Each scene's limits are in <a href="docs/MODEL-FIDELITY.md">Models and limits</a>.</sub></p>
 
@@ -55,7 +62,7 @@ These scenes started in the game [Fog of War](https://github.com/NasserAlbusaidi
 <br>
 
 <table>
-<tr><td><b>Pick a scene</b></td><td>1–8</td></tr>
+<tr><td><b>Pick a scene</b></td><td>1–9, then 0 for scene 10</td></tr>
 <tr><td><b>Orbit · Zoom</b></td><td>Drag · Scroll</td></tr>
 <tr><td><b>Photo mode · Clip · Screenshot</b></td><td>F10 · F9 · F12</td></tr>
 <tr><td><b>Hide panels · Full screen</b></td><td>F2 or H · F11</td></tr>
@@ -63,7 +70,7 @@ These scenes started in the game [Fog of War](https://github.com/NasserAlbusaidi
 <tr><td><b>Menu</b></td><td>Esc</td></tr>
 </table>
 
-Rebind keys in **Esc → Settings → Controls**. 1–8, Esc, F2, H, F11 and the photo-mode camera keys are fixed.
+Rebind keys in **Esc → Settings → Controls**. 1–9, 0, Esc, F2, H, F11 and the photo-mode camera keys are fixed.
 
 </details>
 
@@ -84,6 +91,8 @@ The menu and the program still carry the old "Fog of War" name. A later change r
 `Tools/qa.sh <dir>` builds the program and runs the menu shots (`uishots`) and the scene checks (`qa`). Add `tour`, `bhshots`, `physics` or `gpu` for the scene tour, the black hole shots, the geodesic checks and the GPU-against-reference check.
 
 Full steps, every test flag and the project layout are in the **[developer guide](docs/DEVELOPING.md)**.
+
+The two chaos labs also have a physics-only check that needs PowerShell 7, without Unity: `pwsh -File Tools/check-chaos.ps1`. It compiles and exercises the actual C# models; it does not test rendering or native input.
 
 ---
 
