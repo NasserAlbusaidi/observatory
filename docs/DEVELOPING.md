@@ -222,6 +222,8 @@ Tools/
   blackhole/            Python reference tracer and image checks for the black hole shader
   audio/                offline harness for the ship synth
 ART-CONTRACT.md         what the code expects from Blender output
+CLAUDE.md               the working rules for coding sessions: worktrees, the Unity lock, QA, PRs
+docs/adr/               the project-wide design rules (architecture decision records) and their index
 ```
 
 To add an Observatory scene, write a `SimScene` subclass in `Scripts/Scenes/` and add it to the list in `FogOfWarApp.Awake`. Put it before `OpenSystemScene`, which must stay last: the app treats the last scene as the game.
