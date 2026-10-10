@@ -1206,6 +1206,12 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
   - Bounty: the player must catch the runner. Hiding does not help.
 - **Check first (PR 5-0):** in a normal career, compare the raider calls per trip × the expected loss (`BoardShare`, 50 % of the pay) with the price of a PDC fit. Use a `-fowcareer` report line.
 - #195 makes the check urgent. At 10 km/s a 2-mount fit (60,000 cr) kills 19 % of missiles (D3). The fit's value may now come mostly from boarding (D9). The report gives the numbers; a price or rate change is a separate decision.
+- **Result (5-0, 2026-10-10).** `Career.GearReport` (`-executeMethod FogOfWar.EditorTools.FogOfWarCareerReport.Gear`, writes `Logs/gear-report.txt`). It reads 1,119 board jobs at 9 ports, on 5 dates × 4 days. Stock build at full burn. Loss = the boarding cut if the player stays [calc]:
+  - All raidable jobs: P(call) mean 11 %, median 0. Boarding loss mean 1,066 cr a trip. A 2-mount fit pays back in 56 trips; 4 mounts in 113; 6 mounts in 169.
+  - Risky jobs only (386, 0.1 h or more): P(call) mean 32 %. Loss mean 3,090 cr a trip. 2 mounts pay back in 19 trips.
+  - By port: Vesta 41 % (15 trips for 2 mounts), Ceres 25 % (24 trips). The inner ports run 6-7 % (98-130 trips). The outer moons run 2-3 % (142-364 trips).
+  - Hits from a full magazine of 6 at 10 km/s: 6.00 with no gear, 4.84 with 2 mounts bearing, 3.00 with light plating, 1.20 with heavy. PDCs cut hits little; plating cuts them a lot.
+  - **Reading.** PDCs pay only for a belt career, through boarding. Away from the belt, nobody fits them. The hits that land (6 a full magazine) are left out above. Their bill (D8 repairs, plus the D6 water, cargo and cabin losses) may be larger than the boarding cut. If so, plating is the better buy. Not priced yet; that is the next number.
 
 **5. NPCs have different goals.** New goals need no new hulls. They fly `Fleet.json` hulls.
 
@@ -1255,7 +1261,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. E
 
 | PR | Points | Adds | Needs |
 |---|---|---|---|
-| 5-0 | 4 | A `-fowcareer` report line: raider calls per trip × expected loss, against the price of each PDC and plating fit. A report only; no balance change. | — |
+| 5-0 | 4 | A report: raider calls per trip × expected loss, against the price of each PDC fit, and the hits a full magazine lands with each fit. A report only; no balance change. It follows `ExpressReport` (an editor batch method), not a `-fowcareer` line, so the suite's seeded draws do not move. Result under point 4. | — |
 | 5a | 1, 2, 9 | The warp cap from the time to the next event; the decision card on a cap drop; the after-action card at `EndContact`. Raider encounters only, since no other events exist yet. | — |
 | 5b | 3, 5 (Runner), 6 | Bounty jobs with board intel; the Runner doctrine; the ambush at the runner's destination. | 5a |
 | 5c | 7, 8 | Torpedoes (the player's and the raider's), the reach bubble on the map, the saturation readout. | 5a, 5b |
