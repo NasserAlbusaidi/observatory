@@ -1,7 +1,7 @@
 # Ship building and combat: design
 
 Date: 2026-10-06. Updated 2026-10-08. The four decisions are agreed (2026-10-06).
-**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built (#192). PR 4c is built: the raider's model (#191) and the rest (#193, `pdc-fx`). Phases 5–6 are not built.
+**Status:** W1–W4 are built (see [design-world.md](design-world.md)). Phase 1 is built (PRs 130, 131, 132). Phase 2 is built: 2a (#145) and 2b (#147) are merged. 2c is optional and not built. Phase 3 is built; its design is below. PR 3a (#148, `stealth-sink`), PR 3b (#149, `stealth-lost`) and PR 3c (#150, `stealth-scout`) are built (merged). PR 3d (#184, `stealth-contraband`) and PR 3e (#185, `stealth-corvette`) are built (merged), with their follow-ups (#186, #187). PR 3f (`stealth-corvette-art`, the corvette's own model) is built (#188). Phase 3 is complete. Phase 4 is designed below; D1-D15 are agreed as recommended. PR 4a (`raider-missiles`) is built (#190). PR 4b (`pdc-mounts`) is built (#192). PR 4c is built: the raider's model (#191) and the rest (#193, `pdc-fx`). Phase 5's encounter flow and build plan are agreed (2026-10-10); nothing in Phase 5 is built. Phase 6 is not built.
 Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72eb. Scope: career mode.
 
 **The world came first.** Phases W1–W4 in [design-world.md](design-world.md) (factions, traffic, threat, pirate contacts) shipped before Phase 1 here.
@@ -28,7 +28,7 @@ Code first read on branch `controls-rework`. "Built" notes read `main` at 77f72e
 | 2 | Signatures | Detection ranges, quiet coasts | None | Built (2a #145, 2b #147); 2c optional, not built |
 | 3 | Stealth | Stowable radiators and a water heat sink, losing a raider, quiet scouting and contraband jobs, then a stealth corvette | None | Built: 3a (#148), 3b (#149), 3c (#150), 3d (#184), 3e (#185, follow-ups #186 and #187), 3f (#188) (the corvette's own model). Phase 3 is complete |
 | 4 | Point defense | Raider missiles, PDCs, armor, damage, repairs | Defense only | 4a (`raider-missiles`) built (#190); 4b (`pdc-mounts`) built (#192); 4c built (the raider's model #191; `pdc-fx` #193) |
-| 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | — |
+| 5 | Offense | Missiles, torpedoes, bounty and escort jobs | Yes | Agreed (2026-10-10); PRs 5-0, 5a–5d not built |
 | 6 | Hull ladder | A destroyer for the player, NPC capital ships | Railguns on capitals | — |
 
 ## Phase 1: the shipyard
@@ -1167,14 +1167,15 @@ All are agreed as recommended.
 
 ### Encounter flow (added 2026-10-09)
 
-Points 1-5 come from a review of an outside combat audit. Points 6-9 come from the follow-up. Not agreed. Code read on `pdc-design` at e741ea7.
+Points 1-5 come from a review of an outside combat audit. Points 6-9 come from the follow-up. All nine are agreed (2026-10-10). Code read on `main` at b8f1997, after the missile-flight change (#195).
 
 **1. The warp cap follows time, not range.**
-- Today the chase caps warp by range: `ChaseWarp` 1,000×, then `CloseWarp` 100× inside `CloseKm` = 10,000 km (`Career.Pirates.cs:78,104`) [code]. That works for a 1 g raider at matched velocity, which closes slowly.
+- Today the chase caps warp by range: `ChaseWarp` 1,000×, then `CloseWarp` 100× inside `CloseKm` = 10,000 km (`Career.Pirates.cs:82,129`) [code]. That works for a 1 g raider at matched velocity, which closes slowly.
 - A 50 g torpedo from rest crosses 10,000 km in 202 s [calc]. A range rule does not see it in time.
 - **Rule:** cap = clamp(t / 10 s, 1, `ChaseWarp`). t is the time to the next event [design]. So the next event is always 10 s of real time away or more.
 - **Events:** an impact; a raider at `FireKm`; a target inside a weapon's reach; the player's own planned burn or flip; the end of a transfer.
-- Phase 4 falls out of it: a 1,000 s missile flight gives 100× [calc], the same as `CloseWarp`. D11 keeps its 1× floor for the last 20 s.
+- Phase 4 under the rule: a missile from `FireKm` at rest hits in 217 s, so the cap at launch is 21.7× [calc]. D11 keeps its 1× floor for the last 20 s (`ImpactHoldS`).
+- So the player sees the missile come in. Today `CloseWarp` 100× covers launch to the hold in about 2 s of real time. Under the rule it takes 10 s × ln(217 / 20) ≈ 24 s [calc].
 - The cap sets the frame size only. Every result resolves in closed form, as the Phase 4 missile does.
 
 **2. A warp drop is a decision.**
@@ -1186,6 +1187,7 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
   - The plan: "Intercept still feasible" or "Intercept lost".
   - Answers: Continue; Evade (turn for the most bearing mounts, or burn away); Revise (open the planner).
 - Only events the ship's sensors see. A hidden launch gives no card (Phase 2: hidden means absent).
+- One card for each salvo, not one for each missile [design].
 
 **3. The board shows the fight before the player takes it.**
 - Intercept jobs already post only what the ship can catch (`Catchable`, `Career.Intercept.cs:89`). They give the reaction mass (`NeedTonnes`, `:22`) [code].
@@ -1202,7 +1204,8 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
 - If the free answers always win, nobody fits the gear. The jobs that pay well must close the free answers:
   - Escort: the charge cannot go dark and cannot dock early.
   - Bounty: the player must catch the runner. Hiding does not help.
-- **Check before Phase 5 is agreed:** in a normal career, compare the raider calls per trip × the expected loss (`BoardShare`, 50 % of the pay) with the price of a PDC fit. Use a `-fowcareer` report line or a playtest log.
+- **Check first (PR 5-0):** in a normal career, compare the raider calls per trip × the expected loss (`BoardShare`, 50 % of the pay) with the price of a PDC fit. Use a `-fowcareer` report line.
+- #195 makes the check urgent. At 10 km/s a 2-mount fit (60,000 cr) kills 19 % of missiles (D3). The fit's value may now come mostly from boarding (D9). The report gives the numbers; a price or rate change is a separate decision.
 
 **5. NPCs have different goals.** New goals need no new hulls. They fly `Fleet.json` hulls.
 
@@ -1213,9 +1216,11 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
 | Interceptor (navy, hunter) | To keep the player from a place | It is between the player and the place | The player leaves its zone |
 | Runner (bounty target) | To reach a port | It is caught | It docks |
 
+Build the Runner first, with bounty jobs (5b). Escort and Interceptor come later (5d).
+
 **6. Ambush at the destination.**
 - Every flip-and-burn ends in a braking burn toward a known port. The burn is long, loud and predictable.
-- Raiders already use this. A raider waits at the job's target on the second half of a trip (`Career.Pirates.cs:108`) [code].
+- Raiders already use this. A raider waits at the job's target on the second half of a trip (`Lair`, `Career.Pirates.cs:134`) [code].
 - The player gets the same move as a bounty mode. The bounty gives the runner's destination. The player goes dark near it (Phase 3) and waits.
 - The runner's braking burn shows it to the sensors. Its course is then known for hours. So the player gets a firing solution without a chase.
 - **The limit is heat.** The sink sets how long the player stays dark (Phase 3). A wait that starts too early fails.
@@ -1230,18 +1235,33 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
 
 **8. The saturation readout.**
 - Before a salvo, show the expected hits: salvo × (1 − P(kill)) × (1 − armor stop).
-- P(kill) comes from the Phase 4 pass integral, with the target's mounts that bear on the launch aspect.
-- Example [calc]: 4 missiles at a ship with 2 mounts bearing give 4 × 0.34 = 1.36 hits. With light plating it is 0.68.
-- While the target's fit is unknown, show the best and the worst case: no mounts, and 3 mounts bearing (4 × 0.20 = 0.8 hits).
+- P(kill) comes from the Phase 4 pass integral (`PointDefense.KillChance`), with the target's mounts that bear on the launch aspect.
+- It takes the predicted impact speed: the launch closing speed plus the burn (D2). A missile from rest hits at about 10 km/s.
+- Example at 10 km/s [calc]: 4 missiles at a ship with 2 mounts bearing give 4 × 0.81 = 3.24 hits. With light plating it is 1.62.
+- While the target's fit is unknown, show the best and the worst case: no mounts (4 hits), and 3 mounts bearing (4 × 0.72 = 2.88 hits).
 - This is the main missile decision: a salvo large enough to get through, against a finite magazine.
 
 **9. The after-action card.**
-- When an encounter ends (`EndContact`, `Career.Pirates.cs:367`) [code], one card lists what happened, in order, with the cause:
+- When an encounter ends (`EndContact`, `Career.Pirates.cs:406`) [code], one card lists what happened, in order, with the cause:
   - "2 missiles from 2,000 km. 2 mounts bore. PDCs killed 1."
   - "Hit from aft: drive, thrust 50 %. Your tail faced it, 14 s after the flip."
   - "The raider broke off: magazine empty, PDCs held."
 - Data: the Phase 4 notes, plus the aspect and the bearing count at each impact. The D14 recorder fields already carry them.
 - **Purpose:** the player can say why the fight went as it did, and what to change next time.
+
+### Build plan (agreed 2026-10-10)
+
+Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. Each PR gets its own touch and QA list here when it starts.
+
+| PR | Points | Adds | Needs |
+|---|---|---|---|
+| 5-0 | 4 | A `-fowcareer` report line: raider calls per trip × expected loss, against the price of each PDC and plating fit. A report only; no balance change. | — |
+| 5a | 1, 2, 9 | The warp cap from the time to the next event; the decision card on a cap drop; the after-action card at `EndContact`. Raider encounters only, since no other events exist yet. | — |
+| 5b | 3, 5 (Runner), 6 | Bounty jobs with board intel; the Runner doctrine; the ambush at the runner's destination. | 5a |
+| 5c | 7, 8 | Torpedoes (the player's and the raider's), the reach bubble on the map, the saturation readout. | 5a, 5b |
+| 5d | 5 (Escort, Interceptor) | Player missiles; escort jobs; the Escort and Interceptor doctrines. | 5c |
+
+Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
 
 ## Phase 6: the hull ladder
 
