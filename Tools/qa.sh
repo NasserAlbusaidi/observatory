@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build the Windows game and run the unattended suites in order: Tools/qa.sh <outdir> [suite ...]
-# Suites: career legacy uishots qa (the default set, the one a PR reports), then audio tour physics regression gpu.
+# Suites: uishots qa (the default set, the one a PR reports), then tour bhshots physics gpu.
 # Each suite's process exits 0 when clean, 1 on failed checks or logged errors, 2 when it did not finish.
 # The script stops at the first nonzero exit and returns it. Reports land in <outdir>/<suite>/.
 # QA_NOBUILD=1 reuses the last build. QA_EXE=<path> runs another player (default Builds/Windows/FogOfWar.exe).
@@ -9,7 +9,7 @@
 set -u
 cd "$(dirname "$0")/.."
 OUT="${1:?usage: Tools/qa.sh <outdir> [suite ...]}"; shift
-SUITES="${*:-career legacy uishots qa}"
+SUITES="${*:-uishots qa}"
 PROJ="$(pwd -W)"
 EXE="${QA_EXE:-./Builds/Windows/FogOfWar.exe}"
 UIRES="${QA_UIRES:-1920x1080,1440x2560}"
@@ -56,14 +56,11 @@ editor() { # name method report [extra args]: an editor check, batch mode, write
 
 for s in $SUITES; do
   case $s in
-    career)     player career  career.txt  -fowcareer ;;
-    legacy)     player legacy  career.txt  -fowcareer -fowlegacyui ;;
     uishots)    player uishots uishots.txt "-batchmode -fowuishots" -fowuires "$UIRES" ;;
     qa)         player qa      qa.txt      -fowqa ;;
-    audio)      player audio   audioqa.txt -fowaudioqa ;;
     tour)       player tour    tour.txt    -fowtour ;;
+    bhshots)    player bhshots bhshots.txt "-batchmode -fowbhshots" ;;
     physics)    editor physics    FogOfWarPhysicsCheck.Run    Logs/physics-benchmarks.json -nographics ;;
-    regression) editor regression FogOfWarRegressionCheck.Run Logs/issue-regressions.txt   -nographics ;;
     gpu)        editor gpu        FogOfWarGpuCheck.Run        Logs/gpu-benchmarks.json     -force-d3d11 ;;
     *) echo "unknown suite: $s"; exit 2 ;;
   esac

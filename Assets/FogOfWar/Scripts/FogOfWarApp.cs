@@ -3,8 +3,8 @@ using UnityEngine;
 
 namespace FogOfWar
 {
-    // Owns the camera, the scenes and the IMGUI shell. The game boots into the open world (Open System) behind a main
-    // menu; the eight original physics scenes live in an "Observatory" submenu with their own scene rail.
+    // Owns the camera, the scenes and the IMGUI shell. The app boots into the first scene behind the main menu; the
+    // scene rail, the 1–8 keys and the "Scenes" menu switch between the eight scenes.
     public class FogOfWarApp : MonoBehaviour
     {
         public Camera Cam { get; private set; }
@@ -16,7 +16,6 @@ namespace FogOfWar
         SimScene current;
         int currentIndex = -1;
         public int SceneCount => scenes.Length;
-        public int GameIndex => scenes.Length - 1;
         public SimScene Current => current;
         public bool InputLocked;
         public float UiScale => uiScale;
@@ -26,15 +25,12 @@ namespace FogOfWar
 
         enum Screen { None, Main, Observatory, Controls, Settings }
         Screen menu = Screen.Main;
-        bool gameStarted;
         public bool MenuOpen => menu != Screen.None;
-        public bool InGame => currentIndex == GameIndex;
         public bool HelpOpen;
 
         // ---- for the UI Toolkit shell (UI/UiShell) and the capture tools (Capture/)
         public bool ShellActive => UI.UiShell.Instance != null;
         public int MenuIndex => (int)menu;
-        public bool GameStarted => gameStarted;
         public int CurrentIndex => currentIndex;
         public int SceneEpoch { get; private set; } // bumps whenever a scene is (re)built
         public SimScene SceneAt(int i) => scenes[i];
@@ -51,9 +47,6 @@ namespace FogOfWar
         // actions stay quiet for a few frames after a rebind, so the key just bound doesn't also fire
         public bool KeysQuiet => rebinding != null || Time.frameCount - rebindEndedFrame < 4;
         int rebindEndedFrame = -100;
-        public void NewGame() => Restart(GameIndex);
-        public void ContinueGame() { Activate(GameIndex); (current as OpenSystemScene)?.LoadGame(); }
-        public bool SaveGame() => (current as OpenSystemScene)?.SaveGame() ?? false;
         public void PanelToTop() => panelScroll = Vector2.zero;
 
         readonly PanelUI ui = new PanelUI();
@@ -84,21 +77,22 @@ namespace FogOfWar
             // Leftover lights from a default scene don't affect our shaders, but switch them off to avoid confusion.
             foreach (var l in FindObjectsByType<Light>()) l.enabled = false;
             Orbit = new OrbitCamera(Cam);
-            OpenWorld.ShipLighting.ResetGlobals(); // neutral physical-light globals; the open world drives them
+            // neutral physical-light globals (FOWCommon.cginc): exposure 1, no star glare
+            Shader.SetGlobalFloat("_FOWExposure", 1);
+            Shader.SetGlobalFloat("_FOWStarGlare", 0);
             Art.BindSky();
 
             scenes = new SimScene[]
             {
                 new WormholeScene(), new BlackHoleScene(), new WarpScene(), new JourneyScene(),
-                new NegativeMassScene(), new TidesScene(), new MarsScene(), new MeteorScene(), new OpenSystemScene(),
+                new NegativeMassScene(), new TidesScene(), new MarsScene(), new MeteorScene(),
             };
             Quality = PlayerPrefs.GetInt("fow-quality", 1);
             // clean captures from tours and QA runs, whose input is locked
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fowhidehud") >= 0) showUI = false;
-            // the open world runs behind the main menu
-            Activate(GameIndex);
+            // the first scene runs behind the main menu
+            Activate(0);
             menu = Screen.Main;
-            gameStarted = false;
             UI.UiShell.Install(this);
             Capture.Install(this);
             UiShots.StartIfRequested(this);
@@ -106,17 +100,12 @@ namespace FogOfWar
             BlackHoleClip.StartIfRequested(this);
             Tour.StartIfRequested(this);
             QA.StartIfRequested(this);
-            CareerQA.StartIfRequested(this);
-            AudioQA.StartIfRequested(this);
-            // filming a runner: straight into a new game, where the open world spawns it (OpenSystemScene.SpawnRunner.cs)
-            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fowspawnrunner") >= 0) NewGame();
         }
 
-        // Switch scene (closes any menu). The open world is the game; the rest are Observatory scenes.
+        // Switch scene (closes any menu).
         public void Activate(int i)
         {
             menu = Screen.None;
-            if (i == GameIndex) gameStarted = true;
             if (i == currentIndex) return;
             current?.Exit();
             currentIndex = i;
@@ -129,7 +118,7 @@ namespace FogOfWar
             panelScroll = Vector2.zero;
         }
 
-        // Rebuild a scene from scratch (New game).
+        // Rebuild a scene from scratch.
         public void Restart(int i)
         {
             current?.Exit();
@@ -147,9 +136,8 @@ namespace FogOfWar
             simTime += dt;
             Shader.SetGlobalFloat("_SimTime", simTime);
             if (Controls.Pressed(Controls.Action.Help) && !KeysQuiet) HelpOpen = !HelpOpen;
-            // the game pauses under its menu and its help sheet (#17: flight never runs on while the controls are
-            // covered); Observatory scenes keep animating behind theirs, and photo mode keeps its own time control
-            if (!(InGame && (MenuOpen || (HelpOpen && Rig == null)))) current?.Tick(dt);
+            // scenes keep animating behind the menu and the help sheet; photo mode keeps its own time control
+            current?.Tick(dt);
         }
 
         void LateUpdate()
@@ -195,16 +183,14 @@ namespace FogOfWar
             {
                 // the shell draws menus, rail, hints and help; IMGUI keeps the scene's instrument panel
                 railRect = panelRect = Rect.zero;
-                if (!MenuOpen && showUI && !HideGui && (!InGame || GameSettings.ClassicPanel)) DrawPanel(W, H);
+                if (!MenuOpen && showUI && !HideGui) DrawPanel(W, H);
             }
             else if (MenuOpen) { railRect = panelRect = Rect.zero; DrawMenu(W, H); }
             else if (showUI)
             {
-                if (!InGame) DrawRail(W, H); else railRect = Rect.zero;
+                DrawRail(W, H);
                 DrawPanel(W, H);
-                GUI.Label(new Rect(W / 2 - 360, H - 30, 720, 20), InGame
-                    ? "F1 controls · drag to look · scroll to zoom · Esc menu · F2 hide panels"
-                    : "drag to orbit · scroll to zoom · 1–8 switch scene · H hide panels · Esc menu", ui.hint);
+                GUI.Label(new Rect(W / 2 - 360, H - 30, 720, 20), "drag to orbit · scroll to zoom · 1–8 switch scene · H hide panels · Esc menu", ui.hint);
             }
             else { railRect = panelRect = Rect.zero; }
 
@@ -248,14 +234,14 @@ namespace FogOfWar
                 else if (HelpOpen) HelpOpen = false;
                 else if (!MenuOpen && Current != null && Current.CloseOverlay()) { }
                 else if (menu == Screen.Controls || menu == Screen.Observatory || menu == Screen.Settings) { menu = Screen.Main; rebindNote = null; }
-                else if (MenuOpen) { if (gameStarted && InGame) menu = Screen.None; }
+                else if (MenuOpen) menu = Screen.None;
                 else menu = Screen.Main;
                 e.Use();
             }
             else if (e.keyCode == KeyCode.F11) { UnityEngine.Screen.fullScreen = !UnityEngine.Screen.fullScreen; e.Use(); }
             else if (Rig != null) { }
-            else if (e.keyCode == KeyCode.F2 || (!InGame && e.keyCode == KeyCode.H)) { showUI = !showUI; e.Use(); }
-            else if (!InGame && !MenuOpen && e.keyCode >= KeyCode.Alpha1 && e.keyCode <= KeyCode.Alpha8) { Activate(e.keyCode - KeyCode.Alpha1); e.Use(); }
+            else if (e.keyCode == KeyCode.F2 || e.keyCode == KeyCode.H) { showUI = !showUI; e.Use(); }
+            else if (!MenuOpen && e.keyCode >= KeyCode.Alpha1 && e.keyCode < KeyCode.Alpha1 + scenes.Length) { Activate(e.keyCode - KeyCode.Alpha1); e.Use(); }
         }
 
         // ------------------------------------------------------------------------------------------------ menus
@@ -284,18 +270,10 @@ namespace FogOfWar
 
         void MainMenu()
         {
-            GUILayout.Label("The solar system at true scale and today's date. Take the ship anywhere from Mercury to Neptune.", ui.body);
+            GUILayout.Label("Eight physics models, with their limits explained.", ui.body);
             GUILayout.Space(8);
-            if (gameStarted && InGame && GUILayout.Button("Resume", ui.choice)) menu = Screen.None;
-            if (GUILayout.Button("New game", ui.choice)) { Restart(GameIndex); }
-            if (OpenSystemScene.HasSave && GUILayout.Button("Continue (" + OpenSystemScene.SaveSummary + ")", ui.choice))
-            {
-                Activate(GameIndex);
-                (current as OpenSystemScene)?.LoadGame();
-            }
-            if (gameStarted && InGame && GUILayout.Button("Save game", ui.choice)) (current as OpenSystemScene)?.SaveGame();
-            GUILayout.Space(6);
-            if (GUILayout.Button("Observatory scenes", ui.choice)) menu = Screen.Observatory;
+            if (GUILayout.Button("Resume", ui.choice)) menu = Screen.None;
+            if (GUILayout.Button("Scenes", ui.choice)) menu = Screen.Observatory;
             if (GUILayout.Button("Controls", ui.choice)) menu = Screen.Controls;
             if (GUILayout.Button("Quit", ui.choice)) Application.Quit();
         }
@@ -303,7 +281,7 @@ namespace FogOfWar
         void ObservatoryMenu()
         {
             GUILayout.Label("Eight physics models, with their limits explained.", ui.body);
-            for (int i = 0; i < GameIndex; i++)
+            for (int i = 0; i < scenes.Length; i++)
             {
                 if (GUILayout.Button($"{i + 1}. {scenes[i].Title}", ui.choice)) Activate(i);
                 GUILayout.Label(scenes[i].Short, ui.sceneSub);
@@ -329,7 +307,7 @@ namespace FogOfWar
                 }
                 GUILayout.EndHorizontal();
             }
-            GUILayout.Label("Fixed keys: 1–9 attitude holds in flight (off, prograde, retrograde, normal, anti-normal, radial out, radial in, target, anti-target) · Esc menu · F2 hide panels · F11 fullscreen.", ui.note);
+            GUILayout.Label("Fixed keys: 1–8 pick a scene · Esc menu · F2 or H hide panels · F11 fullscreen.", ui.note);
             GUILayout.Space(6);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Reset to defaults", ui.button)) { Controls.ResetDefaults(); rebindNote = null; }
@@ -346,7 +324,6 @@ namespace FogOfWar
             helpScroll = GUILayout.BeginScrollView(helpScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
             GUILayout.BeginVertical(GUILayout.Width(ui.AvailWidth));
             GUILayout.Label("CONTROLS", ui.title);
-            if (InGame) GUILayout.Label("Flight is paused while this sheet is open.", ui.note);
             foreach (var a in Controls.All)
             {
                 GUILayout.BeginHorizontal();
@@ -354,11 +331,7 @@ namespace FogOfWar
                 GUILayout.Label(Controls.Keys(a), ui.value);
                 GUILayout.EndHorizontal();
             }
-            GUILayout.Label("1–9: hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. " +
-                $"Flip ({Controls.Keys(Controls.Action.Flip)}) turns the nose 180° from where it points now, then lets go; 3 points it against your velocity and keeps it there. Turning by hand ends any hold. Turning alone doesn't slow you: burn to brake. " +
-                "Turning uses reaction wheels, which run on power and spend no fuel. " +
-                "Mouse: drag to look around, scroll to zoom. Change keys under Esc → Controls.", ui.note);
-            if (InGame) GUILayout.Label(OpenWorld.Career.DarkCoastHelp, ui.note);
+            GUILayout.Label("1–8: pick a scene. Mouse: drag to orbit, scroll to zoom. Change keys under Esc → Controls.", ui.note);
             GUILayout.Space(6);
             if (GUILayout.Button("Close (F1)", ui.button)) HelpOpen = false;
             GUILayout.EndVertical();
@@ -375,7 +348,7 @@ namespace FogOfWar
             // QA-005: measure the list so the box ends with its last entry instead of stretching to the screen bottom
             float inner = w - ui.panel.padding.horizontal;
             float listH = 0;
-            for (int i = 0; i < GameIndex; i++)
+            for (int i = 0; i < scenes.Length; i++)
                 listH += ui.sceneBtn.CalcHeight(new GUIContent(scenes[i].Title.ToUpperInvariant()), inner) + ui.sceneSub.CalcHeight(new GUIContent(scenes[i].Short), inner) + 2;
             listH += 6 + ui.sceneBtn.CalcHeight(new GUIContent("◀ MAIN MENU"), inner);
             float head = ui.brand.CalcHeight(new GUIContent("FOG OF WAR"), w) + ui.brandAccent.CalcHeight(new GUIContent("OBSERVATORY"), w) + 10;
@@ -386,7 +359,7 @@ namespace FogOfWar
             GUILayout.Space(10);
             GUILayout.BeginVertical(ui.panel, GUILayout.Height(boxH));
             railScroll = GUILayout.BeginScrollView(railScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar);
-            for (int i = 0; i < GameIndex; i++)
+            for (int i = 0; i < scenes.Length; i++)
             {
                 bool on = i == currentIndex;
                 GUILayout.BeginVertical();
@@ -408,7 +381,7 @@ namespace FogOfWar
 
         void DrawPanel(float W, float H)
         {
-            float w = Mathf.Min(InGame ? 430 : 390, W * (InGame ? 0.4f : 0.32f));
+            float w = Mathf.Min(390, W * 0.32f);
             panelRect = new Rect(W - w - 16, 16, w, H - 32);
             GUILayout.BeginArea(panelRect, ui.panel);
             ui.AvailWidth = w - 62;
@@ -417,7 +390,7 @@ namespace FogOfWar
             GUILayout.BeginVertical(GUILayout.Width(ui.AvailWidth));
             GUILayout.Label(current.Eyebrow.ToUpperInvariant(), ui.eyebrow);
             GUILayout.Label(current.Title.ToUpperInvariant(), ui.title);
-            if (!InGame) GUILayout.Label(current.Blurb, ui.body);
+            GUILayout.Label(current.Blurb, ui.body);
             current.PanelTop(ui);
 
             ui.Section("Readouts");
@@ -433,15 +406,12 @@ namespace FogOfWar
                 GUILayout.Space(2);
             }
 
-            ui.Section(InGame ? "Ship and navigation" : "Controls");
+            ui.Section("Controls");
             current.Controls(ui);
 
-            if (!InGame)
-            {
-                ui.Section("Ray-trace quality");
-                int q = GUILayout.Toolbar(Quality, new[] { "Fast", "Balanced", "Sharp" }, ui.button);
-                if (q != Quality) { Quality = q; PlayerPrefs.SetInt("fow-quality", q); }
-            }
+            ui.Section("Ray-trace quality");
+            int q = GUILayout.Toolbar(Quality, new[] { "Fast", "Balanced", "Sharp" }, ui.button);
+            if (q != Quality) { Quality = q; PlayerPrefs.SetInt("fow-quality", q); }
 
             if (!string.IsNullOrEmpty(current.Note)) GUILayout.Label(current.Note, ui.note);
             GUILayout.Space(8);

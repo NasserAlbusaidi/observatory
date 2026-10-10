@@ -10,7 +10,7 @@ namespace FogOfWar
     [RequireComponent(typeof(Camera))]
     public class BHPost : MonoBehaviour
     {
-        public static readonly bool NoGlare = OpenWorld.Bloom.Disabled;
+        public static readonly bool NoGlare = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-fownobloom") >= 0;
         public const int MaxFrames = 64, SwirlFrames = 8;
         // Default exposure: the inner disc on the approaching side sits at the top of the tonemap's shoulder, so its
         // beaming over the receding side (≈ 20× in radiance at 10 M edge-on) still reads on screen. The player's

@@ -95,7 +95,7 @@ namespace FogOfWar.UI
 
         // ------------------------------------------------------------------------------------------ frame
 
-        int builtMenu = -1, builtScene = -1; bool builtStarted, builtHud;
+        int builtMenu = -1, builtScene = -1; bool builtHud;
         float fpsT; int fpsN;
 
         void LateUpdate()
@@ -108,14 +108,14 @@ namespace FogOfWar.UI
 
             // menus
             int menu = app.MenuIndex;
-            if (menu != builtMenu || (menu != 0 && app.GameStarted != builtStarted))
+            if (menu != builtMenu)
             {
-                builtMenu = menu; builtStarted = app.GameStarted;
+                builtMenu = menu;
                 BuildMenu(menu);
             }
             UpdateMenu();
 
-            // the scene's own HUD (or the Observatory rail)
+            // the scene's own HUD and the scene rail
             if (app.SceneEpoch != builtScene || (app.Current != null && app.Current.HasHud != builtHud))
             {
                 builtScene = app.SceneEpoch;
@@ -128,7 +128,7 @@ namespace FogOfWar.UI
             Ui.Show(hudLayer, hudVisible);
             hudLayer.style.opacity = GameSettings.HudOpacity;
             if (hudVisible && builtHud) app.Current.UpdateHud(this);
-            Ui.Show(rail, hudVisible && !app.InGame);
+            Ui.Show(rail, hudVisible);
             if (rail.style.display == DisplayStyle.Flex) UpdateRail();
 
             UpdateChrome();

@@ -6,7 +6,7 @@ using A = FogOfWar.Controls.Action;
 
 namespace FogOfWar.UI
 {
-    // Menus, settings, help sheet, Observatory rail, key hints and toasts.
+    // Menus, settings, help sheet, scene rail, key hints and toasts.
     public partial class UiShell
     {
         // menu indexes, as FogOfWarApp.ShowMenu takes them
@@ -49,33 +49,24 @@ namespace FogOfWar.UI
             bg.pickingMode = PickingMode.Ignore;
             bg.style.backgroundImage = Portrait ? scrimV : scrimH;
             if (Portrait) bg.style.top = Length.Percent(0);
-            if (app.GameStarted) bg.style.backgroundColor = new Color(0.01f, 0.012f, 0.03f, 0.35f);
+            bg.style.backgroundColor = new Color(0.01f, 0.012f, 0.03f, 0.35f); // a scene always runs behind the menu
 
             var side = Ui.E(menuRoot, "menu-side", "fade");
             Ui.L(side, "FOG OF WAR", "brand-a", "f-cond");
             Ui.L(side, "OBSERVATORY", "brand-b", "f-condm");
             Ui.E(side, "brand-rule");
-            bool started = app.GameStarted && app.InGame;
-            Ui.L(side, started ? "Flight paused. The solar system waits." : "The solar system at true scale, on today's date. Take a torch ship anywhere from Mercury to Neptune.", "tagline");
+            Ui.L(side, "Eight physics models, with their limits explained.", "tagline");
 
-            if (started) Ui.MenuItem(side, "Resume", () => app.ShowMenu(MenuNone));
-            Ui.MenuItem(side, started ? "New game" : "Start", () => app.NewGame());
-            if (OpenSystemScene.HasSave)
-            {
-                Ui.MenuItem(side, "Continue", () => app.ContinueGame());
-                Ui.L(side, "Saved: " + OpenSystemScene.SaveSummary, "menu-item", "sub");
-            }
-            if (started) Ui.MenuItem(side, "Save game", () => Toast(app.SaveGame() ? "Game saved" : OpenSystemScene.ChaseNoSave), "small");
-            Ui.MenuItem(side, "Observatory", () => app.ShowMenu(MenuObservatory), "small");
+            Ui.MenuItem(side, "Resume", () => app.ShowMenu(MenuNone));
+            Ui.MenuItem(side, "Scenes", () => app.ShowMenu(MenuObservatory));
             Ui.MenuItem(side, "Settings", () => { settingsTab = 0; app.ShowMenu(MenuSettings); }, "small");
             Ui.MenuItem(side, "Controls", () => app.ShowMenu(MenuControls), "small");
             Ui.MenuItem(side, "Quit", Application.Quit, "small");
 
             var foot = Ui.E(menuRoot, "menu-foot");
             foot.pickingMode = PickingMode.Ignore;
-            Ui.Hint(foot, "Esc", started ? "back to flight" : "back");
+            Ui.Hint(foot, "Esc", "back");
             Ui.Hint(foot, "F11", "fullscreen");
-            Ui.L(foot, DateTime.UtcNow.ToString("yyyy-MM-dd") + "  ·  JPL Horizons ephemeris", "t-label", "f-mono").style.marginLeft = 12;
 
             menuContent = Ui.E(menuRoot, "menu-content", "fade-up");
             switch (menu)
@@ -98,10 +89,10 @@ namespace FogOfWar.UI
 
         void BuildObservatory(VisualElement host)
         {
-            var card = Ui.Panel(host, "Observatory", "Eight physics models, with their limits explained", true, "menu-card");
+            var card = Ui.Panel(host, "Scenes", "Eight physics models, with their limits explained", true, "menu-card");
             var sv = Ui.NewScroll();
             card.Add(sv);
-            for (int i = 0; i < app.GameIndex; i++)
+            for (int i = 0; i < app.SceneCount; i++)
             {
                 int k = i;
                 var s = app.SceneAt(i);
@@ -132,7 +123,6 @@ namespace FogOfWar.UI
             settingsTabs.Add("Interface", Scroll(InterfaceTab));
             settingsTabs.Add("Controls", Scroll(ControlsTab));
             settingsTabs.Add("Capture", Scroll(CaptureTab));
-            settingsTabs.Add("Audio", Scroll(AudioTab));
             settingsTabs.Select(settingsTab);
             settingsTabs.Changed = i => settingsTab = i;
             var row = Ui.E(card, "row");
@@ -164,12 +154,8 @@ namespace FogOfWar.UI
             SliderRow(c, "HUD opacity", 0.3f, 1f, GameSettings.HudOpacity, v => Mathf.RoundToInt(v * 100) + " %", v => GameSettings.HudOpacity = v);
             Ui.FormRow(c, "Key hints at the bottom of the screen", out var ctl);
             ctl.Add(new Switch(GameSettings.ShowHints, v => GameSettings.ShowHints = v));
-            Ui.FormRow(c, "Body labels in flight", out ctl);
-            ctl.Add(new Switch(GameSettings.ShowLabels, v => GameSettings.ShowLabels = v));
             Ui.FormRow(c, "Frame-rate counter", out ctl);
             ctl.Add(new Switch(GameSettings.ShowFps, v => GameSettings.ShowFps = v));
-            Ui.FormRow(c, "Classic instrument panel in flight (the original panel with every control)", out ctl);
-            ctl.Add(new Switch(GameSettings.ClassicPanel, v => GameSettings.ClassicPanel = v));
         }
 
         // slider with its label and value above it; `onRelease` applies only when the drag ends (UI scale would
@@ -260,12 +246,8 @@ namespace FogOfWar.UI
         {
             var groups = new List<(string, A[])>
             {
-                ("Attitude", new[] { A.PitchDown, A.PitchUp, A.YawLeft, A.YawRight, A.RollLeft, A.RollRight }),
-                ("Drive", new[] { A.ThrottleUp, A.ThrottleDown, A.ThrottleFull, A.ThrottleCut }),
-                ("Thrusters (RCS)", new[] { A.RcsForward, A.RcsBack, A.RcsUp, A.RcsDown, A.RcsLeft, A.RcsRight }),
-                ("Flight computer", new[] { A.FlightAssist, A.Flip, A.Engage, A.NextTarget, A.WarpUp, A.WarpDown }),
-                ("View and game", new[] { A.Map, A.CameraMode, A.Help, A.QuickSave }),
-                ("Capture", new[] { A.Screenshot, A.PhotoMode, A.RecordClip, A.MarkLog }),
+                ("View", new[] { A.Help }),
+                ("Capture", new[] { A.Screenshot, A.PhotoMode, A.RecordClip }),
             };
             // anything added to Controls later still shows up
             var listed = new HashSet<A>();
@@ -296,23 +278,6 @@ namespace FogOfWar.UI
             Ui.L(c, "Screenshots hide the HUD. Clips need ffmpeg on the PATH for MP4; without it they are saved as PNG frames with an encode script.", "t-note").style.marginTop = 10;
         }
 
-        void AudioTab(VisualElement c)
-        {
-            Ui.L(c, "Space carries no sound. In the cockpit view you hear what reaches you through the hull and the cabin air: the drive, the thrusters, the machinery, life support and the console. Outside views are silent apart from the console.", "t-note");
-            Ui.FormRow(c, "Ship sound", out var ctl);
-            ctl.Add(new Switch(GameSettings.ShipSound, v => GameSettings.ShipSound = v));
-            string Pct(float v) => Mathf.RoundToInt(v * 100) + " %";
-            SliderRow(c, "Master volume", 0, 1, GameSettings.Master, Pct, v => GameSettings.Master = v);
-            SliderRow(c, "Drive, thrusters and machinery", 0, 1, GameSettings.Effects, Pct, v => GameSettings.Effects = v);
-            SliderRow(c, "Life support and hull", 0, 1, GameSettings.Music, Pct, v => GameSettings.Music = v);
-            SliderRow(c, "Console and alarms", 0, 1, GameSettings.Chimes, Pct, v => GameSettings.Chimes = v);
-            Ui.FormRow(c, "Cinematic sound in outside views (not physical)", out ctl);
-            ctl.Add(new Switch(GameSettings.CinematicSound, v => GameSettings.CinematicSound = v));
-            Ui.FormRow(c, "Mute when the game is in the background", out ctl);
-            ctl.Add(new Switch(GameSettings.MuteInBackground, v => GameSettings.MuteInBackground = v));
-            Ui.L(c, "Cinematic sound adds the film version outside the ship: a roaring drive and hissing thrusters. Real vacuum carries none of it. The ship is silent while a menu is open. There is no music.", "t-note").style.marginTop = 10;
-        }
-
         // ------------------------------------------------------------------------------------------ chrome
 
         VisualElement rail, railList, hintBar, helpRoot;
@@ -340,12 +305,11 @@ namespace FogOfWar.UI
         void RebuildRail()
         {
             rail.Clear(); railItems.Clear();
-            if (app.InGame) return;
             Ui.L(rail, "FOG OF WAR", "rail-brand", "f-cond");
             Ui.L(rail, "OBSERVATORY", "rail-brand-b", "f-condm");
             var p = Ui.Panel(rail, null, null, true, "soft");
             p.style.paddingLeft = 0; p.style.paddingRight = 0; p.style.paddingTop = 6; p.style.paddingBottom = 6;
-            for (int i = 0; i < app.GameIndex; i++)
+            for (int i = 0; i < app.SceneCount; i++)
             {
                 int k = i;
                 var s = app.SceneAt(i);
@@ -380,22 +344,13 @@ namespace FogOfWar.UI
                 && (app.Current == null || app.Current.WantsKeyHints);
             Ui.Show(hintBar, hints);
             if (!hints) return;
-            string key = (app.InGame ? "g" : "o") + Keys(A.Help) + Keys(A.Map) + Keys(A.CameraMode) + Capture.PhotoKey + Capture.ShotKey;
+            string key = Keys(A.Help) + Capture.PhotoKey + Capture.ShotKey;
             if (key == hintKey) return;
             hintKey = key;
             hintBar.Clear();
             Ui.Hint(hintBar, Keys(A.Help), "controls");
-            if (app.InGame)
-            {
-                Ui.Hint(hintBar, Keys(A.Map), "system map");
-                Ui.Hint(hintBar, Keys(A.CameraMode), "camera");
-                Ui.Hint(hintBar, "Drag", "look");
-            }
-            else
-            {
-                Ui.Hint(hintBar, "1–8", "scenes");
-                Ui.Hint(hintBar, "Drag", "orbit");
-            }
+            Ui.Hint(hintBar, "1–8", "scenes");
+            Ui.Hint(hintBar, "Drag", "orbit");
             Ui.Hint(hintBar, Capture.ShotKey, "screenshot");
             Ui.Hint(hintBar, Capture.PhotoKey, "photo mode");
             Ui.Hint(hintBar, "F2", "hide HUD");
@@ -424,7 +379,6 @@ namespace FogOfWar.UI
             var p = Ui.Panel(wrap, "Controls", null, true);
             p.style.width = Mathf.Min(W - 40, Portrait ? 900 : 1080);
             p.style.maxHeight = H - 60;
-            if (app.InGame) Ui.L(p, "Flight is paused while this sheet is open.", "t-note");
             var sv = Ui.NewScroll();
             p.Add(sv);
             var cols = Ui.E(sv.contentContainer, "row");
@@ -447,17 +401,13 @@ namespace FogOfWar.UI
             cap.style.width = Portrait ? Length.Percent(100) : Length.Percent(50);
             cap.style.paddingRight = 18;
             Ui.Section(cap, "Display");
-            foreach (var (k, what) in new[] { ("F2", "Hide the HUD"), ("F11", "Fullscreen"), ("Esc", "Menu") })
+            foreach (var (k, what) in new[] { ("1–8", "Pick a scene"), ("F2 / H", "Hide the HUD"), ("F11", "Fullscreen"), ("Esc", "Menu") })
             {
                 var r = Ui.E(cap, "kv");
                 Ui.L(r, what, "t-body");
                 Ui.L(r, k, "t-val", "f-mono", "accent");
             }
-            Ui.L(sv.contentContainer, "1–9: attitude hold off / prograde / retrograde / normal / anti-normal / radial out / radial in / target / anti-target. " +
-                $"Flip ({Keys(A.Flip)}) turns the nose 180° from where it points now; 3 points it against your velocity. Turning alone doesn't slow you: burn to brake. " +
-                "Turning uses reaction wheels, which run on power and spend no fuel. " +
-                "Mouse: drag to look, scroll to zoom, click a label to target it. Change keys in Esc → Settings → Controls.", "t-note").style.marginTop = 12;
-            if (app.InGame) Ui.L(sv.contentContainer, FogOfWar.OpenWorld.Career.DarkCoastHelp, "t-note").style.marginTop = 6;
+            Ui.L(sv.contentContainer, "Mouse: drag to orbit, scroll to zoom. Change keys in Esc → Settings → Controls.", "t-note").style.marginTop = 12;
             var row = Ui.E(p, "row");
             row.style.marginTop = 10;
             Ui.B(row, "Close  (" + Keys(A.Help) + ")", () => app.HelpOpen = false);
