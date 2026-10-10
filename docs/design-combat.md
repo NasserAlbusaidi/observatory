@@ -1188,6 +1188,14 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
   - Answers: Continue; Evade (turn for the most bearing mounts, or burn away); Revise (open the planner).
 - Only events the ship's sensors see. A hidden launch gives no card (Phase 2: hidden means absent).
 - One card for each salvo, not one for each missile [design].
+- **A step (agreed 2026-10-10)** [design]:
+  - A step is a factor of 10 in the cap: the gap between two warp settings (`OpenSystemScene.Warps`: 1, 10, 100, 1,000×). The cap is compared before the scene rounds it down to a setting, so a value near a boundary cannot show a card and take it away again.
+  - The cap it is compared with is the expected one: the last update's events, aged by the update's time, under point 1's rule. A card shows when the cap now is at or below the expected cap ÷ 10.
+  - So an event that only runs down gives no card: the clock slows as today's cap does. An impact, a kill or an end of contact takes an event away and the cap rises: no card. The D11 1× hold gives no card; its salvo had one.
+  - The test is against the expected cap, not the player's warp. A player already at 1× gets the launch card too: the card is the decision, not the slowdown.
+  - One card at a time. A new event while a card is open updates that card; it does not stack a second.
+  - Phase 4 [calc]: the first salvo (217 s) takes the cap from 1,000× to 21.7×: a card. The next salvo after an impact, 1,000× to about 20×: a card. A raider burn that moves its `FireKm` time from 2 h to 5 min, 1,000× to 30×: a card. A burn that moves an event from 1,500 s to 900 s, 150× to 90×: no card. A new contact hours out stays at 1,000×: no card.
+  - Before the first salvo the raider nears `FireKm` and the cap slows the clock with no card. Then the launch shows its card. The player sees the clock slow, then gets the decision.
 
 **3. The board shows the fight before the player takes it.**
 - Intercept jobs already post only what the ship can catch (`Catchable`, `Career.Intercept.cs:89`). They give the reaction mass (`NeedTonnes`, `:22`) [code].
@@ -1297,7 +1305,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. E
 | 5c | 7, 8 | Torpedoes (the player's and the raider's), the reach bubble on the map, the saturation readout. | 5a, 5b |
 | 5d | 5 (Escort, Interceptor) | Player missiles; escort jobs; the Escort and Interceptor doctrines. | 5c |
 
-Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
+Settled before 5a: "a step" in point 2 (2026-10-10). Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
 
 ## Phase 6: the hull ladder
 
