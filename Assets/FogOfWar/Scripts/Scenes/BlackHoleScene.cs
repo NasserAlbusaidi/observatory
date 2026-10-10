@@ -193,40 +193,11 @@ namespace FogOfWar
                 planckLut = new Texture2D(256, 1, TextureFormat.RGBAHalf, false, true)
                 { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "PlanckLUT", hideFlags = HideFlags.DontSave };
                 var px = new Color[256];
-                for (int i = 0; i < 256; i++) px[i] = PlanckColor(System.Math.Pow(10, 3 + 3.0 * i / 255));
+                for (int i = 0; i < 256; i++) px[i] = OpenWorld.Blackbody.PlanckColor(System.Math.Pow(10, 3 + 3.0 * i / 255));
                 planckLut.SetPixels(px);
                 planckLut.Apply(false, true);
                 return planckLut;
             }
-        }
-
-        // Planck's law × CIE 1931 2° colour-matching functions (the multi-lobe Gaussian fit of Wyman, Sloan and Shirley
-        // 2013), 360–830 nm, → XYZ → linear sRGB (D65), scaled to luminance 1; out-of-gamut colours are mixed with white
-        // of the same luminance until no channel is negative.
-        public static Color PlanckColor(double T)
-        {
-            double X = 0, Y = 0, Z = 0;
-            for (double l = 360; l <= 830; l += 1)
-            {
-                double lm = l * 1e-9;
-                double B = 1 / (lm * lm * lm * lm * lm * (System.Math.Exp(1.438776877e-2 / (lm * T)) - 1));
-                X += B * (1.056 * G(l, 599.8, 37.9, 31.0) + 0.362 * G(l, 442.0, 16.0, 26.7) - 0.065 * G(l, 501.1, 20.4, 26.2));
-                Y += B * (0.821 * G(l, 568.8, 46.9, 40.5) + 0.286 * G(l, 530.9, 16.3, 31.1));
-                Z += B * (1.217 * G(l, 437.0, 11.8, 36.0) + 0.681 * G(l, 459.0, 26.0, 13.8));
-            }
-            X /= Y; Z /= Y; Y = 1;
-            double r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z;
-            double g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
-            double b = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
-            double m = System.Math.Min(r, System.Math.Min(g, b));
-            if (m < 0) { double t = -m / (1 - m); r += (1 - r) * t; g += (1 - g) * t; b += (1 - b) * t; }
-            return new Color((float)r, (float)g, (float)b, 1);
-        }
-
-        static double G(double x, double mu, double s1, double s2)
-        {
-            double t = (x - mu) / (x < mu ? s1 : s2);
-            return System.Math.Exp(-0.5 * t * t);
         }
 
         // Eddington ratio of the steady disc from the temperature slider (flux ∝ T⁴), and the efficiency 1 − E_isco.
