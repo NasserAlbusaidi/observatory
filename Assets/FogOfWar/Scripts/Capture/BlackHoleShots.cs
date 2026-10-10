@@ -209,7 +209,6 @@ namespace FogOfWar
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowbhpanel") >= 0) { yield return PanelShots(); yield break; }
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "bhshots.txt")) { AutoFlush = true };
-            OpenSystemScene.CheckUnattendedSaveKey(log);
             var app = GetComponent<FogOfWarApp>();
             Controls.Locked = true;
             app.InputLocked = true;
@@ -668,7 +667,6 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "bhpanel.txt")) { AutoFlush = true };
-            OpenSystemScene.CheckUnattendedSaveKey(log);
             var app = GetComponent<FogOfWarApp>();
             app.Activate(1);
             yield return new WaitForSecondsRealtime(1.5f);

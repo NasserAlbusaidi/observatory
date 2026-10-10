@@ -41,7 +41,7 @@ namespace FogOfWar.EditorTools
                 if (p != null && p.intValue != 2) { p.intValue = 2; so.ApplyModifiedPropertiesWithoutUndo(); }
             }
             PlayerSettings.companyName = "Nasser";
-            PlayerSettings.productName = "Fog of War Observatory";
+            PlayerSettings.productName = "Observatory";
             PlayerSettings.colorSpace = ColorSpace.Linear;
             PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
             PlayerSettings.defaultIsNativeResolution = true;

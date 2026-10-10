@@ -11,7 +11,7 @@ namespace FogOfWar
     {
         // #155: an unattended suite keeps its setting changes in memory, so a killed run cannot leave QA values in the
         // player's settings. Reads fall back to the player's saved values, so a suite still starts from them.
-        public static readonly bool InMemory = Array.Exists(OpenSystemScene.UnattendedSuites(),
+        public static readonly bool InMemory = Array.Exists(new[] { "-fowqa", "-fowtour", "-fowuishots", "-fowbhshots", "-fowbhclip" },
             a => Array.IndexOf(Environment.GetCommandLineArgs(), a) >= 0);
         static readonly Dictionary<string, float> memF = new Dictionary<string, float>();
         static readonly Dictionary<string, int> memI = new Dictionary<string, int>();
@@ -30,16 +30,12 @@ namespace FogOfWar
         }
 
         public static event Action Changed;
-        public static bool SilentOutput; // the audio check records the synth with the speakers off
 
         // interface
         public static float UiScale { get => F("ui-scale", 1f); set => SetF("ui-scale", Mathf.Clamp(value, 0.7f, 1.6f)); }
         public static float HudOpacity { get => F("hud-opacity", 1f); set => SetF("hud-opacity", Mathf.Clamp(value, 0.3f, 1f)); }
         public static bool ShowHints { get => I("hints", 1) == 1; set => SetI("hints", value ? 1 : 0); }
         public static bool ShowFps { get => I("fps", 0) == 1; set => SetI("fps", value ? 1 : 0); }
-        public static bool ShowLabels { get => I("labels", 1) == 1; set => SetI("labels", value ? 1 : 0); }
-        // the original IMGUI instrument panel instead of the flight console (keeps every scene control reachable)
-        public static bool ClassicPanel { get => I("classic", 0) == 1; set => SetI("classic", value ? 1 : 0); }
 
         // graphics
         public static int DisplayMode { get => I("display", 0); set => SetI("display", value); } // 0 borderless, 1 exclusive, 2 windowed
@@ -48,16 +44,6 @@ namespace FogOfWar
         // Texture detail caps planet and sky maps: 0 full (8K), 1 half (4K), 2 quarter (2K). Mip streaming budget follows.
         public static int TextureDetail { get => I("tex-detail", 0); set => SetI("tex-detail", Mathf.Clamp(value, 0, 2)); }
         static readonly int[] StreamBudgetMb = { 2048, 1024, 512 };
-
-        // audio: levels for the ship's sound (ShipAudio applies them every frame, menus included)
-        public static float Master { get => F("vol-master", 0.8f); set => SetF("vol-master", Mathf.Clamp01(value)); }
-        public static bool ShipSound { get => I("ship-sound", 1) == 1; set => SetI("ship-sound", value ? 1 : 0); }
-        public static float Effects { get => F("vol-fx", 0.8f); set => SetF("vol-fx", Mathf.Clamp01(value)); }      // drive, thrusters, machinery
-        public static float Music { get => F("vol-music", 0.6f); set => SetF("vol-music", Mathf.Clamp01(value)); }   // life support and hull
-        public static float Chimes { get => F("vol-chimes", 0.8f); set => SetF("vol-chimes", Mathf.Clamp01(value)); } // console and alarms
-        // the film version: drive roar and thruster hiss in outside views, where vacuum would carry nothing
-        public static bool CinematicSound { get => I("cine-sound", 0) == 1; set => SetI("cine-sound", value ? 1 : 0); }
-        public static bool MuteInBackground { get => I("mute-bg", 1) == 1; set => SetI("mute-bg", value ? 1 : 0); }
 
         // capture
         public static int ShotScale { get => I("shot-scale", 1); set => SetI("shot-scale", Mathf.Clamp(value, 1, 4)); } // 1, 2 or 4
@@ -83,8 +69,6 @@ namespace FogOfWar
             QualitySettings.vSyncCount = VSync ? 1 : 0;
             Application.targetFrameRate = FrameCap > 0 ? FrameCap : -1;
             ApplyTextureDetail(TextureDetail);
-            AudioListener.volume = SilentOutput ? 0 : 1; // Master is applied in the ship synth, so the audio check can meter it
-            AudioListener.pause = false;
         }
 
         public static void ApplyTextureDetail(int level)

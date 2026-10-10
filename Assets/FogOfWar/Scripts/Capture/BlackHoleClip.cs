@@ -164,7 +164,6 @@ namespace FogOfWar
         {
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "bhclip.txt")) { AutoFlush = true };
-            OpenSystemScene.CheckUnattendedSaveKey(log);
             Application.logMessageReceived += (msg, stack, type) => { if (type != LogType.Log) log.WriteLine($"[{type}] {msg}\n{stack}"); };
             var app = GetComponent<FogOfWarApp>();
             Controls.Locked = true;

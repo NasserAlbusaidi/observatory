@@ -18,7 +18,6 @@ namespace FogOfWar
         string only;
         StreamWriter log;
         int errors;
-        bool classicWas; // the player's "classic panel" setting, off for the run (no HUD to shoot) and put back at the end
 
         public static void StartIfRequested(FogOfWarApp app)
         {
@@ -49,20 +48,14 @@ namespace FogOfWar
 
         IEnumerator Start()
         {
-            FogOfWar.OpenWorld.Signature.RevealAll = true; // shots keep the full sky
             Directory.CreateDirectory(dir);
             log = new StreamWriter(Path.Combine(dir, "uishots.txt")) { AutoFlush = true };
-            OpenSystemScene.CheckUnattendedSaveKey(log);
             var app = GetComponent<FogOfWarApp>();
             Controls.Locked = true;
             app.InputLocked = true;
             yield return null;
-            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowclassicshots") >= 0)
-            { yield return ClassicShots(app); yield break; }
             var shell = UiShell.Instance;
             if (shell == null) { log.WriteLine("no UI shell"); Quit(2); yield break; }
-            classicWas = GameSettings.ClassicPanel;
-            if (classicWas) { GameSettings.ClassicPanel = false; log.WriteLine("classic panel setting on: off for this run"); }
 
             foreach (var size in sizes)
             {
@@ -73,475 +66,41 @@ namespace FogOfWar
                 string tag = $"{size.x}x{size.y}";
                 log.WriteLine("size " + tag);
 
-                // fresh boot: main menu over the paused game
-                app.Restart(app.GameIndex); app.ShowMenu(UiShell.MenuMain); SetStarted(app, false);
+                // fresh boot: main menu over the first scene
+                app.Restart(0); app.ShowMenu(UiShell.MenuMain);
                 yield return Shot(app, shell, camRT, uiRT, tag, "01-main-menu");
                 shell.OpenSettings(0);
                 yield return Shot(app, shell, camRT, uiRT, tag, "02-settings");
-                shell.OpenSettings(4);
-                yield return Shot(app, shell, camRT, uiRT, tag, "02b-audio");
                 app.ShowMenu(UiShell.MenuControls);
                 yield return Shot(app, shell, camRT, uiRT, tag, "03-controls");
                 app.ShowMenu(UiShell.MenuObservatory);
                 yield return Shot(app, shell, camRT, uiRT, tag, "04-observatory-menu");
 
-                // flight
-                app.NewGame();
-                yield return Wait(1.5f);
-                yield return Shot(app, shell, camRT, uiRT, tag, "05-flight");
-                if (app.Current is OpenSystemScene first)
+                // each scene with the rail and its own HUD
+                for (int i = 0; i < app.SceneCount; i++)
                 {
-                    log.WriteLine("    05-flight: console " + (first.TestConsoleOpen ? "open" : "closed"));
-                    if (first.TestConsoleOpen) { errors++; log.WriteLine("    ERROR 05-flight: the console drawer should start closed"); }
-                    // the target card: compact in cruise, everything with the details open
-                    string rows = first.TestCardRows();
-                    log.WriteLine("    05-flight: card rows " + rows);
-                    if (rows != "Distance Closing Trip Engage") { errors++; log.WriteLine("    ERROR 05-flight: expected the compact card 'Distance Closing Trip Engage'"); }
-                    first.SetCardExpanded(true);
-                    yield return Wait(0.3f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "05b-card-expanded");
-                    rows = first.TestCardRows();
-                    log.WriteLine("    05b-card-expanded: card rows " + rows);
-                    foreach (var want in new[] { "Kind", "Rel", "Drift", "Stop", "Brach", "Note" })
-                        if (Array.IndexOf(rows.Split(' '), want) < 0) { errors++; log.WriteLine($"    ERROR 05b-card-expanded: no {want} row"); }
-                    first.SetCardExpanded(false);
+                    app.Activate(i);
+                    yield return Wait(1.0f);
+                    yield return Shot(app, shell, camRT, uiRT, tag, $"05-scene-{i + 1}");
                 }
-                Controls.Tap(Controls.Action.ThrottleFull);
-                yield return Wait(1.2f);
-                yield return Shot(app, shell, camRT, uiRT, tag, "06-flight-burn");
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), "-fowuidump") >= 0) Dump(shell.HudLayer, 0);
                 if (size == sizes[0] && Array.IndexOf(Environment.GetCommandLineArgs(), "-fowcapturetest") >= 0) yield return CaptureTest();
-                Controls.Tap(Controls.Action.ThrottleCut);
-                var os = app.Current as OpenSystemScene;
-                if (os != null)
-                {
-                    // cockpit view: straight ahead, then looking down at the console (HUD must stay off the MFDs)
-                    var setCam = typeof(OpenSystemScene).GetMethod("SetCam", BindingFlags.Instance | BindingFlags.NonPublic);
-                    var lookPitch = typeof(OpenSystemScene).GetField("lookPitch", BindingFlags.Instance | BindingFlags.NonPublic);
-                    setCam.Invoke(os, new object[] { 2 });
-                    yield return Wait(0.5f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06f-cockpit");
-                    log.WriteLine("    06f-cockpit: target card " + (os.TestCardShown ? "shown" : "hidden"));
-                    if (os.TestCardShown) { errors++; log.WriteLine("    ERROR 06f-cockpit: the MFDs carry the target in cruise; the card should hide"); }
-                    lookPitch.SetValue(os, 22f);
-                    yield return Wait(0.3f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06g-cockpit-look-down");
-                    // the nearest surfaces: couch wing, armrest and side console (issue #4)
-                    var lookYaw = typeof(OpenSystemScene).GetField("lookYaw", BindingFlags.Instance | BindingFlags.NonPublic);
-                    lookPitch.SetValue(os, 30f); lookYaw.SetValue(os, -55f);
-                    yield return Wait(0.3f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06i-cockpit-look-left");
-                    lookPitch.SetValue(os, 10f); lookYaw.SetValue(os, 0f);
-                    // the darker condition: red lighting under a 3 g burn
-                    var shipF = (OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(os);
-                    double g0 = shipF.MaxG;
-                    shipF.MaxG = 3;
-                    Controls.Tap(Controls.Action.ThrottleFull);
-                    yield return Wait(1.5f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06j-cockpit-burn-3g");
-                    Controls.Tap(Controls.Action.ThrottleCut);
-                    shipF.MaxG = g0;
-                    yield return Wait(1.0f);
-                    // QA-050: photo mode from the cockpit starts outside the hull and the free camera moves
-                    lookPitch.SetValue(os, 0f);
-                    Capture.TogglePhoto();
-                    yield return Wait(0.5f);
-                    log.WriteLine("    cockpit photo start: " + Capture.RigState);
-                    Capture.TestFly(new Vector3(0, 0.6f, -6f), 1f, 30f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06h-cockpit-photo-moved");
-                    log.WriteLine("    cockpit photo after move: " + Capture.RigState);
-                    Capture.TogglePhoto();
-                    yield return null;
-                    setCam.Invoke(os, new object[] { 0 });
-                    yield return null;
-                }
-                if (os != null)
-                {
-                    // QA-056/058: the tutorial's practice beacon as the target, speeds measured against it (m/s);
-                    // QA-057: the same target off screen, so its edge marker shows
-                    const BindingFlags F = BindingFlags.Instance | BindingFlags.NonPublic;
-                    var spawn = typeof(OpenSystemScene).GetMethod("SpawnBeacon", F);
-                    if (spawn != null)
-                    {
-                        spawn.Invoke(os, null);
-                        var beacon = (OpenWorld.Body)typeof(OpenSystemScene).GetField("beacon", F).GetValue(os);
-                        var ship = (OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", F).GetValue(os);
-                        if (beacon != null && ship != null)
-                        {
-                            ship.VelRef = beacon;
-                            yield return Wait(0.5f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06i-beacon");
-                            os.TestAimTargetAt(1.6f);
-                            yield return Wait(0.3f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06j-beacon-offscreen");
-                            log.WriteLine("    beacon: " + os.TestLabelReport());
-                            // QA-062: the travel line within parking distance (the beacon starts 5 km off), then 5 km past it
-                            log.WriteLine("    travel line, parked: " + os.TestTravelLine());
-                            os.TestOffsetFromTarget(5);
-                            os.TestAimTargetAt(0.5f);
-                            yield return Wait(0.3f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06k-travel-5km");
-                            log.WriteLine("    travel line, 5 km out: " + os.TestTravelLine());
-                            // the approach HUD: brake gauge early, at the burn point and too late, then docking with the RCS split
-                            foreach (var (aShot, aKm, aKms, aDrift, aWant) in new[] {
-                                ("06n-approach", 200.0, 1.5, 0.05, "Approach early"), ("06o-approach-burn", 130.0, 1.5, 0.0, "Approach now"),
-                                ("06p-approach-late", 80.0, 1.5, 0.0, "Approach late"), ("06q-docking", 3.0, 0.03, 0.005, "Docking") })
-                            {
-                                os.TestApproachTarget(aKm, aKms, aDrift);
-                                os.TestAimTargetAt(0.35f);
-                                yield return Wait(0.3f);
-                                yield return Shot(app, shell, camRT, uiRT, tag, aShot);
-                                string aRep = os.TestApproachReport();
-                                log.WriteLine($"    {aShot}: {aRep}");
-                                if (!aRep.StartsWith(aWant)) { errors++; log.WriteLine($"    ERROR {aShot}: expected '{aWant}'"); }
-                            }
-                            // the stop marker (target-relative retrograde) with its burn cue, looking away from the target
-                            os.TestApproachTarget(130, 1.5);
-                            os.TestLookAwayFromTarget();
-                            yield return Wait(0.3f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06s-stop-marker");
-                            string stopRep = os.TestStopMarkerReport();
-                            log.WriteLine("    06s-stop-marker: " + stopRep);
-                            if (!stopRep.Contains("BURN NOW")) { errors++; log.WriteLine("    ERROR 06s-stop-marker: expected the BURN NOW cue"); }
-                            // a lesson that names a card row keeps it on the compact card: Brake (the Stop row, closing
-                            // fast) and Beacon (Closing, under the gauge; that lesson holds only under 20 m/s)
-                            var lessonF = typeof(OpenSystemScene).GetField("lesson", F);
-                            var lessonWas = lessonF.GetValue(os);
-                            foreach (var (lName, lKm, lKms, lRow) in new[] { ("Brake", 130.0, 1.5, "Stop"), ("Beacon", 3.0, 0.01, "Closing") })
-                            {
-                                os.TestApproachTarget(lKm, lKms);
-                                lessonF.SetValue(os, Enum.Parse(lessonF.FieldType, lName));
-                                yield return Wait(0.3f);
-                                string lRows = os.TestCardRows();
-                                log.WriteLine($"    lesson {lName}: card rows {lRows}");
-                                var lSet = lRows.Split(' ');
-                                if (Array.IndexOf(lSet, lRow) < 0 || Array.IndexOf(lSet, "Gauge") < 0) { errors++; log.WriteLine($"    ERROR lesson {lName}: expected the gauge and the {lRow} row"); }
-                            }
-                            lessonF.SetValue(os, lessonWas);
-                            // cockpit: the card shows while the gauge is up (the MFDs repeat the rest of it)
-                            os.TestApproachTarget(130, 1.5);
-                            var setCamA = typeof(OpenSystemScene).GetMethod("SetCam", F);
-                            setCamA.Invoke(os, new object[] { 2 });
-                            yield return Wait(0.5f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06r-cockpit-approach");
-                            log.WriteLine("    06r-cockpit-approach: " + os.TestApproachReport());
-                            setCamA.Invoke(os, new object[] { 0 });
-                            os.TestOffsetFromTarget(5);
-                            yield return null;
-                            // QA-060: toasts stay clear of the target card
-                            shell.Toast("Test toast: job posted");
-                            shell.Toast("Test toast with a note", "and a second line");
-                            shell.Toast("Test toast: something went wrong", null, 3.5f, "bad");
-                            // QA-063: the fuel-short warning, a long title over a long note
-                            shell.Toast("Not enough fuel to reach Neptune", "Needs about 412.6 t with margin, 196.4 t aboard. Engage again to go anyway.", 6, "bad");
-                            yield return Wait(0.4f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06l-toasts");
-                            log.WriteLine("    toasts: " + shell.TestToastReport());
-                            // a payday: a green toast with the bank line, the credits counting up, then settled on the new total
-                            bool wasSandbox = os.TestPayday(12345);
-                            // the count runs 1.2 s by the clock; a fixed wait plus a slow shot can miss it (#157)
-                            yield return Until(() => os.TestPaydayReport().Contains("counting True"), 1.5f);
-                            string payMid = os.TestPaydayReport();
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06p-payday");
-                            yield return Until(() => os.TestPaydayReport().Contains("counting False"), 3f);
-                            string payEnd = os.TestPaydayReport();
-                            log.WriteLine($"    06p-payday: {payMid}  ->  {payEnd}");
-                            string bank = payEnd.Substring(payEnd.LastIndexOf("bank ") + 5);
-                            if (!payMid.Contains("counting True") || payMid.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to be counting up"); }
-                            if (!payEnd.Contains("counting False") || !payEnd.StartsWith(bank + " CR")) { errors++; log.WriteLine("    ERROR 06p-payday: expected the credits to settle on the new total"); }
-                            if (!shell.TestToastReport().Contains("pay")) { errors++; log.WriteLine("    ERROR 06p-payday: expected a pay toast"); }
-                            // a route call: the distress card with its two answers
-                            bool called = os.TestRouteCall(OpenWorld.Career.RouteKind.Distress);
-                            yield return Wait(0.4f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06t-route-call");
-                            if (!called) { errors++; log.WriteLine("    ERROR 06t-route-call: expected a distress call"); }
-                            string callRep = os.TestRouteCallReport();
-                            log.WriteLine($"    06t-route-call: {callRep}");
-                            if (!callRep.Contains("card Flex opacity 1.00") || !callRep.Contains("on screen True") || callRep.Contains("above the lesson False")) { errors++; log.WriteLine("    ERROR 06t-route-call: expected the call card on screen"); }
-                            os.TestRouteCallClear();
-                            // a raider's call: three answers and the live line, in the belt where raiders work
-                            os.TestRaiderPlace(true);
-                            yield return Wait(0.2f); // an update undocks the career before the call
-                            bool raided = os.TestRouteCall(OpenWorld.Career.RouteKind.Pirate);
-                            yield return Wait(0.4f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06t-raider-call");
-                            string raidRep = os.TestRouteCallReport(), raidCard = os.TestCallCardReport();
-                            log.WriteLine($"    06t-raider-call: {raidRep}");
-                            log.WriteLine($"    06t-raider-call: {raidCard}");
-                            if (!raided) { errors++; log.WriteLine("    ERROR 06t-raider-call: expected a raider call"); }
-                            if (!raidRep.Contains("card Flex opacity 1.00") || !raidRep.Contains("on screen True") || raidRep.Contains("above the lesson False")) { errors++; log.WriteLine("    ERROR 06t-raider-call: expected the call card on screen"); }
-                            if (!raidCard.StartsWith("card Flex | Run / Divert to ") || raidCard.Contains(" / - |") || raidCard.EndsWith("| live -")) { errors++; log.WriteLine("    ERROR 06t-raider-call: expected three answers and the live line"); }
-                            os.TestRaiderPlace(false);
-                            os.TestPaydayUndo(12345, wasSandbox);
-                            ship.VelRef = null;
-                            typeof(OpenSystemScene).GetMethod("EndPractice", F)?.Invoke(os, null);
-                        }
-                    }
-                }
-                // Isolated surface/cloud-top fixtures must not award feats or docks to the scripted career. The scene still
-                // ticks the stand-in career, and its missing first job ends the tutorial: the tutorial and plan state come back too.
-                if (os != null)
-                {
-                    var f = BindingFlags.Instance | BindingFlags.NonPublic;
-                    var shipField = typeof(OpenSystemScene).GetField("ship", f);
-                    var refField = typeof(OpenSystemScene).GetField("reference", f);
-                    var careerField = typeof(OpenSystemScene).GetField("career", f);
-                    var player = shipField.GetValue(os); var reference = refField.GetValue(os); var career = careerField.GetValue(os);
-                    var tickFields = new[] { "lesson", "doneBefore", "turned", "turnedAgain", "burned", "planWasActive", "planTarget", "planCruiseIdx" };
-                    var tickState = new object[tickFields.Length];
-                    for (int i = 0; i < tickFields.Length; i++) tickState[i] = typeof(OpenSystemScene).GetField(tickFields[i], f).GetValue(os);
-                    var tutorialText = typeof(OpenSystemScene).GetProperty("TutorialText");
-                    object oldTutorial = tutorialText.GetValue(os);
-                    var sys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", f).GetValue(os);
-                    var setCam = typeof(OpenSystemScene).GetMethod("SetCam", f);
-                    var pitch = typeof(OpenSystemScene).GetField("lookPitch", f);
-                    object oldCam = typeof(OpenSystemScene).GetField("camMode", f).GetValue(os), oldPitch = pitch.GetValue(os);
-                    double stop = os.QaStopJd; bool console = os.TestConsoleOpen;
-                    try
-                    {
-                        var fixture = new OpenWorld.Ship();
-                        shipField.SetValue(os, fixture);
-                        careerField.SetValue(os, new OpenWorld.Career { Sys = sys });
-                        os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", f).GetValue(os);
-                        foreach (var c in SurfaceCases)
-                        {
-                            os.TestSurfaceReadout(c.altitude, c.landed, c.body);
-                            if (c.body == "Ceres") fixture.Vel += new OpenWorld.D3(0.0001, 0, 0);
-                            os.ShowConsoleTab(4);
-                            yield return Shot(app, shell, camRT, uiRT, tag, c.shot);
-                            CheckSurfaceText(os, c.frame, c.speed, c.shot);
-                            var label = (UnityEngine.UIElements.Label)typeof(OpenSystemScene).GetField("spdRef", f).GetValue(os);
-                            var value = (UnityEngine.UIElements.Label)typeof(OpenSystemScene).GetField("spdVal", f).GetValue(os);
-                            var measured = label.MeasureTextSize(label.text, 0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined,
-                                0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined);
-                            bool fits = measured.x <= label.contentRect.width + 1;
-                            log.WriteLine($"    {c.shot}: HUD {value.text} {label.text}, text {measured.x:F1} px / {label.contentRect.width:F1} px");
-                            if (!fits || label.text != "M/S VS " + c.frame.ToUpperInvariant() || value.text + " m/s" != c.speed)
-                            { errors++; log.WriteLine($"    ERROR {c.shot}: surface speed/label wrong or clipped"); }
-                            typeof(OpenSystemScene).GetMethod("SetConsole", f).Invoke(os, new object[] { false });
-                            setCam.Invoke(os, new object[] { 2 }); pitch.SetValue(os, 22f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, c.shot + "-mfd");
-                            CheckMfdSurfaceText(os, c.frame, c.speed, c.shot);
-                            setCam.Invoke(os, new object[] { 0 }); pitch.SetValue(os, oldPitch);
-                        }
-                    }
-                    finally
-                    {
-                        shipField.SetValue(os, player); refField.SetValue(os, reference); careerField.SetValue(os, career); os.QaStopJd = stop;
-                        for (int i = 0; i < tickFields.Length; i++) typeof(OpenSystemScene).GetField(tickFields[i], f).SetValue(os, tickState[i]);
-                        tutorialText.SetValue(os, oldTutorial);
-                        setCam.Invoke(os, new[] { oldCam }); pitch.SetValue(os, oldPitch);
-                        typeof(OpenSystemScene).GetMethod("SetConsole", f).Invoke(os, new object[] { console });
-                    }
-                }
-
-                // the full-screen Jobs and Codex pages
-                os?.TestHandJob(true);
-                os?.TestShipPaid(350000);
-                os?.OpenPage(0);
-                yield return Shot(app, shell, camRT, uiRT, tag, "06a-jobs-page");
-                os?.TestShipPaid(double.NaN);
-                os?.TestHandJob(false);
-                if (os != null)
-                {
-                    // the long goal reached: the buyout card says the career so far
-                    os.ClosePage();
-                    os.TestBuyout();
-                    yield return Wait(0.6f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06o-ship-owned");
-                    string own = os.TestBuyoutReport();
-                    log.WriteLine($"    06o-ship-owned: {own}");
-                    if (!own.Contains("owned True") || !own.Contains("cr earned")) { errors++; log.WriteLine("    ERROR 06o-ship-owned: expected the ship owned and the record"); }
-                    os.TestBuyoutUndo();
-                    os.OpenPage(0);
-                    // the yard with a courier draft: every readout fitted → draft, the trip check and the refit price; a drive
-                    // hit (combat 4a) puts the Repair row on top
-                    os.TestDamage(true);
-                    os.TestYardDraft(true);
-                    yield return Wait(0.6f);
-                    os.TestYardScroll();
-                    yield return Wait(0.3f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06y-yard");
-                    string yard = os.TestYardReport();
-                    log.WriteLine($"    06y-yard: {yard}");
-                    if (!yard.Contains("->") || !yard.Contains("Mars") || !yard.Contains("shown True") || yard.Contains("NaN") || yard.Contains("∞"))
-                    { errors++; log.WriteLine("    ERROR 06y-yard: expected the draft's readouts, a trip check to Mars and the yard on screen"); }
-                    string repair = os.TestRepairReport();
-                    log.WriteLine($"    06y-yard repair: {repair}");
-                    if (!repair.StartsWith("Repair all: ")) { errors++; log.WriteLine("    ERROR 06y-yard: expected the Repair button for a drive hit"); }
-                    // combat 4b: the PDC row, the draft with 4 mounts
-                    os.TestYardDraft(true, 2);
-                    yield return Wait(0.6f);
-                    os.TestYardScroll(true);
-                    yield return Wait(0.3f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06y-yard-pdc");
-                    string pdc = os.TestYardPdcReport();
-                    log.WriteLine($"    06y-yard-pdc: {pdc}");
-                    if (!pdc.StartsWith("PDCs: No PDCs (fitted) | 2 PDC mounts, 6 t: ") || !pdc.Contains("draft 4 mounts") || !pdc.EndsWith("on screen True"))
-                    { errors++; log.WriteLine("    ERROR 06y-yard-pdc: expected the PDC row on screen with the stock pick fitted and a 4-mount draft"); }
-                    os.TestYardDraft(false);
-                    os.TestDamage(false);
-                }
-                os?.OpenPage(1);
-                yield return Shot(app, shell, camRT, uiRT, tag, "06b-codex");
-                if (os != null)
-                {
-                    const BindingFlags f = BindingFlags.Instance | BindingFlags.NonPublic;
-                    var system = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", f).GetValue(os);
-                    var craft = (OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", f).GetValue(os);
-                    var career = (OpenWorld.Career)typeof(OpenSystemScene).GetField("career", f).GetValue(os);
-                    var epoch = typeof(OpenSystemScene).GetField("jd", f);
-                    double oldJd = (double)epoch.GetValue(os);
-                    var oldTarget = craft.Target; var oldPlan = craft.Plan; string oldPhase = craft.Phase;
-                    var targetIndex = typeof(OpenSystemScene).GetField("targetIdx", f);
-                    var cameraDistance = typeof(OpenSystemScene).GetField("camDist", f);
-                    object oldIndex = targetIndex.GetValue(os), oldDistance = cameraDistance.GetValue(os);
-                    var setTarget = typeof(OpenSystemScene).GetMethod("SetTarget", f);
-                    bool oldFreeze = os.QaFreeze;
-                    string oldCareer = JsonUtility.ToJson(career.ToSave(craft));
-                    var visited = new System.Collections.Generic.HashSet<string>(career.Codex.Visited);
-                    var toastLayer = (UnityEngine.UIElements.VisualElement)typeof(UiShell).GetField("toastLayer", f).GetValue(shell);
-                    bool toastsVisible = toastLayer.visible;
-                    toastLayer.visible = false;
-                    os.QaFreeze = true;
-                    var mean = system.Bodies.Find(b => b.ElementsCalibrated && b.Cheb == null) ?? system.Bodies.Find(b => b.Synchronous && b.Cheb == null);
-                    var estimated = system.Bodies.Find(b => b.SizeEstimated);
-                    var targets = new[] { system.Earth, mean, estimated, system.Earth, system["Jupiter"], system["Psyche"], system["Phobos"], system["Titan"] };
-                    var names = new[] { "fitted", "mean-moon", "estimated", "fallback", "giant", "procedural-mesh", "shape-asset", "parent-fallback" };
-                    try
-                    {
-                        for (int q = 0; q < targets.Length; q++)
-                        {
-                            var body = targets[q]; if (body == null) continue;
-                            bool added = career.Codex.Visited.Add(body.Name);
-                            setTarget.Invoke(os, new object[] { body });
-                            epoch.SetValue(os, names[q] == "fallback" ? system.Earth.Cheb.JdEnd + 1 :
-                                names[q] == "parent-fallback" ? body.Parent.Cheb.JdEnd + 1 : CareerQA.Epoch);
-                            os.ShowCodex(0);
-                            yield return Wait(0.5f);
-                            yield return Shot(app, shell, camRT, uiRT, tag, "06b-provenance-" + names[q]);
-                            log.WriteLine($"    provenance {names[q]}: {body.Name}; {body.PositionModel((double)epoch.GetValue(os))}; radius {body.RadiusSource}; shape {body.ShapeSource}; rotation {body.RotationSource}");
-                            bool honest = names[q] != "procedural-mesh" || (body.ShapeSource.StartsWith("procedural") && body.RadiusSource == "catalogue triaxial-diameter radius");
-                            honest &= names[q] != "shape-asset" || body.ShapeSource.StartsWith("shape model");
-                            honest &= names[q] != "parent-fallback" || body.PositionModel((double)epoch.GetValue(os)).Contains("Saturn's mean-element fallback");
-                            if (!honest) { errors++; log.WriteLine("    ERROR provenance " + names[q] + ": wrong model label"); }
-                            if (added) career.Codex.Visited.Remove(body.Name);
-                        }
-                    }
-                    finally
-                    {
-                        if (oldTarget != null) setTarget.Invoke(os, new object[] { oldTarget });
-                        else craft.Target = null;
-                        craft.Plan = oldPlan; craft.Phase = oldPhase;
-                        targetIndex.SetValue(os, oldIndex); cameraDistance.SetValue(os, oldDistance);
-                        epoch.SetValue(os, oldJd);
-                        career.Codex.Visited.Clear(); career.Codex.Visited.UnionWith(visited);
-                        os.QaFreeze = oldFreeze; toastLayer.visible = toastsVisible;
-                    }
-                    bool restored = (double)epoch.GetValue(os) == oldJd && JsonUtility.ToJson(career.ToSave(craft)) == oldCareer;
-                    log.WriteLine("    " + (restored ? "PASS" : "ERROR") + " provenance restores the scene date and career state");
-                    if (!restored) errors++;
-                }
-                os?.ShowCodex(1);
-                yield return Shot(app, shell, camRT, uiRT, tag, "06c-achievements");
-                os?.ShowCodex(0);
-                os?.ClosePage();
-                os?.ShowConsoleTab(0);
-                if (os != null)
-                {
-                    // QA-059: the lesson card above the console, which must clear it
-                    yield return Wait(0.3f);
-                    yield return Shot(app, shell, camRT, uiRT, tag, "06m-lesson-console");
-                    string lessonRep = os.TestLessonReport();
-                    log.WriteLine("    flight tab: " + lessonRep);
-                    if (!lessonRep.EndsWith(": clear")) { errors++; log.WriteLine("    ERROR 06m-lesson-console: expected the first-flight lesson on screen, clear of the right column"); }
-                    // the first flight's payday card, with its two answers, and a step of the hand-flying practice
-                    var lessonFld = typeof(OpenSystemScene).GetField("lesson", BindingFlags.Instance | BindingFlags.NonPublic);
-                    var lessonBefore = lessonFld.GetValue(os);
-                    foreach (var (pName, pShot, pWant) in new[] { ("Payday", "06u-payday-card", "FIRST FLIGHT  ·  PAID | pips 3 | skip False | answers True"),
-                                                                 ("Turn", "06v-practice-card", "HAND-FLYING PRACTICE  ·  STEP 1 OF 8 | pips 8 | skip True | answers False") })
-                    {
-                        lessonFld.SetValue(os, Enum.Parse(lessonFld.FieldType, pName));
-                        yield return Wait(0.4f);
-                        yield return Shot(app, shell, camRT, uiRT, tag, pShot);
-                        string pRep = os.TestLessonCardReport();
-                        log.WriteLine($"    {pShot}: {pRep}");
-                        if (!pRep.StartsWith(pWant)) { errors++; log.WriteLine($"    ERROR {pShot}: expected '{pWant}'"); }
-                    }
-                    lessonFld.SetValue(os, lessonBefore);
-                }
-                if (os != null)
-                    foreach (var k in new[] { OpenWorld.JobKind.Intercept, OpenWorld.JobKind.Rescue })
-                    {
-                        bool ok = os.TestTargetJob(k);
-                        log.WriteLine($"    target a {k} job: {(ok ? "yes" : "none posted")}");
-                        if (ok) yield return Shot(app, shell, camRT, uiRT, tag, "06d-target-" + k.ToString().ToLowerInvariant());
-                        if (ok)
-                            foreach (float frac in new[] { 0.62f, 0.72f, 0.95f })
-                            {
-                                // QA-046: target near the right-hand panels
-                                os.TestAimTargetAt(frac);
-                                yield return Shot(app, shell, camRT, uiRT, tag, $"06e-{k.ToString().ToLowerInvariant()}-at-{frac * 100:0}");
-                                log.WriteLine("    " + os.TestLabelReport());
-                            }
-                    }
                 Controls.Tap(Controls.Action.Help);
                 yield return Wait(0.3f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "07-help");
                 Controls.Tap(Controls.Action.Help);
-                Controls.Tap(Controls.Action.Map);
-                yield return Wait(1.0f);
-                yield return Shot(app, shell, camRT, uiRT, tag, "08-system-map");
-                if (app.Current is OpenSystemScene mapOs)
-                {
-                    // the map as a trip planner: your orbit and the target's stand out, the planned path with its marks
-                    const BindingFlags MF = BindingFlags.Instance | BindingFlags.NonPublic;
-                    var mapSys = (OpenWorld.SolarSystem)typeof(OpenSystemScene).GetField("sys", MF).GetValue(mapOs);
-                    var setTarget = typeof(OpenSystemScene).GetMethod("SetTarget", MF);
-                    foreach (var (mName, mShot) in new[] { ((string)null, "08-system-map"), ("Mars", "08b-map-mars"), ("Jupiter", "08c-map-jupiter") })
-                    {
-                        if (mName != null)
-                        {
-                            setTarget.Invoke(mapOs, new object[] { mapSys[mName] });
-                            yield return Wait(0.5f);
-                            // #120: a portrait screen is narrow; widen the map until the path's flip is on screen
-                            if (size.y > size.x && !mapOs.TestMapReport().Contains("flip mark on"))
-                            {
-                                var camDistF = typeof(OpenSystemScene).GetField("camDist", MF);
-                                for (int z = 0; z < 6 && !mapOs.TestMapReport().Contains("flip mark on"); z++)
-                                {
-                                    camDistF.SetValue(mapOs, (double)camDistF.GetValue(mapOs) * 1.5);
-                                    yield return Wait(0.2f);
-                                }
-                                log.WriteLine($"    {mShot}: portrait, map widened to {(double)camDistF.GetValue(mapOs) / OpenWorld.Frame.AU:F1} AU");
-                            }
-                            yield return Shot(app, shell, camRT, uiRT, tag, mShot);
-                        }
-                        string mRep = mapOs.TestMapReport();
-                        log.WriteLine($"    {mShot}: {mRep}");
-                        // Jupiter's meet point is off screen at the map's opening zoom; Mars barely moves, so its ring gives way
-                        if (mRep.Contains(" 0 segs") || mRep.Contains("path off") || !mRep.Contains("flip mark on") || mRep.Contains("meet mark none")) { errors++; log.WriteLine($"    ERROR {mShot}: expected your orbit, the planned path and its marks"); }
-                    }
-                }
-                Controls.Tap(Controls.Action.Map);
-                yield return Wait(0.5f);
+                yield return Wait(0.3f);
                 app.ShowMenu(UiShell.MenuMain);
                 yield return Shot(app, shell, camRT, uiRT, tag, "09-pause-menu");
                 app.ShowMenu(UiShell.MenuNone);
                 Capture.TogglePhoto();
                 yield return Wait(0.5f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "10-photo-mode");
-                // QA-028: the free camera must actually move the view in the open world
+                // QA-028: the free camera must actually move the view
                 Capture.TestFly(new Vector3(0, 0.6f, -6f), 1f, 30f);
                 yield return Shot(app, shell, camRT, uiRT, tag, "10b-photo-moved");
                 log.WriteLine("    after move: " + Capture.RigState);
-                Capture.TestApproach();
-                yield return Shot(app, shell, camRT, uiRT, tag, "10c-photo-hull");
-                log.WriteLine("    after flying at the hull: " + Capture.RigState);
                 Capture.TogglePhoto();
-                app.Activate(1);
-                yield return Wait(1.0f);
-                yield return Shot(app, shell, camRT, uiRT, tag, "11-observatory-scene");
 
                 app.Cam.targetTexture = null;
                 shell.Surface = null;
@@ -588,123 +147,6 @@ namespace FogOfWar
             log.WriteLine($"  clip: {Capture.LastClip} {(Capture.LastClip != null && File.Exists(Capture.LastClip) ? new FileInfo(Capture.LastClip).Length : 0)} bytes, {Time.realtimeSinceStartup - t1:0.0} s");
         }
 
-        static void SetStarted(FogOfWarApp app, bool v)
-        {
-            var f = typeof(FogOfWarApp).GetField("gameStarted", BindingFlags.Instance | BindingFlags.NonPublic);
-            f?.SetValue(app, v);
-        }
-
-        static readonly (string body, double altitude, bool landed, string shot, string frame, string speed)[] SurfaceCases =
-        {
-            ("Earth", 50, false, "06u-surface-arrival", "Earth surface", "0 m/s"),
-            ("Earth", 0.001, true, "06v-surface-landed", "Earth surface", "0 m/s"),
-            ("Jupiter", 0.001, true, "06w-cloud-top-hold", "Jupiter cloud tops", "0 m/s"),
-            ("Ceres", 1, false, "06x-airless-near-surface", "Ceres surface", "0.1 m/s"),
-        };
-
-        void CheckSurfaceText(OpenSystemScene os, string frame, string speed, string tag)
-        {
-            var row = os.TestSpeedReadout(); string line = os.ClassicSpeedLine;
-            log.WriteLine($"    {tag}: {line}; DATA {row.label} {row.value}");
-            if (!line.Contains(speed + " vs " + frame) || line.Contains("10^")
-                || row.label != "Speed vs " + frame || row.value != speed || row.value.Contains("10^"))
-            { errors++; log.WriteLine($"    ERROR {tag}: classic/data speed must read {speed} vs {frame}, without scientific notation"); }
-        }
-
-        void CheckMfdSurfaceText(OpenSystemScene os, string frame, string speed, string tag)
-        {
-            var f = BindingFlags.Instance | BindingFlags.NonPublic;
-            var cockpit = (Cockpit.CockpitView)typeof(OpenSystemScene).GetField("cockpit", f).GetValue(os);
-            var rows = (System.Collections.Generic.List<(UnityEngine.UIElements.Label k, UnityEngine.UIElements.Label v)>[])
-                typeof(Cockpit.CockpitMfd).GetField("rows", f).GetValue(cockpit.Mfd);
-            for (int screen = 0; screen < 2; screen++)
-            {
-                var row = rows[screen].Find(r => r.k.text == "Speed");
-                if (row.k == null) { errors++; log.WriteLine($"    ERROR {tag}: MFD {screen + 1} missing Speed row"); continue; }
-                float Width(UnityEngine.UIElements.Label label) => label.MeasureTextSize(label.text, 0,
-                    UnityEngine.UIElements.VisualElement.MeasureMode.Undefined, 0, UnityEngine.UIElements.VisualElement.MeasureMode.Undefined).x;
-                float width = Width(row.k) + Width(row.v), available = row.k.parent.contentRect.width;
-                log.WriteLine($"    {tag}: MFD {screen + 1} {row.v.text}, text {width:F1} px / {available:F1} px");
-                if (row.v.text != speed + " vs " + frame || width > available + 1)
-                { errors++; log.WriteLine($"    ERROR {tag}: MFD {screen + 1} speed/frame wrong or clipped"); }
-            }
-        }
-
-        // IMGUI needs a visible player render loop; this optional path captures the classic shell directly.
-        IEnumerator ClassicShots(FogOfWarApp app)
-        {
-            classicWas = GameSettings.ClassicPanel;
-            GameSettings.ClassicPanel = true;
-            foreach (var size in sizes)
-            {
-                Screen.SetResolution(size.x, size.y, FullScreenMode.Windowed);
-                yield return Wait(1);
-                app.NewGame();
-                yield return Wait(1);
-                var os = (OpenSystemScene)app.Current;
-                var f = BindingFlags.Instance | BindingFlags.NonPublic;
-                os.QaStopJd = (double)typeof(OpenSystemScene).GetField("jd", f).GetValue(os);
-                var setCam = typeof(OpenSystemScene).GetMethod("SetCam", f);
-                var pitch = typeof(OpenSystemScene).GetField("lookPitch", f);
-                yield return ClassicYardShot(app, os, size);
-                foreach (var c in SurfaceCases)
-                {
-                    os.TestSurfaceReadout(c.altitude, c.landed, c.body);
-                    if (c.body == "Ceres") ((OpenWorld.Ship)typeof(OpenSystemScene).GetField("ship", f).GetValue(os)).Vel += new OpenWorld.D3(0.0001, 0, 0);
-                    foreach (bool mfd in new[] { false, true })
-                    {
-                        setCam.Invoke(os, new object[] { mfd ? 2 : 0 }); pitch.SetValue(os, mfd ? 22f : 0f);
-                        yield return Wait(0.6f);
-                        yield return new WaitForEndOfFrame();
-                        string tag = $"{size.x}x{size.y}-classic-{c.shot.Substring(4)}" + (mfd ? "-mfd" : "");
-                        var tex = ScreenCapture.CaptureScreenshotAsTexture();
-                        File.WriteAllBytes(Path.Combine(dir, tag + ".png"), tex.EncodeToPNG());
-                        bool fits = os.TestClassicSpeedFits(out float text, out float available);
-                        bool sized = tex.width == size.x && tex.height == size.y;
-                        log.WriteLine($"  {tag}: text {text:F1} / {available:F1}, captured {tex.width}x{tex.height}");
-                        if (!fits || !sized) { errors++; log.WriteLine($"    ERROR {tag}: status line clipped or capture size changed"); }
-                        CheckSurfaceText(os, c.frame, c.speed, tag);
-                        if (mfd) CheckMfdSurfaceText(os, c.frame, c.speed, tag);
-                        Destroy(tex);
-                    }
-                }
-            }
-            GameSettings.ClassicPanel = classicWas;
-            log.WriteLine($"done, {errors} errors");
-            Quit(errors == 0 ? 0 : 1);
-        }
-
-        // #158: the classic panel's yard with a courier draft, the panel scrolled to the yard's head
-        IEnumerator ClassicYardShot(FogOfWarApp app, OpenSystemScene os, Vector2Int size)
-        {
-            var nf = BindingFlags.Instance | BindingFlags.NonPublic;
-            var scroll = typeof(FogOfWarApp).GetField("panelScroll", nf);
-            var panel = typeof(FogOfWarApp).GetField("panelRect", nf);
-            os.TestDamage(true);
-            os.TestYardDraft(true);
-            yield return Wait(0.6f); // the panel lays out and draws the yard
-            os.TestClassicYardReport(out float head);
-            scroll.SetValue(app, new Vector2(0, Mathf.Max(0, head - 8)));
-            yield return Wait(0.6f);
-            yield return new WaitForEndOfFrame();
-            string tag = $"{size.x}x{size.y}-classic-yard";
-            var tex = ScreenCapture.CaptureScreenshotAsTexture();
-            File.WriteAllBytes(Path.Combine(dir, tag + ".png"), tex.EncodeToPNG());
-            string yard = os.TestClassicYardReport(out head);
-            float top = head - ((Vector2)scroll.GetValue(app)).y, view = ((Rect)panel.GetValue(app)).height;
-            bool sized = tex.width == size.x && tex.height == size.y;
-            string repair = os.TestClassicRepairReport();
-            log.WriteLine($"  {tag}: {yard} | head at {top:F0} of {view:F0} in the panel, captured {tex.width}x{tex.height} | repair: {repair}");
-            if (!repair.StartsWith("Repair all: ")) { errors++; log.WriteLine($"    ERROR {tag}: expected the classic panel's Repair button for a drive hit"); }
-            if (!yard.Contains("->") || !yard.Contains("Mars") || !yard.Contains("drawn True") || yard.Contains("NaN") || yard.Contains("∞")
-                || head < 0 || top < -2 || top > view * 0.5f || !sized)
-            { errors++; log.WriteLine($"    ERROR {tag}: expected the draft's readouts, a trip check to Mars and the yard's head in the panel's top half"); }
-            Destroy(tex);
-            os.TestYardDraft(false);
-            os.TestDamage(false);
-            scroll.SetValue(app, Vector2.zero);
-        }
-
         static IEnumerator Wait(float s)
         {
             float t = Time.realtimeSinceStartup + s;
@@ -742,12 +184,6 @@ namespace FogOfWar
             }
             cam.SetPixels32(a);
             File.WriteAllBytes(Path.Combine(dir, $"{tag}-{name}.png"), cam.EncodeToPNG());
-            // the target card reads in plain units: no "×10^-4 m/s" at rest, no "4.17 ×10^6 km" stop distance
-            if (app.Current is OpenSystemScene card && card.TestCardReport() is string cr && cr.Contains("×10"))
-            {
-                errors++;
-                log.WriteLine("    target card has a power of ten: " + cr);
-            }
             Destroy(cam); Destroy(ui);
             log.WriteLine($"  {name}");
         }
@@ -775,7 +211,6 @@ namespace FogOfWar
         // 0 clean, 1 errors, 2 the run could not start
         void Quit(int code)
         {
-            if (classicWas) GameSettings.ClassicPanel = true;
             log?.Close(); log = null;
             Application.Quit(code);
         }

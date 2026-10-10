@@ -4,57 +4,21 @@ using UnityEngine;
 
 namespace FogOfWar
 {
-    // Rebindable keyboard actions for the open world. Each action has a primary and a secondary key; bindings persist in
-    // PlayerPrefs. Unattended QA can hold or press actions virtually (Hold/Tap), which also works while real input is
-    // locked.
+    // Rebindable keyboard actions. Each action has a primary and a secondary key; bindings persist in PlayerPrefs.
+    // Unattended QA can hold or press actions virtually (Hold/Tap), which also works while real input is locked.
     public static class Controls
     {
-        public enum Action
-        {
-            PitchDown, PitchUp, YawLeft, YawRight, RollLeft, RollRight,
-            ThrottleUp, ThrottleDown, ThrottleFull, ThrottleCut,
-            RcsForward, RcsBack, RcsUp, RcsDown, RcsLeft, RcsRight,
-            FlightAssist, Flip, Engage, NextTarget, WarpUp, WarpDown, Map, CameraMode, Help, QuickSave,
-            Screenshot, PhotoMode, RecordClip, Floodlights, VelocityRef, MarkLog, Console, Jobs, Codex,
-        }
+        public enum Action { Help, Screenshot, PhotoMode, RecordClip }
 
         public static readonly Dictionary<Action, string> Label = new Dictionary<Action, string>
         {
-            [Action.PitchDown] = "Pitch nose down", [Action.PitchUp] = "Pitch nose up", [Action.YawLeft] = "Yaw left", [Action.YawRight] = "Yaw right",
-            [Action.RollLeft] = "Roll left", [Action.RollRight] = "Roll right",
-            [Action.ThrottleUp] = "Throttle up", [Action.ThrottleDown] = "Throttle down", [Action.ThrottleFull] = "Throttle full", [Action.ThrottleCut] = "Throttle cut",
-            [Action.RcsForward] = "RCS forward", [Action.RcsBack] = "RCS back", [Action.RcsUp] = "RCS up", [Action.RcsDown] = "RCS down",
-            [Action.RcsLeft] = "RCS left", [Action.RcsRight] = "RCS right",
-            [Action.FlightAssist] = "Flight assist on/off", [Action.Flip] = "Flip (turn 180°)", [Action.Engage] = "Engage / abort nav plan",
-            [Action.NextTarget] = "Next target", [Action.WarpUp] = "Time compression up", [Action.WarpDown] = "Time compression down",
-            [Action.Map] = "System map", [Action.CameraMode] = "Camera: chase / orbit / cockpit", [Action.Help] = "Show controls", [Action.QuickSave] = "Quick save",
-            [Action.Screenshot] = "Screenshot", [Action.PhotoMode] = "Photo mode", [Action.RecordClip] = "Record a clip",
-            [Action.Floodlights] = "Hull floodlights on/off",
-            [Action.VelocityRef] = "Velocity reference: orbit / target",
-            [Action.MarkLog] = "Mark the flight log (something went wrong)",
-            [Action.Console] = "Ship console: open / close", [Action.Jobs] = "Jobs page", [Action.Codex] = "Codex page",
+            [Action.Help] = "Show controls", [Action.Screenshot] = "Screenshot", [Action.PhotoMode] = "Photo mode", [Action.RecordClip] = "Record a clip",
         };
 
         static readonly Dictionary<Action, (KeyCode, KeyCode)> Defaults = new Dictionary<Action, (KeyCode, KeyCode)>
         {
-            [Action.PitchDown] = (KeyCode.W, KeyCode.None), [Action.PitchUp] = (KeyCode.S, KeyCode.None),
-            [Action.YawLeft] = (KeyCode.A, KeyCode.None), [Action.YawRight] = (KeyCode.D, KeyCode.None),
-            [Action.RollLeft] = (KeyCode.Q, KeyCode.None), [Action.RollRight] = (KeyCode.E, KeyCode.None),
-            [Action.ThrottleUp] = (KeyCode.LeftShift, KeyCode.KeypadPlus), [Action.ThrottleDown] = (KeyCode.LeftControl, KeyCode.KeypadMinus),
-            [Action.ThrottleFull] = (KeyCode.Z, KeyCode.None), [Action.ThrottleCut] = (KeyCode.X, KeyCode.None),
-            [Action.RcsForward] = (KeyCode.H, KeyCode.None), [Action.RcsBack] = (KeyCode.N, KeyCode.None),
-            [Action.RcsUp] = (KeyCode.I, KeyCode.None), [Action.RcsDown] = (KeyCode.K, KeyCode.None),
-            [Action.RcsLeft] = (KeyCode.J, KeyCode.None), [Action.RcsRight] = (KeyCode.L, KeyCode.None),
-            [Action.FlightAssist] = (KeyCode.V, KeyCode.None), [Action.Flip] = (KeyCode.F, KeyCode.None),
-            [Action.Engage] = (KeyCode.P, KeyCode.None), [Action.NextTarget] = (KeyCode.Tab, KeyCode.None),
-            [Action.WarpUp] = (KeyCode.Period, KeyCode.RightBracket), [Action.WarpDown] = (KeyCode.Comma, KeyCode.LeftBracket),
-            [Action.Map] = (KeyCode.M, KeyCode.None), [Action.CameraMode] = (KeyCode.C, KeyCode.None),
-            [Action.Help] = (KeyCode.F1, KeyCode.None), [Action.QuickSave] = (KeyCode.F5, KeyCode.None),
+            [Action.Help] = (KeyCode.F1, KeyCode.None),
             [Action.Screenshot] = (KeyCode.F12, KeyCode.None), [Action.PhotoMode] = (KeyCode.F10, KeyCode.None), [Action.RecordClip] = (KeyCode.F9, KeyCode.None),
-            [Action.Floodlights] = (KeyCode.G, KeyCode.None),
-            [Action.VelocityRef] = (KeyCode.B, KeyCode.None),
-            [Action.MarkLog] = (KeyCode.F8, KeyCode.None),
-            [Action.Console] = (KeyCode.BackQuote, KeyCode.None), [Action.Jobs] = (KeyCode.F3, KeyCode.None), [Action.Codex] = (KeyCode.F4, KeyCode.None),
         };
 
         static readonly Dictionary<Action, KeyCode[]> bind = new Dictionary<Action, KeyCode[]>();
@@ -66,16 +30,15 @@ namespace FogOfWar
         public static IEnumerable<Action> All => (Action[])Enum.GetValues(typeof(Action));
         public static KeyCode Get(Action a, int slot) => bind[a][slot];
 
-        // Keys with a fixed job that the rebindable actions can't take (#21): 1–9 attitude holds in flight (1–8 pick a
-        // scene in the Observatory), Esc menu, F2 hide panels, F7 the dev menu (OpenSystemScene.Dev.cs), F11 fullscreen.
+        // Keys with a fixed job that the rebindable actions can't take (#21): 1–8 pick a scene, Esc menu, F2 and H hide
+        // panels, F11 fullscreen.
         public static string FixedUse(KeyCode k)
         {
-            if (k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9) return "attitude holds";
+            if (k >= KeyCode.Alpha1 && k <= KeyCode.Alpha8) return "picking a scene";
             switch (k)
             {
                 case KeyCode.Escape: return "the menu";
-                case KeyCode.F2: return "hiding the panels";
-                case KeyCode.F7: return "the dev menu";
+                case KeyCode.F2: case KeyCode.H: return "hiding the panels";
                 case KeyCode.F11: return "fullscreen";
             }
             return null;
@@ -147,9 +110,6 @@ namespace FogOfWar
             return (k[0] != KeyCode.None && Input.GetKey(k[0])) || (k[1] != KeyCode.None && Input.GetKey(k[1]));
         }
 
-        // Actions that fired since the flight recorder last looked, so its log can say what the pilot pressed.
-        public static readonly List<Action> Fired = new List<Action>();
-
         public static bool Pressed(Action a)
         {
             bool on = virtualTap.Remove(a);
@@ -158,11 +118,8 @@ namespace FogOfWar
                 var k = bind[a];
                 on = (k[0] != KeyCode.None && Input.GetKeyDown(k[0])) || (k[1] != KeyCode.None && Input.GetKeyDown(k[1]));
             }
-            if (on && Fired.Count < 32) Fired.Add(a);
             return on;
         }
-
-        public static float Axis(Action neg, Action pos) => (Held(pos) ? 1 : 0) - (Held(neg) ? 1 : 0);
 
         // QA: hold an action until released, or tap it once
         public static void Hold(Action a, bool on) { if (on) virtualHeld.Add(a); else virtualHeld.Remove(a); }

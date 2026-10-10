@@ -1,100 +1,19 @@
-# Fog of War Observatory: developer guide
+# Observatory: developer guide
 
-The full reference behind the [store page](../README.md): game rules and numbers, controls, how to build and test, the repository layout and every data credit.
-
-The [models and limits guide](MODEL-FIDELITY.md) records each subsystem's assumptions, supported domain and validation limits, including the retained drive/RCS/wheel model and snapshot-time black-hole emission.
+How to build and test the Observatory, the repository layout and every data credit. The [models and limits guide](MODEL-FIDELITY.md) records each scene's assumptions, supported domain and validation limits.
 
 ## Contents
 
-- [Game rules](#game-rules)
-- [The solar system](#the-solar-system)
-- [The Observatory](#the-observatory)
-- [Controls](#controls)
+- [The scenes](#the-scenes)
 - [Open and build](#open-and-build)
-- [Saves, settings and capture](#saves-settings-and-capture)
+- [Settings and capture](#settings-and-capture)
 - [Unattended test runs](#unattended-test-runs)
 - [Repository layout](#repository-layout)
 - [Credits and licence](#credits-and-licence)
 
-## Game rules
+## The scenes
 
-### Time against reaction mass
-
-The nav computer shows these numbers before every trip:
-
-- **Brachistochrone** (burn, flip at the midpoint, brake): t = 2√(d/a), Δv = 2√(a·d).
-- **Burn, coast, burn**: cap the cruise speed at a fraction f of the brachistochrone peak. Then Δv = f × (brachistochrone Δv) and t = √(d/a)·(f + 1/f). At f = 0.5 you need half the Δv, and the trip takes 25 % longer.
-- **Rocket equation**: reaction mass used = m·(1 − e^(−Δv/vₑ)). Cargo mass costs reaction mass.
-- **The planets move.** The same contract can cost several times more reaction mass on a different date.
-
-Deadlines are in game days, so time compression saves your patience but not the deadline. A tight deadline forces a hard burn. A loose one lets you coast.
-
-### Your ship
-
-| | Start | Upgrades (at any port) |
-|---|---|---|
-| Drive | 1 g | 3 g for 50,000 cr, then 5 g for 150,000 cr |
-| Reaction mass (water) | 200 t tank | +100 t for 35,000 cr, twice (each adds 8 t dry mass) |
-| Dry mass | 300 t | |
-| Cargo hold | 100 t | |
-| Sensors | stock | 30,000 cr: scan range ×2, scan time ÷2 |
-| Credits | 25,000 cr | |
-
-If the tank runs dry, you are adrift. An emergency tender brings 30 t for 20,000 cr. Debt is allowed.
-
-The drive is acceleration-regulated with assumed thrust reserve; cargo increases fuel cost without reducing commanded g. Translational RCS shares the drive's effective exhaust velocity. Reaction wheels use no reaction mass and omit momentum saturation and cargo-dependent inertia. Reactor power, heat rejection and high-g endurance are assumed technology, not solved engineering. The [spacecraft decisions](MODEL-FIDELITY.md#spacecraft-decisions) specify the retained model.
-
-### Ports
-
-You are docked when you are in a bound orbit close to the port body with the drive off. The price of water follows how easy it is to get there.
-
-| Port | Reaction mass, cr/t | Why |
-|---|---|---|
-| Earth orbit | 60 | Deep gravity well: water is lifted from the ground |
-| Luna | 35 | Polar craters |
-| Mars orbit | 30 | Ice under the surface |
-| Vesta | 25 | Dry rock: water is shipped in |
-| Titan | 15 | Water ice under the haze |
-| Ganymede | 10 | Ice shell |
-| Callisto | 10 | Ice and rock, outside Jupiter's worst radiation |
-| Enceladus | 9 | Plume water from the south pole |
-| Ceres | 8 | Ice-rich: the belt's water port |
-
-### Jobs
-
-Each port has a contract board that refreshes every game day. You can hold three jobs at a time.
-
-| Kind | What you do |
-|---|---|
-| Cargo | Carry freight from port A to port B before the deadline |
-| Passengers | Carry people from A to B. Sustained acceleration is capped at 1 g for their comfort |
-| Survey | Go to a named moon or asteroid. Stay in scan range with the drive off for 2 hours |
-| Rescue | A ship with a dead drive coasts on its own orbit. Match velocity within 500 km and 50 m/s, then hold for 30 minutes |
-| Intercept | A ship under thrust between two ports won't stop for you. Catch it, match it within 500 km and 100 m/s while it burns, and hold for 10 minutes |
-
-A late job pays half. After twice the time allowed, it fails and pays nothing.
-
-### Discovery
-
-- **Codex.** Pass close to a body to log its data from the game's own ephemeris. Scan it to unlock real facts (43 bodies have them).
-- **Survey data.** The first scan of a body sells for 400 cr + 600 cr per AU from the Sun, ×1.5 for bodies under 100 km. The far moons pay for the trip out.
-- **17 achievements**, from "Paid in full" to "Edge of the map" (30 AU from the Sun) and "Owner-operator" (buy out the ship).
-
-A new career starts docked at Earth with one job: medical supplies to Luna. A short first-flight lesson teaches turning, burning, attitude holds, targeting, the autopilot and time compression. You can skip it.
-
-## The solar system
-
-- **Positions.** The planets, the Moon and 21 named asteroids use Chebyshev fits to JPL Horizons vectors from 2000 to 2100 (TDB). Outside that span, bodies fall back to mean orbital elements.
-- **453 moons** from the JPL SSD tables: Mars 2, Jupiter 115, Saturn 291, Uranus 29, Neptune 16. Most use mean elements, with Horizons calibration for some fast moons; calibration is not a time-resolved fitted trajectory. Missing radii and default synchronous rotations are assumptions.
-- **Asteroid belt.** A procedural sample of about 1 % of the real belt, with the Kirkwood gaps, five collision families, Hungarias, Hildas in the 3:2 resonance and Jupiter's Trojans.
-- **Flight.** Through 100×, drive-off and powered flight share multi-body/J2 gravity. At 1k× and above, eligible coasts use labelled dominant-body conics. Time compression runs from 1× to 1M×. On a flip-and-burn, a toast warns 5 minutes before the flip and time compression steps down to 10× on the way in. The autopilot uses feedback guidance at 0.3, 1, 3, 5 or 10 g to accelerate, brake and park; the midpoint flip is an ideal planning estimate. You can also fly by hand with RCS and reaction wheels. See the [arrival policy](MODEL-FIDELITY.md#arrival-and-contact-policy) for airless contact and assisted atmospheric/cloud-top arrival.
-- **Views.** Chase, orbit and cockpit cameras, a system map, and hull floodlights for the night side.
-- **Sound.** All ship sound (drive, RCS, wheels, creaks, docking, alarms) is synthesised live by the game. No audio files ship.
-- **Rendering.** Physics runs in double-precision heliocentric km. The camera is the floating origin, and anything past 100,000 km is compressed logarithmically, so angular sizes stay exact.
-
-## The Observatory
-
-Open it from the main menu (**Esc → Observatory**). Keys **1–8** switch scenes there.
+The program opens on the main menu over the first scene. Keys **1–8**, the scene rail and **Esc → Scenes** switch scenes.
 
 | Key | Scene | Physics |
 |---|---|---|
@@ -109,54 +28,13 @@ Open it from the main menu (**Esc → Observatory**). Keys **1–8** switch scen
 
 If the black hole or wormhole stutters, set **Ray-trace quality** (Esc → Settings → Graphics) to Fast or Balanced.
 
-## Controls
-
-Press **F1** in flight for the full list. Rebind any action in **Esc → Settings → Controls**. Each action has two slots.
-
-| Group | Action | Default |
-|---|---|---|
-| Attitude | Pitch nose down / up | W / S |
-| | Yaw left / right | A / D |
-| | Roll left / right | Q / E |
-| Drive | Throttle up / down | L-Shift / L-Ctrl (or Num + / Num −) |
-| | Throttle full / cut | Z / X |
-| Thrusters (RCS) | Forward / back | H / N |
-| | Up / down | I / K |
-| | Left / right | J / L |
-| Flight computer | Flight assist on/off | V |
-| | Flip (turn 180°) | F |
-| | Engage / abort nav plan | P |
-| | Next target | Tab |
-| | Time compression up / down | . / , (or ] / [) |
-| View and game | System map | M |
-| | Camera: chase / orbit / cockpit | C |
-| | Show controls | F1 |
-| | Quick save | F5 |
-| Capture | Photo mode | F10 |
-| | Record a clip | F9 |
-| | Screenshot | F12 |
-| | Mark the flight log | F8 |
-| Other | Hull floodlights on/off | G |
-| | Velocity reference: orbit / target | B |
-
-**Fixed keys** (you can't rebind them):
-
-- **1–9**: attitude hold off, prograde, retrograde, normal, anti-normal, radial out, radial in, target, anti-target.
-- **Esc**: menu. **F2**: hide the HUD. **F11**: fullscreen.
-
-**Mouse**: drag to look, scroll to zoom, click a label to target that body.
-
-With flight assist on, the attitude keys set the turn rate, and the ship stops turning when you release them. With it off, they apply torque and the spin stays. Turning by hand ends an attitude hold. Flip ends by itself when the turn is complete.
-
-Turning uses reaction wheels and costs no reaction mass. Turning alone doesn't slow you down: burn to brake.
-
 ## Open and build
 
 1. Install **Unity 6.6** (editor `6000.6.4f1`, see `ProjectSettings/ProjectVersion.txt`) with **Windows Build Support (Mono)**.
 2. Clone this repo.
 3. In Unity Hub, choose **Add → Add project from disk** and select the repo folder. The first import takes a while.
 4. Use the **Fog of War** menu: **1. Create and open the sim scene**, then press Play. This also re-imports the art with the right settings.
-5. To build: **Fog of War → 2. Build Windows game**. The game lands in `Builds/Windows/FogOfWar.exe`.
+5. To build: **Fog of War → 2. Build Windows game**. The program lands in `Builds/Windows/FogOfWar.exe`.
 
 To build from a terminal:
 
@@ -164,69 +42,50 @@ To build from a terminal:
 Unity.exe -batchmode -quit -projectPath "<repo path>" -executeMethod FogOfWar.EditorTools.FogOfWarBuild.BuildWindows -logFile Logs/build.log
 ```
 
-The **Build … review copy** menu items build the same game under another name, in `Builds/Audio`, `Builds/BlackHole`, `Builds/Cockpit`, `Builds/Fidelity`, `Builds/Ship` or `Builds/UI`. A review build never replaces the main build in `Builds/Windows`.
+The **Build … review copy** menu item builds the same program under another name, in `Builds/BlackHole`. A review build never replaces the main build in `Builds/Windows`.
 
-## Saves, settings and capture
+## Settings and capture
 
-- The game, career, settings and key bindings are stored in Unity `PlayerPrefs` (on Windows, the registry under `HKCU\Software\Nasser\Fog of War Observatory`). The save keys are `fow-save-v1` and `fow-career-v1`.
-- **Settings** (Esc → Settings) has five tabs: Graphics (display mode, v-sync, frame cap, texture detail, ray-trace quality), Interface, Controls, Capture and Audio.
+- Settings and key bindings are stored in Unity `PlayerPrefs` (on Windows, the registry under `HKCU\Software\Nasser\Observatory`). The program has no save game.
+- **Settings** (Esc → Settings) has four tabs: Graphics (display mode, v-sync, frame cap, texture detail, ray-trace quality), Interface, Controls and Capture.
 - **Screenshots and clips** go to `Pictures\FogOfWar`. Screenshots can be 1×, 2× or 4× the screen size.
-- **Clips** are MP4 through ffmpeg, found on `PATH` or at `ffmpeg\ffmpeg.exe` next to the game. Without ffmpeg, the game writes PNG frames and an `encode.bat`.
-- **Flight log.** Each run of the game writes `flight-<date>.log` to the capture folder; the newest 20 are kept. It holds a state line each second (`S`), a line for each change of hold, plan, phase, warp, target, camera, throttle or stick with the keys pressed in that frame (`EVT`), sanity rules such as `passed-target` (`WARN`) and Unity errors (`ERR`). **F8** writes a bookmark (`MARK`), the last 10 s at 10 Hz, and a screenshot. Press it when the ship does something you did not intend.
+- **Clips** are MP4 through ffmpeg, found on `PATH` or at `ffmpeg\ffmpeg.exe` next to the program. Without ffmpeg, it writes PNG frames and an `encode.bat`.
 - **Photo mode** stops or slows time, hides the HUD and gives you a free camera with lens and colour controls. Its Cinema tab flies an orbit, a flyby or a keyframed path and can record it.
 
 ## Unattended test runs
 
-`Tools/qa.sh <dir>` builds the Windows game and runs the suites a PR reports, in order: `career`, `legacy` (the career run in the classic shell), `uishots` and `qa`. It stops at the first nonzero exit and leaves each report under `<dir>/<suite>/`. Name suites to run a subset, or add `audio`, `tour`, `physics`, `regression` or `gpu`. `QA_NOBUILD=1` reuses the last build. The scripts find the editor under the Unity Hub folder and keep one build or suite running at a time with a lock in the temp folder; `Tools/unity-env.sh` names the variables (`UNITY_EDITORS`, `FOW_UNITY_LOCK`) and the gitignored `Tools/unity.local` that can set them.
+`Tools/qa.sh <dir>` builds the Windows program and runs the suites a PR reports, in order: `uishots` and `qa`. It stops at the first nonzero exit and leaves each report under `<dir>/<suite>/`. Name suites to run a subset, or add `tour`, `bhshots`, `physics` or `gpu`. `QA_NOBUILD=1` reuses the last build. The scripts find the editor under the Unity Hub folder and keep one build or suite running at a time with a lock in the temp folder; `Tools/unity-env.sh` names the variables (`UNITY_EDITORS`, `FOW_UNITY_LOCK`) and the gitignored `Tools/unity.local` that can set them.
 
-The built game takes these flags. Each run writes its report and screenshots to `<dir>`, then quits. A suite that checks something (`-fowqa`, `-fowtour`, `-fowcareer`, `-fowaudioqa`, `-fowuishots`, `-fowbhshots`) exits 0 when the run is clean, 1 on a failed check or a logged error, and 2 when the run did not finish (a hang guard or an exception), so a script can gate on the exit code and not on the report. `-fowshipshots` and `-fowfidelity` only capture, and always exit 0.
+The built program takes these flags. Each run writes its report and screenshots to `<dir>`, then quits with 0 when the run is clean, 1 on a failed check or a logged error, and 2 when the run did not finish.
 
 | Flag | What it does |
 |---|---|
-| `-fowqa <dir>` | Drives every scene's controls to their extremes, flags NaN/∞ readouts and logged errors, and stress-tests scene, quality and window changes. Writes `qa.txt`. `-fowqascene N` limits it to scene N |
+| `-fowqa <dir>` | Drives every scene's controls to their extremes, flags NaN/∞ readouts and logged errors, and stress-tests scene, quality and window changes. Writes `qa.txt`. `-fowqascene N` limits it to scene N; `-fowui` shoots only the IMGUI menus |
 | `-fowtour <dir>` | Visits every scene and screenshots each. Writes `tour.txt` |
-| `-fowcareer <dir>` | Plays the first jobs of a new career on the autopilot and compares trip estimates with what the flight used. Writes `career.txt` |
-| `-fowaudioqa <dir>` | Drives the ship through its sounds, records the synth to `audioqa.wav` with the speakers muted, and writes `audioqa.txt` |
-| `-fowshipshots <dir>` | Parks the ship in low orbit at Earth, Mars and Saturn and shoots day, terminator and night views. Writes `ship.txt` |
-| `-fowfidelity <dir>` | Frames each mapped body up close and logs frame rate and every texture in memory. Writes `fidelity.txt`. `-fowtexdetail N` sets texture detail |
-| `-batchmode -fowuishots <dir>` | Renders the game and its UI offscreen and saves a PNG per state. Set sizes with `-fowuires`, for example `1920x1080,1440x2560`. No window opens |
+| `-batchmode -fowuishots <dir>` | Renders the menus, each scene and photo mode offscreen and saves a PNG per state. Set sizes with `-fowuires`, for example `1920x1080,1440x2560`. No window opens |
 | `-batchmode -fowbhshots <dir>` | Renders a fixed set of black hole views offscreen and times the ray tracer. Options: `-fowbhres`, `-fowbhss`, `-fowbhonly`, `-fowbhui` |
+| `-fowbhclip <dir>` | Renders the offscreen black hole montage |
 
-Other flags:
+The editor checks run in batch mode: `physics` (`FogOfWarPhysicsCheck.Run`: Kerr and Schwarzschild geodesics, the relativistic journey) and `gpu` (`FogOfWarGpuCheck.Run`: the black hole shader against the reference rays in `Tools/benchmarks/fixtures/rays.json`). See `Tools/benchmarks/README.md`.
 
-- `-fowsavekey <key>` uses another save slot. Without it, unattended suites reuse `fow-save-qa-<hash>`, a stable short hash of the build data path and suite flag. This bounds the saved key pairs and separates suites and worktrees from the player's save. Concurrent copies of the same build and suite share that pair; give them distinct explicit keys when isolation is needed. `-fowfidelity` and `-fowbhshots` are unattended too, so route events are disabled for them.
-- `-fowcareer` uses a fixed TDB epoch and a fixed simulated frame duration. Flight limits use game time; a wall-clock hang guard reports `TIMEOUT` and exits 2. Timing samples report `PERF PASS` or `PERF SLOW` separately. `-fowcareertraffic` alongside `-fowcareer <dir>` runs just the deterministic traffic section.
-- Run focused coast-clock regressions with `Unity.exe -batchmode -nographics -projectPath "<repo>" -executeMethod FogOfWar.EditorTools.FogOfWarRegressionCheck.Run -logFile Logs/regression-editor.log`. The analytic circle and zero-motion guidance checks write `Logs/issue-regressions.txt` and exit nonzero on failure.
-- `-fowqa` runs the career in sandbox: unlimited reaction mass and no contracts, so the physics tests keep working.
-- `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fowprof` logs frame time every 2 s. `-fownobloom` turns bloom off. `-fowlegacyui` uses the old IMGUI shell.
-- `-fowspawnrunner <class>` (courier, packet, liner, freighter, tanker or hauler) starts a new game, accepts an intercept for that runner and holds the ship 2 km beside it, camera on it, for filming. It accepts a real job, so use it with `-fowsavekey`.
-- `-fowterrain <dir>` loads the terrain pack from that folder only. Without the flag the game looks in the folder that the `FOW_TERRAIN_DIR` environment variable names, then for a `Terrain` folder next to the exe (or the project). `-fowterrain none` runs on the 8K global maps, as a player without the pack does. `-fowqaterrain` runs only the terrain low passes of `-fowqa`.
+Other flags: `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fownobloom` turns the black hole's glare off. `-fowlegacyui` uses the old IMGUI shell.
 
 ## Repository layout
 
 ```
 Assets/FogOfWar/
   Scripts/              FogOfWarApp (camera, scenes, menus), Controls, QA and tour harnesses
-  Scripts/OpenWorld/    Ephemeris, belt, ship, career (ports, jobs, rescue, intercept), codex
-  Scripts/Scenes/       one file per Observatory scene; OpenSystemScene.*.cs is the game
-  Scripts/Cockpit/      procedural cockpit interior and its MFD pages
-  Scripts/Audio/        the live ship synth (Dsp/) and its test
+  Scripts/Scenes/       one file per scene; the black hole has its partials, Kerr, KerrGeo and BHPost
   Scripts/Capture/      photo mode, screenshots, clip recorder, offscreen shot tools
   Scripts/UI/           UI Toolkit shell, menus and settings
-  Resources/            shaders, ephemerides, planet and ring maps, models, sky maps, star catalogue, UI theme and fonts
+  Resources/            shaders, Earth, Moon and Mars maps, models, sky maps, star catalogue, UI theme and fonts
   Editor/               the "Fog of War" menu: scene setup, builds, art import settings, checks
 Tools/
-  horizons/             fit.mjs: Chebyshev fits to JPL Horizons (node Tools/horizons/fit.mjs)
-  satellites/           build.mjs: the 453-moon table from JPL SSD
-  fidelity/             Python pipeline that rebuilds planet, relief and sky maps from mission data (see its README)
   blackhole/            Python reference tracer and image checks for the black hole shader
-  audio/                offline harness for the ship synth
-ART-CONTRACT.md         what the code expects from Blender output
-CLAUDE.md               the working rules for coding sessions: worktrees, the Unity lock, QA, PRs
-docs/adr/               the project-wide design rules (architecture decision records) and their index
+  benchmarks/           reference rays and image comparison for the GPU check
 ```
 
-To add an Observatory scene, write a `SimScene` subclass in `Scripts/Scenes/` and add it to the list in `FogOfWarApp.Awake`. Put it before `OpenSystemScene`, which must stay last: the app treats the last scene as the game.
+To add a scene, write a `SimScene` subclass in `Scripts/Scenes/` and add it to the list in `FogOfWarApp.Awake`.
 
 ## Credits and licence
 
@@ -254,43 +113,21 @@ The repository has three parts, each under its own terms.
   this Program grant you additional permission to convey the resulting work.
   ```
 
-  The additional permission lets anyone share a build of the game, which always contains Unity's proprietary engine.
+  The additional permission lets anyone share a build of the program, which always contains Unity's proprietary engine.
 
-- **The project's own art and text: Creative Commons Attribution 4.0 International ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).** © 2026 Nasser Albusaidi. This covers everything else made for the project: the ship, fleet, asteroid and procedural body models and their textures, the procedural planet and ring maps, the codex text, the docs, and the screenshots and videos in `docs/media`. You may share and change them, if you credit Nasser Albusaidi, link the licence and say what you changed. Third-party content inside them, such as the sky in the screenshots, keeps its own terms.
-- **Third-party content keeps its own licence.** The sources and their credits are below. Files built from them, such as the ephemeris fits, the moon table and the reprojected maps, keep their source's terms.
+- **The project's own art and text: Creative Commons Attribution 4.0 International ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).** © 2026 Nasser Albusaidi. This covers everything else made for the project: the ship, rubble, antenna and tower models, the docs, and the screenshots and videos in `docs/media`. You may share and change them, if you credit Nasser Albusaidi, link the licence and say what you changed. Third-party content inside them, such as the sky in the screenshots, keeps its own terms.
+- **Third-party content keeps its own licence.** The sources and their credits are below. Files built from them, such as the reprojected maps, keep their source's terms.
 
 The Unity Editor and engine are not in this repository. They are under Unity's own terms.
 
 ### Sources
 
-- **Ephemerides and physical data**: NASA JPL Horizons, the JPL Solar System Dynamics satellite tables and physical parameters, and the NASA planetary fact sheets.
 - **Earth**: NASA Visible Earth (Blue Marble Next Generation, Black Marble, MODIS clouds) and GEBCO elevation (GEBCO Compilation Group, GEBCO_08 Grid).
 - **Moon**: LRO WAC colour from the CGI Moon Kit and LRO LOLA relief. Credit: NASA's Scientific Visualization Studio.
-- **Planets and moons**: USGS Astrogeology and PDS mosaics from Viking, MGS MOLA, MESSENGER, Magellan, Voyager, Galileo, Cassini and Dawn. Each map's source is in its `Planets/<Body>/Body.json`. Credits for these maps:
-  - Mercury colour (MESSENGER MDIS, 1000, 750 and 430 nm): mosaic by the MESSENGER Team, Arizona State University.
-  - Mercury relief (MESSENGER global DEM, 665 m, v2): Kris Becker et al.; NASA, Arizona State University, Johns Hopkins Applied Physics Laboratory, Carnegie Institution for Science.
-  - Venus surface (Magellan C3-MDIR radar mosaic): PDS Geosciences Node; data by Peter Ford, Gordon Pettengill, Fang Liu and Joan Quigley (MIT) from the Magellan Project.
-  - Mars colour (Viking MDIM, 925 m): USGS Astrogeology Science Center and PDS (MDIM by Eliason, Batson and Manley); hue from the NASA 3D Resources Mars map (NASA/JPL-Caltech).
-  - Mars relief (MGS MOLA DEM, 463 m): MOLA Team, NASA Goddard Space Flight Center.
-  - Ceres and Vesta (Dawn FC): NASA/JPL-Caltech/UCLA/MPS/DLR/IDA.
-  - Jupiter: Cassini PIA07782 (NASA/JPL/Space Science Institute).
-  - Io (Galileo SSI and Voyager colour merge): USGS Astrogeology Science Center and PDS; Becker and Geissler (2005).
-  - Europa (Voyager and Galileo SSI): Tammy Becker; Archinal, Colvin, Davies, Gitlin, Kirk and Weller, USGS Astrogeology Science Center.
-  - Ganymede (Voyager and Galileo SSI colour): USGS Astrogeology Science Center; Becker et al. (2001).
-  - Callisto (Galileo and Voyager): USGS Astrogeology Science Center.
-  - Mimas (Cassini ISS): NASA/JPL/Space Science Institute; basemap by DLR (Roatsch et al., 2018).
-  - Enceladus (Cassini ISS): Cassini Team, NASA/JPL/Space Science Institute.
-  - Tethys (Cassini ISS) and Rhea (Cassini ISS, Voyager fill): NASA/JPL/Space Science Institute; mosaics by Roatsch et al., DLR.
-  - Dione (Cassini ISS, Voyager fill): NASA/JPL/Space Science Institute.
-  - Titan (Cassini ISS, 938 nm): Cassini ISS Team; NASA/JPL-Caltech/SSI.
-  - Iapetus (Cassini ISS, Voyager fill): Cassini Team, Jet Propulsion Laboratory and Space Science Institute; cartography by Roatsch et al., DLR.
-  - Triton (Voyager 2): NASA/JPL; colour mosaic by Paul Schenk, Lunar and Planetary Institute.
-  - Saturn, Uranus, Neptune and the Uranian moons that Voyager 2 saw only in part are modelled from published imagery.
-- **Shape models**: irregular moons and asteroids from NASA PDS Small Bodies Node and NAIF, decimated to three LODs with baked normal maps (sources in `Resources/Models/Bodies/LODS.json`). Shape model of Ryugu: ISAS/JAXA (modified); the game shows this credit on Ryugu's codex card. Bodies without a shape model, and the belt rocks, are procedural.
-- **Rings**: radii and optical depths from the Voyager, Galileo, Cassini and New Horizons ring literature, rounded.
+- **Mars**: USGS Astrogeology and PDS. Colour (Viking MDIM, 925 m): USGS Astrogeology Science Center and PDS (MDIM by Eliason, Batson and Manley); hue from the NASA 3D Resources Mars map (NASA/JPL-Caltech). Relief (MGS MOLA DEM, 463 m): MOLA Team, NASA Goddard Space Flight Center.
 - **Sky**: NASA/Goddard Space Flight Center Scientific Visualization Studio, Deep Star Maps 2020. Gaia DR2: ESA/Gaia/DPAC. ESA distributes Gaia data under [CC BY-NC 3.0 IGO](https://www.cosmos.esa.int/web/gaia-users/license). So `Sky/SkyOurs.png`, `Sky/MilkyWay.png` and the screenshots that show this sky are for non-commercial use only. For commercial use, ESA points to its Terms and Conditions for the use of data in the ESA space science archives. Stars from the Yale Bright Star Catalogue, 5th revised edition (Hoffleit and Warren) (`bsc5.csv`).
 - **Fonts**: Barlow and JetBrains Mono, under the SIL Open Font License (licence files in `Resources/UI/Fonts`).
-- **Ships, sound and cockpit**: made for this project, in code or by its own Blender scripts. A new outside asset must be CC0 or public domain, and must be credited.
+- **Models**: made for this project, in code or by its own Blender scripts. A new outside asset must be CC0 or public domain, and must be credited.
 - **Earlier versions in the git history**:
   - From 2f3642c until 94b4de0 removed them, `Resources/Textures` held the first Earth, Moon and Mars textures. The Earth and Moon files came from the three.js example planet textures (`examples/textures/planets` in mrdoob/three.js).
   - From 3bcb67a until 94b4de0 replaced it, the Moon map was the SELENE (Kaguya) Terrain Camera morning mosaic, ©JAXA/SELENE, from USGS, resampled and recoloured. We thank the SELENE(KAGUYA) TC team and the SELENE Data Archive for providing the SELENE(KAGUYA) data. SELENE is a Japanese mission developed and operated by JAXA.
