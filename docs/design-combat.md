@@ -950,7 +950,7 @@ A missile that gets through hits the ship. Armor rolls first (see Armor). If the
 | Hold | 20 % | 20 % | 0 % | With cargo aboard: 20 % of the cargo and of its pay, as `Take` (`Career.Pirates.cs:357-362`) | none |
 | Cabin | 20 % | 10 % | 0 % | With passengers aboard: they are hurt and the job fails | none |
 | Sensors | 30 % | 10 % | 0 % | Sensor range × 0.5, floor 25 % | 25 % of the part's price, 0.5 day |
-| PDC mount | 10 % | 15 % | 10 % | The working mount nearest the approach is off. Its arc is open | 25 % of a mount's price, 1 day |
+| PDC mount | 10 % | 15 % | 10 % | The working mount nearest the approach is off. Its arc is open | Free while another mount still works; else 25 % of a mount's price. 1 day |
 | Radiators | 0 % | 5 % | 10 % | Stowable radiators jam out: not dark-ready | 25 % of the part's price, 1 day |
 
 - **A hit on an empty system hits the hull** [design]. No cargo, no passengers, no mount left, or fixed radiators: a note says "the hull took it", and nothing changes.
@@ -1103,7 +1103,7 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone.
   - **No kill draw with no mount bearing.** `Strike` draws the kill only when m > 0. So a ship without PDCs draws 2 a missile, as in 4a (17i's 12 draws hold), and one with a mount bearing draws 1 more.
   - **The boarding clock holds while a mount bears; it does not reset.** A break of the alongside rule (500 km, 0.1 km/s) still resets it. The bearing test has no range limit: alongside is 500 km, the PDC envelope 5 km, and the raider holds 2.05 km off.
   - **The repel clock** counts sim time only while the raider is alongside, a working mount bears on it, its magazine is spent and none is in flight. It resets when the raider leaves alongside or the boarding clock runs. So a ship without PDCs is never repelled, and W4's boarding holds. It has no 30 s cap a step, which the boarding clock has.
-  - **The PDC hit** takes the working mount whose zenith is nearest the approach, bearing or not; on a tie (the frigate's `PDC_1` and `PDC_4` share a zenith) the lower index. The note is "Hit: a PDC mount, n of m working". With no working mount it is the hull's.
+  - **The PDC hit** takes the working mount whose zenith is nearest the approach, bearing or not; on a tie (the frigate's `PDC_1` and `PDC_4` share a zenith) the lower index. The note is "Hit: a PDC mount, n of m working". With no working mount it is the hull's. **Changed 2026-10-10:** a hit that leaves another mount working marks its mount free (`ShipDamage.freeMounts`, saved; clamped to the dead mounts): its repair costs no credits, still 1 day. The hit on the last working mount costs 25 % of a mount's price. Cause: the hit report (Phase 5 point 4) showed a 2-mount fit raised the repair bill above a bare hull's.
   - **A refit that changes the hull** clears the dead mounts too: the new hull's fit mask differs. A save's mask is clamped to the fitted mounts.
   - **Notes and events.** New `Happening.MissileKilled` for "PDCs killed a missile", a good (cyan) note. The break-off reads "PDCs: the raider breaks off, back to <haven>", as the other break-offs do.
   - **Rows.** The Missiles row ends "; n mounts bear" (the working mounts that bear on the nearest missile at the attitude now) only with mounts fitted, so a stock ship's row is 4a's. The Damage row says "n of m PDC mounts out". The yard's row is headed "PDCs"; a fit reads "2 PDC mounts, 6 t: one bearing kills 10 % of missiles at 10 km/s". Since 2026-10-09 the kill roll takes the missile's closing speed at impact, so the row names its speed: 10 km/s, a missile from a raider at rest, the slowest a full burn ends. A raider closing at 5 km/s gives 15 km/s and 7 %. 17v's 10,000 strikes run at 10 km/s.
@@ -1138,7 +1138,7 @@ All are agreed as recommended.
 5. **[4a] D5. Armor:** a new slot. Light 15 t, 40,000 cr, stops 50 %; heavy 40 t, 100,000 cr, stops 80 %. No wear. Recommend.
 6. **[4a] D6. Damage effects:** the table above. The drive never goes below 25 %, so no hit strands the ship. The tank vents once, with no lasting leak (no new state). Recommend. Alternative: a leak that runs until a dock.
 7. **[4a] D7. Passengers:** keep the 1 g clamp. A cabin hit fails the job. Recommend. Alternative: allow a dodge over 1 g, and hurt the passengers for it.
-8. **[4a] D8. Repairs:** any dock, 25 % of the part's price a hit, and the part's days. Recommend.
+8. **[4a] D8. Repairs:** any dock, 25 % of the part's price a hit, and the part's days. Recommend. **Changed 2026-10-10:** a PDC mount hit while another mount still works repairs free (days unchanged); see 4b's PDC hit.
 9. **[4b] D9. Boarding:** a bearing working mount stops the boarding clock. An empty magazine and 1 h without a boarding is a break-off. Recommend.
 10. **[4a] D10. Combat rng** is its own `System.Random`. Recommend: the route and board draws do not move.
 11. **[4c] D11. Warp:** closed form at any warp. 1× for the last 20 s before an impact, for the eyes. Recommend.
@@ -1228,6 +1228,20 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
   - **Light plating is the best buy** on every job set: 27 trips from Vesta, 35 on risky jobs.
   - **The tail costs most** (24,670 cr a call with no gear, risky jobs): 60 % of tail hits are on the drive. A flip that shows the raider the nose saves about a third.
   - **Reading.** No fit pays back in under 27 trips (light plating, Vesta). Over all jobs, none pays back in under 100; that figure includes the belt, so the other ports alone are higher. The gear is a belt purchase. The free answers still win elsewhere, as point 4 says. Escort and bounty jobs must close them.
+- **Balance change (2026-10-10, agreed).** A PDC hit that leaves another mount working repairs free; the last mount's hit still costs 7,500 cr (see 4b's PDC hit and D8). The report again, same jobs and seeds; the plating rows and the no-gear row do not move [calc]:
+
+  | Fit | A call costs (risky jobs) | Of it, repair | A trip saves (all / risky / Vesta) | Pays back in trips (all / risky / Vesta) |
+  |---|---|---|---|---|
+  | No gear | 19,720 cr | 7,889 | — | — |
+  | 2 PDC mounts | 12,547 | 8,101 | 820 / 2,378 / 2,959 cr | 73 / 25 / 20 |
+  | 4 PDC mounts | 9,670 | 6,591 | 1,141 / 3,307 / 4,119 | 105 / 36 / 29 |
+  | 6 PDC mounts | 8,266 | 5,690 | 1,293 / 3,749 / 4,689 | 139 / 48 / 38 |
+  | Light plating | 16,129 | 5,293 | 393 / 1,138 / 1,477 | 102 / 35 / 27 |
+  | Heavy plating | 12,494 | 2,386 | 791 / 2,293 / 2,987 | 126 / 44 / 33 |
+
+  - **2 mounts are now the best buy** on every job set: 73 trips over all jobs, 25 on risky jobs, 20 from Vesta. Light plating is second.
+  - A 2-mount fit still repairs a little more than a bare hull (8,101 against 7,889 cr a call): the last mount's hit costs.
+  - **Reading.** The gear is still a belt purchase: over all jobs, 73 trips at best. The free answers still win elsewhere.
 
 **5. NPCs have different goals.** New goals need no new hulls. They fly `Fleet.json` hulls.
 

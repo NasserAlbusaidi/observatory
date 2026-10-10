@@ -354,14 +354,17 @@ namespace FogOfWar
             // the PDC hit: the working mount nearest the approach goes, bearing or not; with none left, the hull
             var h = PdcBench(qs, 1);
             var masks = new List<string>();
-            for (int i = 0; i < 3; i++) { h.C.Hit(h.Ship, Career.HitSystem.Pdc, Vector3.up); masks.Add(Mask(h.C.Damage.mounts)); }
+            var costs = new List<double>();
+            for (int i = 0; i < 3; i++) { h.C.Hit(h.Ship, Career.HitSystem.Pdc, Vector3.up); masks.Add(Mask(h.C.Damage.mounts)); h.C.CanRepair(out _, out double cost, out _); costs.Add(cost); }
             var notesH = h.Said.FindAll(x => x.Text.StartsWith("Hit:")).ConvertAll(x => x.Text);
             var w = PdcBench(qs, 3);
             w.C.Hit(w.Ship, Career.HitSystem.Pdc, Vector3.right);
             Check(masks[0] == "0x02" && masks[1] == "0x22" && masks[2] == "0x22" && notesH.Count == 3 && notesH[0] == "Hit: a PDC mount, 1 of 2 working" && notesH[1] == "Hit: a PDC mount, 0 of 2 working"
-                  && notesH[2] == Career.HullNote && h.C.DamageText() == "2 of 2 PDC mounts out" && w.C.Damage.mounts == 0x08,
+                  && notesH[2] == Career.HullNote && h.C.DamageText() == "2 of 2 PDC mounts out" && w.C.Damage.mounts == 0x08
+                  && h.C.Damage.freeMounts == 0x02 && costs[0] == 0 && costs[1] == 7500 && costs[2] == 7500 && w.C.Damage.freeMounts == 0x08,
                 $"defense 17v: three PDC hits from the top on 2 mounts leave the dead mask {string.Join(", ", masks)} (0x02 PDC_1 the dorsal, 0x22 then PDC_5, 0x22: the hull); notes {string.Join(" / ", notesH)}; " +
-                $"Damage \"{h.C.DamageText()}\"; on 6 mounts a hit from starboard takes {Mask(w.C.Damage.mounts)} (0x08, PDC_3)");
+                $"Damage \"{h.C.DamageText()}\"; repair {string.Join(", ", costs.ConvertAll(x => x.ToString("N0")))} cr (0: PDC_5 still worked, then 7,500 for the last; free mask {Mask(h.C.Damage.freeMounts)}, 0x02); " +
+                $"on 6 mounts a hit from starboard takes {Mask(w.C.Damage.mounts)} (0x08, PDC_3), free ({Mask(w.C.Damage.freeMounts)})");
 
             // a whole chase with 6 mounts: routeRng does not move; the combat rng draws the kill roll, then plating and system
             // for each missile that gets through
@@ -500,8 +503,8 @@ namespace FogOfWar
                 string two = $"2 PDC mounts, 6 t: one bearing kills {PointDefense.KillChance(1, Career.MissileDvKms) * 100:0} % of missiles at 10 km/s";
                 int head = CountText(box, "PDCs"), row = CountText(box, two), fitted = CountText(box, "4 PDC mounts, 12 t: one bearing kills 10 % of missiles at 10 km/s (fitted)");
                 string want = R<string>("RepairLine", false);
-                Check(head == 1 && row == 1 && fitted == 1 && want.StartsWith("Repair all: 7,500 cr, ", StringComparison.Ordinal) && CountText(box, want) == 1,
-                    $"defense 17v: the Jobs page docked at Ceres draws the \"PDCs\" head {head} time (1), \"{two}\" {row} (1), the 4 fitted {fitted} (1), and \"{want}\" (a mount at 25 % of 30,000, 1 day)");
+                Check(head == 1 && row == 1 && fitted == 1 && want.StartsWith("Repair all: 0 cr, ", StringComparison.Ordinal) && CountText(box, want) == 1,
+                    $"defense 17v: the Jobs page docked at Ceres draws the \"PDCs\" head {head} time (1), \"{two}\" {row} (1), the 4 fitted {fitted} (1), and \"{want}\" (0 cr: 3 mounts still worked, so the mount is free; 1 day)");
             });
             Guard("pdc scene cleanup", () =>
             {

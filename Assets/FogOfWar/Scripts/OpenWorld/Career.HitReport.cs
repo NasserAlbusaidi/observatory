@@ -38,7 +38,7 @@ namespace FogOfWar.OpenWorld
             w.WriteLine($"  tank      {VentShare * fuelAboard,7:0} t of water ({VentShare * fuelAboard * meanFuel:N0} cr at the ports' mean {meanFuel:N0} cr/t)");
             w.WriteLine($"  hold      {HoldShare:P0} of the cargo job's pay and load");
             w.WriteLine($"  cabin     the passenger job's whole pay, a failure and {StandingLoss} standing; the chase ends");
-            w.WriteLine($"  PDC mount {RepairShare * ShipBuild.MountPrice,7:N0} cr repair; with no mount, the hull");
+            w.WriteLine($"  PDC mount       0 cr while another mount works, else {RepairShare * ShipBuild.MountPrice:N0} cr repair; with no mount, the hull");
             w.WriteLine($"  radiators {(stock.Stowable ? (RepairShare * stock[Slot.Radiators].Price).ToString("N0") + " cr repair" : "fixed on the stock build: the hull")}");
             w.WriteLine("weights by approach (drive, tank, hold, cabin, sensors, PDC, radiators): " + string.Join("; ", Array.ConvertAll(new[] { 0, 1, 2 }, i => $"{(Aspect)i} {string.Join("/", HitWeights[i])}")));
             w.WriteLine();

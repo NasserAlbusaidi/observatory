@@ -46,6 +46,7 @@ namespace FogOfWar.OpenWorld
         public int drive, sensors;   // hits that count, 0 to Career.MaxHits
         public bool radiators;       // stowable radiators jammed out
         public int mounts;           // 4b: bit i, PDC_i fitted and dead
+        public int freeMounts;       // the dead mounts a hit took while another worked: no repair cost (a subset of mounts)
         public bool Any => drive > 0 || sensors > 0 || radiators || mounts != 0;
         public ShipDamage Clone() => (ShipDamage)MemberwiseClone();
     }
@@ -66,7 +67,8 @@ namespace FogOfWar.OpenWorld
         public const int MaxHits = 2;                        // [design] D6: hits that count on the drive and the sensors
         public const double HitFactor = 0.5;                 // [design] D6: thrust or sensor range per hit; floor 0.25
         public const double VentShare = 0.2, HoldShare = 0.2; // [design] D6: of the water aboard; of the cargo and its pay
-        public const double RepairShare = 0.25;              // [design] D8: of the fitted part's price, per hit
+        public const double RepairShare = 0.25;              // [design] D8: of the fitted part's price, per hit; a mount hit while another
+                                                             // still works repairs free (2026-10-10, the hit report: else a fit costs more than it saves)
         public const double DriveRepairDays = 1, SensorRepairDays = 0.5, RadiatorRepairDays = 1, MountRepairDays = 1; // [design] D8, per hit
 
         public enum Aspect { Fore, Broadside, Aft }
@@ -193,7 +195,9 @@ namespace FogOfWar.OpenWorld
                     Say(Happening.MissileHit, "Hit: radiators jammed out, not dark-ready", false);
                     return;
                 case HitSystem.Pdc when WorkingMounts != 0:
-                    Damage.mounts |= 1 << PointDefense.Nearest(Build.Hull, WorkingMounts, body);
+                    int dead = 1 << PointDefense.Nearest(Build.Hull, WorkingMounts, body);
+                    if (PointDefense.Count(WorkingMounts) > 1) Damage.freeMounts |= dead;
+                    Damage.mounts |= dead;
                     Say(Happening.MissileHit, MountNote(PointDefense.Count(WorkingMounts), Build.MountCount), false);
                     return;
             }
@@ -239,13 +243,14 @@ namespace FogOfWar.OpenWorld
 
         // ------------------------------------------------------------ repairs (D8)
 
-        // Any port, every hit at once: RepairShare of the fitted part's price (a mount's for a dead mount) and the part's
-        // days per hit, in the yard as a refit is (RefitJd). A refit that replaces a damaged part clears its hits (RefitTo).
+        // Any port, every hit at once: RepairShare of the fitted part's price (a mount's for a dead mount, none for a free one)
+        // and the part's days per hit, in the yard as a refit is (RefitJd). A refit that replaces a damaged part clears its
+        // hits (RefitTo).
         public bool CanRepair(out string why, out double cost, out double days)
         {
-            int dead = PointDefense.Count(Damage.mounts);
+            int dead = PointDefense.Count(Damage.mounts), paid = PointDefense.Count(Damage.mounts & ~Damage.freeMounts);
             cost = Math.Round(RepairShare * (Damage.drive * Build[Slot.Drive].Price + Damage.sensors * Build[Slot.Sensors].Price + (Damage.radiators ? Build[Slot.Radiators].Price : 0)
-                                             + dead * ShipBuild.MountPrice));
+                                             + paid * ShipBuild.MountPrice));
             days = Damage.drive * DriveRepairDays + Damage.sensors * SensorRepairDays + (Damage.radiators ? RadiatorRepairDays : 0) + dead * MountRepairDays;
             why = Sandbox ? "sandbox" : !Damage.Any ? "no damage" : Docked == null ? "dock first" : Credits < cost ? "not enough credits" : null;
             return why == null;
@@ -268,14 +273,14 @@ namespace FogOfWar.OpenWorld
             if (to.pick[(int)Slot.Drive] != Build.pick[(int)Slot.Drive]) Damage.drive = 0;
             if (to.pick[(int)Slot.Sensors] != Build.pick[(int)Slot.Sensors]) Damage.sensors = 0;
             if (to.pick[(int)Slot.Radiators] != Build.pick[(int)Slot.Radiators]) Damage.radiators = false;
-            if (to.pick[(int)Slot.PointDefense] != Build.pick[(int)Slot.PointDefense] || to.hull != Build.hull) Damage.mounts = 0;
+            if (to.pick[(int)Slot.PointDefense] != Build.pick[(int)Slot.PointDefense] || to.hull != Build.hull) Damage.mounts = Damage.freeMounts = 0;
         }
 
         // a save's damage, clamped: a missing field is none, fixed radiators cannot jam, and only a fitted mount can be dead
         static ShipDamage Cleaned(ShipDamage d, ShipBuild b) => d == null ? new ShipDamage() : new ShipDamage
         {
             drive = Math.Max(0, Math.Min(MaxHits, d.drive)), sensors = Math.Max(0, Math.Min(MaxHits, d.sensors)), radiators = d.radiators && b.Stowable,
-            mounts = d.mounts & b.FittedMounts,
+            mounts = d.mounts & b.FittedMounts, freeMounts = d.freeMounts & d.mounts & b.FittedMounts,
         };
     }
 }
