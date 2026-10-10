@@ -9,6 +9,7 @@
 - `Career` decides every result: a kill, a hit, a boarding, a break-off, a job's end. The scene never decides one.
 - The scene draws what the career said. It listens to `Career.OnEvent` and reads career state. It does not roll, and it does not change a result.
 - A visual that needs a fact (a side, a mount, a position) reads it from the career or from the same shared rule the career used (see 0005).
+- Physical effects of an impact on the ship also live in the career. The momentum kick (`Career.Kick`, called first in `Strike`) changes the ship's velocity; it must not move to the scene.
 
 ## Why
 
@@ -24,6 +25,7 @@
 ## Where
 
 - `OpenWorld/Career.cs`: `OnEvent`, `Say`.
+- `OpenWorld/Career.Damage.cs`: `Strike`, `Kick`.
 - `Scenes/OpenSystemScene.Career.cs`: `career.OnEvent += MissileEvent`.
 - `Scenes/OpenSystemScene.Missiles.cs`: the flares, tracers, hit and kill flashes.
 

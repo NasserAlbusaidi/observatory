@@ -40,7 +40,7 @@ Read at <commit>.
 |---|---|---|
 | [0001](0001-open-world-game.md) | The game is the open world; the Observatory scenes move to their own repo | Accepted |
 | [0002](0002-career-decides.md) | The career decides every outcome; the scene only draws it | Accepted |
-| [0003](0003-closed-form-combat.md) | Combat resolves in closed form at any warp: one draw a missile, at impact | Accepted |
+| [0003](0003-closed-form-combat.md) | Combat resolves in closed form at any warp: one kill draw a missile, at impact | Accepted |
 | [0004](0004-combat-rng.md) | Combat draws from its own random stream | Accepted |
 | [0005](0005-one-bearing-rule.md) | One bearing rule for the rows, the cards and the tracers | Accepted |
 | [0006](0006-chase-warp-cap.md) | In a chase, the warp follows the time to the next event | Accepted |

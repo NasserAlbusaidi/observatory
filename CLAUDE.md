@@ -18,7 +18,7 @@ The Observatory physics scenes are leaving this repo (ADR 0001). Do not add feat
 |---|---|
 | 0001 | The game is the open world; the Observatory scenes move to their own repo. Name later. |
 | 0002 | The career decides every outcome; the scene only draws it (`Career.OnEvent`). |
-| 0003 | Combat resolves in closed form at any warp: one draw a missile, at impact. |
+| 0003 | Combat resolves in closed form at any warp: one kill draw a missile, at impact. |
 | 0004 | Combat draws from `combatRng` only; route and board draws must not move. |
 | 0005 | One bearing rule (`PointDefense.Bears`, working mounts) for rows, cards and tracers. |
 | 0006 | In a chase, the warp follows the time to the next event; 1× before each impact. |
