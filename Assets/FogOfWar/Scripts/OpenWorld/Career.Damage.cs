@@ -63,6 +63,7 @@ namespace FogOfWar.OpenWorld
         public const double MissileG = 30, MissileDvKms = 10; // [design] D2 (2026-10-09): the burn, and the closing speed it adds
         public const double MissileA = MissileG * Ship.G0;  // km/s²
         public const double BurnS = MissileDvKms / MissileA;  // [calc] 34.0 s, 170 km from rest; from rest at FireKm 217 s
+        public const double MissileKg = 100;                 // [design] Impact effects: its momentum goes into the ship
         public const int Salvo = 2, MagazineSize = 6;        // [design] D2
         public const int MaxHits = 2;                        // [design] D6: hits that count on the drive and the sensors
         public const double HitFactor = 0.5;                 // [design] D6: thrust or sensor range per hit; floor 0.25
@@ -149,12 +150,22 @@ namespace FogOfWar.OpenWorld
         // when the PDCs killed it. No kill draw with no mount bearing, so a ship without PDCs draws as it did in 4a.
         internal bool Strike(Ship ship, D3 from, double kms)
         {
+            Kick(ship, from, kms);
             var body = ToBody(ship, from);
             int m = PointDefense.Bearing(Build.Hull, WorkingMounts, body);
             if (m > 0 && PointDefense.Kills(combatRng, m, kms)) { Say(Happening.MissileKilled, KillNote); return true; }
             if (combatRng.NextDouble() < Build.ArmorStop) { Say(Happening.MissileHit, PlatingNote); return false; }
             Hit(ship, SystemFor(AspectOf(body), combatRng.NextDouble()), body);
             return false;
+        }
+
+        // [design] Every missile's mass reaches the hull, killed or not: a kill in the last 200 m (most of them) spreads its
+        // debris a few metres at most. So its momentum goes into the ship, m·V / M along its flight: 3.3 m/s to a 300 t ship
+        // at 10 km/s. The spray thrown back off the hull is left out (momentum factor 1). No draw: the seeded draws do not move.
+        internal static void Kick(Ship ship, D3 from, double kms)
+        {
+            if (!(from.Sqr > 0) || !(ship.Mass > 0)) return;
+            ship.Vel -= from.Norm * (MissileKg * kms / (ship.Mass * 1000));
         }
 
         // The hit's effect and its note; body is the approach in the body frame. A system with nothing to lose (no water, no

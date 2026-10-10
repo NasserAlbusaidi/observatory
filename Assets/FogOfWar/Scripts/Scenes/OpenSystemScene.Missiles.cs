@@ -235,7 +235,7 @@ namespace FogOfWar
         // The hit as a blackbody (docs/design-combat.md "Impact effects"): [design] a 100 kg missile, 1 % of its kinetic energy
         // radiated, from 6,000 K, cooling as T = T0·(1 + t/τ)^(-1/3) (radiative, dT/dt ∝ -T⁴), so 1,500 K at 1 s; its
         // power L0·(T/T0)⁴ integrates to that 1 %. [calc] 1.05 GW at 10 km/s, 610 × sunlight 10 m away.
-        const double MissileKg = 100, FlashEta = 0.01, FlashT0 = 6000, FlashTauS = 1.0 / 63, SunWm2 = 1361;
+        const double MissileKg = Career.MissileKg, FlashEta = 0.01, FlashT0 = 6000, FlashTauS = 1.0 / 63, SunWm2 = 1361;
         const float CoreGain = 8, CoreMax = 16; // [design] the glowing spot's brightness on screen, before exposure
 
         // At `age` s: its temperature, and its visible light 10 m away in sunlight-at-1-AU units
