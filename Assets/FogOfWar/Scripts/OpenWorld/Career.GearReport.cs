@@ -14,16 +14,19 @@ namespace FogOfWar.OpenWorld
     // the hits a full magazine lands, for the reader to price.
     public partial class Career
     {
-        public static void GearReport(TextWriter w, double jd0)
+        // a raidable job from a board, with the planner's risk for it at a full burn of the stock build
+        sealed class Sampled
         {
-            var sys = SolarSystem.Build();
+            public string from; public JobKind kind; public double hours, p, pay, fuelPrice; public Contract job;
+        }
+
+        // Every port's real board (Tick on a ship docked there) on four days at each of five dates a fifth of a year apart;
+        // each raidable job once (by Key), with its target, and P(call) = 1 − e^(−RaidsPerHour · hours) as RaidChance has it.
+        static List<Sampled> SampleRaidable(SolarSystem sys, double jd0)
+        {
             var b = ShipBuild.Stock();
             double dry = b.DryMass, tank = b.TankCapacity, thrust = b.Thrust;
-            w.WriteLine($"GEAR REPORT, stock build: dry {dry:N1} t, tank {tank:N0} t, {thrust:0.0} MN; full {b.GFull:0.00} g. Full burn with the job aboard (passengers at {PassengerG} g).");
-            w.WriteLine($"RaidsPerHour {RaidsPerHour}, BoardShare {BoardShare}, GiveUpShare {GiveUpShare}; dates jd {jd0} + 0, 73, 146, 219, 292 days, 4 boards each");
-            w.WriteLine();
-
-            var rows = new List<(string from, JobKind kind, double hours, double p, double pay)>();
+            var rows = new List<Sampled>();
             var seen = new HashSet<string>();
             foreach (var port in Ports)
             {
@@ -46,16 +49,29 @@ namespace FogOfWar.OpenWorld
                             double load = j.Kind == JobKind.Cargo ? j.Tonnes : j.People * PassengerTonnes;
                             double a = Math.Min(thrust / (dry + tank + load), j.Kind == JobKind.Passengers ? PassengerG * Ship.G0 : double.MaxValue);
                             double hours = Threat.Of(sys, home, D3.Zero, to, jd, d, a).Hours;
-                            rows.Add((port.Name, j.Kind, hours, 1 - Math.Exp(-RaidsPerHour * hours), j.Pay));
+                            rows.Add(new Sampled { from = port.Name, kind = j.Kind, hours = hours, p = 1 - Math.Exp(-RaidsPerHour * hours), pay = j.Pay, fuelPrice = port.FuelPrice, job = j });
                         }
                     }
             }
+            return rows;
+        }
+
+        public static void GearReport(TextWriter w, double jd0)
+        {
+            var sys = SolarSystem.Build();
+            var b = ShipBuild.Stock();
+            double dry = b.DryMass, tank = b.TankCapacity, thrust = b.Thrust;
+            w.WriteLine($"GEAR REPORT, stock build: dry {dry:N1} t, tank {tank:N0} t, {thrust:0.0} MN; full {b.GFull:0.00} g. Full burn with the job aboard (passengers at {PassengerG} g).");
+            w.WriteLine($"RaidsPerHour {RaidsPerHour}, BoardShare {BoardShare}, GiveUpShare {GiveUpShare}; dates jd {jd0} + 0, 73, 146, 219, 292 days, 4 boards each");
+            w.WriteLine();
+
+            var rows = SampleRaidable(sys, jd0);
 
             double Q(List<double> xs, double q) { if (xs.Count == 0) return double.NaN; xs.Sort(); return xs[(int)Math.Min(xs.Count - 1, Math.Floor(q * xs.Count))]; }
             double Mean(List<double> xs) { double s = 0; foreach (var x in xs) s += x; return xs.Count > 0 ? s / xs.Count : double.NaN; }
             var fits = new[] { (2, 2 * ShipBuild.MountPrice), (4, 4 * ShipBuild.MountPrice), (6, 6 * ShipBuild.MountPrice) };
 
-            void Block(string label, Predicate<(string from, JobKind kind, double hours, double p, double pay)> keep)
+            void Block(string label, Predicate<Sampled> keep)
             {
                 var sel = rows.FindAll(keep);
                 var p = sel.ConvertAll(r => r.p);

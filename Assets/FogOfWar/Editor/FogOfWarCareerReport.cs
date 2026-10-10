@@ -6,12 +6,15 @@ using UnityEngine;
 namespace FogOfWar.EditorTools
 {
     // Report only: -executeMethod FogOfWar.EditorTools.FogOfWarCareerReport.Express writes Logs/express-rate.txt
-    // (OpenWorld/Career.ExpressReport.cs); .Gear writes Logs/gear-report.txt (OpenWorld/Career.GearReport.cs)
+    // (OpenWorld/Career.ExpressReport.cs); .Gear writes Logs/gear-report.txt (OpenWorld/Career.GearReport.cs); .Hits writes
+    // Logs/hit-report.txt (OpenWorld/Career.HitReport.cs)
     public static class FogOfWarCareerReport
     {
         public static void Express() => Write("express-rate.txt", OpenWorld.Career.ExpressReport);
 
         public static void Gear() => Write("gear-report.txt", OpenWorld.Career.GearReport);
+
+        public static void Hits() => Write("hit-report.txt", OpenWorld.Career.HitReport);
 
         static void Write(string file, Action<TextWriter, double> report)
         {
