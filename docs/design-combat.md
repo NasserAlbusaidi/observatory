@@ -1190,7 +1190,7 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
 - One card for each salvo, not one for each missile [design].
 - **A step (agreed 2026-10-10)** [design]:
   - A step is a factor of 10 in the cap: the gap between two warp settings (`OpenSystemScene.Warps`: 1, 10, 100, 1,000×). The cap is compared before the scene rounds it down to a setting, so a value near a boundary cannot show a card and take it away again.
-  - The cap it is compared with is the expected one: the last update's events, aged by the update's time, under point 1's rule. A card shows when the cap now is at or below the expected cap ÷ 10.
+  - The cap it is compared with is the expected one: the last update's events, aged by the update's time, under point 1's rule. An event that arrives (aged to 0 s or less) leaves the expected set: the raider at `FireKm`, an impact. A card shows when the cap now is at or below the expected cap ÷ 10.
   - So an event that only runs down gives no card: the clock slows as today's cap does. An impact, a kill or an end of contact takes an event away and the cap rises: no card. The D11 1× hold gives no card; its salvo had one.
   - The test is against the expected cap, not the player's warp. A player already at 1× gets the launch card too: the card is the decision, not the slowdown.
   - One card at a time. A new event while a card is open updates that card; it does not stack a second.
