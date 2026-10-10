@@ -1305,6 +1305,23 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. E
 | 5c | 7, 8 | Torpedoes (the player's and the raider's), the reach bubble on the map, the saturation readout. | 5a, 5b |
 | 5d | 5 (Escort, Interceptor) | Player missiles; escort jobs; the Escort and Interceptor doctrines. | 5c |
 
+**PR 5a: touch and QA list (2026-10-10).** Three commits, each gated: point 1, then point 2, then point 9.
+
+- **Point 1, the cap** (`Career.Pirates.cs`, `WarpCap`). While a chase is on, cap = clamp(t / `EventS`, 1, `ChaseWarp`), `EventS` = 10 s; t the least of the events below; D11's 1× hold stays a floor. `CloseWarp` and `CloseKm` go.
+  - Events, all closed form [design]: the next impact (`ImpactInS`); the raider at `FireKm`, while it has missiles and none in flight; the raider alongside (`InterceptKm`); a boarding (`BoardingSeconds` − `Dwell`, while no mount bears); the player's flip and arrival under a Fast plan.
+  - The raider's times are a lower bound: from its closing speed u, at its full drive a straight at the ship, s = u·t + a·t²/2 over the range left. A bound errs slow, never past the event. The flip and arrival come from `Ship.TripFrom` (flip at (vp − u) / a).
+  - The cap is computed in `Career`, not the scene, so QA can read it. The scene's `CapWarp` keeps rounding down to `Warps` and keeps D11's give-back.
+  - The chase label's "close" (`RaiderHud.cs:214`) goes with `CloseKm`: it reads "in range" inside `FireKm`.
+  - QA (rewritten, not dropped): `CareerQA.Pirates.cs` 109-126 and 494-499, `CareerQA.RaiderModel.cs:165`, `CareerQA.MissileFx.cs` 103 and 163 assert the new cap. `RunNote` says "Time slows as the raider closes" in place of a fixed 1,000×. New: the bound against a numeric step of the raider's flight (it is never later); the cap at launch 21.7× (217 s); the flip event under a Fast plan.
+- **Point 2, the card** (`Career.Route.cs`, `RouteKind.Threat`). After `Volley`, inside `Contacts`, the career keeps the last update's events as (kind, seconds), ages them by the update's time, drops those at 0 s or less, and compares the caps (the step rule above).
+  - What: "Missiles: 2 inbound from aft, 2,000 km". When: "Impact in 3 min 37 s". The plan: "It is alongside in 1 h 10 min; you dock at Vesta in 2 h: it catches you first", or "you dock first" (`CatchNow` against the Fast plan's `TripFrom` to the target; "No plan flying" with none). For a launch, a raider at `FireKm` or a burn change.
+  - Answers [design]: **Continue** (close the card) and **Revise** (close it and open the console's Nav tab, the trip planner; in the classic panel the planner is already on the panel, so it only closes). **Evade waits for 5c**, with the saturation readout (point 8): a mount-bearing attitude under a flying plan is new autopilot work. Divert and Give up stay on the Jobs page (`ChaseAnswers`).
+  - The card replaces an unanswered raider call card. `DropContact` drops a Threat card with the chase. It drops the warp to 1× (`DropWarp`).
+  - QA: the first and second salvo each give one card; the countdown to an impact gives none; a hidden raider gives none (Phase 2); the card's lines; Continue and Revise in both shells; the raider card replaced.
+- **Point 9, the after-action card** (`RouteKind.Report`). `Strike` records the aspect and the mounts that bore on each missile; the chase's notes are kept in order on the `Encounter`. Every `EndContact` (all nine ends) puts the card up after `DropContact`, with one line a salvo and the end's cause. One answer: **Close**. A load (`LostContact`) gives no card.
+  - The Report card does not drop the warp and does not block a new call: a new call replaces it. `RouteTick`'s drop rule (the job over) does not apply to it.
+  - QA: a chase with 6 mounts, seeded: the lines match the notes and the recorded aspects; each end gives its cause; a load gives no card; both shells draw it.
+
 Settled before 5a: "a step" in point 2 (2026-10-10). Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
 
 ## Phase 6: the hull ladder
