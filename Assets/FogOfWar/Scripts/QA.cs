@@ -45,7 +45,9 @@ namespace FogOfWar
 
         static void Set(object o, string field, object value)
         {
-            var f = o.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            FieldInfo f = null;
+            for (var type = o.GetType(); type != null && f == null; type = type.BaseType)
+                f = type.GetField(field, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (f == null) throw new MissingFieldException(o.GetType().Name, field);
             f.SetValue(o, f.FieldType.IsEnum ? Enum.ToObject(f.FieldType, value) : Convert.ChangeType(value, f.FieldType));
         }
@@ -131,6 +133,65 @@ namespace FogOfWar
                 ("paused-no-trails", s => { Set(s, "paused", true); Set(s, "showTrails", false); }, 2),
                 ("replay", s => { Set(s, "showTrails", true); Call(s, "Reset"); }, 2),
             },
+            [typeof(LorenzScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("butterfly-twins", s => Call(s, "Reset"), 15),
+                ("low-convection", s => { Set(s, "rho", 1f); Set(s, "offsetPower", -6f); Call(s, "Reset"); }, 4),
+                ("wide-wings", s => { Set(s, "rho", 45f); Set(s, "offsetPower", -1f); Call(s, "Reset"); }, 6),
+            },
+            [typeof(ReactionDiffusionScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("growing-spots", s => Call(s, "Reset"), 20),
+                ("low-feed", s => { Set(s, "feed", 0.01f); Set(s, "kill", 0.04f); Call(s, "Reset"); }, 6),
+                ("high-feed", s => { Set(s, "feed", 0.08f); Set(s, "kill", 0.075f); Call(s, "Reset"); }, 6),
+            },
+            [typeof(WaveTankScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("in-phase", s => Call(s, "Reset"), 5),
+                ("opposite-phase", s => { Set(s, "phase", 180f); Set(s, "frequency", 1.5f); Set(s, "separation", 4f); Set(s, "waveSpeed", 12f); Call(s, "Reset"); }, 5),
+                ("low-frequency", s => { Set(s, "phase", 0f); Set(s, "frequency", 0.15f); Set(s, "separation", 32f); Set(s, "waveSpeed", 4f); Call(s, "Reset"); }, 5),
+            },
+            [typeof(GravityAssistScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("speed-gain", s => { Set(s, "speed", 4f); Call(s, "Reset"); }, 8),
+                ("speed-loss", s => { Set(s, "side", 1); Set(s, "impact", 0.8f); Set(s, "incoming", 0.8f); Set(s, "planetSpeed", 1.5f); Call(s, "Reset"); }, 8),
+                ("distant-fast-pass", s => { Set(s, "impact", 4f); Set(s, "incoming", 2.5f); Set(s, "planetSpeed", 0f); Call(s, "Reset"); }, 5),
+            },
+            [typeof(LagrangeScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("stable-l4", s => Call(s, "Reset"), 8),
+                ("unstable-l5", s => { Set(s, "mu", 0.15f); Set(s, "offset", 0.15f); Set(s, "point", 1); Call(s, "Reset"); }, 8),
+                ("small-secondary", s => { Set(s, "mu", 0.001f); Set(s, "offset", -0.15f); Call(s, "Reset"); }, 5),
+            },
+            [typeof(ChargedParticleScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("magnetic-only", s => { Set(s, "electric", 0f); Set(s, "magnetic", 3f); Set(s, "pitch", 75f); Call(s, "Reset"); }, 5),
+                ("negative-drift", s => { Set(s, "sign", 1); Set(s, "electric", 1f); Set(s, "magnetic", 0.3f); Set(s, "pitch", 0f); Call(s, "Reset"); }, 6),
+            },
+            [typeof(RutherfordScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("scattered-beam", s => { Set(s, "speed", 4f); Call(s, "Reset"); }, 6),
+                ("low-energy-high-charge", s => { Set(s, "energy", 0.5f); Set(s, "charge", 3f); Set(s, "spread", 5f); Call(s, "Reset"); }, 8),
+                ("high-energy-narrow", s => { Set(s, "energy", 5f); Set(s, "charge", 0.5f); Set(s, "spread", 0.5f); Call(s, "Reset"); }, 6),
+            },
+            [typeof(ResonanceScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("resonance", s => Call(s, "Reset"), 8),
+                ("low-drive-low-damping", s => { Set(s, "drive", 0.7f); Set(s, "damping", 0.05f); Call(s, "Reset"); }, 6),
+                ("high-drive-high-damping", s => { Set(s, "drive", 3.3f); Set(s, "damping", 1f); Call(s, "Reset"); }, 6),
+            },
+            [typeof(FlockingScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("emergent-flock", s => Call(s, "Reset"), 10),
+                ("ballistic", s => { Set(s, "separation", 0f); Set(s, "alignment", 0f); Set(s, "cohesion", 0f); Call(s, "Reset"); }, 5),
+                ("strong-steering", s => { Set(s, "separation", 3f); Set(s, "alignment", 3f); Set(s, "cohesion", 3f); Call(s, "Reset"); }, 5),
+            },
+            [typeof(GalaxyEncounterScene)] = new (string, Action<SimScene>, float)[]
+            {
+                ("tidal-tails", s => { Set(s, "speed", 4f); Call(s, "Reset"); }, 8),
+                ("near-head-on", s => { Set(s, "impact", 0.2f); Set(s, "approach", 0.2f); Call(s, "Reset"); }, 5),
+                ("retrograde-flyby", s => { Set(s, "impact", 4f); Set(s, "approach", 1.4f); Set(s, "retrograde", true); Call(s, "Reset"); }, 5),
+            },
         };
 
         IEnumerator UiPass()
@@ -212,6 +273,17 @@ namespace FogOfWar
                     yield return new WaitForSecondsRealtime(wait);
                     yield return Shot($"{i + 1}-{name}");
                 }
+                if (scene is LabScene lab)
+                {
+                    Set(lab, "paused", true);
+                    double frozen = lab.Elapsed;
+                    yield return new WaitForSecondsRealtime(1f);
+                    if (lab.Elapsed != frozen) { bad++; log.WriteLine("    paused model advanced"); }
+                    yield return Shot($"{i + 1}-paused");
+                    lab.Reset();
+                    if (lab.Elapsed != 0 || lab.Paused) { bad++; log.WriteLine("    replay did not reset playback"); }
+                    yield return Shot($"{i + 1}-replay");
+                }
             }
 
             log.WriteLine("quality modes on the ray tracers");
@@ -241,7 +313,7 @@ namespace FogOfWar
             {
                 Screen.SetResolution(w, h, FullScreenMode.Windowed);
                 yield return new WaitForSecondsRealtime(1.5f);
-                foreach (int s in new[] { 3, 7, 8, 9 }) { app.Activate(s); yield return new WaitForSecondsRealtime(1f); yield return Shot($"res{w}x{h}-{s + 1}"); }
+                foreach (int s in new[] { 3, 7, 8, 9, 11, 12, 18, 19 }) { app.Activate(s); yield return new WaitForSecondsRealtime(1f); yield return Shot($"res{w}x{h}-{s + 1}"); }
             }
 
             log.WriteLine($"done: {errors} errors, {bad} bad readouts");

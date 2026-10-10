@@ -30,8 +30,12 @@ namespace FogOfWar
         public static IEnumerable<Action> All => (Action[])Enum.GetValues(typeof(Action));
         public static KeyCode Get(Action a, int slot) => bind[a][slot];
 
-        // Zero selects the tenth scene; Alpha0 precedes Alpha1 in Unity's enum.
-        public static int SceneIndex(KeyCode k) => k == KeyCode.Alpha0 ? 9 : k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9 ? k - KeyCode.Alpha1 : -1;
+        // Digits select 1–10; Shift selects 11–20. Alpha0 precedes Alpha1 in Unity's enum.
+        public static int SceneIndex(KeyCode k, bool shift = false)
+        {
+            int i = k == KeyCode.Alpha0 ? 9 : k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9 ? k - KeyCode.Alpha1 : -1;
+            return i < 0 ? -1 : i + (shift ? 10 : 0);
+        }
 
         // Keys with a fixed job that the rebindable actions can't take (#21): 1–9 / 0 pick a scene, Esc menu, F2 and H hide
         // panels, F11 fullscreen.

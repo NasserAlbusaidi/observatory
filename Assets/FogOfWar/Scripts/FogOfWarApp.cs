@@ -4,7 +4,7 @@ using UnityEngine;
 namespace FogOfWar
 {
     // Owns the camera, the scenes and the IMGUI shell. The app boots into the first scene behind the main menu; the
-    // scene rail, the 1–9 / 0 keys and the "Scenes" menu switch between scenes.
+    // Scene rail, digits (Shift for 11–20) and the "Scenes" menu switch between scenes.
     public class FogOfWarApp : MonoBehaviour
     {
         public Camera Cam { get; private set; }
@@ -87,6 +87,9 @@ namespace FogOfWar
                 new WormholeScene(), new BlackHoleScene(), new WarpScene(), new JourneyScene(),
                 new NegativeMassScene(), new TidesScene(), new MarsScene(), new MeteorScene(),
                 new ThreeBodyScene(), new DoublePendulumScene(),
+                new LorenzScene(), new ReactionDiffusionScene(), new WaveTankScene(), new GravityAssistScene(),
+                new LagrangeScene(), new ChargedParticleScene(), new RutherfordScene(), new ResonanceScene(),
+                new FlockingScene(), new GalaxyEncounterScene(),
             };
             Quality = PlayerPrefs.GetInt("fow-quality", 1);
             // clean captures from tours and QA runs, whose input is locked
@@ -191,7 +194,7 @@ namespace FogOfWar
             {
                 DrawRail(W, H);
                 DrawPanel(W, H);
-                GUI.Label(new Rect(W / 2 - 360, H - 30, 720, 20), "drag to orbit · scroll to zoom · 1–9 / 0 switch scene · H hide panels · Esc menu", ui.hint);
+                GUI.Label(new Rect(W / 2 - 360, H - 30, 720, 20), "drag to orbit · scroll to zoom · digits / Shift + digit switch scene · H hide panels · Esc menu", ui.hint);
             }
             else { railRect = panelRect = Rect.zero; }
 
@@ -242,9 +245,9 @@ namespace FogOfWar
             else if (e.keyCode == KeyCode.F11) { UnityEngine.Screen.fullScreen = !UnityEngine.Screen.fullScreen; e.Use(); }
             else if (Rig != null) { }
             else if (e.keyCode == KeyCode.F2 || e.keyCode == KeyCode.H) { showUI = !showUI; e.Use(); }
-            else if (!MenuOpen && !KeysQuiet && Controls.SceneIndex(e.keyCode) >= 0)
+            else if (!MenuOpen && !KeysQuiet && Controls.SceneIndex(e.keyCode, e.shift) >= 0)
             {
-                int i = Controls.SceneIndex(e.keyCode);
+                int i = Controls.SceneIndex(e.keyCode, e.shift);
                 if (i < scenes.Length) { Activate(i); e.Use(); }
             }
         }
@@ -275,7 +278,7 @@ namespace FogOfWar
 
         void MainMenu()
         {
-            GUILayout.Label($"{SceneCount} physics models, with their limits explained.", ui.body);
+            GUILayout.Label($"{SceneCount} interactive models, with their limits explained.", ui.body);
             GUILayout.Space(8);
             if (GUILayout.Button("Resume", ui.choice)) menu = Screen.None;
             if (GUILayout.Button("Scenes", ui.choice)) menu = Screen.Observatory;
@@ -285,7 +288,7 @@ namespace FogOfWar
 
         void ObservatoryMenu()
         {
-            GUILayout.Label($"{SceneCount} physics models, with their limits explained.", ui.body);
+            GUILayout.Label($"{SceneCount} interactive models, with their limits explained.", ui.body);
             for (int i = 0; i < scenes.Length; i++)
             {
                 if (GUILayout.Button($"{i + 1}. {scenes[i].Title}", ui.choice)) Activate(i);
@@ -312,7 +315,7 @@ namespace FogOfWar
                 }
                 GUILayout.EndHorizontal();
             }
-            GUILayout.Label("Fixed keys: 1–9 / 0 pick a scene · Esc menu · F2 or H hide panels · F11 fullscreen.", ui.note);
+            GUILayout.Label("Fixed keys: digits select scenes 1–10 · Shift + digit: 11–20 · Esc menu · F2 or H hide panels · F11 fullscreen.", ui.note);
             GUILayout.Space(6);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Reset to defaults", ui.button)) { Controls.ResetDefaults(); rebindNote = null; }
@@ -336,7 +339,7 @@ namespace FogOfWar
                 GUILayout.Label(Controls.Keys(a), ui.value);
                 GUILayout.EndHorizontal();
             }
-            GUILayout.Label("1–9 / 0: pick a scene. Mouse: drag to orbit, scroll to zoom. Change keys under Esc → Controls.", ui.note);
+            GUILayout.Label("Digits: scenes 1–10. Shift + digit: 11–20. Mouse: drag to orbit, scroll to zoom. Change keys under Esc → Controls.", ui.note);
             GUILayout.Space(6);
             if (GUILayout.Button("Close (F1)", ui.button)) HelpOpen = false;
             GUILayout.EndVertical();
