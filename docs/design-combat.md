@@ -1324,8 +1324,8 @@ Two kinds of matter leave a hit: hot droplets that glow as blackbodies, and cold
 |---|---|---|
 | Round mass | 50 g | [design] |
 | Its energy | 3.6 MJ at 12 km/s (the missile's speed plus the round's 2 km/s) | [calc] |
-| Hot spray | E / 50 MJ: 72 g, in a 60° cone along the round's path, up to half the closing speed relative to the missile | [design], [calc] |
-| Chunks | 40 chunks share the missile's 100 kg. Up to 80 m/s relative to the missile, from 10 % of the round's energy | [design], [calc] |
+| Hot spray | E / 50 MJ: 72 g, in a 60° cone along the round's path, from 200 m/s up to half the closing speed relative to the missile | [design], [calc] |
+| Chunks | 40 chunks share the missile's 100 kg. 5 m/s up to about 85 m/s relative to the missile, from 10 % of the round's energy | [design], [calc] |
 | At the hull | A piece whose path meets the hull's ellipsoid (0.15, 0.12, 0.5 of its length) stops there. It is not drawn as a hit | [design] |
 
 **Drawing it.** A compute shader works out every piece from its seed and its age each frame, with no saved state. It drops what is dead or too faint to see, then draws the rest with one indirect draw. Each piece is a point source, so its light on the eye is E = P / (4π·d²). Its pixels sum to π·E / Ω_pixel, in the units where a white surface in full sunlight is 1. A piece that moves on screen in the frame is a streak of that length, with the same total light. A piece whose peak would pass 1 grows wider instead.

@@ -5,14 +5,15 @@ using UnityEngine;
 namespace FogOfWar.OpenWorld
 {
     // The matter a missile hit or kill throws out (docs/design-combat.md "The sparks (fx-2)"): hot droplets that glow and cool
-    // as blackbodies, and cold chunks lit by the Sun. A burst is a seed, an age and a few numbers; Sparks.compute works out
-    // every piece from them each frame and appends the ones bright enough to see, and Sparks.shader draws them with one
+    // as blackbodies, and cold chunks lit by the Sun. A burst is a seed, an age and a few numbers; SparksCompute.compute works
+    // out every piece from them each frame and appends the ones bright enough to see, and Sparks.shader draws them with one
     // indirect draw. Positions are in metres in the ship's frame (Unity axes, not turning with it). Off without compute
     // shaders: the flash alone is drawn then.
     public sealed class Sparks : IDisposable
     {
-        const int Slots = 8, PerBurst = 32768, Capacity = 1 << 17;
+        const int Slots = 8, PerBurst = 32768;
         const int HitHot = 16384, HitCold = 24, KillHot = 2048, KillCold = 40;
+        const int Capacity = Slots * (HitHot + HitCold); // every piece of a full set of hits drawn at once
         const float HitLife = 20, KillLife = 3; // s: past these every piece is gone or far away
         const double SpecificJ = 50e6;          // [design] E / 50 MJ is the hot mass
         const double RoundKg = 0.05;            // [design] a PDC round
@@ -60,12 +61,12 @@ namespace FogOfWar.OpenWorld
         public Sparks()
         {
             if (!SystemInfo.supportsComputeShaders) { Debug.LogWarning("Fog of War: no compute shaders, impact sparks off"); return; }
-            cs = Resources.Load<ComputeShader>("Shaders/Sparks");
-            if (cs == null) { Debug.LogError("Fog of War: missing compute shader Resources/Shaders/Sparks"); return; }
+            cs = Resources.Load<ComputeShader>("Shaders/SparksCompute");
+            if (cs == null) { Debug.LogError("Fog of War: missing compute shader Resources/Shaders/SparksCompute"); return; }
             kernel = cs.FindKernel("Sparks");
             mat = Gfx.Mat("Sparks");
             burstBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Slots, Marshal.SizeOf<Burst>());
-            outBuf = new GraphicsBuffer(GraphicsBuffer.Target.Append, Capacity, sizeof(float) * 9);
+            outBuf = new GraphicsBuffer(GraphicsBuffer.Target.Append | GraphicsBuffer.Target.Structured, Capacity, sizeof(float) * 9);
             argsBuf = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawArgs.size);
             lut = BlackbodyLut();
             mat.SetBuffer(idSparks, outBuf);

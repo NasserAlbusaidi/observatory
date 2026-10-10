@@ -1,4 +1,4 @@
-// Impact sparks (Sparks.compute, docs/design-combat.md "The sparks (fx-2)"): one quad a piece, drawn indirect. A piece is a
+// Impact sparks (SparksCompute.compute, docs/design-combat.md "The sparks (fx-2)"): one quad a piece, drawn indirect. A piece is a
 // point source: its pixels sum to π·E / Ω_pixel times the exposure, where a white surface in full sunlight is 1 (ShipPBR's
 // scale). It is a streak from where it was a shutter ago, with the same total light; a Gaussian across it, never under
 // 0.7 px, and wider where its peak would pass 1. Additive, behind the hull where the hull is nearer.
@@ -43,8 +43,8 @@ Shader "FogOfWar/Sparks"
                 float4 ct = mul(UNITY_MATRIX_VP, float4(sp.tail, 1.0));
                 if (ch.w <= 1e-6) { o.pos = float4(2, 2, 2, 1); return o; }   // behind the eye: outside the clip volume
                 if (ct.w <= 1e-6) ct = ch;
-                float2 half = _ScreenParams.xy * 0.5;
-                float2 d = ch.xy / ch.w * half - ct.xy / ct.w * half;
+                float2 halfPx = _ScreenParams.xy * 0.5;
+                float2 d = ch.xy / ch.w * halfPx - ct.xy / ct.w * halfPx;
                 float L = length(d);
                 float2 u = L > 1e-3 ? d / L : float2(1, 0), n = float2(-u.y, u.x);
                 // one pixel's solid angle: 2·tan(fov/2)/H, squared
@@ -58,7 +58,7 @@ Shader "FogOfWar/Sparks"
                 o.col = sp.col * scale / (sigma * r2pi * (L + sigma * r2pi));
                 float ext = 3.0 * sigma;
                 float4 p = c.x < 0 ? ct : ch;
-                p.xy += (u * (c.x * ext) + n * (c.y * ext)) / half * p.w;
+                p.xy += (u * (c.x * ext) + n * (c.y * ext)) / halfPx * p.w;
                 o.pos = p;
                 o.prof = float4(c.x < 0 ? -ext : L + ext, c.y * ext, L, sigma);
                 return o;
