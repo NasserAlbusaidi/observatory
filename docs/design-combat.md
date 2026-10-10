@@ -1211,7 +1211,23 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
   - Risky jobs only (386, 0.1 h or more): P(call) mean 32 %. Loss mean 3,090 cr a trip. 2 mounts pay back in 19 trips.
   - By port: Vesta 41 % (15 trips for 2 mounts), Ceres 25 % (24 trips). The inner ports run 6-7 % (98-130 trips). The outer moons run 2-3 % (142-364 trips).
   - Hits from a full magazine of 6 at 10 km/s: 6.00 with no gear, 4.84 with 2 mounts bearing, 3.00 with light plating, 1.20 with heavy. PDCs cut hits little; plating cuts them a lot.
-  - **Reading.** PDCs pay only for a belt career, through boarding. Away from the belt, nobody fits them. The hits that land (6 a full magazine) are left out above. Their bill (D8 repairs, plus the D6 water, cargo and cabin losses) may be larger than the boarding cut. If so, plating is the better buy. Not priced yet; that is the next number.
+  - **Reading.** PDCs pay only for a belt career, through boarding. Away from the belt, nobody fits them. The hits that land (6 a full magazine) are left out above. Their bill (D8 repairs, plus the D6 water, cargo and cabin losses) may be larger than the boarding cut. If so, plating is the better buy. Priced below.
+- **The hits, priced (2026-10-10).** `Career.HitReport` (`FogOfWarCareerReport.Hits`, `Logs/hit-report.txt`). Same 1,119 jobs. The game's own `Strike` fires a full magazine at 10 km/s, from the nose, starboard and tail, 32 seeded runs each. The bill: the repair, the water vented (100 t aboard, the port's price), the pay lost, and the boarding cut when no mount still works. Left out: standing, trip time, yard days, the fit's mass, and the free answers [calc]:
+
+  | Fit | A call costs (risky jobs) | Of it, boarded | A trip saves (all / risky / Vesta) | Pays back in trips (all / risky / Vesta) |
+  |---|---|---|---|---|
+  | No gear | 19,720 cr | 7,761 | — | — |
+  | 2 PDC mounts | 15,790 | 947 | 458 / 1,326 / 1,638 cr | 131 / 45 / 37 |
+  | 4 PDC mounts | 13,231 | 13 | 739 / 2,141 / 2,622 | 162 / 56 / 46 |
+  | 6 PDC mounts | 11,176 | 0 | 966 / 2,800 / 3,487 | 186 / 64 / 52 |
+  | Light plating | 16,129 | 8,528 | 393 / 1,138 / 1,477 | 102 / 35 / 27 |
+  | Heavy plating | 12,494 | 9,104 | 791 / 2,293 / 2,987 | 126 / 44 / 33 |
+
+  - **The hits cost more than the boarding.** With no gear, a call on a risky job costs about 12,000 cr in hits and 7,761 cr in the boarding cut.
+  - **A PDC hit is a 7,500 cr repair.** With no mounts it is the hull's, for free. So 2 mounts raise the repair bill (7,889 to 11,343 cr a call), and a boarder gets on when the hits kill both mounts. The boarding-only number above (56 trips for 2 mounts) becomes 131.
+  - **Light plating is the best buy** on every job set: 27 trips from Vesta, 35 on risky jobs.
+  - **The tail costs most** (24,670 cr a call with no gear, risky jobs): 60 % of tail hits are on the drive. A flip that shows the raider the nose saves about a third.
+  - **Reading.** No fit pays back in under about 30 trips. Away from the belt, none pays back in under 100. The gear is a belt purchase. The free answers still win elsewhere, as point 4 says. Escort and bounty jobs must close them.
 
 **5. NPCs have different goals.** New goals need no new hulls. They fly `Fleet.json` hulls.
 
