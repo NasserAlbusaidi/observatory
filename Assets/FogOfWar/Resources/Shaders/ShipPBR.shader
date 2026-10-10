@@ -1,7 +1,7 @@
 // Player ship hull: metal/roughness PBR (GGX, Smith, Schlick) from the baked atlas in Models/PlayerShip, lit only by
 // what is really there (ShipLighting.cs): the Sun as one hard directional light with inverse-square falloff, cut by
 // eclipses and by the ship's own shadow map; planetshine from the brightest nearby body; the drive plume while it
-// burns. No ambient term, so a side facing away from every source is black. Output is scaled by _FOWExposure.
+// burns; an impact flash. No ambient term, so a side facing away from every source is black. Output is scaled by _FOWExposure.
 Shader "FogOfWar/ShipPBR"
 {
     Properties
@@ -30,6 +30,7 @@ Shader "FogOfWar/ShipPBR"
             float _FOWSunIrr, _FOWEclipse;
             float4 _FOWShineDir, _FOWShineCol;  // shine: w = angular radius of the body (rad)
             float4 _FOWPlumePos, _FOWPlumeCol;  // plume: w = falloff radius (render units)
+            float4 _FOWFlashPos, _FOWFlashCol;  // impact flash: xyz render position, w = 10 m; rgb light at 10 m, a = on
             float4 _FOWFloodPos[4];             // hull floodlights: xyz render position, w = 10 m in render units
             float4 _FOWFloodDir[4];             // xyz aim, w = cos of the outer cone
             float4 _FOWFloodCol;                // rgb irradiance at 10 m (0 = off), a = cos of the inner cone
@@ -133,6 +134,15 @@ Shader "FogOfWar/ShipPBR"
                         float r2 = _FOWFloodPos[k].w * _FOWFloodPos[k].w;
                         c += brdf(n, v, lf, albedo, metal, rough) * _FOWFloodCol.rgb * cone * min(r2 / d2, 16.0);
                     }
+                }
+
+                // impact flash: a point at the hull, inverse square from 10 m, held under 1.25 m (no self-shadow: it sits on the hull)
+                if (_FOWFlashCol.a > 0.0)
+                {
+                    float3 dl = _FOWFlashPos.xyz - i.wp;
+                    float d2 = max(dot(dl, dl), 1e-12);
+                    float r2 = _FOWFlashPos.w * _FOWFlashPos.w;
+                    c += brdf(n, v, dl * rsqrt(d2), albedo, metal, rough) * _FOWFlashCol.rgb * min(r2 / d2, 64.0);
                 }
 
                 c *= _FOWExposure;

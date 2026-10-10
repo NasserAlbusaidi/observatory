@@ -23,6 +23,7 @@ namespace FogOfWar
         Mesh missileMesh;
         Material missileFlareMat, missilePlumeMat;
         D3 missileLast;               // the nearest missile's P at the last draw: the side a hit comes in on
+        double missileLastKms;        // and its closing speed then: the hit's energy
 
         // review checks: how many dots DrawMissiles drew last, and its summary
         int missileDots;
@@ -57,12 +58,13 @@ namespace FogOfWar
                 missileT.Add(t); missilePx.Add(0);
             }
             if (n == 0) { LateTracers(null); LateFlash(hitFlash); LateFlash(killFlash); return; }
+            HullColliders(); // cooked while the salvo flies, not on the frame it hits
             float pxPerRad = UnityEngine.Screen.height / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
             double near = double.PositiveInfinity;
             for (int i = 0; i < n; i++)
             {
                 var P = e.Missiles[i].P;
-                if (P.Mag < near) { near = P.Mag; missileLast = P; }
+                if (P.Mag < near) { near = P.Mag; missileLast = P; missileLastKms = e.Missiles[i].Kms; }
                 var t = missileT[i];
                 t.GetChild(1).gameObject.SetActive(e.Missiles[i].Burning);
                 t.localPosition = Map(ship.Pos + P, out double k);
@@ -219,10 +221,59 @@ namespace FogOfWar
             public float At = -1;   // Time.unscaledTime it fired, or -1
             public D3 Off;          // where, from the ship, in the sim frame
             public int Count;       // review checks: how many fired
+            public bool Hot;        // a hit: a cooling blackbody that lights the hull, not a fixed colour
+            public double Kms;      // a hit's closing speed
+            public bool OnHull;     // review checks: the hit's ray met the hull mesh
         }
-        // [design] a hit swells at the hull for 0.6 s; a kill is a short white pop at the missile
-        readonly Flash hitFlash = new Flash { Name = "Missile hit", Seconds = 0.6f, Km = 0.015f, Colour = new Color(2f, 1.6f, 1f) };
+        // [design] a hit glows at the hull for 0.6 s (Hot: its colour and light from HitGlow); a kill is a short white pop at the missile
+        readonly Flash hitFlash = new Flash { Name = "Missile hit", Seconds = 0.6f, Km = 0.006f, Colour = Color.white, Hot = true };
         readonly Flash killFlash = new Flash { Name = "Missile kill", Seconds = 0.35f, Km = 0.01f, Colour = new Color(1.8f, 1.9f, 2.2f) };
+
+        // The hit as a blackbody (docs/design-combat.md "Impact effects"): [design] a 100 kg missile, 1 % of its kinetic energy
+        // radiated, from 6,000 K, cooling as T = T0·(1 + t/τ)^(-1/3) (radiative, dT/dt ∝ -T⁴), so 1,500 K at 1 s; its
+        // power L0·(T/T0)⁴ integrates to that 1 %. [calc] 1.05 GW at 10 km/s, 610 × sunlight 10 m away.
+        const double MissileKg = 100, FlashEta = 0.01, FlashT0 = 6000, FlashTauS = 1.0 / 63, SunWm2 = 1361;
+        const float CoreGain = 8, CoreMax = 16; // [design] the glowing spot's brightness on screen, before exposure
+
+        // At `age` s: its temperature, and its visible light 10 m away in sunlight-at-1-AU units
+        internal static float HitGlow(double kms, float age, out float kelvin)
+        {
+            double x = 1 + Math.Max(age, 0) / FlashTauS;
+            kelvin = (float)(FlashT0 * Math.Pow(x, -1.0 / 3));
+            double l0 = FlashEta * 0.5 * MissileKg * kms * kms * 1e6 / (3 * FlashTauS);
+            double watts = l0 * Math.Pow(x, -4.0 / 3);
+            return (float)(watts / (4 * Math.PI * 100) / SunWm2) * Blackbody.VisibleShare(kelvin);
+        }
+
+        Transform collidersOf; // the hull model that has MeshColliders for HullHitKm
+
+        void HullColliders()
+        {
+            if (shipModel == null || collidersOf == shipModel) return;
+            collidersOf = shipModel;
+            foreach (var mf in shipModel.GetComponentsInChildren<MeshFilter>(true))
+                if (mf.sharedMesh != null && mf.sharedMesh.isReadable && mf.GetComponent<MeshCollider>() == null) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+        }
+
+        // The hull's surface on the line from its middle along `dir` (unit, sim frame), in km from the middle: a ray from
+        // outside against the hull's mesh. Half a hull length (4c's point) when the ray misses or there is no model.
+        double HullHitKm(D3 dir, out bool onHull)
+        {
+            double half = HullKm() * 0.5;
+            onHull = false;
+            if (shipModel == null) return half;
+            HullColliders();
+            Physics.SyncTransforms();
+            float len = shipLen * shipT.lossyScale.x; // the model's length in world units: HullKm() in km
+            if (len <= 0) return half;
+            var w = Root.TransformDirection(Frame.U(dir)).normalized;
+            var ray = new Ray(shipT.position + w * (2 * len), -w);
+            float best = float.PositiveInfinity;
+            foreach (var c in shipModel.GetComponentsInChildren<MeshCollider>())
+                if (c.enabled && c.gameObject.activeInHierarchy && c.Raycast(ray, out var hit, 2 * len) && hit.distance < best) best = hit.distance;
+            onHull = !float.IsInfinity(best);
+            return onHull ? (2 * len - best) / len * HullKm() : half;
+        }
 
         // Career.OnEvent: a hit (a cabin hit says JobFailed, with the same "Hit:" lead) at the hull on the side it came in on;
         // a kill where the missile was last drawn: the kill is drawn at impact, so at 1× that is one frame's flight (167 m at 10 km/s) out
@@ -230,7 +281,11 @@ namespace FogOfWar
         {
             var dir = missileLast.Sqr > 1e-18 ? missileLast.Norm : -ship.Heading;
             if (what == Career.Happening.MissileKilled) Fire(killFlash, missileLast.Sqr > 1e-18 ? missileLast : dir * (HullKm() * 0.5));
-            else if (what == Career.Happening.MissileHit || (what == Career.Happening.JobFailed && text != null && text.StartsWith("Hit:"))) Fire(hitFlash, dir * (HullKm() * 0.5));
+            else if (what == Career.Happening.MissileHit || (what == Career.Happening.JobFailed && text != null && text.StartsWith("Hit:")))
+            {
+                hitFlash.Kms = missileLastKms > 0 ? missileLastKms : Career.MissileDvKms;
+                Fire(hitFlash, dir * HullHitKm(dir, out hitFlash.OnHull));
+            }
         }
 
         static void Fire(Flash f, D3 off)
@@ -240,11 +295,11 @@ namespace FogOfWar
             f.Count++;
         }
 
-        // It swells and fades over its Seconds, never under a few pixels across
+        // It swells and fades over its Seconds, never under a few pixels across. A hot one glows and lights the hull as it cools.
         void LateFlash(Flash f)
         {
             float age = Time.unscaledTime - f.At;
-            if (f.At < 0 || age > f.Seconds) { DropFlash(f); return; }
+            if (f.At < 0 || age > f.Seconds) { DropFlash(f); if (f.Hot) lighting?.SetFlash(default, Color.black, 0); return; }
             if (f.T == null)
             {
                 DropFlash(f); // a scene rebuild destroyed the holder: free what it left
@@ -254,8 +309,16 @@ namespace FogOfWar
             }
             float u = age / f.Seconds;
             var c = f.Colour; c.a = (1 - u) * (1 - u);
-            f.Mat.SetColor("_Color", c);
             f.T.localPosition = Map(ship.Pos + f.Off, out double k);
+            if (f.Hot)
+            {
+                float irr10 = HitGlow(f.Kms, age, out float kelvin), share = irr10 / HitGlow(f.Kms, 0, out _);
+                var col = Blackbody.Colour(kelvin);
+                c = col * Mathf.Min(CoreGain * share * (lighting?.Exposure ?? 1), CoreMax); c.a = 1;
+                float metre = (float)(k / 1000) * Root.lossyScale.x;
+                lighting?.SetFlash(Root.TransformPoint(f.T.localPosition), col * irr10, metre);
+            }
+            f.Mat.SetColor("_Color", c);
             float pxPerRad = UnityEngine.Screen.height / 2f / Mathf.Tan(Cam.fieldOfView * Mathf.Deg2Rad / 2);
             float minKm = 3f * Mathf.Max(f.T.localPosition.magnitude, 1e-6f) / pxPerRad;
             f.T.localScale = Vector3.one * Mathf.Max((float)(f.Km * k) * (0.3f + 0.7f * Mathf.Sqrt(u)), minKm);
