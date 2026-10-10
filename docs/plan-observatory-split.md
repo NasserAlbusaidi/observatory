@@ -41,7 +41,7 @@ The Observatory is about 13 % of the code. The game does not need most of the sh
 
 Each step is its own PR, gated as `CLAUDE.md` says.
 
-**S0. Game repo: move `PlanckColor`** (cut point 1). Small. No behaviour change. Suites: `career` and `qa`. The impact-fx session offered to do it.
+**S0. Game repo: move `PlanckColor`** (cut point 1). Small. No behaviour change. Suites: `career` and `qa`.
 
 **S1. New repo: the Observatory alone.**
 - Nasser creates the repo (name and visibility are open below).
@@ -70,4 +70,4 @@ Each step is its own PR, gated as `CLAUDE.md` says.
 
 1. The new repo's name, and public or private. This repo is public, under GPL-3.0.
 2. The Observatory program's product name (it must differ from the game's, cut point 5).
-3. Who does S0 (the impact-fx session offered).
+3. Who does S0.
