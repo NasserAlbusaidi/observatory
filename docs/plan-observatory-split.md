@@ -2,7 +2,7 @@
 
 Date: 2026-10-10. Status: proposed. Nothing is moved yet.
 Decision: [ADR 0001](adr/0001-open-world-game.md). The game is the open world. The eight Observatory scenes move to a separate repo. The name is decided later.
-Code read on main at ef016bf. Paths are under `Assets/FogOfWar/` unless shown.
+Code read on main at ef016bf. Cut points re-checked on fed0783: no change under `Assets/`. Paths are under `Assets/FogOfWar/` unless shown.
 
 ## Size
 
@@ -44,7 +44,7 @@ Each step is its own PR, gated as `CLAUDE.md` says.
 **S0. Game repo: move `PlanckColor`** (cut point 1). Small. No behaviour change. Suites: `career` and `qa`.
 
 **S1. New repo: the Observatory alone.**
-- Nasser creates the repo (name and visibility are open below).
+- Nasser creates the repo: `NasserAlbusaidi/observatory`, public (see "Decided").
 - Start from a clone of this repo with full history, so the Observatory files keep their history and the GPL-3.0 licence. Then delete the game-only code in one commit.
 - Fix cut points 2 and 4 there. Give it its own product name (cut point 5).
 - Its QA: the Observatory part of `-fowqa` and `-fowtour`, `-fowbhshots`, the `gpu` suite, and the relativity checks of `FogOfWarPhysicsCheck`.
@@ -66,8 +66,12 @@ Each step is its own PR, gated as `CLAUDE.md` says.
 - **Missed asset references.** Assets are loaded by string (`Gfx.Mat(name)`, `Art.Tex`, `Resources.Load`), so the compiler does not catch a missing one. S2's suites and a manual boot catch it.
 - **Two copies of the shared code.** Fixes in one copy do not reach the other. Accept this; the Observatory changes little.
 
+## Decided (Nasser, 2026-10-10)
+
+1. The new repo: `NasserAlbusaidi/observatory`, public. This repo is public, under GPL-3.0.
+2. The Observatory program's product name: `Observatory` (cut point 5). Its settings go under `HKCU\Software\Nasser\Observatory`.
+3. S0: the "observatory-split" session.
+
 ## Open (Nasser)
 
-1. The new repo's name, and public or private. This repo is public, under GPL-3.0.
-2. The Observatory program's product name (it must differ from the game's, cut point 5).
-3. Who does S0.
+1. When to create the repo (S1). It needs his approval at that time.
