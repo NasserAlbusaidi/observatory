@@ -1536,7 +1536,7 @@ A raider missile hits at 10 km/s or more (Phase 4). No warhead is needed: the ki
 | Light after 0.1 s | 7 % of L₀ at 3,100 K, of which less reaches the eye: the visible share of a blackbody falls as it cools | [calc] |
 
 - **Where.** The hit is on the hull surface: a ray along the approach direction, against the hull mesh. It was a point half a hull length out from the centre, which on a broadside hit is in space.
-- **The light.** A point light at the hit, lighting the hull through `ShipPBR` like the plume (`_FOWFlashPos`, `_FOWFlashCol`), colour from Planck's law (`BlackHoleScene.PlanckColor`), visible power from the same spectrum.
+- **The light.** A point light at the hit, lighting the hull through `ShipPBR` like the plume (`_FOWFlashPos`, `_FOWFlashCol`), colour from Planck's law (`Blackbody.PlanckColor`), visible power from the same spectrum.
 - **The eye.** The exposure meter counts the flash. The frame whites out, then the eye closes over 0.35 s while the glow fades to orange, so the hull reads dark for a moment after.
 - **The core.** The glowing spot itself, a few metres across, takes the same colour and brightness.
 - **The kill flash** is a PDC round on the missile, a much smaller energy. It stays as 4c built it until fx-2 adds its debris.
