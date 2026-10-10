@@ -1327,12 +1327,37 @@ Proposed by Nasser and the impact-fx session. Not agreed in full, and not built.
 
 - The PDCs are the last line. The torpedo's impact speed is the balance knob: a slower terminal run gives the PDCs more time, and costs the torpedo less heat.
 
-**A torpedo hit disables the ship** [design, recommended]. 3.6 TJ on a 300 t ship would destroy it. The game makes it a mission kill instead:
-- The drive goes to 0 % until a yard repairs it. The ship is adrift.
-- The plating does not stop it.
+**A torpedo hit: the ship's mass and the aspect decide** (agreed 2026-10-10). The aspect is Phase 4's (Damage: fore, broadside, aft from the approach in the body frame) [code].
+- **Energy into the ship.** Along the axis (fore or aft) the torpedo goes through the whole length and leaves all its energy. Broadside it crosses the beam (about 0.24 of the length) and leaves a share f = 0.3 [design]. e = f·E / M, the energy per kilogram of ship.
+- **The outcome by e** [design]. 5 MJ/kg is more than TNT's 4.2 MJ/kg in every kilogram of the ship.
+
+| e | Outcome |
+|---|---|
+| 5 MJ/kg or more | Destroyed |
+| 0.5 to 5 MJ/kg | Disabled: the drive at 0 % until a yard repairs it; the ship is adrift |
+| Under 0.5 MJ/kg | A heavy hit: two rolls on the Phase 4 hit table |
+
+- The plating does not stop a torpedo [design].
+- At 3.6 TJ (60 km/s) [calc]:
+
+| Ship | Mass | Fore or aft | Broadside |
+|---|---|---|---|
+| Player frigate, full | 500 t | 7.2 MJ/kg: destroyed | 2.2: disabled |
+| Player frigate, dry | 300 t | 12.0: destroyed | 3.6: disabled |
+| Courier (46 m) | 346 t | 10.4: destroyed | 3.1: disabled |
+| Hauler (123 m) | 6,617 t | 0.54: disabled | 0.16: heavy hit |
+| Freighter (175 m) | 19,058 t | 0.19: heavy hit | 0.06: heavy hit |
+
+- So a small ship turns its side to a torpedo, which is the opposite of its best aspect against missiles (the PDCs bear best fore and aft). That is a decision for the player.
 - The push is m·V / M: 400 m/s to a 300 t ship at 60 km/s [calc] (Impact effects, "Momentum").
-- This fits the raider: it wants the prize whole (point 5). It disables the ship from far away, then closes and boards.
-- A disabled ship needs a way home: a tow to the nearest port, for credits, as the emergency tender (`Happening.EmergencyTender`) brings water.
+- This fits the raider: it wants the prize whole (point 5). It fires from the side, disables the ship, then closes and boards.
+- **A destroyed player ship** needs a rule for the loss (open, below).
+
+**The tow** (agreed 2026-10-10). A disabled ship calls a tow from the nearest port.
+- **Time:** a flip-and-burn at 1 g from the port [design]: t = 2·√(d / a). 5.6 h from 1 million km, 17.7 h from 10 million km [calc].
+- **Price:** by the tow's time: 20,000 cr (as the emergency tender) plus a rate per hour [design, number open].
+- **The race.** The raider's time to the ship against the tow's. If the raider gets there first, it boards (Phase 4 boarding: the PDCs that still work keep it off). Then the tow still comes.
+- **The escort.** The tow comes with one corvette, flown with the Escort doctrine (point 5) [design]. A raider does not attack an escorted tow on the way home [design].
 
 **Each range has its answer:**
 
@@ -1345,9 +1370,9 @@ Proposed by Nasser and the impact-fx session. Not agreed in full, and not built.
 The attacker's answers: fire from closer, fire salvos from different sides, fire again while the track is fresh. Coming close is dangerous for the attacker only when the target can shoot back (player missiles, 5d).
 
 **Open (Nasser):**
-1. A torpedo hit: disabled (recommended) or destroyed. Destroyed ends the career or needs a new rule for the loss.
-2. The torpedo's numbers: impact speed (60 km/s above is an example), cross-section, price, magazine.
-3. The tow: its price, and whether the raider boards before it arrives.
+1. The loss of the player's ship: what a destroyed ship means for the career.
+2. The tow's rate per hour.
+3. The torpedo's numbers (60 km/s, 2 m², 2 t) are a first set, for play tests (agreed 2026-10-10). Price and magazine are open.
 
 ### Build plan (agreed 2026-10-10)
 
