@@ -46,7 +46,10 @@ namespace FogOfWar
         void AnswerCall(Career.RouteCall call, int i)
         {
             if (career == null || call == null || call != career.Call || call.Answers == null || i < 0 || i >= call.Answers.Length) return;
-            career.Answer(call.Answers[i].What, jd);
+            var what = call.Answers[i].What;
+            career.Answer(what, jd);
+            // Phase 5 point 2: Revise opens the trip planner, the console's Nav tab; the classic panel has it on the panel
+            if (what == Career.RouteAnswer.Revise && !GameSettings.ClassicPanel && consoleTabs != null) ShowConsoleTab(1);
         }
 
         // Once Run has closed the card the chase goes on, and Divert and Give up stay on offer: Divert to the patrolled port

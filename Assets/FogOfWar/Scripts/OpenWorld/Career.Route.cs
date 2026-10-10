@@ -10,10 +10,11 @@ namespace FogOfWar.OpenWorld
     // call is not saved.
     public partial class Career
     {
-        public enum RouteKind { Distress, CargoTrouble, Pirate }
+        // Threat: a chase's warp-drop card (Career.Threat.cs, Phase 5 point 2)
+        public enum RouteKind { Distress, CargoTrouble, Pirate, Threat }
 
-        // Yes and No answer a distress call or cargo trouble; Run, Divert and GiveUp a raider
-        public enum RouteAnswer { Yes, No, Run, Divert, GiveUp }
+        // Yes and No answer a distress call or cargo trouble; Run, Divert and GiveUp a raider; Continue and Revise a Threat card
+        public enum RouteAnswer { Yes, No, Run, Divert, GiveUp, Continue, Revise }
 
         public class RouteCall
         {
@@ -120,26 +121,29 @@ namespace FogOfWar.OpenWorld
         }
 
         // An answer from the card (RouteCall.Answers). Yes and No go to a distress call or cargo trouble; Run, Divert and
-        // GiveUp to a raider, also once Run has closed its card, while the chase goes on.
+        // GiveUp to a raider, also once Run has closed its card or a Threat card is up, while the chase goes on. Continue
+        // and Revise close a Threat card (the scene opens the planner on Revise).
         public void Answer(RouteAnswer a, double jd)
         {
             var call = Call;
-            if (call != null && call.Kind != RouteKind.Pirate)
+            if (call != null && (call.Kind == RouteKind.Distress || call.Kind == RouteKind.CargoTrouble))
             {
                 if (a == RouteAnswer.Yes || a == RouteAnswer.No) Answer(a == RouteAnswer.Yes, jd);
                 return;
             }
+            if (a == RouteAnswer.Continue || a == RouteAnswer.Revise) { if (call?.Kind == RouteKind.Threat) Drop(); return; }
             if (a == RouteAnswer.Run || a == RouteAnswer.Divert || a == RouteAnswer.GiveUp) AnswerRaider(a, jd);
         }
 
         // The pilot's answer. Distress: yes takes the rescue on (if there is a slot and the fuel for it). Cargo trouble:
         // yes vents the fuel now, no starts the spoil clock on the job. A raider's two-button card: yes gives up the share
-        // its Yes label names, no runs.
+        // its Yes label names, no runs. A Threat card closes either way.
         public void Answer(bool yes, double jd)
         {
             var call = Call;
             if (call == null) return;
             if (call.Kind == RouteKind.Pirate) { AnswerRaider(yes ? RouteAnswer.GiveUp : RouteAnswer.Run, jd); return; }
+            if (call.Kind == RouteKind.Threat) { Drop(); return; }
             if (call.Kind != RouteKind.Distress && call.Kind != RouteKind.CargoTrouble) return;
             Drop();
             if (call.Kind == RouteKind.Distress)

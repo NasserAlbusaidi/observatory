@@ -171,14 +171,23 @@ namespace FogOfWar.OpenWorld
             if (e.Magazine > 0 && e.Missiles.Count == 0) into.Add((ChaseEvent.Fire, ReachInS(d - FireKm, u, a)));
             if (!(d < InterceptKm && v.Mag < InterceptKms)) into.Add((ChaseEvent.Alongside, Math.Max(ReachInS(d - InterceptKm, u, a), (v.Mag - InterceptKms) / a)));
             else if (MountsBearing(ship, r) == 0) into.Add((ChaseEvent.Boarded, Math.Max(0, Threat.BoardingSeconds - e.Dwell)));
-            if (!ship.PlanActive || ship.Plan != Plan.Brachistochrone || ship.Target == null) return;
-            var T = ship.Target;
-            double dist = Math.Max((e.Sys.Pos(T, jd) - ship.Pos).Mag - Ship.Standoff(T), 0), am = ship.AMax;
-            var (uT, wT) = ship.RelToTarget(e.Sys, jd);
-            if (!(am > 0)) return;
-            into.Add((ChaseEvent.Arrival, Ship.TripFrom(dist, am, uT, wT, ship.CruiseCap).t));
-            double brake = BrakeInS(dist, uT, am, ship.CruiseCap);
+            if (!FastPlanIn(e.Sys, ship, out double arrive, out double brake)) return;
+            into.Add((ChaseEvent.Arrival, arrive));
             if (brake > 0) into.Add((ChaseEvent.Flip, brake));
+        }
+
+        // The player's Fast plan from now: the seconds to the arrival (Ship.TripFrom) and to the brake (BrakeInS). False
+        // with none flying.
+        bool FastPlanIn(SolarSystem sys, Ship ship, out double arrive, out double brake)
+        {
+            arrive = brake = double.NaN;
+            if (ship == null || !ship.PlanActive || ship.Plan != Plan.Brachistochrone || ship.Target == null || !(ship.AMax > 0)) return false;
+            var T = ship.Target;
+            double dist = Math.Max((sys.Pos(T, jd) - ship.Pos).Mag - Ship.Standoff(T), 0), am = ship.AMax;
+            var (uT, wT) = ship.RelToTarget(sys, jd);
+            arrive = Ship.TripFrom(dist, am, uT, wT, ship.CruiseCap).t;
+            brake = BrakeInS(dist, uT, am, ship.CruiseCap);
+            return true;
         }
 
         // The seconds to close s km from a closing speed u (negative: opening) at a straight acceleration a: s = u·t + a·t²/2,
@@ -347,6 +356,7 @@ namespace FogOfWar.OpenWorld
             Volley(e, ship, simDt);
             // a cabin hit failed the chase's passenger job
             if (!Active.Contains(e.Job)) { EndContact(Happening.RaiderGone, OffNote(BreakOff.JobOver, null, Haven()), true, jd); return; }
+            ThreatCheck(e, ship, simDt);
             if (!alongside) { e.Dwell = 0; e.Repel = 0; return; }
             if (MountsBearing(ship, e.Pirate.Pos - ship.Pos) > 0)
             {
@@ -393,7 +403,7 @@ namespace FogOfWar.OpenWorld
                 var port = (card ? Call.DivertTo : null) ?? (ship != null ? NearestPatrol(e.Sys, ship, jd, out _) : null);
                 var b = port != null ? e.Sys[port.Body] : null;
                 if (b == null || Divert == null || !Divert(b)) { Say(Happening.RouteCall, NavNote, false); return; }
-                if (card) Drop();
+                if (card || Call?.Kind == RouteKind.Threat) Drop(); // a Threat card's plan line is the old plan's
                 Say(Happening.RouteCall, DivertNote(port));
                 return;
             }
@@ -489,11 +499,12 @@ namespace FogOfWar.OpenWorld
         // The raider and its proxy body leave the system now, with no note: a load, a new career. True if there was one.
         public bool DropContact()
         {
+            threatKept = false;
             var e = Encounter;
             if (e == null) return false;
             e.Sys.Bodies.Remove(e.Proxy);
             Encounter = null;
-            if (Call?.Kind == RouteKind.Pirate) Drop();
+            if (Call?.Kind == RouteKind.Pirate || Call?.Kind == RouteKind.Threat) Drop();
             return true;
         }
     }
