@@ -1351,7 +1351,7 @@ Proposed by Nasser and the impact-fx session. Not agreed in full, and not built.
 - So a small ship turns its side to a torpedo, which is the opposite of its best aspect against missiles (the PDCs bear best fore and aft). That is a decision for the player.
 - The push is m·V / M: 400 m/s to a 300 t ship at 60 km/s [calc] (Impact effects, "Momentum").
 - This fits the raider: it wants the prize whole (point 5). It fires from the side, disables the ship, then closes and boards.
-- **A destroyed player ship** needs a rule for the loss (open, below).
+- **A destroyed player ship:** the second chance (below).
 
 **The tow** (agreed 2026-10-10). A disabled ship calls a tow from the nearest port.
 - **Time:** a flip-and-burn at 1 g from the port [design]: t = 2·√(d / a). 5.6 h from 1 million km, 17.7 h from 10 million km [calc].
@@ -1369,8 +1369,18 @@ Proposed by Nasser and the impact-fx session. Not agreed in full, and not built.
 
 The attacker's answers: fire from closer, fire salvos from different sides, fire again while the track is fresh. Coming close is dangerous for the attacker only when the target can shoot back (player missiles, 5d).
 
+**The second chance** (direction agreed 2026-10-10; the details proposed). A destroyed ship does not end the career.
+- **The crew lives.** It leaves in the lifeboat, and the escorted tow (above) takes it to the nearest port [design].
+- **What is lost:** the ship and every fitted part, the cargo, and the active jobs. Each job fails as an expired one does: no pay, a failure, the standing loss [code: the cabin hit].
+- **A new ship.** The career already has a lease: the yard's ship is 1,000,000 cr, paid off 50,000 cr at a time (`Career.ShipPrice`, `ShipStep`) [code].
+  - With 1,000,000 cr or more, the player buys a stock frigate at the port, outright.
+  - With less, the yard leases a new stock frigate: `ShipPaid` goes back to 0. What was paid toward the lost ship is lost. A leased ship that is destroyed also costs a deductible of 10 % of the price, 100,000 cr; debt is allowed, as for the tender [design].
+  - So nobody is ever left without a ship, and the player never has to reload.
+- **No save scumming.** The game autosaves at the moment of the loss, as it does for Give up (#99), and the career has one save slot. A load then shows the loss; it cannot undo it [design].
+- **Not chosen:** a reload of the last save with a penalty. A penalty kept outside the save is easy to get around (clear the game's data), and the lease already gives a way back.
+
 **Open (Nasser):**
-1. The loss of the player's ship: what a destroyed ship means for the career.
+1. The deductible (10 % above).
 2. The tow's rate per hour.
 3. The torpedo's numbers (60 km/s, 2 m², 2 t) are a first set, for play tests (agreed 2026-10-10). Price and magazine are open.
 
