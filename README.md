@@ -69,7 +69,21 @@ Rebind keys in **Esc → Settings → Controls**. 1–8, Esc, F2, H, F11 and the
 
 ## BUILD IT
 
-There's no download and no store build. Build it from source in Unity 6: open the project, then **Fog of War → 2. Build Windows game**. Full steps, test tools and the project layout are in the **[developer guide](docs/DEVELOPING.md)**.
+There's no download and no store build. Build it from source:
+
+1. Install Unity **6000.6.4f1** with Windows Build Support (Mono).
+2. Clone the repo: `git clone https://github.com/NasserAlbusaidi/observatory.git`
+3. Open the folder in Unity. The first import takes a few minutes.
+4. To try it in the editor: **Fog of War → 1. Create and open the sim scene**, then press Play.
+5. To build: **Fog of War → 2. Build Windows game**. The program lands in `Builds/Windows/FogOfWar.exe`.
+
+The menu and the program still carry the old "Fog of War" name. A later change renames them.
+
+## TEST IT
+
+`Tools/qa.sh <dir>` builds the program and runs the menu shots (`uishots`) and the scene checks (`qa`). Add `tour`, `bhshots`, `physics` or `gpu` for the scene tour, the black hole shots, the geodesic checks and the GPU-against-reference check.
+
+Full steps, every test flag and the project layout are in the **[developer guide](docs/DEVELOPING.md)**.
 
 ---
 
