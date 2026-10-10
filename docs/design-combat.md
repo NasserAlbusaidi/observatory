@@ -1285,6 +1285,105 @@ Build the Runner first, with bounty jobs (5b). Escort and Interceptor come later
 - Data: the Phase 4 notes, plus the aspect and the bearing count at each impact. The D14 recorder fields already carry them.
 - **Purpose:** the player can say why the fight went as it did, and what to change next time.
 
+### Torpedoes and missiles: range against certainty (proposed 2026-10-10)
+
+Proposed by Nasser and the impact-fx session. Not agreed in full, and not built. The combat session builds 5c from it. The open items are at the end.
+
+**The rule.** A missile is short range and sure. A torpedo is long range, heavy and easy to avoid, but a hit disables the ship. The attacker chooses: come close for a sure hit, or stay far and risk a miss.
+
+| Item | Missile (Phase 4) | Torpedo |
+|---|---|---|
+| Launch range | Up to `FireKm` = 2,000 km | 100,000 km or more |
+| Mass | 100 kg | 2 t (point 7 above) [design] |
+| Drive | 30 g until it has added 10 km/s | 50 g for up to 10 min: 294 km/s, 2.9 % of its mass at vₑ = 10,000 km/s [calc]. Heat, not fuel, is the limit [design] |
+| Guidance | The launcher's track, by data link | The launcher's track while the launcher sees the target, then a passive heat seeker [design] |
+| Seeker | Not needed: the flight is short (below) | Sees as stock sensors do: `Signature.RangeKm`. A burning ship from 0.2 AU or more; a cold hull at 10,000 km (stock), 3,000 km (frigate, radiators stowed), 1,000 km (corvette, stowed) [code] |
+| Flight time | 217 s from rest at `FireKm` | 28 min from 100,000 km at 60 km/s; 56 min from 200,000 km [calc] |
+| Energy at impact | 5 GJ at 10 km/s | 3.6 TJ at 60 km/s, 0.86 kt TNT, 720 × a missile [calc] |
+| Effect of a hit | The hit table (Damage, Phase 4) | Disabled (below) |
+
+**Why no active seeker on a torpedo** [design]. Radar and lidar find a cold hull, but the return falls off as 1/R⁴, so their range is short, and the pulse shows where the shooter is. A torpedo with one would find a dark ship every time, and going dark would never help. So torpedoes are passive only.
+
+**Going dark against a torpedo.** It reuses Phase 3's track hold.
+- The torpedo flies to where the last track says the ship will be. Without a new fix, the position error grows at the stale-fix speed u = 1.389 km/s (Phase 3) [code].
+- At arrival, the seeker must find the ship inside that error. A cold hull is seen to ρ × 10,000 km, and u × hold = ρ × 10,000 km by Phase 3's own rule.
+- **So the rule is: a torpedo misses a dark ship when its last fix is older than the ship's hold at impact** (`Career.HoldS`) [design]. No new number. One draw is not needed; it is a test.
+- Against a 28 min flight (100,000 km), a stowed corvette (hold 12 min) that goes dark at launch escapes. A stowed frigate (36 min) does not, and escapes a 56 min flight (200,000 km). A stock ship (2 h) does not escape either [calc].
+- So the long shot is the risky one, and the stealth parts pay for themselves in a fight.
+
+**Going dark against a missile does not help.** A missile's flight is 217 s or less, and the shortest hold is 720 s (stowed corvette). Its track is never stale [calc].
+
+**A dark ship is a sitting duck.** It cannot burn, so its coast is predictable, and a fresh track still finds it. Its sink fills (Phase 3), so it cannot stay dark for long. Going dark does nothing against a close launch.
+
+**Burning away.** A torpedo that must burn longer than its endurance to reach the ship cannot hit. That is the reach bubble of point 7: about 86,000 km against a 1 g ship. Outside it, running works; the cost is Δv and a loud drive, which keeps the track fresh.
+
+**PDCs against a torpedo.** The Phase 4 pass integral, with the torpedo's cross-section. A 2 t torpedo is larger: A = 2 m² [design], 4 × a missile. P(kill) at 60 km/s [calc]:
+
+| Mounts bearing | Missile cross-section (0.5 m²) | Torpedo (2 m²) |
+|---|---|---|
+| 1 | 0.02 | 0.07 |
+| 2 | 0.04 | 0.13 |
+| 5 | 0.09 | 0.30 |
+
+- The PDCs are the last line. The torpedo's impact speed is the balance knob: a slower terminal run gives the PDCs more time, and costs the torpedo less heat.
+
+**A torpedo hit: the ship's mass and the aspect decide** (agreed 2026-10-10). The aspect is Phase 4's (Damage: fore, broadside, aft from the approach in the body frame) [code].
+- **Energy into the ship.** Along the axis (fore or aft) the torpedo goes through the whole length and leaves all its energy. Broadside it crosses the beam (about 0.24 of the length) and leaves a share f = 0.3 [design]. e = f·E / M, the energy per kilogram of ship.
+- **The outcome by e** [design]. 5 MJ/kg is more than TNT's 4.2 MJ/kg in every kilogram of the ship.
+
+| e | Outcome |
+|---|---|
+| 5 MJ/kg or more | Destroyed |
+| 0.5 to 5 MJ/kg | Disabled: the drive at 0 % until a yard repairs it; the ship is adrift |
+| Under 0.5 MJ/kg | A heavy hit: two rolls on the Phase 4 hit table |
+
+- The plating does not stop a torpedo [design].
+- At 3.6 TJ (60 km/s) [calc]:
+
+| Ship | Mass | Fore or aft | Broadside |
+|---|---|---|---|
+| Player frigate, full | 500 t | 7.2 MJ/kg: destroyed | 2.2: disabled |
+| Player frigate, dry | 300 t | 12.0: destroyed | 3.6: disabled |
+| Courier (46 m) | 346 t | 10.4: destroyed | 3.1: disabled |
+| Hauler (123 m) | 6,617 t | 0.54: disabled | 0.16: heavy hit |
+| Freighter (175 m) | 19,058 t | 0.19: heavy hit | 0.06: heavy hit |
+
+- So a small ship turns its side to a torpedo, which is the opposite of its best aspect against missiles (the PDCs bear best fore and aft). That is a decision for the player.
+- The push is m·V / M: 400 m/s to a 300 t ship at 60 km/s [calc] (Impact effects, "Momentum").
+- This fits the raider: it wants the prize whole (point 5). It fires from the side, disables the ship, then closes and boards.
+- **A destroyed player ship:** the second chance (below).
+
+**The tow** (agreed 2026-10-10). A disabled ship calls a tow from the nearest port.
+- **Time:** a flip-and-burn at 1 g from the port [design]: t = 2·√(d / a). 5.6 h from 1 million km, 17.7 h from 10 million km [calc].
+- **Price:** by the tow's time: 20,000 cr (as the emergency tender) plus a rate per hour [design, number open].
+- **The race.** The raider's time to the ship against the tow's. If the raider gets there first, it boards (Phase 4 boarding: the PDCs that still work keep it off). Then the tow still comes.
+- **The escort.** The tow comes with one corvette, flown with the Escort doctrine (point 5) [design]. A raider does not attack an escorted tow on the way home [design].
+
+**Each range has its answer:**
+
+| Launch | The target's best answer | Its cost |
+|---|---|---|
+| Far: flight longer than the hold | Go dark | Sink heat, time, the job's schedule |
+| Middle: inside the reach bubble | Burn out of the bubble | Δv, and a fresh track |
+| Close: missiles | PDCs, plating, turn the mounts to bear | Hits, repairs |
+
+The attacker's answers: fire from closer, fire salvos from different sides, fire again while the track is fresh. Coming close is dangerous for the attacker only when the target can shoot back (player missiles, 5d).
+
+**The second chance** (direction agreed 2026-10-10; the details proposed). A destroyed ship does not end the career.
+- **The crew lives.** It leaves in the lifeboat, and the escorted tow (above) takes it to the nearest port [design].
+- **What is lost:** the ship and every fitted part, the cargo, and the active jobs. Each job fails as an expired one does: no pay, a failure, the standing loss [code: the cabin hit].
+- **A new ship.** The career already has a lease: the yard's ship is 1,000,000 cr, paid off 50,000 cr at a time (`Career.ShipPrice`, `ShipStep`) [code].
+  - With 1,000,000 cr or more, the player buys a stock frigate at the port, outright.
+  - With less, the yard leases a new stock frigate: `ShipPaid` goes back to 0. What was paid toward the lost ship is lost. A leased ship that is destroyed also costs a deductible of 10 % of the price, 100,000 cr; debt is allowed, as for the tender [design].
+  - So nobody is ever left without a ship, and the player never has to reload.
+- **No save scumming.** The game autosaves at the moment of the loss, as it does for Give up (#99), and the career has one save slot. A load then shows the loss; it cannot undo it [design].
+- **Not chosen:** a reload of the last save with a penalty. A penalty kept outside the save is easy to get around (clear the game's data), and the lease already gives a way back.
+
+**Open (Nasser):**
+1. The deductible (10 % above).
+2. The tow's rate per hour.
+3. The torpedo's numbers (60 km/s, 2 m², 2 t) are a first set, for play tests (agreed 2026-10-10). Price and magazine are open.
+
 ### Build plan (agreed 2026-10-10)
 
 Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. Each PR gets its own touch and QA list here when it starts.
