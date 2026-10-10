@@ -135,7 +135,7 @@ namespace FogOfWar
             bool lessonUp = lessonCard != null && lessonCard.parent != null && lessonCard.resolvedStyle.display == DisplayStyle.Flex && !float.IsNaN(lessonCard.layout.y);
             callCard.style.bottom = lessonUp ? new StyleLength(lessonCard.parent.layout.height - lessonCard.layout.y + 10) : new StyleLength(StyleKeyword.Null);
             // a raider's range, closing speed and boarding clock change every frame; the rest only with the call
-            string live = call?.Kind == Career.RouteKind.Pirate ? RaiderLine() : null;
+            string live = call?.Kind == Career.RouteKind.Pirate || call?.Kind == Career.RouteKind.Threat ? RaiderLine() : null;
             Ui.Show(callLive, live != null);
             if (live != null) Ui.Text(callLive, live);
             if (call == callShown) return;

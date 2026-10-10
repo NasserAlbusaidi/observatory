@@ -431,6 +431,7 @@ namespace FogOfWar
             int k = 0;
             while (r.C.Encounter == er && k < 200) { r.Tick(30); k++; }
             var off = r.Said.FindLast(x => x.What == Career.Happening.RaiderGone);
+            ReportedCheck(r.C, off.Text, "held off by a PDC");
             var flying = new List<string>();
             foreach (int mag in new[] { 0, 2 })
             {

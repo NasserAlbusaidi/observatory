@@ -142,6 +142,7 @@ namespace FogOfWar.OpenWorld
             // [design] the raider's closing rate on the ship, −d|r|/dt; a raider opening the range gives 0
             var m = new Missile { P = from, S0 = r > 0 ? Math.Max(0, -D3.Dot(from, e.Pirate.Vel - ship.Vel) / r) : 0 };
             for (int i = 0; i < n; i++) e.Missiles.Add(m);
+            e.Salvos.Add(new SalvoLog { Fired = n, Km = r });
             Say(Happening.MissileFired, FiredNote(n, m.ImpactInS), false);
             return n;
         }
@@ -152,11 +153,13 @@ namespace FogOfWar.OpenWorld
         {
             Kick(ship, from, kms);
             var body = ToBody(ship, from);
-            int m = PointDefense.Bearing(Build.Hull, WorkingMounts, body);
-            if (m > 0 && PointDefense.Kills(combatRng, m, kms)) { Say(Happening.MissileKilled, KillNote); return true; }
-            if (combatRng.NextDouble() < Build.ArmorStop) { Say(Happening.MissileHit, PlatingNote); return false; }
-            Hit(ship, SystemFor(AspectOf(body), combatRng.NextDouble()), body);
-            return false;
+            int m = PointDefense.Bearing(Build.Hull, WorkingMounts, body), n0 = Notes.Count;
+            bool killed = m > 0 && PointDefense.Kills(combatRng, m, kms);
+            if (killed) Say(Happening.MissileKilled, KillNote);
+            else if (combatRng.NextDouble() < Build.ArmorStop) Say(Happening.MissileHit, PlatingNote);
+            else Hit(ship, SystemFor(AspectOf(body), combatRng.NextDouble()), body);
+            if (Encounter != null) Record(Encounter, AspectOf(body), m, killed, n0); // point 9's after-action card
+            return killed;
         }
 
         // [design] Every missile's mass reaches the hull, killed or not: a kill in the last 200 m (most of them) spreads its

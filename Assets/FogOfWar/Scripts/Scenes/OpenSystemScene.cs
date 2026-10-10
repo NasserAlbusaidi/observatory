@@ -275,7 +275,7 @@ namespace FogOfWar
             if (ship.VelRef != null && (ship.VelRef != ship.Target || !sys.Bodies.Contains(ship.VelRef))) ship.VelRef = null;
             CapWarp();
             TrackRoute();
-            double simDt = Math.Min(dt * Warps[warpIdx], Math.Max(0, (QaStopJd - jd) * 86400));
+            double simDt = Math.Min(dt * FrameRate(), Math.Max(0, (QaStopJd - jd) * 86400));
             // combat 4c (D11): a frame at any warp or frame time ends where the 1× hold before an impact starts, so the hold
             // is never stepped over; the missiles' result does not depend on it (Career.Volley)
             double toHold = career.ImpactInS - Career.ImpactHoldS;

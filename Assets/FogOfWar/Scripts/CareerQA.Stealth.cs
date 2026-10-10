@@ -395,8 +395,8 @@ namespace FogOfWar
                     $"stealth: a Dark hull, raider 100,000 km off, never burned: after 2,100 s the chase is {on21} (on; {lose21} left, 60), after 2,200 s {State(lb, le)} (gone), heard \"{said}\"; sink {lb.C.SinkK:0.000000} K (5.2556 ± 1e-3, 2,200 quiet chase seconds)");
                 var roll = SigRoll(lb);
                 lb.Tick(3600);
-                Check(roll.Draws == 0 && lb.C.Call == null && lb.C.Encounter == null,
-                    $"stealth: one update of 3,600 s after the loss, the roll that always hits: {roll.Draws} draws (0; the gap holds for 0.5 d), call {(lb.C.Call == null ? "none" : lb.C.Call.Kind.ToString())} (none), chase {State(lb, le)} (gone)");
+                Check(roll.Draws == 0 && Reported(lb.C, said) && lb.C.Encounter == null,
+                    $"stealth: one update of 3,600 s after the loss, the roll that always hits: {roll.Draws} draws (0; the gap holds for 0.5 d), call {(lb.C.Call == null ? "none" : lb.C.Call.Kind.ToString())} (Report, the loss its cause), chase {State(lb, le)} (gone)");
 
                 // a stock hull has fixed radiators: nothing to hide, the raider keeps the track
                 var sb = Keep(SigBench(qs, at, vel));

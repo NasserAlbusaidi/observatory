@@ -149,9 +149,10 @@ namespace FogOfWar
             if (go) go = Guard("shells give up", () =>
             {
                 string rep = s.TestCallCardReport(), pill = s.TestRaiderPill();
-                Check(clicked && career.Encounter == null && career.Call == null && job.Pay == pay * (1 - Career.GiveUpShare) && rep.StartsWith("card None") && pill == "-"
-                      && ship.Target == null && !sys.Bodies.Contains(e.Proxy),
-                    $"shells: Give up through the card's button: pay {pay:N0} → {job.Pay:N0} cr, the card and the pill gone, the raider target released ({rep})");
+                Check(clicked && career.Encounter == null && Reported(career, career.Notes.FindLast(n => n.What == Career.Happening.RaiderGone).Text) && job.Pay == pay * (1 - Career.GiveUpShare)
+                      && rep.StartsWith("card Flex") && pill == "-" && ship.Target == null && !sys.Bodies.Contains(e.Proxy),
+                    $"shells: Give up through the card's button: pay {pay:N0} → {job.Pay:N0} cr, the after-action card in its place ({career.Call?.Kind.ToString() ?? "none"}), the pill gone, the raider target released ({rep})");
+                career.Answer(Career.RouteAnswer.Close, jd);
 
                 // a second call: the Jobs page, which covers the card, shows the chase and the card's own answers
                 e = null; call = null;
@@ -223,8 +224,9 @@ namespace FogOfWar
             if (go) go = Guard("shells classic give up", () =>
             {
                 string drawn = Get<string>("classicDrawn");
-                Check(career.Encounter == null && job.Pay == pay * (1 - Career.GiveUpShare) && drawn == "" && Get<int>("classicClick") == -1,
-                    $"shells: Give up from the classic panel: pay {pay:N0} → {job.Pay:N0} cr, the block gone (\"{drawn}\")");
+                Check(career.Encounter == null && job.Pay == pay * (1 - Career.GiveUpShare) && drawn == "Close" && career.Call?.Kind == Career.RouteKind.Report && Get<int>("classicClick") == -1,
+                    $"shells: Give up from the classic panel: pay {pay:N0} → {job.Pay:N0} cr, the chase's block gone, the after-action card in its place (\"{drawn}\")");
+                career.Answer(Career.RouteAnswer.Close, jd);
                 e = null; call = null;
                 called = SceneCall(Career.RouteKind.Pirate, job, "a third raider call, for the classic panel");
                 e = career.Encounter; call = career.Call;
@@ -380,8 +382,9 @@ namespace FogOfWar
             if (go) Guard("legacy give up", () =>
             {
                 string drawn = Get<string>("classicDrawn");
-                Check(career.Encounter == null && job.Pay == pay * (1 - Career.GiveUpShare) && drawn == "" && Get<int>("classicClick") == -1,
-                    $"shells: Give up from -fowlegacyui's panel: pay {pay:N0} → {job.Pay:N0} cr, the block gone (\"{drawn}\")");
+                Check(career.Encounter == null && job.Pay == pay * (1 - Career.GiveUpShare) && drawn == "Close" && career.Call?.Kind == Career.RouteKind.Report && Get<int>("classicClick") == -1,
+                    $"shells: Give up from -fowlegacyui's panel: pay {pay:N0} → {job.Pay:N0} cr, the chase's block gone, the after-action card in its place (\"{drawn}\")");
+                career.Answer(Career.RouteAnswer.Close, jd);
             });
             Guard("legacy cleanup", () =>
             {

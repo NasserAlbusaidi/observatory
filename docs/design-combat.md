@@ -1188,6 +1188,18 @@ Points 1-5 come from a review of an outside combat audit. Points 6-9 come from t
   - Answers: Continue; Evade (turn for the most bearing mounts, or burn away); Revise (open the planner).
 - Only events the ship's sensors see. A hidden launch gives no card (Phase 2: hidden means absent).
 - One card for each salvo, not one for each missile [design].
+- **A step (agreed 2026-10-10; per event kind, changed 2026-10-10)** [design]:
+  - A step is a factor of 10 in the cap: the gap between two warp settings (`OpenSystemScene.Warps`: 1, 10, 100, 1,000×). The cap is compared before the scene rounds it down to a setting, so a value near a boundary cannot show a card and take it away again.
+  - Each raider event is compared with its own expected time: the last update's time of the same kind, aged by the update's time, under point 1's rule. A card shows when an expected event's cap now is at or below its expected cap ÷ 10: a burn that brings the event a step sooner.
+  - **A launch always shows a card:** an impact where none was expected. One card a salvo.
+  - No other new event shows a card. An event that arrives (aged to 0 s or less) leaves the expected set and shows none: the raider at `FireKm`, an impact. A boarding clock that starts and stops as a mount bears shows none.
+  - The first update of a chase shows none: the raider's call is that card.
+  - So an event that only runs down gives no card: the clock slows as today's cap does. The D11 1× hold gives no card; its salvo had one. The player's own flip and arrival slow the clock and never show a card.
+  - The test is against the expected time, not the player's warp. A player already at 1× gets the launch card too: the card is the decision, not the slowdown.
+  - One card at a time. A new event while a card is open updates that card; it does not stack a second.
+  - **Why not the soonest event of the set** (the first rule, 2026-10-10). A raider that closes from far is near its alongside time when it fires: in QA 20a, a 1 g raider from rest 50,000 km off fires at 4,020 s and is alongside at 4,700 s, so the expected cap at launch is 68× or less. The launch is 21.7× or less (the missile adds the raider's closing speed to its own). That is a ratio near 3, not 10: the first salvo gave no card. The 1,000× → 21.7× example held only for a raider at rest at `FireKm`.
+  - Phase 4 [calc]: the first salvo: a card. The next salvo after an impact: a card. A raider burn that moves its `FireKm` time from 2 h to 5 min, 720× to 30×: a card. A burn that moves an event from 1,500 s to 900 s, 150× to 90×: no card. A new contact hours out: no card.
+  - Before the first salvo the raider nears `FireKm` and the cap slows the clock with no card. Then the launch shows its card. The player sees the clock slow, then gets the decision.
 
 **3. The board shows the fight before the player takes it.**
 - Intercept jobs already post only what the ship can catch (`Catchable`, `Career.Intercept.cs:89`). They give the reaction mass (`NeedTonnes`, `:22`) [code].
@@ -1396,7 +1408,29 @@ Each PR passes `-fowcareer` with 0 FAIL in both shells, and is playable alone. E
 | 5c | 7, 8 | Torpedoes (the player's and the raider's), the reach bubble on the map, the saturation readout. | 5a, 5b |
 | 5d | 5 (Escort, Interceptor) | Player missiles; escort jobs; the Escort and Interceptor doctrines. | 5c |
 
-Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
+**PR 5a: touch and QA list (2026-10-10).** Three commits, each gated: point 1, then point 2, then point 9.
+
+- **Point 1, the cap** (`Career.Pirates.cs`, `WarpCap`). While a chase is on, cap = clamp(t / `EventS`, 1, `ChaseWarp`), `EventS` = 10 s; t the least of the events below; D11's 1× hold stays a floor. `CloseWarp` and `CloseKm` go.
+  - Events, all closed form [design]: the next impact (`ImpactInS`); the raider at `FireKm`, while it has missiles and none in flight; the raider alongside (`InterceptKm`); a boarding (`BoardingSeconds` − `Dwell`, while no mount bears); the player's flip and arrival under a Fast plan.
+  - The raider's times are a lower bound: from its closing speed u, at its full drive a straight at the ship, s = u·t + a·t²/2 over the range left. A bound errs slow, never past the event. The flip and arrival come from `Ship.TripFrom` (flip at (vp − u) / a).
+  - The cap is computed in `Career`, not the scene, so QA can read it. The scene's `CapWarp` keeps rounding the setting down to `Warps`.
+  - **The frame runs at the cap, not at the setting under it** (decided 2026-10-10) [design]. It runs at the cap or the warp asked, the lower (`FrameRate`), as the frame budget already runs a frame under its setting. A frame at the setting would hold the last 100 s before every event at 1×: about 112 s of real time a salvo, not 44 s, and 211 s to the first salvo from 50,000 km, not 67 s [calc]. The HUD shows the rate: "Chase: running at 21×". The two-body coast still needs the 1,000× setting.
+  - **The give-back covers every cut the cap makes** [design]. 4c gave the warp back after the 1× hold, because its cap jumped from 100× to 1×. A cap that falls with t takes the warp down one setting at a time, so 4c's rule never fired. Now, as the cap rises after an event, the scene gives back what the cap took, the setting and the rate, up to the warp it took it from, in the same chase. It stops when anything else moves the warp: the player, `DropWarp`, a card.
+  - The chase label's "close" (`RaiderHud.cs:214`) goes with `CloseKm`: it reads "in range" inside `FireKm`.
+  - QA (rewritten, not dropped): `CareerQA.Pirates.cs` 109-126 and 494-499, `CareerQA.RaiderModel.cs:165`, `CareerQA.MissileFx.cs` 103 and 163 assert the new cap. `RunNote` says "Time slows as the raider closes" in place of a fixed 1,000×. 18a and 18b also check that each frame ran at the cap. New: the bound against a numeric step of the raider's flight (it is never later); the cap at launch 21.7× (217 s); the flip event under a Fast plan.
+- **Point 2, the card** (`Career.Threat.cs`, `RouteKind.Threat`). After `Volley`, inside `Contacts`, the career keeps the last update's raider events as (kind, seconds), ages them by the update's time, drops those at 0 s or less, and compares each kind with its own (the step rule above).
+  - A launch, as built: "Missiles inbound. 2 missiles inbound from astern, 2,000 km. Impact in 3 min 37 s. It can be alongside in 1 h 10 min; you reach Vesta in 2 h: it catches you first", or "you get there first" (`CatchNow` against the Fast plan's `TripFrom` to the target; "No plan flying" with none; "It is alongside" once it is). A burn change: "The Lamprey closes. The Lamprey changed its burn, 256,000 km off. In missile range (2,000 km) in 5 min at the soonest", then the plan.
+  - Divert from the Jobs page drops a Threat card too: its plan line is the old plan's.
+  - Answers [design]: **Continue** (close the card) and **Revise** (close it and open the console's Nav tab, the trip planner; in the classic panel the planner is already on the panel, so it only closes). **Evade waits for 5c**, with the saturation readout (point 8): a mount-bearing attitude under a flying plan is new autopilot work. Divert and Give up stay on the Jobs page (`ChaseAnswers`).
+  - The card replaces an unanswered raider call card. `DropContact` drops a Threat card with the chase. It drops the warp to 1× (`DropWarp`).
+  - QA: a raider flown by its own Pursue from far, as 20a flies it (a salvo placed by hand cannot show the first rule's defect): the first and second salvo each give one card; the countdown to an impact gives none; a burn change a step sooner gives one; the card's lines; Continue and Revise in both shells; the raider card replaced. (A hidden raider is not a case: a raider in a chase is always shown.)
+- **Point 9, the after-action card** (`Career.Report.cs`, `RouteKind.Report`). `Fire` opens a `SalvoLog` on the `Encounter` (count, launch range); `Strike` adds each arrival to it: the aspect, the mounts that bore, a PDC kill, and the hit notes it said, in order. Every `EndContact` (all nine ends) puts the card up after `DropContact`, with one line a salvo and the end's note as the cause. One answer: **Close**. A load (`LostContact`) gives no card.
+  - As built: title "After action: the Lamprey"; lines "Salvo 1: 2 missiles from 1,991 km, in at the tail. 2 mounts bore, then 1. PDCs killed 1. Hit: a PDC mount, 5 of 6 working.", then the cause, "PDCs: the raider breaks off, back to Pallas.". A chase with no salvo reads "The Lamprey fired no missiles."; a salvo still in flight at the end, "none arrived before the end".
+  - Left out [design]: the doc's "14 s after the flip" needs a flip time the career does not keep. Missiles put in flight by hand (QA only) share one entry with no launch range.
+  - The Report card does not drop the warp and does not block a new call: a new call replaces it. `RouteTick`'s drop rule (the job over) does not apply to it.
+  - QA: a chase with 6 mounts, seeded: the lines match the notes and the recorded aspects; each end gives its cause; a load gives no card; both shells draw it.
+
+Settled before 5a: "a step" in point 2 (2026-10-10). Open before 5b: the bounty's kill rule (D15 says the raider takes no damage; a runner must). Open before 5c: torpedo numbers (g, endurance, price, mass) and D13 (the plume).
 
 ## Impact effects (added 2026-10-10)
 

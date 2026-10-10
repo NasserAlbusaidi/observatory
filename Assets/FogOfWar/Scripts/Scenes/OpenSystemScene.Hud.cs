@@ -596,8 +596,9 @@ namespace FogOfWar
             Ui.Text(stDate, date.ToString("ddd d MMM yyyy  ·  HH:mm", System.Globalization.CultureInfo.InvariantCulture));
             segWarpTop.Value = warpIdx;
             bool limited = WarpLimitedShown;
-            Ui.Text(stLimited, limited ? $"Limited by the frame budget: running at {Fmt.Num(effectiveWarp, 0)}×" : "");
-            Ui.Show(stLimited, limited);
+            bool chaseRate = !limited && ChaseRateShown;
+            Ui.Text(stLimited, limited ? $"Limited by the frame budget: running at {Fmt.Num(effectiveWarp, 0)}×" : chaseRate ? $"Chase: running at {Fmt.Num(effectiveWarp, 0)}×" : "");
+            Ui.Show(stLimited, limited || chaseRate);
             var refPos = sys.Pos(reference, jd);
             double alt = (ship.Pos - refPos).Mag - reference.Radius;
             Ui.Text(stNear, (ship.Landed != null ? "ON " : "NEAR ") + reference.Name.ToUpperInvariant() + "  ·  " + Km(alt) + (reference == sys.Sun ? " out" : " up"));
