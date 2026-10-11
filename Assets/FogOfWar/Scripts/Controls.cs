@@ -30,11 +30,18 @@ namespace FogOfWar
         public static IEnumerable<Action> All => (Action[])Enum.GetValues(typeof(Action));
         public static KeyCode Get(Action a, int slot) => bind[a][slot];
 
-        // Keys with a fixed job that the rebindable actions can't take (#21): 1–8 pick a scene, Esc menu, F2 and H hide
+        // Digits select 1–10; Shift selects 11–20. Alpha0 precedes Alpha1 in Unity's enum.
+        public static int SceneIndex(KeyCode k, bool shift = false)
+        {
+            int i = k == KeyCode.Alpha0 ? 9 : k >= KeyCode.Alpha1 && k <= KeyCode.Alpha9 ? k - KeyCode.Alpha1 : -1;
+            return i < 0 ? -1 : i + (shift ? 10 : 0);
+        }
+
+        // Keys with a fixed job that the rebindable actions can't take (#21): 1–9 / 0 pick a scene, Esc menu, F2 and H hide
         // panels, F11 fullscreen.
         public static string FixedUse(KeyCode k)
         {
-            if (k >= KeyCode.Alpha1 && k <= KeyCode.Alpha8) return "picking a scene";
+            if (SceneIndex(k) >= 0) return "picking a scene";
             switch (k)
             {
                 case KeyCode.Escape: return "the menu";
@@ -137,7 +144,7 @@ namespace FogOfWar
         {
             KeyCode.None => "", KeyCode.LeftShift => "L-Shift", KeyCode.LeftControl => "L-Ctrl", KeyCode.Period => ".", KeyCode.Comma => ",",
             KeyCode.LeftBracket => "[", KeyCode.RightBracket => "]", KeyCode.KeypadPlus => "Num +", KeyCode.KeypadMinus => "Num -",
-            KeyCode.Alpha1 => "1", KeyCode.Alpha2 => "2", KeyCode.Alpha3 => "3", KeyCode.Alpha4 => "4", KeyCode.Alpha5 => "5",
+            KeyCode.Alpha0 => "0", KeyCode.Alpha1 => "1", KeyCode.Alpha2 => "2", KeyCode.Alpha3 => "3", KeyCode.Alpha4 => "4", KeyCode.Alpha5 => "5",
             KeyCode.Alpha6 => "6", KeyCode.Alpha7 => "7", KeyCode.Alpha8 => "8", KeyCode.Alpha9 => "9", KeyCode.Escape => "Esc",
             _ => c.ToString(),
         };

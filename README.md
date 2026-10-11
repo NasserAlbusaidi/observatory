@@ -18,7 +18,7 @@
 
 ## OBSERVATORY
 
-**Eight interactive physics models**, each with its assumptions explained.
+**Twenty interactive models**, each with its assumptions explained.
 
 <table>
 <tr>
@@ -34,6 +34,30 @@
 <td align="center"><img src="docs/media/obs-8-meteors.jpg"><br><b>RADIO METEORS</b><br><sub>Catch meteor echoes with an SDR from Muscat</sub></td>
 </tr>
 </table>
+
+Two more experiments are in the scene rail:
+
+- **9 · Three-Body Lab** — three gravitating bodies with fading orbital trails. Try a figure-eight dance, a rotating triangle or a 3:4:5 close encounter, then nudge the launch velocity and replay.
+- **0 · Double Pendulum** — overlay two pendulums with almost identical starting angles. Watch their tips diverge, change gravity, or pause and step through the motion.
+
+Both labs have deterministic presets, pause/replay, simulation-speed controls and live energy-error readouts. Their assumptions and numerical limits are in [Models and limits](docs/MODEL-FIDELITY.md#chaos-labs).
+
+Ten further exhibits extend the collection:
+
+| Shortcut | Exhibit | Try this |
+|---|---|---|
+| Shift+1 | Lorenz Attractor | Separate two nearly identical trajectories, then turn chaos into a fixed point |
+| Shift+2 | Reaction–Diffusion | Grow spots, maze patterns and coral with feed/removal controls |
+| Shift+3 | Wave Interference | Shift two sources out of phase and drop a pulse into the reflecting tank |
+| Shift+4 | Gravity Assist | Flip a flyby to compare a speed gain and a speed loss |
+| Shift+5 | Lagrange-Point Lab | Nudge an L4/L5 probe and increase the secondary's mass |
+| Shift+6 | Charged Particle | Reverse gyration with charge, then add electric-field drift |
+| Shift+7 | Rutherford Scattering | Fire seventeen trajectories past a repulsive nucleus |
+| Shift+8 | Resonance Bank | Sweep a common drive across nineteen different springs |
+| Shift+9 | Flocking Lab | Turn separation, alignment and cohesion on and off |
+| Shift+0 | Galaxy Encounter | Compare prograde and retrograde encounters with 192 stellar tracers |
+
+All ten include pause, replay, a single model step, playback speed and live readouts. Parameter changes restart the experiment; seed and pulse buttons act on the running field. Their equations and deliberate simplifications are documented in [Additional exhibits](docs/MODEL-FIDELITY.md#additional-exhibits).
 
 <p align="center"><sub>The black hole uses geodesic-based lensing with numerical tracing and lens tables. Moving emission uses snapshot time; the disk is an idealized model. Each scene's limits are in <a href="docs/MODEL-FIDELITY.md">Models and limits</a>.</sub></p>
 
@@ -55,7 +79,7 @@ These scenes started in the game [Fog of War](https://github.com/NasserAlbusaidi
 <br>
 
 <table>
-<tr><td><b>Pick a scene</b></td><td>1–8</td></tr>
+<tr><td><b>Pick a scene</b></td><td>1–9 / 0 for scenes 1–10; Shift + digit for 11–20</td></tr>
 <tr><td><b>Orbit · Zoom</b></td><td>Drag · Scroll</td></tr>
 <tr><td><b>Photo mode · Clip · Screenshot</b></td><td>F10 · F9 · F12</td></tr>
 <tr><td><b>Hide panels · Full screen</b></td><td>F2 or H · F11</td></tr>
@@ -63,7 +87,7 @@ These scenes started in the game [Fog of War](https://github.com/NasserAlbusaidi
 <tr><td><b>Menu</b></td><td>Esc</td></tr>
 </table>
 
-Rebind keys in **Esc → Settings → Controls**. 1–8, Esc, F2, H, F11 and the photo-mode camera keys are fixed.
+Rebind keys in **Esc → Settings → Controls**. 1–9, 0, Esc, F2, H, F11 and the photo-mode camera keys are fixed.
 
 </details>
 
@@ -84,6 +108,10 @@ The menu and the program still carry the old "Fog of War" name. A later change r
 `Tools/qa.sh <dir>` builds the program and runs the menu shots (`uishots`) and the scene checks (`qa`). Add `tour`, `bhshots`, `physics` or `gpu` for the scene tour, the black hole shots, the geodesic checks and the GPU-against-reference check.
 
 Full steps, every test flag and the project layout are in the **[developer guide](docs/DEVELOPING.md)**.
+
+The two chaos labs also have a physics-only check that needs PowerShell 7, without Unity: `pwsh -File Tools/check-chaos.ps1`. It compiles and exercises the actual C# models; it does not test rendering or native input.
+
+Run `pwsh -File Tools/check-exhibits.ps1` for the ten additional models and `pwsh -File Tools/check-scenes.ps1` for scene/control logic against test adapters. A native Unity build is still needed to verify rendering, real input and performance.
 
 ---
 

@@ -55,7 +55,7 @@ namespace FogOfWar.UI
             Ui.L(side, "FOG OF WAR", "brand-a", "f-cond");
             Ui.L(side, "OBSERVATORY", "brand-b", "f-condm");
             Ui.E(side, "brand-rule");
-            Ui.L(side, "Eight physics models, with their limits explained.", "tagline");
+            Ui.L(side, $"{app.SceneCount} interactive models, with their limits explained.", "tagline");
 
             Ui.MenuItem(side, "Resume", () => app.ShowMenu(MenuNone));
             Ui.MenuItem(side, "Scenes", () => app.ShowMenu(MenuObservatory));
@@ -89,7 +89,7 @@ namespace FogOfWar.UI
 
         void BuildObservatory(VisualElement host)
         {
-            var card = Ui.Panel(host, "Scenes", "Eight physics models, with their limits explained", true, "menu-card");
+            var card = Ui.Panel(host, "Scenes", $"{app.SceneCount} interactive models, with their limits explained", true, "menu-card");
             var sv = Ui.NewScroll();
             card.Add(sv);
             for (int i = 0; i < app.SceneCount; i++)
@@ -200,7 +200,7 @@ namespace FogOfWar.UI
                 }
             }
             Ui.Section(c, "Fixed keys");
-            Ui.L(c, "1–9 attitude holds (off, prograde, retrograde, normal, anti-normal, radial out, radial in, target, anti-target) · Esc menu · F2 hide the HUD · F11 fullscreen. These keys can't be assigned to other actions.", "t-note");
+            Ui.L(c, "Digits 1–9 / 0 pick scenes 1–10; Shift + digit picks 11–20 · Esc menu · F2 or H hide the HUD · F11 fullscreen. These keys can't be assigned to other actions.", "t-note");
             var row2 = Ui.E(c, "row");
             row2.style.marginTop = 10;
             Ui.B(row2, "Reset to defaults", () => { Controls.ResetDefaults(); app.CancelRebind(); }, "danger");
@@ -309,14 +309,17 @@ namespace FogOfWar.UI
             Ui.L(rail, "OBSERVATORY", "rail-brand-b", "f-condm");
             var p = Ui.Panel(rail, null, null, true, "soft");
             p.style.paddingLeft = 0; p.style.paddingRight = 0; p.style.paddingTop = 6; p.style.paddingBottom = 6;
+            p.style.flexShrink = 1;
+            var sv = Ui.NewScroll();
+            p.Add(sv);
             for (int i = 0; i < app.SceneCount; i++)
             {
                 int k = i;
                 var s = app.SceneAt(i);
-                var item = Ui.E(p, "scene-item");
+                var item = Ui.E(sv.contentContainer, "scene-item");
                 item.RegisterCallback<ClickEvent>(_ => app.Activate(k));
                 var head = Ui.E(item, "row");
-                Ui.L(head, (i + 1).ToString(), "t-label", "f-mono").style.marginRight = 8;
+                Ui.L(head, (i + 1).ToString("00"), "t-label", "f-mono").style.marginRight = 8;
                 Ui.L(head, s.Title.ToUpperInvariant(), "t-h3", "f-cond");
                 Ui.L(item, s.Short, "t-note");
                 railItems.Add(item);
@@ -325,6 +328,11 @@ namespace FogOfWar.UI
             back.RegisterCallback<ClickEvent>(_ => app.ShowMenu(MenuMain));
             Ui.L(back, "◀  MAIN MENU", "t-h3", "f-cond", "dim");
             Ui.Fontify(rail);
+            if (app.CurrentIndex >= 0 && app.CurrentIndex < railItems.Count)
+            {
+                var selected = railItems[app.CurrentIndex];
+                sv.schedule.Execute(() => sv.ScrollTo(selected)).StartingIn(16);
+            }
         }
 
         void UpdateRail()
@@ -349,7 +357,7 @@ namespace FogOfWar.UI
             hintKey = key;
             hintBar.Clear();
             Ui.Hint(hintBar, Keys(A.Help), "controls");
-            Ui.Hint(hintBar, "1–8", "scenes");
+            Ui.Hint(hintBar, "1–0 / Shift+1–0", "scenes");
             Ui.Hint(hintBar, "Drag", "orbit");
             Ui.Hint(hintBar, Capture.ShotKey, "screenshot");
             Ui.Hint(hintBar, Capture.PhotoKey, "photo mode");
@@ -401,7 +409,7 @@ namespace FogOfWar.UI
             cap.style.width = Portrait ? Length.Percent(100) : Length.Percent(50);
             cap.style.paddingRight = 18;
             Ui.Section(cap, "Display");
-            foreach (var (k, what) in new[] { ("1–8", "Pick a scene"), ("F2 / H", "Hide the HUD"), ("F11", "Fullscreen"), ("Esc", "Menu") })
+            foreach (var (k, what) in new[] { ("1–0 / Shift+1–0", "Scenes 1–10 / 11–20"), ("F2 / H", "Hide the HUD"), ("F11", "Fullscreen"), ("Esc", "Menu") })
             {
                 var r = Ui.E(cap, "kv");
                 Ui.L(r, what, "t-body");

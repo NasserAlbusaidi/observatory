@@ -13,7 +13,7 @@ How to build and test the Observatory, the repository layout and every data cred
 
 ## The scenes
 
-The program opens on the main menu over the first scene. Keys **1–8**, the scene rail and **Esc → Scenes** switch scenes.
+The program opens on the main menu over the first scene. Keys **1–9 / 0** select scenes 1–10; **Shift + digit** selects scenes 11–20. The scrollable scene rail and **Esc → Scenes** also switch scenes. The rail scrolls to the selected exhibit.
 
 | Key | Scene | Physics |
 |---|---|---|
@@ -25,6 +25,22 @@ The program opens on the main menu over the first scene. Keys **1–8**, the sce
 | 6 | Moon 1,000 km Closer | True-scale tides, month length and Roche-limit breakup |
 | 7 | Terraform Mars | Energy balance, greenhouse optical depth, lapse rate |
 | 8 | Radio Meteors | Forward scatter heard with an SDR from Muscat |
+| 9 | Three-Body Lab | Planar softened Newtonian gravity: figure-eight, rotating triangle and 3:4:5 encounter |
+| 0 | Double Pendulum | Two independent pendulums with a small initial-angle difference; equal masses and rod lengths |
+| Shift+1 | Lorenz Attractor | Three-variable convection system; twin trajectories and variable rho |
+| Shift+2 | Reaction–Diffusion | Gray–Scott chemistry on a periodic 64×64 lattice |
+| Shift+3 | Wave Interference | Damped scalar wave equation, reflecting walls and phase-controlled point drivers |
+| Shift+4 | Gravity Assist | Newtonian flyby with a second inertial-frame velocity comparison |
+| Shift+5 | Lagrange-Point Lab | Planar circular restricted three-body dynamics near L4/L5 |
+| Shift+6 | Charged Particle | Exact nonrelativistic motion in uniform perpendicular electric and magnetic fields |
+| Shift+7 | Rutherford Scattering | Repulsive inverse-square trajectories at varying impact parameters |
+| Shift+8 | Resonance Bank | Nineteen driven damped oscillators, compared with their analytic steady amplitudes |
+| Shift+9 | Flocking Lab | Bounded Reynolds-style steering on a periodic plane |
+| Shift+0 | Galaxy Encounter | Two gravitating cores and 192 massless stellar disk tracers |
+
+In the two labs, **Pause** exposes a single-step button; **Replay** resets time and trails. Changing a starting condition restarts the experiment, while speed and trail visibility leave the physical state intact. The three-body camera can keep all bodies in frame; scrolling switches to manual zoom. **Top view** and **Front view** restore useful camera angles.
+
+Scenes 11–20 share **Pause / Resume**, **Replay**, **Reset view**, **One model step** (while paused) and a **Playback speed** slider. Parameter sliders restart the model; speed and camera controls preserve it. The reaction and wave fields have **Plant seed** and **Drop pulse** actions. Galaxy auto zoom can be disabled by scrolling or its toggle. Charged-particle view follows the particle except in photo mode.
 
 If the black hole or wormhole stutters, set **Ray-trace quality** (Esc → Settings → Graphics) to Fast or Balanced.
 
@@ -70,6 +86,29 @@ The editor checks run in batch mode: `physics` (`FogOfWarPhysicsCheck.Run`: Kerr
 
 Other flags: `-fowhidehud` hides the HUD. `-fowcapturedir <dir>` sends captures somewhere other than Pictures. `-fownobloom` turns the black hole's glare off. `-fowlegacyui` uses the old IMGUI shell.
 
+### Chaos lab checks without Unity
+
+```powershell
+pwsh -NoProfile -File Tools/check-chaos.ps1
+```
+
+This compiles `ThreeBodyModel.cs` and `DoublePendulumModel.cs` directly with PowerShell's C# compiler. The 85 assertions cover conservation over 60 model-time units, preset/nudge extremes, an analytic rotating triangle, an approximate figure-eight return, the pendulum's small-angle normal mode, deterministic replay, twin divergence, timestep refinement and invalid parameters. A failed assertion exits nonzero.
+
+For native checks, the normal `qa`, `tour` and `uishots` suites include both scenes. `-fowqascene 9` and `-fowqascene 10` exercise their controls, including pause, replay, hidden trails and extreme settings. Check **9 / 0** selection, scrolling to the last rail entry on small windows, pause/single-step, scene re-entry and photo mode in a current build. The headless model checks do not establish Unity compilation, visuals, native input or frame rate.
+
+### Additional exhibit and scene checks
+
+```powershell
+pwsh -NoProfile -File Tools/check-exhibits.ps1
+pwsh -NoProfile -File Tools/check-scenes.ps1
+```
+
+The first runner compiles the actual pure C# equations. Fixtures cover Lorenz equilibria and refinement, reaction positivity and periodic transport, wave damping and destructive interference, central-force invariants and gravity-assist direction, L4/L5 equilibria and Jacobi drift, exact Lorentz work-energy balance and drift, analytic forced resonance, deterministic bounded flocking, and galaxy core invariants with finite tracers. See [ModelChecks.cs](../Tools/exhibits/ModelChecks.cs) for parameter ranges, elapsed times and tolerances.
+
+The second compiles the twelve added scenes, their models, `SimScene` and `Controls` against small adapters. It checks all twenty digit mappings, reserved bindings, stable controls, pause/single-step/replay, 30/120 fps trajectories, slider limits, recipes, field actions, bounded geometry and re-entry. The adapters check data passed to meshes/textures; they do not emulate Unity rendering, input dispatch, transforms or native object lifetime.
+
+The native `QA.Steps` now covers all twenty scenes, including extreme controls, paused clocks and replay for the new ten. Use `-fowqascene 11` through `20` to focus it. The portrait/window pass includes both field scenes, flocking and the final rail entry. Also manually verify **Shift+1…Shift+0**, mouse orbit/zoom, rail scrolling, field colours, marker visibility and photo mode. Unity 6000.6.4f1 was unavailable when these exhibits were implemented; native builds, screenshots and frame rate remain unverified.
+
 ## Repository layout
 
 ```
@@ -83,9 +122,12 @@ Assets/FogOfWar/
 Tools/
   blackhole/            Python reference tracer and image checks for the black hole shader
   benchmarks/           reference rays and image comparison for the GPU check
+  chaos/                production-model checks for the first two labs
+  exhibits/             model checks and limited headless scene adapters
 ```
 
 To add a scene, write a `SimScene` subclass in `Scripts/Scenes/` and add it to the list in `FogOfWarApp.Awake`.
+Add its control extremes to `QA.Steps` too. `LabScene` provides shared playback, bounded batched markers/lines and optional scalar-field drawing for small exhibits; model equations remain independent of Unity. Digits and Shift+digits cover twenty scenes; the rail and menu use the full scene list.
 
 ## Credits and licence
 
